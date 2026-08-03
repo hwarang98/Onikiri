@@ -52,7 +52,13 @@ namespace Onikiri.EditorTools
 
         private const float IdleFrameRate = 10f;
 
-        /// <summary>Player sits left of centre; enemies will walk in from the right.</summary>
+        /// <summary>
+        /// Where the samurai is dropped on the FIRST build only. After that his transform
+        /// is authored in the Scene view and rebuilds preserve it, so this is a seed value
+        /// rather than the live setting. Visible world width is 6.75 units on every target
+        /// phone, so the usable range is roughly -3.375 .. 3.375; he sits left of centre
+        /// because enemies walk in from the right.
+        /// </summary>
         private const float PlayerX = -2.0f;
 
         private const int BackgroundSortingBase = -110;
@@ -219,30 +225,53 @@ namespace Onikiri.EditorTools
 
         // ---------------------------------------------------------------- samurai
 
+        /// <summary>
+        /// Creates the samurai, or refreshes the existing one in place.
+        ///
+        /// The transform is deliberately left alone when the object already exists: where
+        /// the character stands is an art decision made by dragging him in the Scene view,
+        /// and a rebuild must not throw that away. <see cref="PlayerX"/> is only a starting
+        /// position for the very first build.
+        /// </summary>
         private static void BuildSamurai(Transform player, AnimatorController controller)
         {
-            for (int i = player.childCount - 1; i >= 0; i--)
-                Object.DestroyImmediate(player.GetChild(i).gameObject);
+            var existing = player.Find("Samurai");
+            bool isNew = existing == null;
 
-            var go = new GameObject("Samurai");
-            go.transform.SetParent(player, false);
-            // Local Y of zero: the ground anchor supplies the world height, and the sprite
-            // pivot is already on the character's feet.
-            go.transform.localPosition = new Vector3(PlayerX, 0f, 0f);
+            GameObject go;
+            if (isNew)
+            {
+                go = new GameObject("Samurai");
+                go.transform.SetParent(player, false);
+                // Local Y of zero: the ground anchor supplies the world height, and the
+                // sprite pivot is already on the character's feet.
+                go.transform.localPosition = new Vector3(PlayerX, 0f, 0f);
+            }
+            else
+            {
+                go = existing.gameObject;
+            }
 
-            var renderer = go.AddComponent<SpriteRenderer>();
+            var renderer = go.GetComponent<SpriteRenderer>();
+            if (renderer == null) renderer = go.AddComponent<SpriteRenderer>();
+
             var sprites = LoadOrderedSprites(IdleSheet);
             if (sprites.Count > 0) renderer.sprite = sprites[0];
             renderer.sortingOrder = PlayerSortingOrder;
 
             if (controller != null)
             {
-                var animator = go.AddComponent<Animator>();
+                var animator = go.GetComponent<Animator>();
+                if (animator == null) animator = go.AddComponent<Animator>();
                 animator.runtimeAnimatorController = controller;
                 animator.applyRootMotion = false;
                 animator.updateMode = AnimatorUpdateMode.Normal;
                 animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             }
+
+            Debug.Log(isNew
+                ? "[Onikiri] Samurai created at x=" + PlayerX + "."
+                : "[Onikiri] Samurai refreshed, keeping position " + go.transform.localPosition + ".");
         }
 
         // ---------------------------------------------------------------- wiring
