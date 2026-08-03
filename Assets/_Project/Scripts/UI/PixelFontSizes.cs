@@ -31,6 +31,15 @@ namespace Onikiri.UI
         /// <summary>Headings. Each atlas pixel becomes a 2x2 block.</summary>
         public const float GalmuriLarge = GalmuriAtlasSize * 2;    // 66
 
+        /// <summary>Size the Thaleah face was drawn at (from its legacy bitmap font).</summary>
+        public const int ThaleahDesignSize = 16;
+
+        /// <summary>Size the Thaleah atlas is rasterised at.</summary>
+        public const int ThaleahAtlasSize = 48;
+
+        /// <summary>Damage popups. Latin display face, 1:1 with its atlas.</summary>
+        public const float ThaleahDamage = ThaleahAtlasSize;       // 48
+
         /// <summary>Nearest legal size at or below <paramref name="desired"/>.</summary>
         public static float SnapToMultiple(float desired, int baseSize)
         {

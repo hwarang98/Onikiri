@@ -82,6 +82,9 @@ namespace Onikiri.EditorTools
         private const string KillAudioFolder = "Assets/_Project/Audio/Kills";
 
         private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
+
+        /// <summary>Latin display face used for damage popups, per the handoff spec.</summary>
+        private const string ThaleahFontPath = "Assets/_Project/Art/Fonts/ThaleahFat SDF.asset";
         private const string DamagePrefabPath = PrefabFolder + "/DamageNumber.prefab";
 
         /// <summary>
@@ -311,7 +314,9 @@ namespace Onikiri.EditorTools
         /// </summary>
         private static Onikiri.UI.DamageNumber BuildDamageNumberPrefab()
         {
-            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(GalmuriFontPath);
+            // Thaleah, not Galmuri: damage popups are digits-only and want a chunky Latin
+            // display face. Korean UI stays on Galmuri.
+            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(ThaleahFontPath);
 
             var root = new GameObject("DamageNumber", typeof(RectTransform));
             var rect = (RectTransform)root.transform;
@@ -347,7 +352,7 @@ namespace Onikiri.EditorTools
                 label.font = font;
                 label.fontSharedMaterial = font.material;
             }
-            label.fontSize = Onikiri.UI.PixelFontSizes.GalmuriSmall;   // 1:1 with the atlas
+            label.fontSize = Onikiri.UI.PixelFontSizes.ThaleahDamage;   // 1:1 with the atlas
             label.alignment = TMPro.TextAlignmentOptions.Center;
             label.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
             label.raycastTarget = false;

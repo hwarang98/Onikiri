@@ -16,25 +16,34 @@ namespace Onikiri.EditorTools
     /// </summary>
     public static class FontProofSheet
     {
-        private const string FontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
+        private const string GalmuriPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
+        private const string ThaleahPath = "Assets/_Project/Art/Fonts/ThaleahFat SDF.asset";
         private const string OutputPath = "Assets/Screenshots/font_proof.png";
 
-        private static readonly string[] Lines =
+        private struct ProofLine
         {
-            "귀참 키우기",
-            "공격력 강화",
-            "12.3K"
+            public string Text;
+            public bool UseThaleah;
+            public float Size;
+        }
+
+        private static readonly ProofLine[] Lines =
+        {
+            new ProofLine { Text = "귀참 키우기",  UseThaleah = false, Size = 33f },
+            new ProofLine { Text = "공격력 강화",  UseThaleah = false, Size = 33f },
+            new ProofLine { Text = "12.3K",        UseThaleah = false, Size = 33f },
+            new ProofLine { Text = "12.3K  4.7M",  UseThaleah = true,  Size = 48f }
         };
 
         [MenuItem("Onikiri/Art/Render Font Proof Sheet")]
         public static void Render()
         {
-            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-            if (font == null) { Debug.LogError("[Onikiri] Font asset missing: " + FontPath); return; }
+            var galmuri = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriPath);
+            var thaleah = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(ThaleahPath);
+            if (galmuri == null) { Debug.LogError("[Onikiri] Font asset missing: " + GalmuriPath); return; }
 
-            const int fontSize = 33;   // 11 x 3
-            const int width = 420;
-            const int height = 200;
+            const int width = 460;
+            const int height = 260;
             const int zoom = 3;        // magnify afterwards to inspect the pixel edges
 
             var root = new GameObject("~FontProof");
@@ -63,11 +72,13 @@ namespace Onikiri.EditorTools
                 var labelObject = new GameObject("Line" + i, typeof(RectTransform));
                 labelObject.transform.SetParent(canvasObject.transform, false);
 
+                var chosen = Lines[i].UseThaleah && thaleah != null ? thaleah : galmuri;
+
                 var label = labelObject.AddComponent<TextMeshProUGUI>();
-                label.font = font;
-                label.fontSharedMaterial = font.material;
-                label.fontSize = fontSize;
-                label.text = Lines[i];
+                label.font = chosen;
+                label.fontSharedMaterial = chosen.material;
+                label.fontSize = Lines[i].Size;
+                label.text = Lines[i].Text;
                 label.color = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
                 label.alignment = TextAlignmentOptions.Left;
 
@@ -113,7 +124,8 @@ namespace Onikiri.EditorTools
             Object.DestroyImmediate(renderTexture);
 
             AssetDatabase.Refresh();
-            Debug.Log("[Onikiri] Font proof rendered at " + fontSize + "px, magnified " + zoom + "x -> " + OutputPath);
+            Debug.Log("[Onikiri] Font proof rendered (Galmuri 33px, Thaleah 48px), magnified "
+                      + zoom + "x -> " + OutputPath);
         }
     }
 }

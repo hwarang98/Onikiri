@@ -56,13 +56,30 @@ namespace Onikiri.EditorTools
         /// </summary>
         public const int GalmuriSampleMultiple = 3;
 
+        /// <summary>
+        /// Size the Thaleah face was drawn at, taken from the legacy bitmap font that ships
+        /// alongside it (ThaleahFat.fontsettings, m_FontSize: 16).
+        /// </summary>
+        public const int ThaleahDesignSize = 16;
+        public const int ThaleahSampleMultiple = 3;
+
+        /// <summary>
+        /// Thaleah is a Latin display face used only for damage popups, so it only needs
+        /// digits, separators and the magnitude suffixes NumberFormatter emits. Feeding it
+        /// the full UI charset would just log a warning per missing Hangul glyph.
+        /// </summary>
+        private const string NumberCharset =
+            "0123456789.,+-x" +
+            "KMBT" +
+            "abcdefghijklmnopqrstuvwxyz";
+
         [MenuItem("Onikiri/Art/Build Pixel Font Assets")]
         public static void BuildAll()
         {
             FontCharsetBuilder.Rebuild();
             var charset = FontCharsetBuilder.LoadCharset();
 
-            // Sampled at 3x the 11px design size, not at 11.
+            // Sampled at 3x the design size, not at the design size.
             //
             // Rasterising the outline at exactly 11 produces glyph bitmaps one pixel
             // shorter than the metrics TMP builds quads from, so every glyph gets stretched
@@ -70,20 +87,30 @@ namespace Onikiri.EditorTools
             // A pixel font's outlines are axis-aligned rectangles, so rasterising at an
             // integer multiple yields exact NxN blocks and the rounding error becomes
             // negligible. Display size then matches the sampling size 1:1.
-            Build("Galmuri11", GalmuriDesignSize * GalmuriSampleMultiple, charset);
+            Build(GalmuriSourcePath, "Galmuri11",
+                  GalmuriDesignSize * GalmuriSampleMultiple, charset);
+
+            Build(ThaleahSourcePath, "ThaleahFat",
+                  ThaleahDesignSize * ThaleahSampleMultiple, NumberCharset);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
 
+        private const string GalmuriSourcePath = FontFolder + "/Galmuri11.ttf";
+
+        /// <summary>Imported from the Asset Store package, left where it landed.</summary>
+        private const string ThaleahSourcePath =
+            "Assets/Thaleah_PixelFont/Materials/ThaleahFat_TTF.ttf";
+
         /// <summary>
-        /// Bakes one font. <paramref name="designPointSize"/> must be the size the face was
-        /// drawn at - Galmuri11 is an 11px face, so sampling at anything else resamples the
-        /// bitmap and destroys it.
+        /// Bakes one font. <paramref name="samplingPointSize"/> must be a whole multiple of
+        /// the size the face was drawn at, and display sizes must then match it or a
+        /// multiple of it.
         /// </summary>
-        public static TMP_FontAsset Build(string fontName, int designPointSize, string charset)
+        public static TMP_FontAsset Build(string sourcePath, string fontName,
+                                          int samplingPointSize, string charset)
         {
-            string sourcePath = FontFolder + "/" + fontName + ".ttf";
             var sourceFont = AssetDatabase.LoadAssetAtPath<Font>(sourcePath);
             if (sourceFont == null)
             {
@@ -91,6 +118,7 @@ namespace Onikiri.EditorTools
                 return null;
             }
 
+            int designPointSize = samplingPointSize;
             string outputPath = OutputFolder + "/" + fontName + " SDF.asset";
             // Named "<font> SDF" only because that is the convention TMP tooling expects;
             // the contents are a raster atlas.
