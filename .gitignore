@@ -108,3 +108,7 @@ InitTestScene*.unity*
 
 # JetBrains Rider / IntelliJ project directory
 .idea/
+
+# Generated verification screenshots
+/[Aa]ssets/Screenshots/
+/[Aa]ssets/Screenshots.meta

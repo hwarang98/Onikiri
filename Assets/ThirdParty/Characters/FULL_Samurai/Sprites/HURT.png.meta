@@ -55,11 +55,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -138,19 +138,19 @@ TextureImporter:
       name: HURT_0
       rect:
         serializedVersion: 2
-        x: 34
-        y: 14
-        width: 25
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4083e2270dff09130800000000000000
+      spriteID: f7ce06e2d9d3481418f37b17a4260393
       internalID: 3571635775238715396
       vertices: []
       indices: 
@@ -160,19 +160,19 @@ TextureImporter:
       name: HURT_1
       rect:
         serializedVersion: 2
-        x: 130
-        y: 14
-        width: 25
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 86e90f40b593115a0800000000000000
+      spriteID: 9045d960d33ffea45beecf3f3e6c7cc5
       internalID: -6552392919759675800
       vertices: []
       indices: 
@@ -182,19 +182,19 @@ TextureImporter:
       name: HURT_2
       rect:
         serializedVersion: 2
-        x: 227
-        y: 14
-        width: 24
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 6a18ca575fea3d5c0800000000000000
+      spriteID: 5682117a402ec28438a5682055ff832a
       internalID: -4191814458887339610
       vertices: []
       indices: 
@@ -204,19 +204,19 @@ TextureImporter:
       name: HURT_3
       rect:
         serializedVersion: 2
-        x: 324
-        y: 14
-        width: 21
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 288
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: bfcfc4aef95a8d0b0800000000000000
+      spriteID: 3a32cfd64f0ed78478587b607ae5805a
       internalID: -5703626821815436037
       vertices: []
       indices: 

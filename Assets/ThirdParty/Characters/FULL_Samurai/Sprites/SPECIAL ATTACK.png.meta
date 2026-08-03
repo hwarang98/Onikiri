@@ -85,11 +85,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -165,309 +165,309 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: SPECIAL ATTACK_0
+      name: SPECIAL_ATTACK_0
       rect:
         serializedVersion: 2
-        x: 36
-        y: 14
-        width: 21
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 776268c1a7ea20b10800000000000000
-      internalID: 1946309828465272439
+      spriteID: be038094f8f301544b431c4346a3bfbf
+      internalID: 1277205664
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_1
+      name: SPECIAL_ATTACK_1
       rect:
         serializedVersion: 2
-        x: 131
-        y: 14
-        width: 21
-        height: 33
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 98b5a3c34e70c0090800000000000000
-      internalID: -8067064155683005559
+      spriteID: 6a828ad35ea6a2941aa529f52d71057c
+      internalID: -959222652
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_2
+      name: SPECIAL_ATTACK_2
       rect:
         serializedVersion: 2
-        x: 231
-        y: 14
-        width: 23
-        height: 31
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f6e5f2040e66d9090800000000000000
-      internalID: -8026145847568802193
+      spriteID: 6c0cc354da95c7648accb37bb358967b
+      internalID: -1907010792
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_3
+      name: SPECIAL_ATTACK_3
       rect:
         serializedVersion: 2
-        x: 327
-        y: 14
-        width: 23
-        height: 31
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 288
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 5eee422eb4261c450800000000000000
-      internalID: 6107270647747243749
+      spriteID: b29198b41cab3f4479feb3f2dd7e056b
+      internalID: 2076957264
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_4
+      name: SPECIAL_ATTACK_4
       rect:
         serializedVersion: 2
-        x: 423
-        y: 14
-        width: 24
-        height: 30
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4c8cc1eb0fbad1a30800000000000000
-      internalID: 4187692278994487492
+      spriteID: 0edbdaa44e792134da41ce4bc3e56af8
+      internalID: -1255956487
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_5
+      name: SPECIAL_ATTACK_5
       rect:
         serializedVersion: 2
-        x: 517
-        y: 15
-        width: 45
-        height: 81
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 480
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 87676b546c3f9c8e0800000000000000
-      internalID: -1672537753692768648
+      spriteID: 8b9567f993f369842b9e2efbe4d0b67d
+      internalID: 1001556637
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_6
+      name: SPECIAL_ATTACK_6
       rect:
         serializedVersion: 2
-        x: 614
-        y: 42
-        width: 43
-        height: 54
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 576
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: afbc25ef95f922770800000000000000
-      internalID: 8584599048589331450
+      spriteID: 11b707535f89b0d4aa885632d5f6a683
+      internalID: 1450923751
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_7
+      name: SPECIAL_ATTACK_7
       rect:
         serializedVersion: 2
-        x: 711
-        y: 43
-        width: 27
-        height: 43
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 672
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f9c4884d2b2b7af90800000000000000
-      internalID: -6942383819428705121
+      spriteID: b2ab6876d119b23498d302d5f74c8875
+      internalID: 1934079832
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_8
+      name: SPECIAL_ATTACK_8
       rect:
         serializedVersion: 2
-        x: 807
-        y: 41
-        width: 27
-        height: 43
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 768
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 8fbde1c6e152863e0800000000000000
-      internalID: -2060356016928793608
+      spriteID: 6d3c8b7553d8bc24ba198535af87194f
+      internalID: -905372402
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_9
+      name: SPECIAL_ATTACK_9
       rect:
         serializedVersion: 2
-        x: 903
-        y: 24
-        width: 25
-        height: 39
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 864
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: a69e957433876a220800000000000000
-      internalID: 2496815205059258730
+      spriteID: b63da1fcf77af4d44883ff0dbcd5770a
+      internalID: -846468337
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_10
+      name: SPECIAL_ATTACK_10
       rect:
         serializedVersion: 2
-        x: 987
-        y: 14
-        width: 51
-        height: 32
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 960
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 492796688bf4a7cc0800000000000000
-      internalID: -3712567288865918316
+      spriteID: f6ae31ac56142df4c9d37d3dcca9e0a9
+      internalID: 1839456038
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_11
+      name: SPECIAL_ATTACK_11
       rect:
         serializedVersion: 2
-        x: 1081
-        y: 14
-        width: 55
-        height: 30
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1056
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 2e2470a7bf04fb690800000000000000
-      internalID: -7584271798640360734
+      spriteID: 6f7e899d19c127342a35ed123348f3c0
+      internalID: 385521342
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_12
+      name: SPECIAL_ATTACK_12
       rect:
         serializedVersion: 2
-        x: 1175
-        y: 14
-        width: 59
-        height: 31
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1152
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: db879c5c421de6d20800000000000000
-      internalID: 3273783935012272317
+      spriteID: e380b98da7daaa34db2f813a113e436e
+      internalID: 2073309260
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: SPECIAL ATTACK_13
+      name: SPECIAL_ATTACK_13
       rect:
         serializedVersion: 2
-        x: 1270
-        y: 14
-        width: 61
-        height: 31
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1248
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 916c437b9e3cab140800000000000000
-      internalID: 4736313366701983257
+      spriteID: 107454297335be047b6b1225b60ad561
+      internalID: 663380714
       vertices: []
       indices: 
       edges: []
@@ -486,20 +486,20 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      SPECIAL ATTACK_0: 1946309828465272439
-      SPECIAL ATTACK_1: -8067064155683005559
-      SPECIAL ATTACK_10: -3712567288865918316
-      SPECIAL ATTACK_11: -7584271798640360734
-      SPECIAL ATTACK_12: 3273783935012272317
-      SPECIAL ATTACK_13: 4736313366701983257
-      SPECIAL ATTACK_2: -8026145847568802193
-      SPECIAL ATTACK_3: 6107270647747243749
-      SPECIAL ATTACK_4: 4187692278994487492
-      SPECIAL ATTACK_5: -1672537753692768648
-      SPECIAL ATTACK_6: 8584599048589331450
-      SPECIAL ATTACK_7: -6942383819428705121
-      SPECIAL ATTACK_8: -2060356016928793608
-      SPECIAL ATTACK_9: 2496815205059258730
+      SPECIAL_ATTACK_0: 1277205664
+      SPECIAL_ATTACK_1: -959222652
+      SPECIAL_ATTACK_10: 1839456038
+      SPECIAL_ATTACK_11: 385521342
+      SPECIAL_ATTACK_12: 2073309260
+      SPECIAL_ATTACK_13: 663380714
+      SPECIAL_ATTACK_2: -1907010792
+      SPECIAL_ATTACK_3: 2076957264
+      SPECIAL_ATTACK_4: -1255956487
+      SPECIAL_ATTACK_5: 1001556637
+      SPECIAL_ATTACK_6: 1450923751
+      SPECIAL_ATTACK_7: 1934079832
+      SPECIAL_ATTACK_8: -905372402
+      SPECIAL_ATTACK_9: -846468337
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

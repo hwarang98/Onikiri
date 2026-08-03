@@ -52,11 +52,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -132,67 +132,67 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: WALL CONTACT_0
+      name: WALL_CONTACT_0
       rect:
         serializedVersion: 2
-        x: 40
-        y: 25
-        width: 21
-        height: 40
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 6e6cb443e59551a40800000000000000
-      internalID: 5338271194456770278
+      spriteID: fdc2d8a9ac31c864e891e443f5f65e21
+      internalID: -634416624
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: WALL CONTACT_1
+      name: WALL_CONTACT_1
       rect:
         serializedVersion: 2
-        x: 136
-        y: 26
-        width: 22
-        height: 38
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: bafd61579f37d5a20800000000000000
-      internalID: 3052723637675548587
+      spriteID: 440281265f0b4d844a467a6766573da3
+      internalID: -1746809229
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: WALL CONTACT_2
+      name: WALL_CONTACT_2
       rect:
         serializedVersion: 2
-        x: 233
-        y: 26
-        width: 23
-        height: 38
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 7ea773d2123eae0d0800000000000000
-      internalID: -3392649637638210841
+      spriteID: 0923ae1a89d1ca245a2cfb9474923e03
+      internalID: 674692078
       vertices: []
       indices: 
       edges: []
@@ -211,9 +211,9 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      WALL CONTACT_0: 5338271194456770278
-      WALL CONTACT_1: 3052723637675548587
-      WALL CONTACT_2: -3392649637638210841
+      WALL_CONTACT_0: -634416624
+      WALL_CONTACT_1: -1746809229
+      WALL_CONTACT_2: 674692078
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

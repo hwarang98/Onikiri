@@ -67,11 +67,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -150,19 +150,19 @@ TextureImporter:
       name: CLIMBING_0
       rect:
         serializedVersion: 2
-        x: 22
+        x: 0
         y: 0
-        width: 22
-        height: 39
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f51bc944f9aa7bdb0800000000000000
+      spriteID: 3caac554a777fe644a8faf52e60e61a5
       internalID: -4776161278775479969
       vertices: []
       indices: 
@@ -172,19 +172,19 @@ TextureImporter:
       name: CLIMBING_1
       rect:
         serializedVersion: 2
-        x: 118
+        x: 96
         y: 0
-        width: 22
-        height: 39
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 411e711430f39c6f0800000000000000
+      spriteID: 5677ec1d87cbb684f9476681d2c2d56d
       internalID: -663930186850901740
       vertices: []
       indices: 
@@ -194,19 +194,19 @@ TextureImporter:
       name: CLIMBING_2
       rect:
         serializedVersion: 2
-        x: 215
-        y: 8
-        width: 21
-        height: 37
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d24924ef6411ff680800000000000000
+      spriteID: 4f29358069018a741982c080d3804936
       internalID: -8719231356954831827
       vertices: []
       indices: 
@@ -216,19 +216,19 @@ TextureImporter:
       name: CLIMBING_3
       rect:
         serializedVersion: 2
-        x: 312
-        y: 22
-        width: 24
-        height: 33
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 288
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 9fb18b67e12e79ab0800000000000000
+      spriteID: 37ff407b91d838f4289e1b9eb47d34e2
       internalID: -5001280240702972935
       vertices: []
       indices: 
@@ -238,19 +238,19 @@ TextureImporter:
       name: CLIMBING_4
       rect:
         serializedVersion: 2
-        x: 413
-        y: 23
-        width: 28
-        height: 35
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d8693a01c3d41a0c0800000000000000
+      spriteID: 92a1520579580aa44a93aef4d4868a3b
       internalID: -4566283626804439411
       vertices: []
       indices: 
@@ -260,19 +260,19 @@ TextureImporter:
       name: CLIMBING_5
       rect:
         serializedVersion: 2
-        x: 509
-        y: 26
-        width: 28
-        height: 34
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 480
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d31b9a5515e73cad0800000000000000
+      spriteID: 784c196d2d33e274d91373b6c31b2a95
       internalID: -2683162065188048579
       vertices: []
       indices: 
@@ -282,19 +282,19 @@ TextureImporter:
       name: CLIMBING_6
       rect:
         serializedVersion: 2
-        x: 607
-        y: 31
-        width: 27
-        height: 32
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 576
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 3eac0efbb4999cee0800000000000000
+      spriteID: 5c4dd738c42606d4eafabe6cf47b149e
       internalID: -1240291671743083805
       vertices: []
       indices: 
@@ -304,19 +304,19 @@ TextureImporter:
       name: CLIMBING_7
       rect:
         serializedVersion: 2
-        x: 704
-        y: 36
-        width: 26
-        height: 29
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 672
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: aa9f5e6a15ef80ea0800000000000000
+      spriteID: 4c4f577253548d54d9865b5342c5e999
       internalID: -5906191284650509910
       vertices: []
       indices: 

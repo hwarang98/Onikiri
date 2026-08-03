@@ -88,11 +88,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -171,19 +171,19 @@ TextureImporter:
       name: HEALING_0
       rect:
         serializedVersion: 2
-        x: 36
-        y: 14
-        width: 21
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 73239b8e418b38440800000000000000
+      spriteID: 766c5ac8623244d4f8a6f7babe6a6123
       internalID: 4936992016471503415
       vertices: []
       indices: 
@@ -193,19 +193,19 @@ TextureImporter:
       name: HEALING_1
       rect:
         serializedVersion: 2
-        x: 132
-        y: 14
-        width: 26
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4661c0f6cbbb3d9c0800000000000000
+      spriteID: 81871fb78ddd06c44b0c360af324d67c
       internalID: -3903570034008779164
       vertices: []
       indices: 
@@ -215,19 +215,19 @@ TextureImporter:
       name: HEALING_2
       rect:
         serializedVersion: 2
-        x: 228
-        y: 14
-        width: 26
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: dbde1fbc818657200800000000000000
+      spriteID: 90b3d0d17086bc04a9ffc813601da06b
       internalID: 177162216061136317
       vertices: []
       indices: 
@@ -237,19 +237,19 @@ TextureImporter:
       name: HEALING_3
       rect:
         serializedVersion: 2
-        x: 324
-        y: 14
-        width: 25
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 288
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 994bcd770adf1fd40800000000000000
+      spriteID: c6a8f50192230af44941d96009511bc5
       internalID: 5616549075955266713
       vertices: []
       indices: 
@@ -259,19 +259,19 @@ TextureImporter:
       name: HEALING_4
       rect:
         serializedVersion: 2
-        x: 420
-        y: 14
-        width: 22
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 81683cd07216da090800000000000000
+      spriteID: 0a678a4d2f43aa449b08683a59ebc9cc
       internalID: -8021648540914448872
       vertices: []
       indices: 
@@ -281,19 +281,19 @@ TextureImporter:
       name: HEALING_5
       rect:
         serializedVersion: 2
-        x: 516
-        y: 14
-        width: 22
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 480
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 30f531af86b3d2ff0800000000000000
+      spriteID: d91b2d7964af45b4688ae8700a796e6d
       internalID: -59325898027737341
       vertices: []
       indices: 
@@ -303,19 +303,19 @@ TextureImporter:
       name: HEALING_6
       rect:
         serializedVersion: 2
-        x: 612
-        y: 14
-        width: 22
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 576
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: ef8b4bcb4cfc7dbc0800000000000000
+      spriteID: fff8c1aa23e454e429cbfe99169eada4
       internalID: -3758306920130889474
       vertices: []
       indices: 
@@ -325,19 +325,19 @@ TextureImporter:
       name: HEALING_7
       rect:
         serializedVersion: 2
-        x: 708
-        y: 14
-        width: 22
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 672
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: de7353faced563080800000000000000
+      spriteID: f50457903f8d49145b78cbaf5cfb3c38
       internalID: -9208069116979234835
       vertices: []
       indices: 
@@ -347,19 +347,19 @@ TextureImporter:
       name: HEALING_8
       rect:
         serializedVersion: 2
-        x: 804
-        y: 14
-        width: 24
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 768
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: bc4a1936f7bf746c0800000000000000
+      spriteID: b128e6ab9b794c84e9796ed4c0390eeb
       internalID: -4159079206303456053
       vertices: []
       indices: 
@@ -369,19 +369,19 @@ TextureImporter:
       name: HEALING_9
       rect:
         serializedVersion: 2
-        x: 900
-        y: 14
-        width: 27
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 864
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c478506590a478af0800000000000000
+      spriteID: 9b6df5a8af76d1c49a63ac93980c96f2
       internalID: -394265038413265076
       vertices: []
       indices: 
@@ -391,19 +391,19 @@ TextureImporter:
       name: HEALING_10
       rect:
         serializedVersion: 2
-        x: 996
-        y: 14
-        width: 26
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 960
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: e7fe6070e8a1f89b0800000000000000
+      spriteID: c26256f90ec1c624392e12404bdc4ba4
       internalID: -5075809057717686402
       vertices: []
       indices: 
@@ -413,19 +413,19 @@ TextureImporter:
       name: HEALING_11
       rect:
         serializedVersion: 2
-        x: 1092
-        y: 14
-        width: 26
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1056
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4b01907c900808110800000000000000
+      spriteID: d0a06a9772339ca4691409c2d4469ef3
       internalID: 1261148675146059956
       vertices: []
       indices: 
@@ -435,19 +435,19 @@ TextureImporter:
       name: HEALING_12
       rect:
         serializedVersion: 2
-        x: 1188
-        y: 14
-        width: 23
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1152
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 38cfe89f6d58e81d0800000000000000
+      spriteID: c7a7d699d5da45f4eadde9f48d5592d6
       internalID: -3346590314733306749
       vertices: []
       indices: 
@@ -457,19 +457,19 @@ TextureImporter:
       name: HEALING_13
       rect:
         serializedVersion: 2
-        x: 1284
-        y: 14
-        width: 21
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1248
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 105ffe6d427b66f20800000000000000
+      spriteID: 41414dab9a7de094bb75bee741588a58
       internalID: 3415618736259855617
       vertices: []
       indices: 
@@ -479,19 +479,19 @@ TextureImporter:
       name: HEALING_14
       rect:
         serializedVersion: 2
-        x: 1380
-        y: 14
-        width: 21
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1344
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 15807b382638c5350800000000000000
+      spriteID: 551e523cc504e82438a399c8981b5f66
       internalID: 6006820462145243217
       vertices: []
       indices: 

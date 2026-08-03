@@ -52,11 +52,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -135,19 +135,19 @@ TextureImporter:
       name: JUMP-FALL_0
       rect:
         serializedVersion: 2
-        x: 31
-        y: 15
-        width: 28
-        height: 38
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d37963fdd890433c0800000000000000
+      spriteID: d465a9a8a2c73a64b9a00707f31734fd
       internalID: -4380866032584714435
       vertices: []
       indices: 
@@ -157,19 +157,19 @@ TextureImporter:
       name: JUMP-FALL_1
       rect:
         serializedVersion: 2
-        x: 127
-        y: 15
-        width: 28
-        height: 38
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: abc1218eed69ffa20800000000000000
+      spriteID: a8ff69a50c1aa1a4baa3a6e30f99e4ff
       internalID: 3098360952774597818
       vertices: []
       indices: 
@@ -179,19 +179,19 @@ TextureImporter:
       name: JUMP-FALL_2
       rect:
         serializedVersion: 2
-        x: 223
-        y: 15
-        width: 28
-        height: 38
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: b6c97e47365680cc0800000000000000
+      spriteID: eeca16dc961021c4d9e48aa5c93bdf0f
       internalID: -3744631612321063829
       vertices: []
       indices: 

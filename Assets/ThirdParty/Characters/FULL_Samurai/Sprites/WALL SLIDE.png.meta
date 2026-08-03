@@ -52,11 +52,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -132,67 +132,67 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: WALL SLIDE_0
+      name: WALL_SLIDE_0
       rect:
         serializedVersion: 2
-        x: 41
-        y: 25
-        width: 23
-        height: 43
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: b34e6fc7db3c088d0800000000000000
-      internalID: -2846059745885363141
+      spriteID: d9e8044368a58c34fb4ada1ab8f68aec
+      internalID: 1261086167
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: WALL SLIDE_1
+      name: WALL_SLIDE_1
       rect:
         serializedVersion: 2
-        x: 137
-        y: 25
-        width: 23
-        height: 45
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 59e00ab341f5b8dd0800000000000000
-      internalID: -2482786229060366699
+      spriteID: 76df442366cb8964a9625fc5181e4f05
+      internalID: -1391864890
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: WALL SLIDE_2
+      name: WALL_SLIDE_2
       rect:
         serializedVersion: 2
-        x: 233
-        y: 25
-        width: 23
-        height: 47
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15625}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c4c6406de142f3530800000000000000
-      internalID: 3836825122401184844
+      spriteID: 0bbebe71702eea24c87c40560871c04a
+      internalID: -1428646949
       vertices: []
       indices: 
       edges: []
@@ -211,9 +211,9 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      WALL SLIDE_0: -2846059745885363141
-      WALL SLIDE_1: -2482786229060366699
-      WALL SLIDE_2: 3836825122401184844
+      WALL_SLIDE_0: 1261086167
+      WALL_SLIDE_1: -1391864890
+      WALL_SLIDE_2: -1428646949
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
