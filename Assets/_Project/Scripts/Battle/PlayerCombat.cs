@@ -73,6 +73,11 @@ namespace Onikiri.Battle
         private State state = State.Idle;
         private float cooldownRemaining;
         private float stateTimer;
+
+        /// <summary>Authored length of the swing, before attack speed compresses it.</summary>
+        private float baseAttackDuration;
+
+        /// <summary>Length of the swing currently playing.</summary>
         private float attackDuration;
         private bool impactDelivered;
         private Enemy currentTarget;
@@ -84,9 +89,10 @@ namespace Onikiri.Battle
             if (vfxParent == null) vfxParent = transform;
             if (slashPrefab != null) slashPool = new ObjectPool<SlashVfx>(slashPrefab, vfxParent, slashPrewarm);
 
-            attackDuration = attackFrames != null && attackFrames.Length > 0
+            baseAttackDuration = attackFrames != null && attackFrames.Length > 0
                 ? attackFrames.Length / attackFrameRate
                 : 0.4f;
+            attackDuration = baseAttackDuration;
         }
 
         private void Start()
@@ -128,10 +134,23 @@ namespace Onikiri.Battle
             state = State.Winding;
             stateTimer = 0f;
             impactDelivered = false;
-            cooldownRemaining = 1f / Mathf.Max(0.01f, attacksPerSecond);
+
+            float interval = 1f / Mathf.Max(0.01f, attacksPerSecond);
+            cooldownRemaining = interval;
+
+            // The swing has to fit inside the attack interval, otherwise the animation
+            // becomes the real rate cap: a 7-frame swing at 14fps takes 0.5s, so the
+            // samurai would top out at 2 attacks/sec no matter how high the stat went -
+            // and attack speed is a core upgrade axis that has to keep mattering into the
+            // double digits. Compressing the clip also reads correctly: faster stat,
+            // visibly faster swing.
+            attackDuration = Mathf.Min(baseAttackDuration, interval);
 
             if (attackFrames != null && attackFrames.Length > 0)
-                animator.Play(attackFrames, attackFrameRate, false);
+            {
+                float rate = attackFrames.Length / Mathf.Max(0.0001f, attackDuration);
+                animator.Play(attackFrames, rate, false);
+            }
         }
 
         /// <summary>The frame the blade lands: effect, damage and freeze together.</summary>

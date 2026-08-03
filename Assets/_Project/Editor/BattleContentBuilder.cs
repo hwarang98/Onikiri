@@ -77,9 +77,37 @@ namespace Onikiri.EditorTools
         private const string EnemyPrefabPath = PrefabFolder + "/Enemy.prefab";
         private const string SlashPrefabPath = PrefabFolder + "/SlashVfx.prefab";
 
-        /// <summary>Impact sounds are auto-wired from here once the files exist.</summary>
+        /// <summary>
+        /// Extra sounds dropped in by hand are picked up from these folders, on top of the
+        /// curated banks below.
+        /// </summary>
         private const string HitAudioFolder = "Assets/_Project/Audio/Hits";
         private const string KillAudioFolder = "Assets/_Project/Audio/Kills";
+
+        private const string SfxRoot = "Assets/Leohpaz/RPG_Essentials_Free/";
+
+        /// <summary>
+        /// Impact bank, chosen from the RPG Essentials pack.
+        ///
+        /// Picked by hand rather than by scanning a folder: which sounds read as "katana
+        /// into yokai" is a design call, and the pack also contains menu clicks and
+        /// footsteps that must never end up here. Mixed lengths (one 1.3s slash against
+        /// three 0.7s impacts) give the rotation some natural variety on top of the pitch
+        /// randomisation.
+        /// </summary>
+        private static readonly string[] HitClipPaths =
+        {
+            SfxRoot + "10_Battle_SFX/22_Slash_04.wav",
+            SfxRoot + "10_Battle_SFX/15_Impact_flesh_02.wav",
+            SfxRoot + "10_Battle_SFX/77_flesh_02.wav",
+            SfxRoot + "12_Player_Movement_SFX/61_Hit_03.wav"
+        };
+
+        /// <summary>Kill bank. The pack ships one death sound and it is the right one.</summary>
+        private static readonly string[] KillClipPaths =
+        {
+            SfxRoot + "10_Battle_SFX/69_Enemy_death_01.wav"
+        };
 
         private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
 
@@ -411,8 +439,15 @@ namespace Onikiri.EditorTools
             var audio = battle.GetComponent<HitAudio>();
             if (audio == null) audio = battle.AddComponent<HitAudio>();
 
-            var hits = LoadClips(HitAudioFolder);
-            var kills = LoadClips(KillAudioFolder);
+            var hits = LoadClipList(HitClipPaths);
+            var kills = LoadClipList(KillClipPaths);
+
+            // Anything hand-dropped into the audio folders is added on top of the curated set.
+            hits.AddRange(LoadClips(HitAudioFolder));
+            kills.AddRange(LoadClips(KillAudioFolder));
+
+            ApplyOneShotImportSettings(hits);
+            ApplyOneShotImportSettings(kills);
 
             var so = new SerializedObject(audio);
             AssignClips(so.FindProperty("hitClips"), hits);
@@ -425,13 +460,64 @@ namespace Onikiri.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
 
             if (hits.Count == 0)
-                Debug.LogWarning("[Onikiri] No hit sounds in " + HitAudioFolder +
-                                 " - combat is silent. Drop .wav files there and rebuild.");
+                Debug.LogWarning("[Onikiri] No hit sounds found - combat is silent.");
             else
                 Debug.Log("[Onikiri] Sounds wired: " + hits.Count + " hit, " + kills.Count + " kill" +
-                          (kills.Count == 0 ? " (kills fall back to pitched-down hits)" : ""));
+                          (kills.Count == 0 ? " (kills fall back to pitched-down hits)" : "") +
+                          " - mono ADPCM, decompress on load.");
 
             return audio;
+        }
+
+        private static List<AudioClip> LoadClipList(string[] paths)
+        {
+            var clips = new List<AudioClip>();
+            foreach (var path in paths)
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+                if (clip == null) { Debug.LogWarning("[Onikiri] Sound not found: " + path); continue; }
+                clips.Add(clip);
+            }
+            return clips;
+        }
+
+        /// <summary>
+        /// Mobile import settings for short one-shots.
+        ///
+        /// The pack ships 44.1kHz stereo Vorbis, which is wrong on all three counts here:
+        /// these play at spatialBlend 0 so the second channel is thrown away, and Vorbis
+        /// costs a decode on every load for clips under a second. Mono ADPCM decompressed
+        /// on load is the standard recipe - roughly a quarter of the memory and no decode
+        /// cost at play time, which matters when this fires ten times a second late game.
+        /// </summary>
+        private static void ApplyOneShotImportSettings(List<AudioClip> clips)
+        {
+            foreach (var clip in clips)
+            {
+                var path = AssetDatabase.GetAssetPath(clip);
+                var importer = AssetImporter.GetAtPath(path) as AudioImporter;
+                if (importer == null) continue;
+
+                var settings = importer.defaultSampleSettings;
+                bool changed = false;
+
+                if (!importer.forceToMono) { importer.forceToMono = true; changed = true; }
+                if (importer.loadInBackground) { importer.loadInBackground = false; changed = true; }
+
+                // preloadAudioData moved onto the per-platform sample settings.
+                if (settings.loadType != AudioClipLoadType.DecompressOnLoad ||
+                    settings.compressionFormat != AudioCompressionFormat.ADPCM ||
+                    !settings.preloadAudioData)
+                {
+                    settings.loadType = AudioClipLoadType.DecompressOnLoad;
+                    settings.compressionFormat = AudioCompressionFormat.ADPCM;
+                    settings.preloadAudioData = true;
+                    importer.defaultSampleSettings = settings;
+                    changed = true;
+                }
+
+                if (changed) importer.SaveAndReimport();
+            }
         }
 
         private static List<AudioClip> LoadClips(string folder)

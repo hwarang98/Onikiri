@@ -144,7 +144,7 @@ Transform:
   m_GameObject: {fileID: 222233081}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.80416745, z: 0}
+  m_LocalPosition: {x: 0, y: -0.86812514, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -312,7 +312,7 @@ Transform:
   m_GameObject: {fileID: 328582445}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.05416745, z: 0}
+  m_LocalPosition: {x: 0, y: -0.11812514, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -822,7 +822,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 2
-  m_Size: {x: 9.5, y: 18.083334}
+  m_Size: {x: 10.025, y: 19.3625}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -1908,8 +1908,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0580b0ce1dae3374b9657a1d3e58792f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.HitAudio
-  hitClips: []
-  killClips: []
+  hitClips:
+  - {fileID: 8300000, guid: 88b1cbe3caa3fee4b8b103b5edd7aba9, type: 3}
+  - {fileID: 8300000, guid: 7c47b20bb9874304a809dc5580d403ba, type: 3}
+  - {fileID: 8300000, guid: 2b21ef916f6943c439b71a7c74568878, type: 3}
+  - {fileID: 8300000, guid: 8b23b175a78d6b5458322e3a6c9905d0, type: 3}
+  killClips:
+  - {fileID: 8300000, guid: 566d2ea6240b489479a6e9fd608c2621, type: 3}
   voices: 4
   minHitInterval: 0.04
   minKillInterval: 0.02
