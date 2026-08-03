@@ -76,7 +76,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 0
@@ -159,19 +159,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_0
       rect:
         serializedVersion: 2
-        x: 70
-        y: 72
-        width: 47
-        height: 29
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 84ff72707559e5bf0800000000000000
+      spriteID: b0d2616d6ba841546997327d85c1657d
       internalID: -333665121364082872
       vertices: []
       indices: 
@@ -181,19 +181,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_1
       rect:
         serializedVersion: 2
-        x: 144
-        y: 72
-        width: 38
-        height: 35
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 64
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 0c9cb7ce9cd415f20800000000000000
+      spriteID: 160d6f5e124bd4f41b346ae5f751aab1
       internalID: 3409591922547476928
       vertices: []
       indices: 
@@ -203,19 +203,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_2
       rect:
         serializedVersion: 2
-        x: 208
-        y: 88
-        width: 37
-        height: 18
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 1e663ba9a470c8230800000000000000
+      spriteID: 2b39128706803d2459b79e351adc2595
       internalID: 3642294215640311521
       vertices: []
       indices: 
@@ -225,19 +225,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_3
       rect:
         serializedVersion: 2
-        x: 261
-        y: 96
-        width: 25
-        height: 21
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 9f49c7640be490120800000000000000
+      spriteID: 56d2f8ce66ddeaa4db3b21ccbf557ae9
       internalID: 2380520397045798137
       vertices: []
       indices: 
@@ -247,19 +247,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_4
       rect:
         serializedVersion: 2
-        x: 272
-        y: 96
-        width: 29
-        height: 10
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 08ef08c0b540812b0800000000000000
+      spriteID: 91e02252900952a40a67cd40bf326eb6
       internalID: -5613732146419007872
       vertices: []
       indices: 
@@ -269,19 +269,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_5
       rect:
         serializedVersion: 2
-        x: 6
-        y: 72
-        width: 15
-        height: 15
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: b1b79bfeef0ebbfe0800000000000000
+      spriteID: 4573f6a3bb3c35242aa428082d27d5ce
       internalID: -1172095892451656933
       vertices: []
       indices: 
@@ -291,19 +291,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_6
       rect:
         serializedVersion: 2
-        x: 15
-        y: 72
-        width: 15
-        height: 16
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 64
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 3f3a5ecb3c346e300800000000000000
+      spriteID: f9f5ca48a837d094686cf130bc635ec6
       internalID: 280986534724084723
       vertices: []
       indices: 
@@ -313,19 +313,19 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_7
       rect:
         serializedVersion: 2
-        x: 8
-        y: 28
-        width: 49
-        height: 25
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4c6ac49fb504147b0800000000000000
+      spriteID: 782741d1298f5af4aba3796c896e8df0
       internalID: -5241837727513794876
       vertices: []
       indices: 
@@ -335,64 +335,20 @@ TextureImporter:
       name: Slash_64x64_Slash1_color4_8
       rect:
         serializedVersion: 2
-        x: 80
-        y: 10
-        width: 42
-        height: 44
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.4921875, y: 0.484375}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 9c49943507a0ae770800000000000000
+      spriteID: f57dc8279a912344cba7c61f495d032e
       internalID: 8640730312613663945
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slash_64x64_Slash1_color4_9
-      rect:
-        serializedVersion: 2
-        x: 154
-        y: 10
-        width: 31
-        height: 41
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: defebc1e06b3c1930800000000000000
-      internalID: 4115229446800928749
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slash_64x64_Slash1_color4_10
-      rect:
-        serializedVersion: 2
-        x: 218
-        y: 10
-        width: 31
-        height: 31
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: a647b26d3d65cc6b0800000000000000
-      internalID: -5274745595726433174
       vertices: []
       indices: 
       edges: []
@@ -413,7 +369,6 @@ TextureImporter:
     nameFileIdTable:
       Slash_64x64_Slash1_color4_0: -333665121364082872
       Slash_64x64_Slash1_color4_1: 3409591922547476928
-      Slash_64x64_Slash1_color4_10: -5274745595726433174
       Slash_64x64_Slash1_color4_2: 3642294215640311521
       Slash_64x64_Slash1_color4_3: 2380520397045798137
       Slash_64x64_Slash1_color4_4: -5613732146419007872
@@ -421,7 +376,6 @@ TextureImporter:
       Slash_64x64_Slash1_color4_6: 280986534724084723
       Slash_64x64_Slash1_color4_7: -5241837727513794876
       Slash_64x64_Slash1_color4_8: 8640730312613663945
-      Slash_64x64_Slash1_color4_9: 4115229446800928749
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

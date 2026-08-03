@@ -67,7 +67,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 0
@@ -150,19 +150,19 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_0
       rect:
         serializedVersion: 2
-        x: 6
-        y: 67
-        width: 26
-        height: 16
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4c86a788640ba1170800000000000000
+      spriteID: 7d58964fab6a30643806f6a67ad87b8a
       internalID: 8150020292664256708
       vertices: []
       indices: 
@@ -172,19 +172,19 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_1
       rect:
         serializedVersion: 2
-        x: 72
-        y: 65
-        width: 40
-        height: 18
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 64
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 10343e5aad6a4d4c0800000000000000
+      spriteID: 10bc915e0c91bf64196d022db615736e
       internalID: -4263599489196801279
       vertices: []
       indices: 
@@ -194,19 +194,19 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_2
       rect:
         serializedVersion: 2
-        x: 137
-        y: 65
-        width: 48
-        height: 42
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 653d1879d905cbb00800000000000000
+      spriteID: 0d56ca56fd1b28341815e1f6a2f88c02
       internalID: 845639467820766038
       vertices: []
       indices: 
@@ -216,19 +216,19 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_3
       rect:
         serializedVersion: 2
-        x: 206
-        y: 65
-        width: 47
-        height: 63
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 593633f694b5ac3a0800000000000000
+      spriteID: 252114b7cc000644f921ca4e75bc9bc8
       internalID: -6644397929275366507
       vertices: []
       indices: 
@@ -238,19 +238,19 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_4
       rect:
         serializedVersion: 2
-        x: 270
-        y: 81
-        width: 31
-        height: 47
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 64
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: abd0e8874e881ec60800000000000000
+      spriteID: 095c6d64b2875614088908e3d18ca163
       internalID: 7845702540712611258
       vertices: []
       indices: 
@@ -260,19 +260,19 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_5
       rect:
         serializedVersion: 2
-        x: 14
-        y: 33
-        width: 17
-        height: 31
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f83a41d6e0ac3c330800000000000000
+      spriteID: 4afe52aaea92a25498ce716205a823c8
       internalID: 3730047079701324687
       vertices: []
       indices: 
@@ -282,42 +282,20 @@ TextureImporter:
       name: Slash_64x64_Slash2_color4_6
       rect:
         serializedVersion: 2
-        x: 27
-        y: 24
-        width: 14
-        height: 19
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 64
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5234375, y: 0.5078125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c6647c2682b83b7d0800000000000000
+      spriteID: 697682e669e95bf439842d181128d6c5
       internalID: -2903824329151658388
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slash_64x64_Slash2_color4_7
-      rect:
-        serializedVersion: 2
-        x: 78
-        y: 39
-        width: 15
-        height: 25
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 73bc8da8eb4304890800000000000000
-      internalID: -7475917388457129161
       vertices: []
       indices: 
       edges: []
@@ -343,7 +321,6 @@ TextureImporter:
       Slash_64x64_Slash2_color4_4: 7845702540712611258
       Slash_64x64_Slash2_color4_5: 3730047079701324687
       Slash_64x64_Slash2_color4_6: -2903824329151658388
-      Slash_64x64_Slash2_color4_7: -7475917388457129161
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -31,6 +31,10 @@ namespace Onikiri.Battle
         [SerializeField] private float groundSurfacePixels = 30f;
         [Tooltip("Source pixel height of the background art, used to report vertical coverage.")]
         [SerializeField] private float backgroundPixelHeight = 180f;
+        [Tooltip("Tiled sky quad sized to cover the whole camera, behind every parallax layer.")]
+        [SerializeField] private SpriteRenderer skyFill;
+        [Tooltip("Extra world units of sky beyond the camera edges, to hide rounding at the seams.")]
+        [SerializeField] private float skyOverscan = 1f;
 
         /// <summary>World Y of the surface characters stand on.</summary>
         public float GroundY { get; private set; }
@@ -66,7 +70,13 @@ namespace Onikiri.Battle
             // Deliberately recomputed every frame rather than only on resolution change.
             // Caching the first result latched a bad value captured before the canvas and
             // camera had settled, and nothing ever corrected it.
-            Band = MeasureBand(screenWidth, screenHeight);
+            int pixelRatio = BattleLayout.PixelRatio(
+                screenWidth, screenHeight, DisplayConfig.ReferenceWidth, DisplayConfig.ReferenceHeight);
+            float cameraWorldHeight = BattleLayout.CameraWorldHeight(
+                screenHeight, pixelRatio, DisplayConfig.PixelsPerUnit);
+            float cameraWorldWidth = screenWidth / (float)(pixelRatio * DisplayConfig.PixelsPerUnit);
+
+            Band = MeasureBand(screenHeight, cameraWorldHeight);
             GroundY = BattleLayout.GroundY(Band, groundSurfacePixels, DisplayConfig.PixelsPerUnit);
 
             float backgroundTop = Band.Bottom + backgroundPixelHeight / DisplayConfig.PixelsPerUnit;
@@ -74,6 +84,36 @@ namespace Onikiri.Battle
 
             if (backgroundRoot != null) SetY(backgroundRoot, Band.Bottom);
             if (groundAnchor != null) SetY(groundAnchor, GroundY);
+
+            UpdateSkyFill(cameraWorldWidth, cameraWorldHeight);
+        }
+
+        /// <summary>
+        /// Sizes the sky quad to cover the entire camera view.
+        ///
+        /// Previously the area above the 180px background was just the camera clear colour
+        /// happening to match Sky.png. That works only while the sky stays a flat colour -
+        /// the moment anything is drawn into it the trick breaks. Tiling actual sky art
+        /// across the full view removes the dependency, and because the source is a uniform
+        /// tone the repeat is invisible.
+        /// </summary>
+        private void UpdateSkyFill(float cameraWorldWidth, float cameraWorldHeight)
+        {
+            if (skyFill == null) return;
+
+            if (skyFill.drawMode != SpriteDrawMode.Tiled)
+            {
+                skyFill.drawMode = SpriteDrawMode.Tiled;
+                skyFill.tileMode = SpriteTileMode.Continuous;
+            }
+
+            var size = new Vector2(cameraWorldWidth + skyOverscan * 2f, cameraWorldHeight + skyOverscan * 2f);
+            if ((skyFill.size - size).sqrMagnitude > 0.0001f) skyFill.size = size;
+
+            var cameraPosition = targetCamera.transform.position;
+            var desired = new Vector3(cameraPosition.x, cameraPosition.y, skyFill.transform.position.z);
+            if ((skyFill.transform.position - desired).sqrMagnitude > 0.0001f)
+                skyFill.transform.position = desired;
         }
 
         /// <summary>
@@ -86,7 +126,7 @@ namespace Onikiri.Battle
         /// in edit mode. <see cref="BattleLayout.PixelRatio"/> is verified against Unity's
         /// own pixelRatio at every target resolution.
         /// </summary>
-        private BattleLayout.Band MeasureBand(int screenWidth, int screenHeight)
+        private BattleLayout.Band MeasureBand(int screenHeight, float cameraWorldHeight)
         {
             var corners = new Vector3[4];
             battleArea.GetWorldCorners(corners);
@@ -98,11 +138,6 @@ namespace Onikiri.Battle
 
             float bottomScreenY = RectTransformUtility.WorldToScreenPoint(uiCamera, corners[0]).y;
             float topScreenY = RectTransformUtility.WorldToScreenPoint(uiCamera, corners[1]).y;
-
-            int pixelRatio = BattleLayout.PixelRatio(
-                screenWidth, screenHeight, DisplayConfig.ReferenceWidth, DisplayConfig.ReferenceHeight);
-            float cameraWorldHeight = BattleLayout.CameraWorldHeight(
-                screenHeight, pixelRatio, DisplayConfig.PixelsPerUnit);
             float cameraCenterY = targetCamera.transform.position.y;
 
             return BattleLayout.ComputeBand(bottomScreenY, topScreenY, screenHeight, cameraWorldHeight, cameraCenterY);

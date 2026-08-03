@@ -51,7 +51,14 @@ namespace Onikiri.EditorTools
         public static void Apply(TextureImporter importer)
         {
             importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
+
+            // Never demote an already-sliced sheet back to a single sprite. Doing so
+            // deletes every SpriteRect, which silently breaks every prefab and animation
+            // clip referencing those sprites. Only sheets that have never been sliced get
+            // the Single default.
+            bool alreadySliced = importer.spriteImportMode == SpriteImportMode.Multiple;
+            if (!alreadySliced) importer.spriteImportMode = SpriteImportMode.Single;
+
             importer.spritePixelsPerUnit = PixelsPerUnit;
             importer.filterMode = FilterMode.Point;
             importer.wrapMode = TextureWrapMode.Clamp;
@@ -65,7 +72,9 @@ namespace Onikiri.EditorTools
 
             var settings = new TextureImporterSettings();
             importer.ReadTextureSettings(settings);
-            settings.spriteAlignment = (int)PivotFor(importer.assetPath);
+            // On a sliced sheet the pivot lives per-SpriteRect, and those were authored by
+            // the slicer against measured art. Leave them alone.
+            if (!alreadySliced) settings.spriteAlignment = (int)PivotFor(importer.assetPath);
             settings.spriteMeshType = SpriteMeshType.FullRect;
             settings.spriteExtrude = 0;
             importer.SetTextureSettings(settings);
@@ -85,6 +94,15 @@ namespace Onikiri.EditorTools
             importer.SetPlatformTextureSettings(ps);
         }
 
+        /// <summary>
+        /// Height of the lowest drawn pixel above the bottom of the Feudal Japan enemy
+        /// canvas (92px). Measured across the hover cycle, which only bobs by 1px.
+        /// Without this the enemies float 20px (0.625 units) above the ground, because the
+        /// importer pivots on the canvas edge rather than the art.
+        /// </summary>
+        public const float EnemyArtBottomPixels = 20f;
+        public const float EnemyCanvasPixels = 92f;
+
         public static void Apply(AsepriteImporter importer)
         {
             importer.textureType = TextureImporterType.Sprite;
@@ -94,7 +112,20 @@ namespace Onikiri.EditorTools
             importer.mipmapEnabled = false;
             importer.spriteMeshType = SpriteMeshType.FullRect;
             importer.spriteExtrude = 0;
-            importer.pivotAlignment = PivotFor(importer.assetPath);
+
+            if (importer.assetPath.Contains("/Enemies/"))
+            {
+                // Canvas space keeps every trimmed frame aligned to the original 92x92
+                // artboard, so one pivot value holds for the whole animation.
+                importer.pivotSpace = PivotSpaces.Canvas;
+                importer.pivotAlignment = SpriteAlignment.Custom;
+                importer.customPivotPosition =
+                    new Vector2(0.5f, EnemyArtBottomPixels / EnemyCanvasPixels);
+            }
+            else
+            {
+                importer.pivotAlignment = PivotFor(importer.assetPath);
+            }
             // Aseprite frame tags become animation clips, which is why we import the
             // .aseprite sources for enemies instead of the untagged loose PNG frames.
             importer.generateAnimationClips = true;
