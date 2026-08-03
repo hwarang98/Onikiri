@@ -1,3 +1,4 @@
+using Onikiri.Core;
 using UnityEngine;
 
 namespace Onikiri.Battle
@@ -22,8 +23,16 @@ namespace Onikiri.Battle
 
         public float frameRate = 12f;
 
+        [Header("Spawning")]
+        [Tooltip("Relative chance of this type appearing. Sets the size mix on screen: " +
+                 "small filler types carry a high weight, elites a low one.")]
+        public float spawnWeight = 1f;
+
         [Header("Combat")]
         public float maxHealth = 12f;
+
+        [Tooltip("Gold granted the moment this yokai's health reaches zero.")]
+        public BigDouble goldReward = BigDouble.One;
 
         [Tooltip("World units per second while walking in from the right.")]
         public float moveSpeed = 1.1f;

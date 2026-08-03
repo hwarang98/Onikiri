@@ -20,7 +20,14 @@ namespace Onikiri.Battle
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private SpriteAnimator animator;
 
-        /// <summary>Raised when the death animation finishes. Argument is this enemy.</summary>
+        /// <summary>
+        /// Raised the instant health reaches zero, before the death animation plays.
+        /// Rewards hang off this rather than <see cref="Died"/> so gold lands on the hit
+        /// that killed, not half a second later when the corpse finishes dissolving.
+        /// </summary>
+        public event Action<Enemy> Killed;
+
+        /// <summary>Raised when the death animation finishes and the instance can be recycled.</summary>
         public event Action<Enemy> Died;
 
         private EnemyDefinition definition;
@@ -107,6 +114,9 @@ namespace Onikiri.Battle
             CurrentState = State.Dying;
             spriteRenderer.color = Color.white;
 
+            var killed = Killed;
+            if (killed != null) killed(this);
+
             if (definition.deathFrames != null && definition.deathFrames.Length > 0)
             {
                 animator.Play(definition.deathFrames, definition.frameRate, false, FinishDeath);
@@ -176,6 +186,7 @@ namespace Onikiri.Battle
             CurrentState = State.Inactive;
             animator.Stop();
             Died = null;
+            Killed = null;
         }
     }
 }

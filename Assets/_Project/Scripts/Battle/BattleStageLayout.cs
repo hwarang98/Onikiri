@@ -31,10 +31,25 @@ namespace Onikiri.Battle
         [SerializeField] private float groundSurfacePixels = 30f;
         [Tooltip("Source pixel height of the background art, used to report vertical coverage.")]
         [SerializeField] private float backgroundPixelHeight = 180f;
+        [Tooltip("Optional. When present the layout follows the camera's unshaken position, " +
+                 "so an impact shake actually moves the view instead of cancelling itself out.")]
+        [SerializeField] private ScreenShake cameraShake;
         [Tooltip("Tiled sky quad sized to cover the whole camera, behind every parallax layer.")]
         [SerializeField] private SpriteRenderer skyFill;
         [Tooltip("Extra world units of sky beyond the camera edges, to hide rounding at the seams.")]
         [SerializeField] private float skyOverscan = 1f;
+
+        /// <summary>
+        /// Camera position with any impact shake removed.
+        ///
+        /// Everything here anchors world content to the camera, so following the shaken
+        /// position would move the background in lockstep with the camera and make the
+        /// shake invisible.
+        /// </summary>
+        private Vector3 CameraBasePosition
+        {
+            get { return cameraShake != null ? cameraShake.BasePosition : targetCamera.transform.position; }
+        }
 
         /// <summary>World Y of the surface characters stand on.</summary>
         public float GroundY { get; private set; }
@@ -110,7 +125,7 @@ namespace Onikiri.Battle
             var size = new Vector2(cameraWorldWidth + skyOverscan * 2f, cameraWorldHeight + skyOverscan * 2f);
             if ((skyFill.size - size).sqrMagnitude > 0.0001f) skyFill.size = size;
 
-            var cameraPosition = targetCamera.transform.position;
+            var cameraPosition = CameraBasePosition;
             var desired = new Vector3(cameraPosition.x, cameraPosition.y, skyFill.transform.position.z);
             if ((skyFill.transform.position - desired).sqrMagnitude > 0.0001f)
                 skyFill.transform.position = desired;
@@ -138,7 +153,7 @@ namespace Onikiri.Battle
 
             float bottomScreenY = RectTransformUtility.WorldToScreenPoint(uiCamera, corners[0]).y;
             float topScreenY = RectTransformUtility.WorldToScreenPoint(uiCamera, corners[1]).y;
-            float cameraCenterY = targetCamera.transform.position.y;
+            float cameraCenterY = CameraBasePosition.y;
 
             return BattleLayout.ComputeBand(bottomScreenY, topScreenY, screenHeight, cameraWorldHeight, cameraCenterY);
         }

@@ -80,15 +80,49 @@ namespace Onikiri.Battle
         {
             if (definitions == null || definitions.Length == 0) return;
 
-            var definition = definitions[Random.Range(0, definitions.Length)];
+            var definition = PickDefinition();
+            if (definition == null) return;
+
             var enemy = pool.Get();
 
             // Nearer enemies draw in front of the ones behind them.
             int sorting = SortingOrders.EnemyBase + (active.Count % SortingOrders.EnemySlots);
 
+            enemy.Killed += OnEnemyKilled;
             enemy.Died += OnEnemyDied;
             enemy.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY, sorting);
             active.Add(enemy);
+        }
+
+        /// <summary>
+        /// Weighted pick, so the size mix on screen is authored rather than uniform: small
+        /// filler yokai carry a high weight and elites a low one.
+        /// </summary>
+        private EnemyDefinition PickDefinition()
+        {
+            float total = 0f;
+            for (int i = 0; i < definitions.Length; i++)
+            {
+                if (definitions[i] != null) total += Mathf.Max(0f, definitions[i].spawnWeight);
+            }
+            if (total <= 0f) return definitions[0];
+
+            float roll = Random.Range(0f, total);
+            for (int i = 0; i < definitions.Length; i++)
+            {
+                if (definitions[i] == null) continue;
+                roll -= Mathf.Max(0f, definitions[i].spawnWeight);
+                if (roll <= 0f) return definitions[i];
+            }
+            return definitions[definitions.Length - 1];
+        }
+
+        private void OnEnemyKilled(Enemy enemy)
+        {
+            enemy.Killed -= OnEnemyKilled;
+
+            var wallet = Onikiri.Progression.PlayerWallet.Instance;
+            if (wallet != null && enemy.Definition != null) wallet.Add(enemy.Definition.goldReward);
         }
 
         private void OnEnemyDied(Enemy enemy)

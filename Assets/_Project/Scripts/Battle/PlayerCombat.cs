@@ -41,7 +41,25 @@ namespace Onikiri.Battle
         [SerializeField] private float impactPoint = 0.45f;
 
         [Header("Feel")]
+        [SerializeField] private ScreenShake cameraShake;
+        [SerializeField] private HitAudio hitAudio;
+
+        [Tooltip("Hitstop length at low attack speed, before scaling.")]
         [SerializeField] private float hitStopSeconds = 0.07f;
+
+        [Tooltip("Seconds of hitstop allowed per second of play. Caps the freeze once " +
+                 "attack speed climbs; see CombatFeel.")]
+        [SerializeField] private float hitStopBudgetPerSecond = 0.3f;
+
+        [Tooltip("Shake length at low attack speed, before scaling.")]
+        [SerializeField] private float shakeSeconds = 0.1f;
+
+        [Tooltip("Seconds of shake allowed per second of play.")]
+        [SerializeField] private float shakeBudgetPerSecond = 0.4f;
+
+        [Tooltip("Shake strength in source pixels.")]
+        [SerializeField] private float shakePixels = 3f;
+
         [Tooltip("Where the slash appears, measured from the target towards the samurai.")]
         [SerializeField] private Vector2 slashOffset = new Vector2(-0.15f, 0.55f);
 
@@ -131,7 +149,15 @@ namespace Onikiri.Battle
 
             SpawnSlash(impactPosition);
             currentTarget.TakeDamage(damage);
-            HitStop.Request(hitStopSeconds);
+
+            // All three land on the same frame. The freeze and the shake are both shortened
+            // as attack speed rises so late-game swinging does not become a constant
+            // stutter - see CombatFeel.
+            HitStop.Request(CombatFeel.ScaledDuration(hitStopSeconds, hitStopBudgetPerSecond, attacksPerSecond));
+            ScreenShake.Request(cameraShake,
+                CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond),
+                shakePixels);
+            if (hitAudio != null) hitAudio.PlayHit();
         }
 
         private void SpawnSlash(Vector3 position)

@@ -12,35 +12,39 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
   m_Name: Enemy_Chochin
   m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
-  displayName: Hitodama
+  displayName: Chochin-obake
   idleFrames:
-  - {fileID: 3208615374545953127, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 7358915094208718161, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 3262115250661806795, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -4715639985143046238, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -1866367150087826541, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -4495104759285127431, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -2161625209461272042, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -5148154169953553834, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 4955962575298893352, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -1890714553573336451, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 7027127184969782194, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 148151059788083923, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -6322287156814667007, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -2117281626113365366, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 8368210344236706294, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -4456398528377030394, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 3136938448632525848, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -2619062527539487977, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -6743429893111795510, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 2254721224086879679, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -8105521795945599750, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 5814135891545874005, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 6518954722630835864, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 392686947131252341, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -2256181034632379788, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 250486281289957957, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -8365282006364641672, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 7101612589925819777, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 204383650045084023, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 1679679292852648574, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -5775657986390419533, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -2546484541383549571, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   hurtFrames: []
   deathFrames:
-  - {fileID: 143969792064742435, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 9132941140487187472, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: -1533390363398142786, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 1998794626859793373, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 788642207260049123, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  - {fileID: 4284320474717948680, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 5851640218161731370, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 3398260029828185443, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -2200471799623284286, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 1182361352653400374, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 5900452014663879782, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: -9003274427570385946, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   frameRate: 12
-  maxHealth: 12
-  moveSpeed: 1.1
-  queueSpacing: 1
-  hoverHeight: 0.35
-  artBottomOffset: 1.0625
+  spawnWeight: 1
+  maxHealth: 34
+  goldReward:
+    m: 1.8
+    e: 1
+  moveSpeed: 0.8
+  queueSpacing: 1.5
+  hoverHeight: 0.1
+  artBottomOffset: 0.65625

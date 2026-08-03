@@ -1,7 +1,9 @@
 {
     "name": "Onikiri.Runtime",
     "rootNamespace": "Onikiri",
-    "references": [],
+    "references": [
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
