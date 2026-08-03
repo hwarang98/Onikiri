@@ -16,10 +16,14 @@ namespace Onikiri.EditorTools
     /// </summary>
     public static class BattleContentBuilder
     {
-        private const string EnemyAseprite = "Assets/ThirdParty/Enemies/FeudalJapan/Inimig (1).aseprite";
-        // color2 is the red variant. The pack's default (color1) is bright green, which
-        // fights the ink/red/sakura palette the brief calls for.
-        private const string SlashSheet = "Assets/ThirdParty/VFX/Slashes/Slash_64x64_Slash1_color2.png";
+        // Inimig (4) is a hitodama wisp whose idle art is 32x20px - just under the samurai's
+        // 34px, so a common mob never out-sizes the hero. Inimig (1), the lantern, measures
+        // 47px and reads as an elite; it is kept for a later tier rather than used as trash.
+        private const string EnemyAseprite = "Assets/ThirdParty/Enemies/FeudalJapan/Inimig (4).aseprite";
+        // White slash, generated from the pack's red sheet by collapsing hue to the max
+        // channel. Weapon tiers are planned as white -> red -> gold, so the base blade has
+        // to be white and the coloured sheets stay reserved for upgrades.
+        private const string SlashSheet = "Assets/_Project/Art/VFX/Slash_White.png";
         private const string SamuraiIdle = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/IDLE.png";
         private const string SamuraiAttack = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/ATTACK 1.png";
 
@@ -38,8 +42,10 @@ namespace Onikiri.EditorTools
         // Aseprite tags in this pack are unnamed, so clips arrive as Tag/Tag_0/Tag_1...
         // Identified by inspecting the frames: see the step 4 report.
         private const string IdleClip = "Tag";
-        private const string HurtClip = "Tag_1";
-        private const string DeathClip = "Tag_2";
+        // Inimig (4) ships no hurt tag. Enemy falls back to its colour flash, which reads
+        // fine at this sprite size.
+        private const string HurtClip = null;
+        private const string DeathClip = "Tag_1";
 
         [MenuItem("Onikiri/Scene/Build Combat Content")]
         public static void Build()
@@ -68,7 +74,6 @@ namespace Onikiri.EditorTools
                 return;
             }
 
-            WireSortingAndSky();
             var spawner = WireSpawner(definition, enemyPrefab);
             WirePlayerCombat(spawner, slashPrefab);
 
@@ -91,22 +96,32 @@ namespace Onikiri.EditorTools
                 AssetDatabase.CreateAsset(definition, EnemyDefinitionPath);
             }
 
-            definition.displayName = "Chochin-obake";
+            definition.displayName = "Hitodama";
             definition.idleFrames = FramesFromClip(EnemyAseprite, IdleClip);
             definition.hurtFrames = FramesFromClip(EnemyAseprite, HurtClip);
             definition.deathFrames = FramesFromClip(EnemyAseprite, DeathClip);
             definition.frameRate = 12f;
             definition.maxHealth = 12f;
             definition.moveSpeed = 1.1f;
-            // The lantern art is 36px wide (1.125 units), so anything under that overlaps
-            // the neighbour and the queue reads as one smear instead of separate yokai.
-            definition.queueSpacing = 1.35f;
-            definition.hoverHeight = 0.1f;
+            // Wisp art is 20px wide (0.625 units); this keeps a clear gap between queued
+            // yokai and still fits four of them on the 6.75-unit-wide screen.
+            definition.queueSpacing = 1.0f;
+            // It floats, so it sits clear of the ground rather than standing on it.
+            definition.hoverHeight = 0.35f;
+
+            // Measure where the art actually starts inside its canvas. bounds.min.y is the
+            // distance from the pivot (canvas bottom) to the lowest drawn pixel, which is
+            // exactly the correction Enemy needs to sit the yokai on the ground.
+            definition.artBottomOffset = definition.idleFrames.Length > 0
+                ? definition.idleFrames[0].bounds.min.y
+                : 0f;
 
             EditorUtility.SetDirty(definition);
 
-            Debug.Log(string.Format("[Onikiri] Enemy definition: idle={0} hurt={1} death={2} frames.",
-                definition.idleFrames.Length, definition.hurtFrames.Length, definition.deathFrames.Length));
+            Debug.Log(string.Format(
+                "[Onikiri] Enemy '{0}': idle={1} hurt={2} death={3} frames, artBottomOffset={4:F4} units.",
+                definition.displayName, definition.idleFrames.Length, definition.hurtFrames.Length,
+                definition.deathFrames.Length, definition.artBottomOffset));
 
             return definition;
         }
@@ -118,6 +133,8 @@ namespace Onikiri.EditorTools
         /// </summary>
         private static Sprite[] FramesFromClip(string assetPath, string clipName)
         {
+            if (string.IsNullOrEmpty(clipName)) return new Sprite[0];
+
             AnimationClip clip = null;
             foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
             {
@@ -242,44 +259,6 @@ namespace Onikiri.EditorTools
         /// Applies the explicit sorting order table and lifts the grass layer in front of
         /// the fighters so it crosses their feet.
         /// </summary>
-        private static void WireSortingAndSky()
-        {
-            var background = GameObject.Find("Background");
-            if (background == null) return;
-
-            int order = SortingOrders.BackgroundBase;
-            SpriteRenderer skyRenderer = null;
-
-            foreach (Transform layer in background.transform)
-            {
-                var renderer = layer.GetComponent<SpriteRenderer>();
-                if (renderer == null) continue;
-
-                if (layer.name == "Gras")
-                {
-                    renderer.sortingOrder = SortingOrders.GroundCover;
-                    continue;
-                }
-
-                if (layer.name == "Sky")
-                {
-                    skyRenderer = renderer;
-                    renderer.sortingOrder = SortingOrders.SkyFill;
-                    // Detach from the band-anchored root: the sky is sized to the camera,
-                    // not to the background's bottom edge.
-                    layer.SetParent(background.transform.parent, true);
-                    continue;
-                }
-
-                renderer.sortingOrder = order++;
-            }
-
-            var layout = GameObject.Find("Battle").GetComponent<BattleStageLayout>();
-            var so = new SerializedObject(layout);
-            so.FindProperty("skyFill").objectReferenceValue = skyRenderer;
-            so.ApplyModifiedPropertiesWithoutUndo();
-        }
-
         private static EnemySpawner WireSpawner(EnemyDefinition definition, Enemy enemyPrefab)
         {
             var battle = GameObject.Find("Battle");
@@ -307,7 +286,9 @@ namespace Onikiri.EditorTools
 
             so.FindProperty("targetAlive").intValue = 4;
             so.FindProperty("spawnInterval").floatValue = 1.1f;
-            so.FindProperty("frontLineX").floatValue = -0.75f;
+            // Samurai now stands at -1.2, so the front of the queue moves right with him to
+            // keep a readable gap between the blade and the leading yokai.
+            so.FindProperty("frontLineX").floatValue = 0.05f;
             so.FindProperty("prewarm").intValue = 8;
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -369,8 +350,9 @@ namespace Onikiri.EditorTools
             so.FindProperty("impactPoint").floatValue = 4f / 7f;
             so.FindProperty("hitStopSeconds").floatValue = 0.07f;
             so.FindProperty("slashFrameRate").floatValue = 22f;
-            // Lands on the yokai rather than midway, at roughly its centre of mass.
-            so.FindProperty("slashOffset").vector2Value = new Vector2(-0.2f, 0.45f);
+            // Measured from the yokai's rendered centre, so it only needs to nudge the arc
+            // back towards the blade rather than compensate for pivot placement.
+            so.FindProperty("slashOffset").vector2Value = new Vector2(-0.3f, 0f);
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

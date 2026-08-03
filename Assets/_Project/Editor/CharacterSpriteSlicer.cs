@@ -33,7 +33,11 @@ namespace Onikiri.EditorTools
         /// </summary>
         public const int SlashCell = 64;
 
-        private const string SlashFolder = "Assets/ThirdParty/VFX/Slashes";
+        private static readonly string[] SlashFolders =
+        {
+            "Assets/ThirdParty/VFX/Slashes",
+            "Assets/_Project/Art/VFX"
+        };
 
         [MenuItem("Onikiri/Art/Slice Samurai Sheets")]
         public static void SliceSamurai()
@@ -73,10 +77,11 @@ namespace Onikiri.EditorTools
             try
             {
                 AssetDatabase.StartAssetEditing();
-                foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { SlashFolder }))
+                foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", SlashFolders))
                 {
                     var path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (!path.Contains("64x64")) continue;   // leave the 128 set untouched
+                    // Leave the 128px set untouched; our own recoloured sheets are already 64px.
+                    if (!path.Contains("64x64") && !path.StartsWith("Assets/_Project/Art/VFX")) continue;
 
                     // The drawn arc does not sit in the middle of its 64x64 cell, so a plain
                     // centre pivot throws the effect away from the point it is meant to land

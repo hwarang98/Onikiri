@@ -94,15 +94,6 @@ namespace Onikiri.EditorTools
             importer.SetPlatformTextureSettings(ps);
         }
 
-        /// <summary>
-        /// Height of the lowest drawn pixel above the bottom of the Feudal Japan enemy
-        /// canvas (92px). Measured across the hover cycle, which only bobs by 1px.
-        /// Without this the enemies float 20px (0.625 units) above the ground, because the
-        /// importer pivots on the canvas edge rather than the art.
-        /// </summary>
-        public const float EnemyArtBottomPixels = 20f;
-        public const float EnemyCanvasPixels = 92f;
-
         public static void Apply(AsepriteImporter importer)
         {
             importer.textureType = TextureImporterType.Sprite;
@@ -115,12 +106,16 @@ namespace Onikiri.EditorTools
 
             if (importer.assetPath.Contains("/Enemies/"))
             {
-                // Canvas space keeps every trimmed frame aligned to the original 92x92
-                // artboard, so one pivot value holds for the whole animation.
+                // Canvas space keeps every trimmed frame aligned to the original artboard,
+                // so one pivot holds for a whole animation.
+                //
+                // The pivot is the canvas edge, NOT the art. Where the art sits inside that
+                // canvas varies per yokai (the lantern draws from 20px up, the wisp from
+                // 34px), so trying to bake a feet-line into the import needs a different
+                // number per file. Instead EnemyDefinition measures the offset off the
+                // imported sprite and Enemy compensates at spawn time.
                 importer.pivotSpace = PivotSpaces.Canvas;
-                importer.pivotAlignment = SpriteAlignment.Custom;
-                importer.customPivotPosition =
-                    new Vector2(0.5f, EnemyArtBottomPixels / EnemyCanvasPixels);
+                importer.pivotAlignment = SpriteAlignment.BottomCenter;
             }
             else
             {

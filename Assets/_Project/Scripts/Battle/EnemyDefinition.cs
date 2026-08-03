@@ -34,5 +34,9 @@ namespace Onikiri.Battle
         [Header("Presentation")]
         [Tooltip("Height above the ground line, for yokai that float rather than walk.")]
         public float hoverHeight = 0.12f;
+
+        [Tooltip("World units between the sprite pivot (canvas bottom) and the lowest drawn " +
+                 "pixel. Measured from the art by the build step - do not hand-edit.")]
+        public float artBottomOffset;
     }
 }

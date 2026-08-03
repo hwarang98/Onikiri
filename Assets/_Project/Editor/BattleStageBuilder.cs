@@ -50,8 +50,38 @@ namespace Onikiri.EditorTools
         private const float GroundSurfacePixels = 24f;
         private const float BackgroundPixelHeight = 180f;
 
-        /// <summary>Uniform sky tone of Sky.png; the camera clears to this so tall phones blend.</summary>
-        private static readonly Color SkyColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
+        // ------------------------------------------------------------------ colour grade
+        //
+        // The background packs ship bright and warm, which flattens the scene and lets the
+        // sakura compete with the fighters. Tinting the sprite renderers by depth pushes the
+        // distance darker and cooler and leaves the near ground lightest, so the untinted
+        // characters read as the closest, brightest thing on screen.
+        //
+        // Characters and enemies are deliberately NOT tinted - that separation is the whole
+        // point of the grade.
+
+        /// <summary>Far layers: sky, clouds, Fuji.</summary>
+        private static readonly Color FarTint = new Color32(0x6E, 0x68, 0xA0, 0xFF);
+
+        /// <summary>Mid layers: mountains and tree bands.</summary>
+        private static readonly Color MidTint = new Color32(0x8B, 0x82, 0xB5, 0xFF);
+
+        /// <summary>Near layers: shrine, ground, grass.</summary>
+        private static readonly Color NearTint = new Color32(0xA8, 0x9E, 0xCB, 0xFF);
+
+        /// <summary>Camera clear colour, behind the tinted sky fill.</summary>
+        private static readonly Color ClearColor = new Color32(0x2A, 0x27, 0x40, 0xFF);
+
+        private static readonly string[] FarLayers = { "Sky", "Clouds", "Fuji" };
+        private static readonly string[] NearLayers = { "Shrine_Single", "Shrine_Multiple", "House", "Ground", "Gras" };
+
+        /// <summary>Depth tint for a background layer. Anything unlisted is treated as mid.</summary>
+        public static Color TintFor(string layerName)
+        {
+            foreach (var name in FarLayers) if (name == layerName) return FarTint;
+            foreach (var name in NearLayers) if (name == layerName) return NearTint;
+            return MidTint;
+        }
 
         private const string IdleSheet = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/IDLE.png";
         private const string AnimationFolder = "Assets/_Project/Animation";
@@ -65,12 +95,14 @@ namespace Onikiri.EditorTools
         /// is authored in the Scene view and rebuilds preserve it, so this is a seed value
         /// rather than the live setting. Visible world width is 6.75 units on every target
         /// phone, so the usable range is roughly -3.375 .. 3.375; he sits left of centre
-        /// because enemies walk in from the right.
+        /// because enemies walk in from the right, but far enough right to clear the pagoda
+        /// that sits on the left edge of the background.
         /// </summary>
-        private const float PlayerX = -2.0f;
+        public const float PlayerX = -1.2f;
 
-        private const int BackgroundSortingBase = -110;
-        private const int PlayerSortingOrder = 0;
+        private const string SkyLayerName = "Sky";
+        private const string SkyFillName = "SkyFill";
+        private const string GroundCoverLayerName = "Gras";
 
         [MenuItem("Onikiri/Scene/Build Battle Stage")]
         public static void Build()
@@ -85,7 +117,7 @@ namespace Onikiri.EditorTools
             }
 
             var camera = Camera.main;
-            camera.backgroundColor = SkyColor;
+            camera.backgroundColor = ClearColor;
 
             var backgroundRoot = EnsureChild(battle.transform, "Background");
             var groundAnchor = EnsureChild(battle.transform, "GroundAnchor");
@@ -99,13 +131,13 @@ namespace Onikiri.EditorTools
             var player = EnsureChild(groundAnchor, "Player");
             EnsureChild(groundAnchor, "Enemies");
 
-            BuildBackground(backgroundRoot);
+            var skyFill = BuildBackground(backgroundRoot, battle.transform);
 
             var clip = BuildIdleClip();
             var controller = BuildController(clip);
             BuildSamurai(player, controller);
 
-            WireLayout(battle, camera, backgroundRoot, groundAnchor);
+            WireLayout(battle, camera, backgroundRoot, groundAnchor, skyFill);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -116,13 +148,34 @@ namespace Onikiri.EditorTools
 
         // ---------------------------------------------------------------- background
 
-        private static void BuildBackground(Transform root)
+        /// <summary>
+        /// Builds every background layer and returns the sky fill renderer.
+        ///
+        /// The sky is deliberately NOT a child of the background root. The other layers are
+        /// bottom-anchored to the battle band, whereas the sky is stretched over the whole
+        /// camera by <see cref="BattleStageLayout"/>, so it lives beside them under Battle.
+        /// Both jobs are done here rather than split across two builders - when the combat
+        /// builder also reparented the sky, rebuilds left a second stale copy behind and
+        /// mutating the hierarchy mid-iteration silently skipped a layer's sorting order.
+        /// </summary>
+        private static SpriteRenderer BuildBackground(Transform root, Transform battle)
         {
             for (int i = root.childCount - 1; i >= 0; i--)
                 Object.DestroyImmediate(root.GetChild(i).gameObject);
 
-            int order = BackgroundSortingBase;
+            // Sweep every prior sky, not just the first match. An earlier version of this
+            // builder left the sky parented under Battle, so repeated rebuilds silently
+            // stacked up copies that all rendered on top of each other.
+            for (int i = battle.childCount - 1; i >= 0; i--)
+            {
+                var child = battle.GetChild(i);
+                if (child.name == SkyFillName || child.name == SkyLayerName)
+                    Object.DestroyImmediate(child.gameObject);
+            }
+
+            int order = SortingOrders.BackgroundBase;
             int built = 0;
+            SpriteRenderer skyFill = null;
 
             foreach (var layerName in BackgroundLayers)
             {
@@ -134,12 +187,30 @@ namespace Onikiri.EditorTools
                     continue;
                 }
 
+                if (layerName == SkyLayerName)
+                {
+                    var skyObject = new GameObject(SkyFillName);
+                    skyObject.transform.SetParent(battle, false);
+
+                    skyFill = skyObject.AddComponent<SpriteRenderer>();
+                    skyFill.sprite = sprite;
+                    skyFill.color = TintFor(layerName);
+                    skyFill.sortingOrder = SortingOrders.SkyFill;
+                    built++;
+                    continue;
+                }
+
                 var go = new GameObject(layerName);
                 go.transform.SetParent(root, false);
 
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
-                renderer.sortingOrder = order++;
+                renderer.color = TintFor(layerName);
+                // Grass jumps in front of the fighters so it crosses their feet; everything
+                // else stacks back to front in list order.
+                renderer.sortingOrder = layerName == GroundCoverLayerName
+                    ? SortingOrders.GroundCover
+                    : order++;
 
                 // Sprites import with a centre pivot, so lift each layer by half its height
                 // to put its bottom edge on the root's origin (which sits on the band floor).
@@ -147,7 +218,8 @@ namespace Onikiri.EditorTools
                 built++;
             }
 
-            Debug.Log("[Onikiri] Background layers built: " + built);
+            Debug.Log("[Onikiri] Background layers built: " + built + " (sky fill " + (skyFill != null) + ")");
+            return skyFill;
         }
 
         // ---------------------------------------------------------------- animation
@@ -265,7 +337,7 @@ namespace Onikiri.EditorTools
 
             var sprites = LoadOrderedSprites(IdleSheet);
             if (sprites.Count > 0) renderer.sprite = sprites[0];
-            renderer.sortingOrder = PlayerSortingOrder;
+            renderer.sortingOrder = SortingOrders.Player;
 
             if (controller != null)
             {
@@ -284,7 +356,8 @@ namespace Onikiri.EditorTools
 
         // ---------------------------------------------------------------- wiring
 
-        private static void WireLayout(GameObject battle, Camera camera, Transform backgroundRoot, Transform groundAnchor)
+        private static void WireLayout(GameObject battle, Camera camera, Transform backgroundRoot,
+                                       Transform groundAnchor, SpriteRenderer skyFill)
         {
             var layout = battle.GetComponent<BattleStageLayout>();
             if (layout == null) layout = battle.AddComponent<BattleStageLayout>();
@@ -294,6 +367,7 @@ namespace Onikiri.EditorTools
             so.FindProperty("battleArea").objectReferenceValue = FindBattleArea();
             so.FindProperty("backgroundRoot").objectReferenceValue = backgroundRoot;
             so.FindProperty("groundAnchor").objectReferenceValue = groundAnchor;
+            so.FindProperty("skyFill").objectReferenceValue = skyFill;
             so.FindProperty("groundSurfacePixels").floatValue = GroundSurfacePixels;
             so.FindProperty("backgroundPixelHeight").floatValue = BackgroundPixelHeight;
             so.ApplyModifiedPropertiesWithoutUndo();

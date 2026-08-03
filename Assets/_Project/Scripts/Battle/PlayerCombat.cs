@@ -125,7 +125,8 @@ namespace Onikiri.Battle
 
             if (currentTarget == null) return;
 
-            Vector3 impactPosition = currentTarget.transform.position
+            // Aim at the drawn sprite's centre, not the transform - see Enemy.HitPoint.
+            Vector3 impactPosition = currentTarget.HitPoint
                                      + new Vector3(slashOffset.x, slashOffset.y, 0f);
 
             SpawnSlash(impactPosition);

@@ -57,7 +57,7 @@ namespace Onikiri.Battle
             // the source art is drawn.
             spriteRenderer.flipX = true;
 
-            transform.position = new Vector3(spawnX, ground + def.hoverHeight, 0f);
+            transform.position = new Vector3(spawnX, RestingY(), 0f);
             PlayIdle();
         }
 
@@ -68,6 +68,18 @@ namespace Onikiri.Battle
         }
 
         public float CurrentX { get { return transform.position.x; } }
+
+        /// <summary>
+        /// Centre of the drawn sprite, which is where hits should land.
+        ///
+        /// Not the transform: the pivot is the canvas bottom, and each yokai draws at a
+        /// different height inside that canvas, so aiming at the transform puts the effect
+        /// on the ground under a floating wisp instead of on the wisp.
+        /// </summary>
+        public Vector3 HitPoint
+        {
+            get { return spriteRenderer != null ? spriteRenderer.bounds.center : transform.position; }
+        }
 
         public void TakeDamage(float amount)
         {
@@ -143,8 +155,19 @@ namespace Onikiri.Battle
                 CurrentState = State.Engaged;
             }
 
-            position.y = groundY + definition.hoverHeight;
+            position.y = RestingY();
             transform.position = position;
+        }
+
+        /// <summary>
+        /// World Y that puts the lowest drawn pixel exactly <c>hoverHeight</c> above the
+        /// ground. The sprite pivot is the canvas edge, not the art, and each yokai draws
+        /// at a different height inside its canvas, so the measured offset is subtracted
+        /// back out here.
+        /// </summary>
+        private float RestingY()
+        {
+            return groundY + definition.hoverHeight - definition.artBottomOffset;
         }
 
         /// <summary>Hard reset used when the spawner clears the field.</summary>
