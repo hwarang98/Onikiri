@@ -38,8 +38,16 @@ namespace Onikiri.EditorTools
             "Gras"
         };
 
-        /// <summary>Ground surface height above the background's bottom edge, in source pixels.</summary>
-        private const float GroundSurfacePixels = 30f;
+        /// <summary>
+        /// Height of the walkable dirt surface above the background's bottom edge, in
+        /// source pixels.
+        ///
+        /// Measured as the most common per-column surface height in Ground.png (209 of 353
+        /// columns), NOT the topmost opaque pixel. The highest dirt mound reaches 30px but
+        /// only 8 columns are that tall, so calibrating to it left the character floating
+        /// 6px above the ground everyone else walks on.
+        /// </summary>
+        private const float GroundSurfacePixels = 24f;
         private const float BackgroundPixelHeight = 180f;
 
         /// <summary>Uniform sky tone of Sky.png; the camera clears to this so tall phones blend.</summary>

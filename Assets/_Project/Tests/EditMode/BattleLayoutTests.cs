@@ -18,9 +18,10 @@ namespace Onikiri.Tests
         const float BandMin = DisplayConfig.GrowthPanelTop;  // 0.45
         const float BandMax = DisplayConfig.BattleAreaTop;   // 0.90
 
-        // Measured from the art: ground surface sits 30px above the background's bottom edge,
-        // and the samurai's tallest idle frame is 34px.
-        const float GroundSurfacePixels = 30f;
+        // Measured from the art: the walkable dirt surface sits 24px above the background's
+        // bottom edge (modal column height in Ground.png, not its tallest mound), and the
+        // samurai's tallest idle frame is 34px.
+        const float GroundSurfacePixels = 24f;
         const float CharacterPixelHeight = 34f;
         const float BackgroundPixelHeight = 180f;
 
@@ -83,6 +84,17 @@ namespace Onikiri.Tests
             var b21 = BandFor(1080, 2520);
             Assert.AreEqual(-0.78750f, b21.Bottom, 1e-4f);
             Assert.AreEqual(6.30000f, b21.Top, 1e-4f);
+        }
+
+        [Test]
+        public void GroundY_MatchesHandComputedValues()
+        {
+            // Pins the ground calibration itself. Getting this wrong does not fail any
+            // "is it inside the band" check - it just floats the character above the dirt,
+            // which is only visible by eye. So assert the numbers directly.
+            Assert.AreEqual(0.15000f, BattleLayout.GroundY(BandFor(1080, 1920), GroundSurfacePixels, PPU), 1e-4f);
+            Assert.AreEqual(0.01875f, BattleLayout.GroundY(BandFor(1080, 2340), GroundSurfacePixels, PPU), 1e-4f);
+            Assert.AreEqual(-0.03750f, BattleLayout.GroundY(BandFor(1080, 2520), GroundSurfacePixels, PPU), 1e-4f);
         }
 
         [Test]
