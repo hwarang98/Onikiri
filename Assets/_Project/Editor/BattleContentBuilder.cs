@@ -79,6 +79,10 @@ namespace Onikiri.EditorTools
 
         /// <summary>Impact sounds are auto-wired from here once the files exist.</summary>
         private const string HitAudioFolder = "Assets/_Project/Audio/Hits";
+        private const string KillAudioFolder = "Assets/_Project/Audio/Kills";
+
+        private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
+        private const string DamagePrefabPath = PrefabFolder + "/DamageNumber.prefab";
 
         /// <summary>
         /// First frame of the slash sheet used for the impact effect (0-based). The sheet's
@@ -95,6 +99,7 @@ namespace Onikiri.EditorTools
             foreach (var tier in Tiers) BuildEnemyDefinition(tier);
             BuildEnemyPrefab();
             BuildSlashPrefab();
+            BuildDamageNumberPrefab();
 
             var scene = EditorSceneManager.OpenScene(MainSceneBuilder.ScenePath, OpenSceneMode.Single);
 
@@ -121,9 +126,10 @@ namespace Onikiri.EditorTools
             var shake = WireCameraShake();
             var hitAudio = WireHitAudio();
             WireWalletAndHud();
+            var damageNumbers = WireDamageNumbers();
 
             var spawner = WireSpawner(definitions, enemyPrefab);
-            WirePlayerCombat(spawner, slashPrefab, shake, hitAudio);
+            WirePlayerCombat(spawner, slashPrefab, shake, hitAudio, damageNumbers);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -160,7 +166,7 @@ namespace Onikiri.EditorTools
             definition.deathFrames = FramesFromClip(aseprite, tier.DeathClip);
             definition.frameRate = 12f;
             definition.spawnWeight = tier.SpawnWeight;
-            definition.maxHealth = tier.Health;
+            definition.maxHealth = BigDouble.FromDouble(tier.Health);
             definition.moveSpeed = tier.MoveSpeed;
             definition.queueSpacing = tier.QueueSpacing;
             definition.hoverHeight = tier.HoverHeight;
@@ -299,6 +305,62 @@ namespace Onikiri.EditorTools
             return prefab.GetComponent<Enemy>();
         }
 
+        /// <summary>
+        /// The damage popup prefab. Uses the Galmuri raster font at an exact multiple of
+        /// its 11px design size, so the digits keep the same pixel grid as the art.
+        /// </summary>
+        private static Onikiri.UI.DamageNumber BuildDamageNumberPrefab()
+        {
+            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(GalmuriFontPath);
+
+            var root = new GameObject("DamageNumber", typeof(RectTransform));
+            var rect = (RectTransform)root.transform;
+            rect.sizeDelta = new Vector2(260f, 60f);
+
+            // Shadow first so it draws behind, offset by two screen pixels. A bitmap font
+            // has no SDF outline available, and an unshadowed number is unreadable the
+            // moment it lands on top of the white slash.
+            var shadow = CreateDamageLabel(root.transform, font, "Shadow", new Vector2(3f, -3f));
+            var label = CreateDamageLabel(root.transform, font, "Label", Vector2.zero);
+
+            var popup = root.AddComponent<Onikiri.UI.DamageNumber>();
+            var so = new SerializedObject(popup);
+            so.FindProperty("label").objectReferenceValue = label;
+            so.FindProperty("shadow").objectReferenceValue = shadow;
+            so.FindProperty("rect").objectReferenceValue = rect;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, DamagePrefabPath);
+            Object.DestroyImmediate(root);
+            return prefab.GetComponent<Onikiri.UI.DamageNumber>();
+        }
+
+        private static TMPro.TextMeshProUGUI CreateDamageLabel(
+            Transform parent, TMPro.TMP_FontAsset font, string name, Vector2 offset)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var label = go.AddComponent<TMPro.TextMeshProUGUI>();
+            if (font != null)
+            {
+                label.font = font;
+                label.fontSharedMaterial = font.material;
+            }
+            label.fontSize = Onikiri.UI.PixelFontSizes.GalmuriSmall;   // 1:1 with the atlas
+            label.alignment = TMPro.TextAlignmentOptions.Center;
+            label.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            label.raycastTarget = false;
+            label.text = "0";
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(offset.x, offset.y);
+            rect.offsetMax = new Vector2(offset.x, offset.y);
+            return label;
+        }
+
         private static SlashVfx BuildSlashPrefab()
         {
             var root = new GameObject("SlashVfx");
@@ -344,30 +406,75 @@ namespace Onikiri.EditorTools
             var audio = battle.GetComponent<HitAudio>();
             if (audio == null) audio = battle.AddComponent<HitAudio>();
 
-            var clips = new List<AudioClip>();
-            if (AssetDatabase.IsValidFolder(HitAudioFolder))
-            {
-                foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { HitAudioFolder }))
-                {
-                    var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid));
-                    if (clip != null) clips.Add(clip);
-                }
-                clips.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
-            }
+            var hits = LoadClips(HitAudioFolder);
+            var kills = LoadClips(KillAudioFolder);
 
             var so = new SerializedObject(audio);
-            var array = so.FindProperty("clips");
-            array.arraySize = clips.Count;
-            for (int i = 0; i < clips.Count; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = clips[i];
+            AssignClips(so.FindProperty("hitClips"), hits);
+            AssignClips(so.FindProperty("killClips"), kills);
+            so.FindProperty("voices").intValue = 4;
+            so.FindProperty("minHitInterval").floatValue = 0.04f;
+            so.FindProperty("minKillInterval").floatValue = 0.02f;
+            so.FindProperty("hitPitchRange").vector2Value = new Vector2(0.94f, 1.06f);
+            so.FindProperty("killPitchRange").vector2Value = new Vector2(0.78f, 0.88f);
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            if (clips.Count == 0)
+            if (hits.Count == 0)
                 Debug.LogWarning("[Onikiri] No hit sounds in " + HitAudioFolder +
-                                 " - combat will be silent. Drop .wav files there and rebuild.");
+                                 " - combat is silent. Drop .wav files there and rebuild.");
             else
-                Debug.Log("[Onikiri] Hit sounds wired: " + clips.Count);
+                Debug.Log("[Onikiri] Sounds wired: " + hits.Count + " hit, " + kills.Count + " kill" +
+                          (kills.Count == 0 ? " (kills fall back to pitched-down hits)" : ""));
 
             return audio;
+        }
+
+        private static List<AudioClip> LoadClips(string folder)
+        {
+            var clips = new List<AudioClip>();
+            if (!AssetDatabase.IsValidFolder(folder)) return clips;
+
+            foreach (var guid in AssetDatabase.FindAssets("t:AudioClip", new[] { folder }))
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid));
+                if (clip != null) clips.Add(clip);
+            }
+            clips.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+            return clips;
+        }
+
+        private static void AssignClips(SerializedProperty array, List<AudioClip> clips)
+        {
+            array.arraySize = clips.Count;
+            for (int i = 0; i < clips.Count; i++)
+                array.GetArrayElementAtIndex(i).objectReferenceValue = clips[i];
+        }
+
+        /// <summary>
+        /// Damage popups live on the battle band of the overlay canvas, so they sit above
+        /// the fight but below the top bar.
+        /// </summary>
+        private static Onikiri.UI.DamageNumberSpawner WireDamageNumbers()
+        {
+            var canvas = GameObject.Find("UI Canvas");
+            var band = canvas.transform.Find("BattleArea");
+            if (band == null) return null;
+
+            var spawner = band.GetComponent<Onikiri.UI.DamageNumberSpawner>();
+            if (spawner == null) spawner = band.gameObject.AddComponent<Onikiri.UI.DamageNumberSpawner>();
+
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(DamagePrefabPath);
+
+            var so = new SerializedObject(spawner);
+            so.FindProperty("prefab").objectReferenceValue =
+                prefab != null ? prefab.GetComponent<Onikiri.UI.DamageNumber>() : null;
+            so.FindProperty("container").objectReferenceValue = band;
+            so.FindProperty("worldCamera").objectReferenceValue = Camera.main;
+            so.FindProperty("canvas").objectReferenceValue = canvas.GetComponent<Canvas>();
+            so.FindProperty("prewarm").intValue = 12;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            return spawner;
         }
 
         /// <summary>Wallet on the Battle root plus a gold readout in the top bar.</summary>
@@ -400,18 +507,25 @@ namespace Onikiri.EditorTools
                 rect.offsetMax = new Vector2(-48f, -40f);
             }
 
-            // Placeholder styling: the pixel font (Thaleah) is not in the project yet, so
-            // this uses TMP's default face purely so the value is visible and verifiable.
-            label.text = "G 0";
-            label.fontSize = 64f;
+            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(GalmuriFontPath);
+            if (font != null)
+            {
+                label.font = font;
+                label.fontSharedMaterial = font.material;
+            }
+            label.text = "골드 0";
+            // 33 = the atlas rasterisation size, so glyphs draw 1:1 with their bitmaps.
+            label.fontSize = Onikiri.UI.PixelFontSizes.GalmuriSmall;
             label.alignment = TMPro.TextAlignmentOptions.Left;
             label.color = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
+            label.raycastTarget = false;
 
             var hud = topBar.GetComponent<Onikiri.UI.HUDCurrency>();
             if (hud == null) hud = topBar.gameObject.AddComponent<Onikiri.UI.HUDCurrency>();
 
             var so = new SerializedObject(hud);
             so.FindProperty("label").objectReferenceValue = label;
+            so.FindProperty("prefix").stringValue = "골드 ";
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -456,7 +570,8 @@ namespace Onikiri.EditorTools
         }
 
         private static void WirePlayerCombat(EnemySpawner spawner, SlashVfx slashPrefab,
-                                             ScreenShake shake, HitAudio hitAudio)
+                                             ScreenShake shake, HitAudio hitAudio,
+                                             Onikiri.UI.DamageNumberSpawner damageNumbers)
         {
             var samurai = GameObject.Find("Samurai");
             if (samurai == null) { Debug.LogError("[Onikiri] Samurai not found."); return; }
@@ -485,6 +600,7 @@ namespace Onikiri.EditorTools
             so.FindProperty("vfxParent").objectReferenceValue = vfxRoot;
             so.FindProperty("cameraShake").objectReferenceValue = shake;
             so.FindProperty("hitAudio").objectReferenceValue = hitAudio;
+            so.FindProperty("damageNumbers").objectReferenceValue = damageNumbers;
 
             AssignSprites(so.FindProperty("idleFrames"), OrderedSprites(SamuraiIdle));
             AssignSprites(so.FindProperty("attackFrames"), OrderedSprites(SamuraiAttack));
@@ -503,7 +619,7 @@ namespace Onikiri.EditorTools
             // never reach it and the builder would stop being the source of truth.
             so.FindProperty("attackRange").floatValue = 2.0f;
             so.FindProperty("attacksPerSecond").floatValue = 1.15f;
-            so.FindProperty("damage").floatValue = 5f;
+            SetBigDouble(so.FindProperty("damage"), 5d);
             // The samurai art already paints a white sword trail into attack frames 5-6 of
             // 7. Impact is timed to land on that frame so the painted arc, the slash effect,
             // the hit flash and the freeze all happen together instead of in sequence.
@@ -524,6 +640,17 @@ namespace Onikiri.EditorTools
                 OrderedSprites(SamuraiIdle).Count,
                 OrderedSprites(SamuraiAttack).Count,
                 OrderedSprites(SlashSheet).Count));
+        }
+
+        /// <summary>
+        /// Writes a BigDouble through its serialized mantissa/exponent fields, since
+        /// SerializedProperty has no notion of the struct itself.
+        /// </summary>
+        private static void SetBigDouble(SerializedProperty property, double value)
+        {
+            var big = BigDouble.FromDouble(value);
+            property.FindPropertyRelative("m").doubleValue = big.Mantissa;
+            property.FindPropertyRelative("e").longValue = big.Exponent;
         }
 
         private static void AssignSprites(SerializedProperty array, List<Sprite> sprites)

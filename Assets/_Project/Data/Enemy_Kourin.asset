@@ -36,7 +36,9 @@ MonoBehaviour:
   - {fileID: 8899436426121117835, guid: c8b22968a46ae844eaf1523708c9c703, type: 3}
   frameRate: 12
   spawnWeight: 5
-  maxHealth: 14
+  maxHealth:
+    m: 1.4
+    e: 1
   goldReward:
     m: 5
     e: 0

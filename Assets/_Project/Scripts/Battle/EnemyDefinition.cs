@@ -29,7 +29,9 @@ namespace Onikiri.Battle
         public float spawnWeight = 1f;
 
         [Header("Combat")]
-        public float maxHealth = 12f;
+        [Tooltip("BigDouble because late-stage yokai health leaves long's range behind; " +
+                 "damage numbers print through NumberFormatter for the same reason.")]
+        public BigDouble maxHealth = BigDouble.FromDouble(12d);
 
         [Tooltip("Gold granted the moment this yokai's health reaches zero.")]
         public BigDouble goldReward = BigDouble.One;

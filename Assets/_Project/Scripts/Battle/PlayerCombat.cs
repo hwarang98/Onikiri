@@ -21,6 +21,7 @@ namespace Onikiri.Battle
         [SerializeField] private SpriteAnimator animator;
         [SerializeField] private SlashVfx slashPrefab;
         [SerializeField] private Transform vfxParent;
+        [SerializeField] private Onikiri.UI.DamageNumberSpawner damageNumbers;
 
         [Header("Animation")]
         [SerializeField] private Sprite[] idleFrames;
@@ -34,7 +35,9 @@ namespace Onikiri.Battle
         [Tooltip("How far the samurai can reach, in world units.")]
         [SerializeField] private float attackRange = 1.9f;
         [SerializeField] private float attacksPerSecond = 1.15f;
-        [SerializeField] private float damage = 5f;
+        [Tooltip("BigDouble from the start - attack power is the main upgrade axis and " +
+                 "leaves long's range behind within hours of idle play.")]
+        [SerializeField] private BigDouble damage = BigDouble.FromDouble(5d);
 
         [Tooltip("Fraction of the attack animation before the blade connects.")]
         [Range(0f, 1f)]
@@ -148,7 +151,17 @@ namespace Onikiri.Battle
                                      + new Vector3(slashOffset.x, slashOffset.y, 0f);
 
             SpawnSlash(impactPosition);
+
+            var hitPoint = currentTarget.HitPoint;
             currentTarget.TakeDamage(damage);
+            bool killed = !currentTarget.IsAlive;
+
+            if (damageNumbers != null) damageNumbers.Show(damage, hitPoint, killed);
+            if (hitAudio != null)
+            {
+                if (killed) hitAudio.PlayKill();
+                else hitAudio.PlayHit();
+            }
 
             // All three land on the same frame. The freeze and the shake are both shortened
             // as attack speed rises so late-game swinging does not become a constant
@@ -157,7 +170,6 @@ namespace Onikiri.Battle
             ScreenShake.Request(cameraShake,
                 CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond),
                 shakePixels);
-            if (hitAudio != null) hitAudio.PlayHit();
         }
 
         private void SpawnSlash(Vector3 position)

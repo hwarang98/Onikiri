@@ -31,7 +31,7 @@ namespace Onikiri.Battle
         public event Action<Enemy> Died;
 
         private EnemyDefinition definition;
-        private float health;
+        private BigDouble health;
         private float groundY;
         private float targetX;
         private float hurtFlashRemaining;
@@ -88,13 +88,13 @@ namespace Onikiri.Battle
             get { return spriteRenderer != null ? spriteRenderer.bounds.center : transform.position; }
         }
 
-        public void TakeDamage(float amount)
+        public void TakeDamage(BigDouble amount)
         {
             if (!IsAlive) return;
 
             health -= amount;
 
-            if (health <= 0f)
+            if (health <= BigDouble.Zero)
             {
                 Die();
                 return;
