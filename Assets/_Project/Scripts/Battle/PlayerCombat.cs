@@ -63,6 +63,10 @@ namespace Onikiri.Battle
         [Tooltip("흔들림 세기 (원본 픽셀)")]
         [SerializeField] private float shakePixels = 3f;
 
+        [Tooltip("플레이 1초당 허용되는 참격 이펙트 표시 시간. 이것이 없으면 공격속도가 " +
+                 "오를 때 참격이 서로 겹쳐 화면이 흰 덩어리가 된다")]
+        [SerializeField] private float slashBudgetPerSecond = 0.45f;
+
         [Tooltip("참격이 나타나는 위치. 대상에서 사무라이 쪽으로의 오프셋")]
         [SerializeField] private Vector2 slashOffset = new Vector2(-0.15f, 0.55f);
 
@@ -83,6 +87,33 @@ namespace Onikiri.Battle
         private Enemy currentTarget;
 
         public int SlashPoolGrowthCount { get { return slashPool != null ? slashPool.GrowthCount : 0; } }
+
+        /**
+         * @brief 업그레이드가 스탯을 갱신하는 진입점.
+         *
+         * 값을 바꾸는 것만으로 즉시 반영된다. 스윙 길이와 각 효과의 예산은 공격마다
+         * attacksPerSecond에서 다시 계산되므로, 여기서 따로 해줄 일이 없다.
+         */
+        public BigDouble Damage
+        {
+            get { return damage; }
+            set { damage = value; }
+        }
+
+        public float AttacksPerSecond
+        {
+            get { return attacksPerSecond; }
+            set { attacksPerSecond = Mathf.Max(0.01f, value); }
+        }
+
+        /**
+         * @brief 시작 이후 실제로 시작된 스윙 수.
+         *
+         * 공격속도 스탯이 실제 공격 횟수로 이어지는지 확인하는 용도다. 애니메이션
+         * 길이가 조용히 상한이 되어 스탯을 올려도 초당 2회에서 멈춘 적이 있었고,
+         * 그때는 화면만 봐서는 알아챌 수 없었다.
+         */
+        public int AttackCount { get; private set; }
 
         private void Awake()
         {
@@ -117,6 +148,11 @@ namespace Onikiri.Battle
                     {
                         state = State.Idle;
                         PlayIdle();
+                        // 스윙이 끝난 프레임에서 바로 다음 스윙을 시도한다. 다음 Update로
+                        // 넘기면 공격마다 한 프레임이 통째로 버려지는데, 공격속도가 낮을
+                        // 때는 오차가 1%도 안 되지만 초당 20회에서는 프레임 하나가 공격
+                        // 주기의 절반이라 실제 공격 횟수가 설정값의 절반으로 떨어진다
+                        TryStartAttack();
                     }
                     break;
             }
@@ -134,6 +170,7 @@ namespace Onikiri.Battle
             state = State.Winding;
             stateTimer = 0f;
             impactDelivered = false;
+            AttackCount++;
 
             float interval = 1f / Mathf.Max(0.01f, attacksPerSecond);
             cooldownRemaining = interval;
@@ -193,8 +230,20 @@ namespace Onikiri.Battle
         {
             if (slashPool == null || slashFrames == null || slashFrames.Length == 0) return;
 
+            // 참격도 히트스톱·흔들림과 같은 예산 규칙을 따른다. 여기가 상한이 없던
+            // 마지막 효과였다. 스윙 압축으로 공격속도가 실제로 두 자릿수까지 올라가므로,
+            // 고정 22fps(4프레임 = 0.18초)를 유지하면 초당 열 번 공격할 때 참격 두세
+            // 개가 항상 겹쳐 있게 된다. 흰 호가 서로 포개지면 개별 타격이 보이지 않고
+            // 화면 가운데가 흰 얼룩으로 뭉개진다.
+            //
+            // 프레임 수를 줄이지 않고 재생 속도만 올린다. 이펙트의 형태는 그대로 두고
+            // 화면에 머무는 시간만 줄이는 쪽이 픽셀 아트에서는 훨씬 덜 티가 난다.
+            float baseDuration = slashFrames.Length / Mathf.Max(0.0001f, slashFrameRate);
+            float duration = CombatFeel.ScaledDuration(baseDuration, slashBudgetPerSecond, attacksPerSecond);
+            float rate = slashFrames.Length / Mathf.Max(0.0001f, duration);
+
             var slash = slashPool.Get();
-            slash.Play(slashFrames, slashFrameRate, position, false, ReleaseSlash);
+            slash.Play(slashFrames, rate, position, false, ReleaseSlash);
         }
 
         private void ReleaseSlash(SlashVfx slash)

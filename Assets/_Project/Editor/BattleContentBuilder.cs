@@ -105,10 +105,16 @@ namespace Onikiri.EditorTools
             SfxRoot + "12_Player_Movement_SFX/61_Hit_03.wav"
         };
 
-        /** 처치음 뱅크. 팩에 사망음이 하나뿐이고 그것이 정답이다 */
+        /**
+         * @brief 처치음 뱅크.
+         *
+         * 팩에 사망음이 하나뿐이고 그것이 정답이지만, 원본 2.667초는 이 게임에 너무 길다.
+         * 처치 간격이 그보다 짧아지면 보이스가 잔향으로 계속 차 있어서 새 처치음이
+         * 밀려난다. SfxTrimBuilder가 구워둔 0.35초 사본을 쓴다.
+         */
         private static readonly string[] KillClipPaths =
         {
-            SfxRoot + "10_Battle_SFX/69_Enemy_death_01.wav"
+            SfxTrimBuilder.DeathShortPath
         };
 
         private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
@@ -129,6 +135,10 @@ namespace Onikiri.EditorTools
         {
             EnsureFolder(DataFolder);
             EnsureFolder(PrefabFolder);
+
+            // 잘라낸 효과음이 없으면 배선 단계에서 클립을 못 찾는다. 빌더가 스스로
+            // 만들어두게 해서 메뉴 실행 순서를 외우지 않아도 되게 한다
+            SfxTrimBuilder.Rebuild();
 
             foreach (var tier in Tiers) BuildEnemyDefinition(tier);
             BuildEnemyPrefab();
@@ -158,6 +168,10 @@ namespace Onikiri.EditorTools
             }
 
             EnsureAudioListener();
+            // 안전 영역 루트를 먼저 세운다. 아래의 배선이 밴드를 찾아 쓰는데, 그 사이에
+            // 밴드의 부모가 바뀌면 방금 연결한 참조가 가리키는 계층이 달라진다
+            UpgradePanelBuilder.EnsureSafeArea();
+
             var shake = WireCameraShake();
             var hitAudio = WireHitAudio();
             WireWalletAndHud();
@@ -165,6 +179,9 @@ namespace Onikiri.EditorTools
 
             var spawner = WireSpawner(definitions, enemyPrefab);
             WirePlayerCombat(spawner, slashPrefab, shake, hitAudio, damageNumbers);
+
+            // 강화는 PlayerCombat이 씬에 있어야 배선할 수 있다
+            UpgradePanelBuilder.Build();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -304,6 +321,25 @@ namespace Onikiri.EditorTools
             RequireArray(combatSo, "idleFrames", problems);
             RequireArray(combatSo, "attackFrames", problems);
             RequireArray(combatSo, "slashFrames", problems);
+
+            // 강화는 눌러봐야만 알 수 있는 종류의 실패를 낸다. 트랙이 비었거나 combat
+            // 참조가 없으면 버튼은 정상으로 보이고 아무 일도 일어나지 않는다
+            var panel = MainSceneBuilder.FindBand("GrowthPanel");
+            if (panel == null) problems.Add("GrowthPanel band missing");
+            else
+            {
+                var system = panel.GetComponent<Onikiri.Progression.UpgradeSystem>();
+                if (system == null) problems.Add("GrowthPanel has no UpgradeSystem");
+                else
+                {
+                    var upgradeSo = new SerializedObject(system);
+                    RequireReference(upgradeSo, "combat", problems);
+                    RequireArray(upgradeSo, "tracks", problems);
+                }
+            }
+
+            if (Object.FindFirstObjectByType<Onikiri.UI.SafeAreaFitter>() == null)
+                problems.Add("No SafeAreaFitter - UI will run under the notch");
 
             if (problems.Count > 0)
             {
@@ -576,7 +612,7 @@ namespace Onikiri.EditorTools
         private static Onikiri.UI.DamageNumberSpawner WireDamageNumbers()
         {
             var canvas = GameObject.Find("UI Canvas");
-            var band = canvas.transform.Find("BattleArea");
+            var band = MainSceneBuilder.FindBand("BattleArea");
             if (band == null) return null;
 
             var spawner = band.GetComponent<Onikiri.UI.DamageNumberSpawner>();
@@ -603,8 +639,7 @@ namespace Onikiri.EditorTools
             if (battle.GetComponent<Onikiri.Progression.PlayerWallet>() == null)
                 battle.AddComponent<Onikiri.Progression.PlayerWallet>();
 
-            var canvas = GameObject.Find("UI Canvas");
-            var topBar = canvas.transform.Find("TopBar");
+            var topBar = MainSceneBuilder.FindBand("TopBar");
             if (topBar == null) return;
 
             var existing = topBar.Find("GoldLabel");
@@ -748,6 +783,7 @@ namespace Onikiri.EditorTools
             so.FindProperty("shakeBudgetPerSecond").floatValue = 0.4f;
             so.FindProperty("shakePixels").floatValue = 3f;
             so.FindProperty("slashFrameRate").floatValue = 22f;
+            so.FindProperty("slashBudgetPerSecond").floatValue = 0.45f;
             // 요괴의 렌더링된 중심을 기준으로 재므로, 피벗 위치를 보정할 필요 없이
             // 호를 칼 쪽으로 조금 당기기만 하면 된다
             so.FindProperty("slashOffset").vector2Value = new Vector2(-0.3f, 0f);

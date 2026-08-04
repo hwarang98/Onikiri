@@ -102,12 +102,59 @@ namespace Onikiri.EditorTools
 
             go.AddComponent<GraphicRaycaster>();
 
+            var safeArea = CreateSafeArea(go.transform);
+
             // 사양서의 화면 4분할. 아래에서 위로 탭바 10%, 성장 35%, 전투 45%, 상단 10%.
             // 내용물은 나중에 채우므로 의도적으로 비워 둔다
-            CreateBand(go.transform, "BottomTabBar", 0f, DisplayConfig.BottomTabBarTop);
-            CreateBand(go.transform, "GrowthPanel", DisplayConfig.BottomTabBarTop, DisplayConfig.GrowthPanelTop);
-            CreateBand(go.transform, "BattleArea", DisplayConfig.GrowthPanelTop, DisplayConfig.BattleAreaTop);
-            CreateBand(go.transform, "TopBar", DisplayConfig.BattleAreaTop, 1f);
+            CreateBand(safeArea, "BottomTabBar", 0f, DisplayConfig.BottomTabBarTop);
+            CreateBand(safeArea, "GrowthPanel", DisplayConfig.BottomTabBarTop, DisplayConfig.GrowthPanelTop);
+            CreateBand(safeArea, "BattleArea", DisplayConfig.GrowthPanelTop, DisplayConfig.BattleAreaTop);
+            CreateBand(safeArea, "TopBar", DisplayConfig.BattleAreaTop, 1f);
+        }
+
+        public const string SafeAreaName = "SafeArea";
+
+        /**
+         * @brief 모든 UI 밴드가 들어가는 안전 영역 루트.
+         *
+         * 밴드를 캔버스 직속이 아니라 여기 아래에 둔다. 그래야 노치와 제스처 바 보정이
+         * 한 곳에서 끝나고, 밴드 비율(10/35/45/10)은 보이는 영역 안에서 그대로 유지된다.
+         *
+         * 월드는 이 보정을 받지 않는다. 배경까지 안으로 밀면 노치 옆에 검은 띠가 생기고,
+         * 그건 CropFrame.None으로 피하려 했던 바로 그 결과다.
+         */
+        static Transform CreateSafeArea(Transform canvas)
+        {
+            var go = new GameObject(SafeAreaName, typeof(RectTransform));
+            go.transform.SetParent(canvas, false);
+
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            go.AddComponent<Onikiri.UI.SafeAreaFitter>();
+            return go.transform;
+        }
+
+        /**
+         * @brief 이름으로 UI 밴드를 찾는다.
+         *
+         * 안전 영역 루트가 생기기 전에 만들어진 씬도 있으므로 캔버스 직속도 함께 본다.
+         */
+        public static Transform FindBand(string name)
+        {
+            var canvas = GameObject.Find("UI Canvas");
+            if (canvas == null) return null;
+
+            var safeArea = canvas.transform.Find(SafeAreaName);
+            if (safeArea != null)
+            {
+                var inside = safeArea.Find(name);
+                if (inside != null) return inside;
+            }
+            return canvas.transform.Find(name);
         }
 
         static void CreateBand(Transform parent, string name, float anchorMinY, float anchorMaxY)

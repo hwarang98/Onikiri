@@ -27,12 +27,19 @@ namespace Onikiri.EditorTools
             public float Size;
         }
 
+        /**
+         * @brief 검증용 표본.
+         *
+         * 크기는 PixelFontSizes에서 가져온다. 여기에 숫자를 직접 적으면 폰트를 다시
+         * 구운 뒤 검증 시트만 옛 크기로 남아, 정작 확인해야 할 리샘플 흐림을
+         * 이 시트가 스스로 만들어 보여주게 된다.
+         */
         private static readonly ProofLine[] Lines =
         {
-            new ProofLine { Text = "귀참 키우기",  UseThaleah = false, Size = 33f },
-            new ProofLine { Text = "공격력 강화",  UseThaleah = false, Size = 33f },
-            new ProofLine { Text = "12.3K",        UseThaleah = false, Size = 33f },
-            new ProofLine { Text = "12.3K  4.7M",  UseThaleah = true,  Size = 48f }
+            new ProofLine { Text = "귀참 키우기",  UseThaleah = false, Size = Onikiri.UI.PixelFontSizes.GalmuriSmall },
+            new ProofLine { Text = "공격력 강화",  UseThaleah = false, Size = Onikiri.UI.PixelFontSizes.GalmuriSmall },
+            new ProofLine { Text = "12.3K",        UseThaleah = false, Size = Onikiri.UI.PixelFontSizes.GalmuriSmall },
+            new ProofLine { Text = "12.3K  4.7M",  UseThaleah = true,  Size = Onikiri.UI.PixelFontSizes.ThaleahDamage }
         };
 
         [MenuItem("Onikiri/Art/Render Font Proof Sheet")]
@@ -42,9 +49,12 @@ namespace Onikiri.EditorTools
             var thaleah = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(ThaleahPath);
             if (galmuri == null) { Debug.LogError("[Onikiri] Font asset missing: " + GalmuriPath); return; }
 
-            const int width = 460;
-            const int height = 260;
-            const int zoom = 3;        // magnify afterwards to inspect the pixel edges
+            // 줄 높이는 가장 큰 표본에 맞춘다. 폰트를 키우면 시트도 함께 커져야
+            // 글자가 잘리지 않는다
+            int lineHeight = Mathf.CeilToInt(Onikiri.UI.PixelFontSizes.ThaleahDamage * 1.2f);
+            int width = 640;
+            int height = lineHeight * Lines.Length + 40;
+            const int zoom = 2;        // 확대해서 픽셀 경계를 눈으로 확인한다
 
             var root = new GameObject("~FontProof");
             var canvasObject = new GameObject("Canvas");
@@ -85,8 +95,8 @@ namespace Onikiri.EditorTools
                 var rect = (RectTransform)labelObject.transform;
                 rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
                 rect.pivot = new Vector2(0f, 1f);
-                rect.sizeDelta = new Vector2(width - 40, 56);
-                rect.anchoredPosition = new Vector2(20, -20 - i * 56);
+                rect.sizeDelta = new Vector2(width - 40, lineHeight);
+                rect.anchoredPosition = new Vector2(20, -20 - i * lineHeight);
             }
 
             var renderTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { filterMode = FilterMode.Point };
@@ -124,8 +134,8 @@ namespace Onikiri.EditorTools
             Object.DestroyImmediate(renderTexture);
 
             AssetDatabase.Refresh();
-            Debug.Log("[Onikiri] Font proof rendered (Galmuri 33px, Thaleah 48px), magnified "
-                      + zoom + "x -> " + OutputPath);
+            Debug.Log(string.Format("[Onikiri] Font proof rendered (Galmuri {0}px, Thaleah {1}px), magnified {2}x -> {3}",
+                Onikiri.UI.PixelFontSizes.GalmuriSmall, Onikiri.UI.PixelFontSizes.ThaleahDamage, zoom, OutputPath));
         }
     }
 }

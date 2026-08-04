@@ -88,5 +88,28 @@ namespace Onikiri.Tests
             Assert.AreEqual(0.1f, CombatFeel.ScaledDuration(shakeBase, shakeBudget, 1.15f), 1e-5f);
             Assert.AreEqual(0.04f, CombatFeel.ScaledDuration(shakeBase, shakeBudget, 10f), 1e-5f);
         }
+
+        [Test]
+        public void SlashOverlap_StaysBelowOneEffectAtATime()
+        {
+            // 참격은 상한이 없던 마지막 효과였다. 4프레임 22fps = 0.18초 고정이면
+            // 초당 6회만 넘어가도 이펙트가 항상 두 개 이상 겹쳐 흰 얼룩이 된다.
+            //
+            // 여기서 확인하는 것은 길이가 아니라 동시 표시 개수다. 표시 시간 x 초당
+            // 횟수가 1을 넘지 않으면, 평균적으로 화면에 참격이 하나 이하로 존재한다
+            const float slashBase = 4f / 22f;
+            const float slashBudget = 0.45f;
+
+            float[] rates = { 1.15f, 4f, 8.23f, 10f, 30f };
+            foreach (var rate in rates)
+            {
+                float onScreen = CombatFeel.ScaledDuration(slashBase, slashBudget, rate) * rate;
+                Assert.LessOrEqual(onScreen, 1f + 1e-4f,
+                    "slashes overlapped " + onScreen + "x at " + rate + " attacks/sec");
+            }
+
+            // 초반에는 설계한 길이를 그대로 쓴다. 상한이 연출을 미리 갉아먹지 않는다
+            Assert.AreEqual(slashBase, CombatFeel.ScaledDuration(slashBase, slashBudget, 1.15f), 1e-5f);
+        }
     }
 }

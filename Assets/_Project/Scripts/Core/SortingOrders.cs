@@ -21,6 +21,14 @@ namespace Onikiri.Core
         public const int BackgroundBase = -200;
 
         /**
+         * @brief 지면 위에 서 있는 배경 소품 (도리이 등).
+         *
+         * 지면 그림보다는 앞이고 파이터보다는 뒤다. 배경의 일부지만 평면이 아니라
+         * 씬 안에 서 있는 물건으로 읽혀야 한다.
+         */
+        public const int BackgroundProp = -100;
+
+        /**
          * @brief 적은 좁은 구간을 나눠 쓴다. 동시에 여러 마리가 나와도 z-fighting이 없다.
          *
          * 각 적은 EnemyBase + (슬롯 % EnemySlots) 를 갖는다.

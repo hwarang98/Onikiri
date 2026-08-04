@@ -50,9 +50,17 @@ namespace Onikiri.EditorTools
         /**
          * @brief 아틀라스를 래스터하는 정수 배수.
          *
-         * 표시 크기는 이 값(33)이거나 그 배수여야 한다.
+         * 5인 것은 임의의 선택이 아니라 화면의 픽셀 크기와 맞추기 위함이다. 게임 아트는
+         * PPU 32에 기준 해상도 216x384로 그려지고, 1080 폭 기기에서 Pixel Perfect Camera가
+         * 정확히 5배로 확대한다. 즉 아트의 픽셀 하나가 화면 픽셀 5x5다.
+         *
+         * 폰트를 3배로 구우면 글자의 픽셀은 3x3이 되어, 같은 화면 안에 크기가 다른 픽셀이
+         * 두 종류 존재하게 된다. 픽셀 아트에서 이것은 해상도가 섞인 것처럼 보이는 가장
+         * 흔한 원인이다. 5배로 맞추면 글자 계단과 아트 계단이 같은 크기가 된다.
+         *
+         * 표시 크기는 이 값(55)이거나 그 정수배여야 한다.
          */
-        public const int GalmuriSampleMultiple = 3;
+        public const int GalmuriSampleMultiple = 5;
 
         /**
          * @brief Thaleah 폰트가 그려진 크기.
@@ -61,7 +69,9 @@ namespace Onikiri.EditorTools
          * m_FontSize: 16).
          */
         public const int ThaleahDesignSize = 16;
-        public const int ThaleahSampleMultiple = 3;
+
+        /** Galmuri와 같은 이유로 5배. 화면 픽셀 배율과 일치시킨다 */
+        public const int ThaleahSampleMultiple = 5;
 
         /**
          * @brief Thaleah는 데미지 팝업에만 쓰는 라틴 디스플레이 서체다.
@@ -80,13 +90,16 @@ namespace Onikiri.EditorTools
             FontCharsetBuilder.Rebuild();
             var charset = FontCharsetBuilder.LoadCharset();
 
-            // 설계 크기가 아니라 그 3배로 샘플링한다.
+            // 설계 크기가 아니라 그 5배로 샘플링한다.
             //
             // 외곽선을 정확히 11로 래스터하면 TMP가 쿼드를 만드는 메트릭보다 1픽셀 작은
             // 글리프 비트맵이 나온다. 그러면 모든 글리프가 11/10으로 늘어나고 Point
             // 샘플링이 행을 복제해 글자 형태가 눈에 띄게 깨진다. 픽셀 폰트의 외곽선은
             // 축 정렬 사각형이므로 정수배로 래스터하면 정확히 NxN 블록이 나오고 반올림
             // 오차가 무시할 수준이 된다. 표시 크기는 샘플링 크기와 1:1로 맞춘다.
+            //
+            // 배수가 5인 이유는 GalmuriSampleMultiple 주석 참고. 화면에 존재하는 픽셀
+            // 크기를 한 종류로 유지하기 위해 카메라 배율과 같은 값을 쓴다.
             Build(GalmuriSourcePath, "Galmuri11",
                   GalmuriDesignSize * GalmuriSampleMultiple, charset);
 
@@ -158,8 +171,14 @@ namespace Onikiri.EditorTools
             int glyphs = fontAsset.glyphTable != null ? fontAsset.glyphTable.Count : 0;
             int pages = fontAsset.atlasTextures != null ? fontAsset.atlasTextures.Length : 0;
             Debug.Log(string.Format(
-                "[Onikiri] Font '{0}': {1} glyphs, {2} atlas page(s) at {3}pt, RASTER_HINTED, padding 0 -> {4}",
-                fontAsset.name, glyphs, pages, designPointSize, outputPath));
+                "[Onikiri] Font '{0}': {1} glyphs, {2} atlas page(s) at {3}pt, RASTER_HINTED, padding {4} -> {5}",
+                fontAsset.name, glyphs, pages, designPointSize, AtlasPadding, outputPath));
+
+            // 페이지가 늘어나면 머티리얼도 늘어나고 표시 크기 규칙이 조용히 깨진다.
+            // 아틀라스를 키워야 한다는 신호이므로 눈에 띄게 남긴다
+            if (pages > 1)
+                Debug.LogWarning("[Onikiri] " + fontAsset.name + " needed " + pages +
+                                 " atlas pages - raise AtlasWidth/AtlasHeight.");
 
             return fontAsset;
         }

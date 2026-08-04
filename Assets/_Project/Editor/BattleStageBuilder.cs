@@ -64,14 +64,23 @@ namespace Onikiri.EditorTools
         /** 중경 레이어: 산과 나무 띠 */
         private static readonly Color MidTint = new Color32(0x8B, 0x82, 0xB5, 0xFF);
 
-        /** 근경 레이어: 신사, 지면, 풀 */
-        private static readonly Color NearTint = new Color32(0xA8, 0x9E, 0xCB, 0xFF);
+        /**
+         * @brief 근경 레이어: 신사, 지면, 풀, 지면 소품.
+         *
+         * 처음에는 #A89ECB 였는데 적색 채널을 파랑보다 35 낮게 눌러서, 화면 전체가
+         * 보라 단색조가 되고 사양서의 먹빛-적-벚꽃 팔레트에서 적이 사라졌다.
+         *
+         * 지금은 적색을 파랑에 가깝게 되돌렸다. 대기 원근(멀수록 차갑고 푸르게)은
+         * 원경/중경 틴트가 그대로 유지하고 있으므로, 근경만 따뜻해지면 깊이는 오히려
+         * 더 분명해진다.
+         */
+        private static readonly Color NearTint = new Color32(0xC8, 0xA4, 0xB8, 0xFF);
 
         /** 카메라 클리어 색. 틴트된 하늘 뒤에 깔린다 */
         private static readonly Color ClearColor = new Color32(0x2A, 0x27, 0x40, 0xFF);
 
         private static readonly string[] FarLayers = { "Sky", "Clouds", "Fuji" };
-        private static readonly string[] NearLayers = { "Shrine_Single", "Shrine_Multiple", "House", "Ground", "Gras" };
+        private static readonly string[] NearLayers = { "Shrine_Single", "Shrine_Multiple", "House", "Ground", "Gras", ToriiName };
 
         /** 배경 레이어의 깊이 틴트. 목록에 없으면 중경으로 취급한다 */
         public static Color TintFor(string layerName)
@@ -103,6 +112,26 @@ namespace Onikiri.EditorTools
         private const string SkyFillName = "SkyFill";
         private const string GroundCoverLayerName = "Gras";
 
+        // ------------------------------------------------------------------ 지면 소품
+        //
+        // 깊이 틴트를 넣은 뒤 화면에 채도 높은 적이 하나도 남지 않았다. 틴트를 되돌리는
+        // 것만으로는 부족하다. 배경 팩의 원본 색이 갈색과 분홍이라, 곱하기로는 없는 적을
+        // 만들어낼 수 없기 때문이다. 주홍 도리이는 팔레트에 적을 되돌려 놓으면서 무대가
+        // 어디인지도 한 번에 말해준다.
+        //
+        // SpringForest 팩에서 가져왔지만 같은 픽셀 스케일이고 색이 이 씬에 그대로 맞는다.
+
+        private const string ToriiName = "Torii";
+        private const string ToriiSheet = "Assets/ThirdParty/Backgrounds/SpringForest/Props/Torii gate.png";
+
+        /**
+         * @brief 도리이의 가로 위치 (world units).
+         *
+         * 요괴는 오른쪽에서 들어오므로 문을 그쪽에 세운다. 폭이 3 units이고 화면
+         * 오른쪽 끝이 3.375이므로, 중심 1.8이면 0.3~3.3으로 화면 안에 정확히 들어온다.
+         */
+        private const float ToriiX = 1.8f;
+
         [MenuItem("Onikiri/Scene/Build Battle Stage")]
         public static void Build()
         {
@@ -131,6 +160,7 @@ namespace Onikiri.EditorTools
             EnsureChild(groundAnchor, "Enemies");
 
             var skyFill = BuildBackground(backgroundRoot, battle.transform);
+            BuildProps(groundAnchor);
 
             var clip = BuildIdleClip();
             var controller = BuildController(clip);
@@ -220,6 +250,58 @@ namespace Onikiri.EditorTools
 
             Debug.Log("[Onikiri] Background layers built: " + built + " (sky fill " + (skyFill != null) + ")");
             return skyFill;
+        }
+
+        // ---------------------------------------------------------------- 지면 소품
+
+        /**
+         * @brief 지면선 위에 서는 소품을 배치한다.
+         *
+         * 배경 레이어가 아니라 지면 앵커의 자식이다. 배경은 밴드 바닥에 밑단이 붙고
+         * 소품은 걸을 수 있는 흙 표면에 서야 하는데, 그 둘은 0.75 units 차이가 난다.
+         * 앵커에 붙이면 그 차이를 여기서 다시 계산할 필요가 없다.
+         */
+        private static void BuildProps(Transform groundAnchor)
+        {
+            var props = EnsureChild(groundAnchor, "Props");
+
+            for (int i = props.childCount - 1; i >= 0; i--)
+                Object.DestroyImmediate(props.GetChild(i).gameObject);
+
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ToriiSheet);
+            if (sprite == null)
+            {
+                Debug.LogWarning("[Onikiri] Prop not found, skipping: " + ToriiSheet);
+                return;
+            }
+
+            // 이 소품은 다른 배경 팩에서 왔다. 임포트 기준이 적용되기 전에 들어온
+            // 파일이면 PPU가 100(유니티 기본값)일 수 있고, 그러면 도리이만 1/3 크기로
+            // 나온다. 조용히 어긋나는 대신 여기서 잡는다
+            if (!Mathf.Approximately(sprite.pixelsPerUnit, DisplayConfig.PixelsPerUnit))
+            {
+                var importer = AssetImporter.GetAtPath(ToriiSheet) as TextureImporter;
+                if (importer != null)
+                {
+                    PixelArtImportSettings.Apply(importer);
+                    importer.SaveAndReimport();
+                    sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ToriiSheet);
+                }
+            }
+
+            var go = new GameObject(ToriiName);
+            go.transform.SetParent(props, false);
+
+            var renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.color = TintFor(ToriiName);
+            renderer.sortingOrder = SortingOrders.BackgroundProp;
+
+            // 피벗이 중앙이므로 절반 높이만큼 올려 기둥 밑동이 지면선에 닿게 한다
+            go.transform.localPosition = new Vector3(ToriiX, sprite.bounds.extents.y, 0f);
+
+            Debug.Log(string.Format("[Onikiri] Prop '{0}' placed at x={1} ({2:F2} x {3:F2} units, ppu {4}).",
+                ToriiName, ToriiX, sprite.bounds.size.x, sprite.bounds.size.y, sprite.pixelsPerUnit));
         }
 
         // ---------------------------------------------------------------- 애니메이션
