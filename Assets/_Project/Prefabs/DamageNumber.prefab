@@ -330,5 +330,5 @@ MonoBehaviour:
   lifetime: 0.75
   riseSpeed: 320
   gravity: 520
-  horizontalSpread: 60
+  horizontalSpread: 110
   holdFraction: 0.35

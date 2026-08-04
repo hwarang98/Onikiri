@@ -229,7 +229,10 @@ namespace Onikiri.Battle
                 var style = killed ? Onikiri.UI.DamageStyle.Kill
                           : crit   ? Onikiri.UI.DamageStyle.Critical
                                    : Onikiri.UI.DamageStyle.Normal;
-                damageNumbers.Show(dealt, hitPoint, style);
+
+                // 대상 키를 함께 넘겨서 같은 요괴를 연속으로 때릴 때 숫자가 합산되게
+                // 한다. 초당 여덟 번 구간에서는 팝업이 서로 겹쳐 어떤 숫자도 읽을 수 없다
+                damageNumbers.Show(dealt, hitPoint, style, target);
             }
 
             if (hitAudio != null)

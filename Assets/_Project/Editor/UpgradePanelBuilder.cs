@@ -42,16 +42,25 @@ namespace Onikiri.EditorTools
                 Curve = UpgradeTrack.Curve.Multiplicative, BaseValue = 5d, Step = 1.12d,
                 MaxLevel = 0
             },
-            // 공격속도: 선형 + 상한. 지수로 두면 몇 십 레벨 만에 프레임당 여러 번
-            // 공격하는 값이 되어 축 자체가 무의미해진다.
-            // 상한 60에서 1.15 + 0.12*59 = 8.23회/초. 공격 애니메이션 원본 길이(0.5초)가
-            // 만들던 초당 2회 상한을 한참 넘으므로, 스윙 압축이 실제로 동작하는지가
-            // 이 트랙에서 바로 드러난다
+            // 공격속도: 공격력과 같은 형태의 곱연산 + 상한.
+            //
+            // 8단계까지는 선형(+0.12/레벨)에 비용만 지수(x1.35)였다. 그 조합은 계수와
+            // 무관하게 반드시 죽는다. 값의 증가율은 레벨이 오를수록 0으로 수렴하는데
+            // 비용은 계속 지수로 오르기 때문이다. 실측한 시점에 골드당 효율이 공격력의
+            // 1/89까지 벌어져 있었고(Lv.31 대 Lv.51), 그 상태에서는 아무도 누르지 않는
+            // 버튼이 화면만 차지한다.
+            //
+            // 이제 둘 다 곱연산이고 비용 증가율도 같다(x1.15). 그러면 같은 레벨에서의
+            // 효율 비율이 레벨과 무관하게 일정해지고(여기서는 공격력이 1.2배 우위),
+            // 한쪽 레벨이 오르면 그쪽 비용이 올라 자연히 다른 쪽 차례가 온다.
+            // UpgradeEfficiencyTests가 이 관계를 못 박는다.
+            //
+            // 상한 51에서 1.15 x 1.04^50 = 8.17회/초. 이전 상한 8.23과 사실상 같다.
             new TrackSpec {
                 Id = UpgradeSystem.AttackSpeedId, DisplayName = "공격속도 강화",
-                BaseCost = 25d, CostGrowth = 1.35d,
-                Curve = UpgradeTrack.Curve.Additive, BaseValue = 1.15d, Step = 0.12d,
-                MaxLevel = 60
+                BaseCost = 4d, CostGrowth = 1.15d,
+                Curve = UpgradeTrack.Curve.Multiplicative, BaseValue = 1.15d, Step = 1.04d,
+                MaxLevel = 51
             }
         };
 

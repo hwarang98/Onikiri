@@ -21,8 +21,8 @@ namespace Onikiri.Tests
         const double PowerStep = 1.12d;
 
         const double SpeedBaseValue = 1.15d;
-        const double SpeedStep = 0.12d;
-        const int SpeedMaxLevel = 60;
+        const double SpeedStep = 1.04d;
+        const int SpeedMaxLevel = 51;
 
         private static UpgradeTrack AttackPower()
         {
@@ -35,10 +35,25 @@ namespace Onikiri.Tests
         private static UpgradeTrack AttackSpeed()
         {
             return new UpgradeTrack(UpgradeSystem.AttackSpeedId, "공격속도 강화",
-                                    BigDouble.FromDouble(25d), 1.35d,
-                                    UpgradeTrack.Curve.Additive,
+                                    BigDouble.FromDouble(4d), 1.15d,
+                                    UpgradeTrack.Curve.Multiplicative,
                                     BigDouble.FromDouble(SpeedBaseValue), SpeedStep,
                                     SpeedMaxLevel);
+        }
+
+        /**
+         * @brief 합연산 곡선 자체를 검사하기 위한 표본.
+         *
+         * 게임에서 쓰는 축은 이제 둘 다 곱연산이지만, UpgradeTrack이 두 형태를 모두
+         * 지원하므로 합연산 쪽도 계속 검사한다.
+         */
+        private static UpgradeTrack AdditiveSample()
+        {
+            return new UpgradeTrack("additive_sample", "합연산 표본",
+                                    BigDouble.FromDouble(25d), 1.35d,
+                                    UpgradeTrack.Curve.Additive,
+                                    BigDouble.FromDouble(1.15d), 0.12d,
+                                    60);
         }
 
         private static PlayerWallet WalletWith(double gold)
@@ -88,9 +103,9 @@ namespace Onikiri.Tests
         [Test]
         public void Value_AdditiveTrackStaysLinear()
         {
-            var track = AttackSpeed();
-            Assert.AreEqual(SpeedBaseValue, track.ValueAtLevel(1).ToDouble(), 1e-6d);
-            Assert.AreEqual(SpeedBaseValue + SpeedStep * 9, track.ValueAtLevel(10).ToDouble(), 1e-6d);
+            var track = AdditiveSample();
+            Assert.AreEqual(1.15d, track.ValueAtLevel(1).ToDouble(), 1e-6d);
+            Assert.AreEqual(1.15d + 0.12d * 9, track.ValueAtLevel(10).ToDouble(), 1e-6d);
         }
 
         [Test]
@@ -103,7 +118,7 @@ namespace Onikiri.Tests
             double atMax = track.ValueAtLevel(SpeedMaxLevel).ToDouble();
 
             Assert.Greater(atMax, 2d, "max attack speed no longer exceeds the animation cap");
-            Assert.AreEqual(SpeedBaseValue + SpeedStep * (SpeedMaxLevel - 1), atMax, 1e-6d);
+            Assert.AreEqual(SpeedBaseValue * System.Math.Pow(SpeedStep, SpeedMaxLevel - 1), atMax, 1e-6d);
         }
 
         [Test]

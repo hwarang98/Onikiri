@@ -36,7 +36,21 @@ namespace Onikiri.UI
                  "참격은 큰 흰색 덩어리라 그 안에 들어가면 숫자가 묻힌다")]
         [SerializeField] private Vector2 worldOffset = new Vector2(0f, 0.85f);
 
+        [Tooltip("같은 대상을 이 시간 안에 다시 때리면 새 팝업 대신 기존 숫자에 더한다. " +
+                 "초당 여덟 번씩 때리는 구간에서는 팝업이 서로 겹쳐 어떤 숫자도 읽을 수 " +
+                 "없어지는데, 합산하면 한 방에 얼마가 들어갔는지가 더 잘 보인다")]
+        [SerializeField] private float mergeWindow = 0.3f;
+
         private ObjectPool<DamageNumber> pool;
+
+        /**
+         * @brief 대상별로 지금 떠 있는 팝업.
+         *
+         * 요괴는 풀링되므로 인스턴스 ID를 열쇠로 쓴다. 죽어서 반환된 뒤 재사용되면
+         * 같은 ID가 다시 오는데, 그때는 이미 팝업이 회수된 뒤라 문제가 없다.
+         */
+        private readonly System.Collections.Generic.Dictionary<object, DamageNumber> active =
+            new System.Collections.Generic.Dictionary<object, DamageNumber>();
 
         public int PoolGrowthCount { get { return pool != null ? pool.GrowthCount : 0; } }
 
@@ -49,10 +63,38 @@ namespace Onikiri.UI
             if (prefab != null) pool = new ObjectPool<DamageNumber>(prefab, container, prewarm);
         }
 
-        /** 월드 좌표에 amount를 표시한다 */
-        public void Show(BigDouble amount, Vector3 worldPosition, DamageStyle style)
+        /**
+         * @brief 월드 좌표에 amount를 표시한다.
+         *
+         * targetKey가 같고 아직 합산 창 안이면 새 팝업 대신 기존 숫자에 더한다.
+         * null을 넘기면 합산하지 않고 항상 새로 띄운다.
+         */
+        public void Show(BigDouble amount, Vector3 worldPosition, DamageStyle style, object targetKey)
         {
             if (pool == null || canvas == null) return;
+
+            DamageNumber existing;
+            if (targetKey != null && active.TryGetValue(targetKey, out existing))
+            {
+                if (existing != null && existing.CanMerge(mergeWindow))
+                {
+                    // 강조는 위로만 올라간다(평타 < 치명타 < 처치). 평타 여러 대가
+                    // 합쳐진 뒤 마지막 한 대가 처치였다면 그 숫자는 처치로 읽혀야 하고,
+                    // 반대로 처치 뒤에 평타가 섞여 등급이 내려가서는 안 된다
+                    DamageStyle previous;
+                    if (!lastStyle.TryGetValue(targetKey, out previous)) previous = DamageStyle.Normal;
+
+                    var mergedStyle = style > previous ? style : previous;
+                    lastStyle[targetKey] = mergedStyle;
+
+                    var total = existing.Accumulated + amount;
+                    existing.Merge(amount, NumberFormatter.Format(total),
+                                   ColorFor(mergedStyle), FontSizeFor(mergedStyle));
+                    return;
+                }
+                active.Remove(targetKey);
+                lastStyle.Remove(targetKey);
+            }
 
             var screenPoint = worldCamera.WorldToScreenPoint(
                 worldPosition + new Vector3(worldOffset.x, worldOffset.y, 0f));
@@ -67,8 +109,18 @@ namespace Onikiri.UI
 
             var popup = pool.Get();
             popup.Play(NumberFormatter.Format(amount), anchored,
-                       ColorFor(style), FontSizeFor(style), Release);
+                       ColorFor(style), FontSizeFor(style), amount, targetKey, Release);
+
+            if (targetKey != null)
+            {
+                active[targetKey] = popup;
+                lastStyle[targetKey] = style;
+            }
         }
+
+        /** 대상별로 지금까지 올라간 강조 단계 */
+        private readonly System.Collections.Generic.Dictionary<object, DamageStyle> lastStyle =
+            new System.Collections.Generic.Dictionary<object, DamageStyle>();
 
         private Color ColorFor(DamageStyle style)
         {
@@ -93,6 +145,18 @@ namespace Onikiri.UI
 
         private void Release(DamageNumber popup)
         {
+            // 회수되는 팝업이 아직 대상에 걸려 있으면 지운다. 남겨두면 다음 타격이
+            // 이미 풀에 돌아간 인스턴스에 합산을 시도한다
+            if (popup.TargetKey != null)
+            {
+                DamageNumber registered;
+                if (active.TryGetValue(popup.TargetKey, out registered) && registered == popup)
+                {
+                    active.Remove(popup.TargetKey);
+                    lastStyle.Remove(popup.TargetKey);
+                }
+            }
+
             pool.Release(popup);
         }
     }

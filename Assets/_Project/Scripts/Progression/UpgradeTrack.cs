@@ -66,7 +66,14 @@ namespace Onikiri.Progression
          */
         public BigDouble Cost
         {
-            get { return baseCost * BigDouble.Pow(BigDouble.FromDouble(costGrowth), level - 1); }
+            get { return CostAtLevel(level); }
+        }
+
+        /** 임의 레벨의 비용. 밸런스 비교가 현재 레벨에 묶이지 않게 한다 */
+        public BigDouble CostAtLevel(int atLevel)
+        {
+            int steps = Mathf.Max(0, atLevel - 1);
+            return baseCost * BigDouble.Pow(BigDouble.FromDouble(costGrowth), steps);
         }
 
         /** 현재 레벨에서의 효과값 */
