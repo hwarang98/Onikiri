@@ -81,6 +81,42 @@ namespace Onikiri.Tests
             Assert.AreEqual("2K", NumberFormatter.Format(BigDouble.FromDouble(1500d), 0));
         }
 
+        /**
+         * @brief 강화 버튼이 보여줘야 하는 것은 정확히 1000 미만 구간의 변화다.
+         *
+         * Format을 쓰면 그 구간이 정수로 뭉개져 버튼이 "1 -> 1"을 보여준다. 화면을
+         * 봐야만 알 수 있는 종류의 결함이라 여기서 못 박는다.
+         */
+        [Test]
+        public void FormatStat_KeepsDecimalsBelowThousand()
+        {
+            Assert.AreEqual("5", NumberFormatter.FormatStat(BigDouble.FromDouble(5d), 2));
+            Assert.AreEqual("5.6", NumberFormatter.FormatStat(BigDouble.FromDouble(5.6d), 2));
+            Assert.AreEqual("1.15", NumberFormatter.FormatStat(BigDouble.FromDouble(1.15d), 2));
+            Assert.AreEqual("1.27", NumberFormatter.FormatStat(BigDouble.FromDouble(1.27d), 2));
+
+            // 같은 값을 Format에 넣으면 무엇이 사라지는지
+            Assert.AreEqual("6", NumberFormatter.Format(BigDouble.FromDouble(5.6d), 2));
+        }
+
+        [Test]
+        public void FormatStat_FallsBackToSuffixesOnceLarge()
+        {
+            // 후반 공격력은 금방 이 범위로 간다. 거기서는 축약 표기가 맞다
+            Assert.AreEqual("1.50K", NumberFormatter.FormatStat(BigDouble.FromDouble(1500d), 2));
+            Assert.AreEqual("3.20M", NumberFormatter.FormatStat(BigDouble.Create(3.2d, 6L), 2));
+
+            // 반올림이 1000에 닿는 경계
+            Assert.AreEqual("1.00K", NumberFormatter.FormatStat(BigDouble.FromDouble(999.999d), 2));
+        }
+
+        [Test]
+        public void FormatStat_KeepsSignAndZero()
+        {
+            Assert.AreEqual("0", NumberFormatter.FormatStat(BigDouble.Zero, 2));
+            Assert.AreEqual("-2.5", NumberFormatter.FormatStat(BigDouble.FromDouble(-2.5d), 2));
+        }
+
         [Test]
         public void SuffixForTier_CoversTheWholeAlphabeticRange()
         {

@@ -48,6 +48,39 @@ namespace Onikiri.Battle
 
         public int PoolGrowthCount { get { return pool != null ? pool.GrowthCount : 0; } }
 
+        /** 방치 보상이 요괴 공급 상한을 계산할 때 쓴다 */
+        public float SpawnInterval { get { return spawnInterval; } }
+
+        /**
+         * @brief 스폰 가중치로 평균 낸 1스테이지 기준 체력과 골드.
+         *
+         * 방치 보상은 "평균적인 요괴 한 마리"를 기준으로 계산한다. 가중치를 무시하고
+         * 단순 평균을 내면 가중치 1짜리 정예가 가중치 5짜리 잡몹과 같은 비중을 갖게
+         * 되어, 실제보다 후한 보상이 나온다.
+         */
+        public BigDouble AverageBaseHealth { get { return WeightedAverage(true); } }
+        public BigDouble AverageBaseGold { get { return WeightedAverage(false); } }
+
+        private BigDouble WeightedAverage(bool health)
+        {
+            if (definitions == null || definitions.Length == 0) return BigDouble.Zero;
+
+            BigDouble sum = BigDouble.Zero;
+            float totalWeight = 0f;
+
+            foreach (var definition in definitions)
+            {
+                if (definition == null) continue;
+                float weight = Mathf.Max(0f, definition.spawnWeight);
+                if (weight <= 0f) continue;
+
+                sum += (health ? definition.maxHealth : definition.goldReward) * BigDouble.FromDouble(weight);
+                totalWeight += weight;
+            }
+
+            return totalWeight > 0f ? sum / BigDouble.FromDouble(totalWeight) : BigDouble.Zero;
+        }
+
         private void Awake()
         {
             if (enemyParent == null) enemyParent = transform;
@@ -86,9 +119,16 @@ namespace Onikiri.Battle
             // 가까운 적이 뒤쪽 적보다 앞에 그려진다
             int sorting = SortingOrders.EnemyBase + (active.Count % SortingOrders.EnemySlots);
 
+            // 배수는 스폰 시점에 확정한다. 스테이지 오브젝트가 아직 없으면(테스트 씬 등)
+            // 1배로 떨어져 1스테이지 밸런스가 된다
+            var progress = Onikiri.Progression.StageProgress.Instance;
+            var healthMultiplier = progress != null ? progress.HealthMultiplier : BigDouble.One;
+            var goldMultiplier = progress != null ? progress.GoldMultiplier : BigDouble.One;
+
             enemy.Killed += OnEnemyKilled;
             enemy.Died += OnEnemyDied;
-            enemy.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY, sorting);
+            enemy.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY, sorting,
+                        healthMultiplier, goldMultiplier);
             active.Add(enemy);
         }
 
@@ -120,8 +160,12 @@ namespace Onikiri.Battle
         {
             enemy.Killed -= OnEnemyKilled;
 
+            // 정의 에셋의 값이 아니라 이 개체가 스폰될 때 확정된 보상을 준다
             var wallet = Onikiri.Progression.PlayerWallet.Instance;
-            if (wallet != null && enemy.Definition != null) wallet.Add(enemy.Definition.goldReward);
+            if (wallet != null) wallet.Add(enemy.GoldReward);
+
+            var progress = Onikiri.Progression.StageProgress.Instance;
+            if (progress != null) progress.RegisterKill();
         }
 
         private void OnEnemyDied(Enemy enemy)

@@ -22,7 +22,14 @@ namespace Onikiri.UI
         [Tooltip("풀이 늘어나기 전까지 동시에 살아 있을 수 있는 팝업 수")]
         [SerializeField] private int prewarm = 12;
 
+        [Header("강조")]
+        [Tooltip("평타. 화면에 가장 많이 나오므로 의도적으로 조용한 색이다")]
         [SerializeField] private Color normalColor = new Color32(0xFF, 0xF4, 0xD6, 0xFF);
+
+        [Tooltip("치명타. 금색")]
+        [SerializeField] private Color critColor = new Color32(0xFF, 0xD3, 0x4D, 0xFF);
+
+        [Tooltip("처치. 붉은색")]
         [SerializeField] private Color killColor = new Color32(0xFF, 0x8A, 0x7A, 0xFF);
 
         [Tooltip("타격 지점으로부터의 월드 오프셋. 참격 이펙트를 피해 위로 띄운다. " +
@@ -43,7 +50,7 @@ namespace Onikiri.UI
         }
 
         /** 월드 좌표에 amount를 표시한다 */
-        public void Show(BigDouble amount, Vector3 worldPosition, bool wasKill)
+        public void Show(BigDouble amount, Vector3 worldPosition, DamageStyle style)
         {
             if (pool == null || canvas == null) return;
 
@@ -60,7 +67,28 @@ namespace Onikiri.UI
 
             var popup = pool.Get();
             popup.Play(NumberFormatter.Format(amount), anchored,
-                       wasKill ? killColor : normalColor, Release);
+                       ColorFor(style), FontSizeFor(style), Release);
+        }
+
+        private Color ColorFor(DamageStyle style)
+        {
+            if (style == DamageStyle.Kill) return killColor;
+            if (style == DamageStyle.Critical) return critColor;
+            return normalColor;
+        }
+
+        /**
+         * @brief 강조 단계별 글자 크기.
+         *
+         * 평타는 아틀라스와 1:1, 강조는 정확히 2배다. 그 사이 값은 허용하지 않는다.
+         * 래스터 폰트를 정수배가 아닌 크기로 그리면 픽셀 격자가 화면 픽셀 사이에
+         * 놓여, 강조하려고 키운 숫자가 오히려 흐려진다.
+         */
+        private static float FontSizeFor(DamageStyle style)
+        {
+            return style == DamageStyle.Normal
+                ? PixelFontSizes.ThaleahDamage
+                : PixelFontSizes.ThaleahDamage * 2f;
         }
 
         private void Release(DamageNumber popup)

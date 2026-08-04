@@ -454,12 +454,21 @@ namespace Onikiri.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /**
+         * @brief 전투 밴드를 찾는다.
+         *
+         * 캔버스 직속으로만 찾으면 안 된다. 7단계에서 안전 영역 루트가 생기면서 밴드가
+         * 그 아래로 내려갔고, 그때부터 이 빌더를 **두 번째로 실행할 때만** 참조가 null로
+         * 기록됐다. 첫 실행에서는 안전 영역이 아직 없어 우연히 찾아지기 때문이다.
+         *
+         * 그리고 null이 기록돼도 아무 에러가 나지 않았다. BattleStageLayout이 조용히
+         * 조기 반환하면서 배경과 지면 앵커가 마지막으로 성공했을 때의 좌표에 그대로
+         * 머물렀고, 화면에서는 배경이 UI 밴드보다 122px 아래까지 그려지는 것으로만
+         * 드러났다.
+         */
         private static RectTransform FindBattleArea()
         {
-            var canvas = GameObject.Find("UI Canvas");
-            if (canvas == null) return null;
-            var band = canvas.transform.Find("BattleArea");
-            return band as RectTransform;
+            return MainSceneBuilder.FindBand("BattleArea") as RectTransform;
         }
 
         // ---------------------------------------------------------------- 헬퍼

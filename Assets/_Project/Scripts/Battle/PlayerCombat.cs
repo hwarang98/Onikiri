@@ -7,15 +7,20 @@ namespace Onikiri.Battle
      * @brief 사무라이의 자동 발도 공격.
      *
      * 방치형은 플레이하는 것이 아니라 보는 것이므로 루프 전체는 단순하다.
-     * 요괴가 사거리에 들어오길 기다렸다가 쿨다운마다 휘두르고, 접촉을 납득시킨다.
-     * 납득시키는 것은 참격 이펙트·데미지·히트스톱 세 가지가 같은 프레임에 떨어지는
-     * 일이며, 임팩트를 스윙 시작 시점이 아니라 공격 애니메이션에서 유도하는 이유가
-     * 바로 이것이다.
+     * 요괴가 사거리에 들어오길 기다렸다가 일정 간격으로 휘두르고, 접촉을 납득시킨다.
+     *
+     * **데미지는 타이머가 결정하고 애니메이션은 장식이다.** 예전에는 반대였다. 스윙
+     * 상태 기계가 끝나야 다음 공격이 시작될 수 있어서, 공격 하나가 항상 정수 개의
+     * 프레임을 차지했고 실제 공격 횟수가 설정값의 70~85%에 머물렀다. 방치형에서
+     * 스탯 표기와 실제가 다른 것은 연출 문제가 아니라 신뢰 문제다. 이제 타이머는
+     * 프레임 경계와 무관하게 누적되고, 남은 시간은 다음 프레임으로 이월된다.
+     *
+     * 애니메이션은 타격보다 lead 시간만큼 먼저 시작한다. 사무라이 아트에는 흰 검격
+     * 궤적이 스윙의 4/7 지점에 그려져 있어서, 그 프레임이 데미지가 들어가는 순간과
+     * 겹쳐야 참격·궤적·정지가 하나로 읽힌다.
      */
     public sealed class PlayerCombat : MonoBehaviour
     {
-        private enum State { Idle, Winding, Recovering }
-
         [Header("참조")]
         [SerializeField] private EnemySpawner spawner;
         [SerializeField] private SpriteAnimator animator;
@@ -39,9 +44,18 @@ namespace Onikiri.Battle
                  "long 범위를 벗어난다")]
         [SerializeField] private BigDouble damage = BigDouble.FromDouble(5d);
 
-        [Tooltip("칼이 닿기까지 공격 애니메이션에서 지나가는 비율")]
+        [Tooltip("칼이 닿기까지 공격 애니메이션에서 지나가는 비율. 데미지 시점을 " +
+                 "정하지 않는다. 애니메이션을 얼마나 먼저 시작할지를 정한다")]
         [Range(0f, 1f)]
         [SerializeField] private float impactPoint = 0.45f;
+
+        [Header("치명타")]
+        [Tooltip("치명타 확률. 아직 강화 대상이 아니라 고정값이다")]
+        [Range(0f, 1f)]
+        [SerializeField] private float critChance = 0.12f;
+
+        [Tooltip("치명타 배수")]
+        [SerializeField] private float critMultiplier = 2f;
 
         [Header("타격감")]
         [SerializeField] private ScreenShake cameraShake;
@@ -74,17 +88,29 @@ namespace Onikiri.Battle
         [SerializeField] private int slashPrewarm = 6;
 
         private ObjectPool<SlashVfx> slashPool;
-        private State state = State.Idle;
-        private float cooldownRemaining;
-        private float stateTimer;
+
+        /**
+         * @brief 다음 타격까지 쌓인 시간.
+         *
+         * 프레임 경계에서 0으로 되돌리지 않고 간격만큼만 빼낸다. 그래야 남은 시간이
+         * 이월되어 실제 공격 횟수가 설정값과 맞는다.
+         */
+        private float attackTimer;
 
         /** 공격속도로 압축되기 전, 설계된 스윙 길이 */
         private float baseAttackDuration;
 
-        /** 현재 재생 중인 스윙의 길이 */
-        private float attackDuration;
-        private bool impactDelivered;
-        private Enemy currentTarget;
+        /** 이번 주기의 스윙 애니메이션이 이미 시작됐는지 */
+        private bool swingStarted;
+
+        /**
+         * @brief 한 프레임에 밀어넣을 수 있는 타격 수의 상한.
+         *
+         * 프레임이 길어지면 (에디터 멈칫, 앱 복귀 직후) 밀린 시간만큼 타격이 한꺼번에
+         * 쏟아진다. 소리와 이펙트가 같은 프레임에 몰리는 것은 보상이 아니라 사고로
+         * 보이므로, 넘치는 분은 지급하지 않고 버린다.
+         */
+        private const int MaxHitsPerFrame = 3;
 
         public int SlashPoolGrowthCount { get { return slashPool != null ? slashPool.GrowthCount : 0; } }
 
@@ -123,7 +149,6 @@ namespace Onikiri.Battle
             baseAttackDuration = attackFrames != null && attackFrames.Length > 0
                 ? attackFrames.Length / attackFrameRate
                 : 0.4f;
-            attackDuration = baseAttackDuration;
         }
 
         private void Start()
@@ -133,97 +158,101 @@ namespace Onikiri.Battle
 
         private void Update()
         {
-            if (cooldownRemaining > 0f) cooldownRemaining -= Time.deltaTime;
+            float interval = 1f / Mathf.Max(0.01f, attacksPerSecond);
 
-            switch (state)
+            // 스윙은 공격 간격 안에 들어가야 한다. 아니면 다음 스윙이 시작될 때
+            // 이전 스윙이 아직 재생 중이라 동작이 뭉개진다. 스탯이 오르면 스윙도
+            // 눈에 띄게 빨라지므로 연출상으로도 맞다
+            float swingDuration = Mathf.Min(baseAttackDuration, interval);
+            float lead = swingDuration * impactPoint;
+
+            var target = spawner != null
+                ? spawner.FindNearestAlive(transform.position.x, attackRange)
+                : null;
+
+            if (target == null)
             {
-                case State.Idle:
-                    TryStartAttack();
-                    break;
+                // 대상이 없으면 타격 직전에서 타이머를 멈춰 세운다. 요괴가 들어오면
+                // lead 시간만큼 예비 동작을 하고 곧바로 벤다. 자유롭게 쌓이게 두면
+                // 비어 있던 시간만큼 첫 등장에 타격이 몰아친다
+                attackTimer = Mathf.Min(attackTimer + Time.deltaTime, interval - lead);
+                return;
+            }
 
-                case State.Winding:
-                    stateTimer += Time.deltaTime;
-                    if (!impactDelivered && stateTimer >= attackDuration * impactPoint) DeliverImpact();
-                    if (stateTimer >= attackDuration)
-                    {
-                        state = State.Idle;
-                        PlayIdle();
-                        // 스윙이 끝난 프레임에서 바로 다음 스윙을 시도한다. 다음 Update로
-                        // 넘기면 공격마다 한 프레임이 통째로 버려지는데, 공격속도가 낮을
-                        // 때는 오차가 1%도 안 되지만 초당 20회에서는 프레임 하나가 공격
-                        // 주기의 절반이라 실제 공격 횟수가 설정값의 절반으로 떨어진다
-                        TryStartAttack();
-                    }
-                    break;
+            attackTimer += Time.deltaTime;
+
+            int delivered = 0;
+            while (attackTimer >= interval && delivered < MaxHitsPerFrame)
+            {
+                attackTimer -= interval;
+                DeliverHit(target);
+                swingStarted = false;
+                delivered++;
+
+                target = spawner.FindNearestAlive(transform.position.x, attackRange);
+                if (target == null) break;
+            }
+
+            // 상한에 걸려 남은 몫은 이월하지 않고 버린다
+            if (attackTimer > interval) attackTimer = interval;
+
+            if (!swingStarted && target != null && attackTimer >= interval - lead)
+            {
+                PlaySwing(swingDuration);
+                swingStarted = true;
             }
         }
 
-        private void TryStartAttack()
+        /** 데미지가 들어가는 순간. 참격·숫자·소리·정지가 전부 여기서 함께 난다 */
+        private void DeliverHit(Enemy target)
         {
-            if (cooldownRemaining > 0f) return;
-            if (spawner == null) return;
+            if (target == null || !target.IsTargetable) return;
 
-            var target = spawner.FindNearestAlive(transform.position.x, attackRange);
-            if (target == null) return;
-
-            currentTarget = target;
-            state = State.Winding;
-            stateTimer = 0f;
-            impactDelivered = false;
             AttackCount++;
 
-            float interval = 1f / Mathf.Max(0.01f, attacksPerSecond);
-            cooldownRemaining = interval;
-
-            // 스윙이 공격 간격 안에 들어가야 한다. 아니면 애니메이션이 실제 공격
-            // 속도의 상한이 된다. 7프레임 14fps 스윙은 0.5초라, 스탯을 아무리 올려도
-            // 초당 2회에서 멈춘다. 공격속도는 두 자릿수까지 계속 의미가 있어야 하는
-            // 핵심 성장 축이다. 클립을 압축하면 연출상으로도 맞다. 스탯이 오르면
-            // 스윙도 눈에 띄게 빨라진다.
-            attackDuration = Mathf.Min(baseAttackDuration, interval);
-
-            if (attackFrames != null && attackFrames.Length > 0)
-            {
-                float rate = attackFrames.Length / Mathf.Max(0.0001f, attackDuration);
-                animator.Play(attackFrames, rate, false);
-            }
-        }
-
-        /** 칼이 닿는 프레임. 이펙트·데미지·정지가 동시에 일어난다 */
-        private void DeliverImpact()
-        {
-            impactDelivered = true;
-
-            // 예비 동작 도중 대상이 죽거나 사거리 밖으로 나갈 수 있다. 다시 탐색해서
-            // 스윙이 실제로 사무라이 앞에 있는 대상에게 닿게 한다
-            if (currentTarget == null || !currentTarget.IsTargetable)
-                currentTarget = spawner.FindNearestAlive(transform.position.x, attackRange);
-
-            if (currentTarget == null) return;
+            bool crit = critChance > 0f && Random.value < critChance;
+            BigDouble dealt = crit
+                ? damage * BigDouble.FromDouble(critMultiplier)
+                : damage;
 
             // transform이 아니라 그려진 스프라이트의 중심을 겨냥한다. Enemy.HitPoint 참고
-            Vector3 impactPosition = currentTarget.HitPoint
-                                     + new Vector3(slashOffset.x, slashOffset.y, 0f);
+            var hitPoint = target.HitPoint;
+            SpawnSlash(hitPoint + new Vector3(slashOffset.x, slashOffset.y, 0f));
 
-            SpawnSlash(impactPosition);
+            target.TakeDamage(dealt);
+            bool killed = !target.IsAlive;
 
-            var hitPoint = currentTarget.HitPoint;
-            currentTarget.TakeDamage(damage);
-            bool killed = !currentTarget.IsAlive;
+            if (damageNumbers != null)
+            {
+                // 처치가 치명타보다 우선한다. 한 타격에 둘 다 해당하면 플레이어에게
+                // 더 중요한 정보는 "죽었다" 쪽이다
+                var style = killed ? Onikiri.UI.DamageStyle.Kill
+                          : crit   ? Onikiri.UI.DamageStyle.Critical
+                                   : Onikiri.UI.DamageStyle.Normal;
+                damageNumbers.Show(dealt, hitPoint, style);
+            }
 
-            if (damageNumbers != null) damageNumbers.Show(damage, hitPoint, killed);
             if (hitAudio != null)
             {
                 if (killed) hitAudio.PlayKill();
                 else hitAudio.PlayHit();
             }
 
-            // 셋이 같은 프레임에 떨어진다. 정지와 흔들림은 공격속도가 오를수록 짧아져서
-            // 후반의 연속 스윙이 계속 끊기는 화면이 되지 않게 한다. CombatFeel 참고
+            // 정지와 흔들림은 공격속도가 오를수록 짧아져서 후반의 연속 스윙이 계속
+            // 끊기는 화면이 되지 않게 한다. CombatFeel 참고
             HitStop.Request(CombatFeel.ScaledDuration(hitStopSeconds, hitStopBudgetPerSecond, attacksPerSecond));
             ScreenShake.Request(cameraShake,
                 CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond),
                 shakePixels);
+        }
+
+        /** 장식용 스윙. 끝나면 스스로 idle로 돌아간다 */
+        private void PlaySwing(float duration)
+        {
+            if (attackFrames == null || attackFrames.Length == 0) return;
+
+            float rate = attackFrames.Length / Mathf.Max(0.0001f, duration);
+            animator.Play(attackFrames, rate, false, PlayIdle);
         }
 
         private void SpawnSlash(Vector3 position)

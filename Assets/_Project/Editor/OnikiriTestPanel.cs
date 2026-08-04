@@ -1,3 +1,5 @@
+// using System 을 넣지 않는다. System.Object 와 UnityEngine.Object 가 충돌해서
+// 이 파일 전체의 FindFirstObjectByType 호출이 모호해진다
 using Onikiri.Battle;
 using Onikiri.Core;
 using Onikiri.Progression;
@@ -40,6 +42,11 @@ namespace Onikiri.EditorTools
         private UpgradeSystem upgrades;
         private Onikiri.UI.DamageNumberSpawner damageNumbers;
         private HitAudio hitAudio;
+        private StageProgress stage;
+        private GameSession session;
+
+        /** 방치 보상 확인용. 몇 시간 전에 종료한 것으로 꾸밀지 */
+        private float offlineHours = 3f;
 
         /** 공격속도 실측용. 창 길이는 게임 시간으로 잰다 */
         private float rateWindowStart;
@@ -72,7 +79,7 @@ namespace Onikiri.EditorTools
             if (!EditorApplication.isPlaying)
             {
                 combat = null; spawner = null; upgrades = null;
-                damageNumbers = null; hitAudio = null;
+                damageNumbers = null; hitAudio = null; stage = null; session = null;
                 measuredRate = 0f; measuredFps = 0f; audioPeak = 0f;
 
                 // 측정 창도 함께 비운다. 이 창은 도메인 리로드를 넘어 살아남는데,
@@ -90,6 +97,8 @@ namespace Onikiri.EditorTools
             if (upgrades == null) upgrades = Object.FindFirstObjectByType<UpgradeSystem>();
             if (damageNumbers == null) damageNumbers = Object.FindFirstObjectByType<Onikiri.UI.DamageNumberSpawner>();
             if (hitAudio == null) hitAudio = Object.FindFirstObjectByType<HitAudio>();
+            if (stage == null) stage = Object.FindFirstObjectByType<StageProgress>();
+            if (session == null) session = Object.FindFirstObjectByType<GameSession>();
 
             SampleAttackRate();
             SampleFps();
@@ -243,6 +252,29 @@ namespace Onikiri.EditorTools
                     Row("골드", NumberFormatter.Format(wallet.Gold) +
                                 "   (누적 " + NumberFormatter.Format(wallet.LifetimeGold) + ")");
 
+                if (stage != null)
+                {
+                    Row("스테이지", string.Format("{0}   {1}/{2} 처치   체력 x{3}  골드 x{4}",
+                        stage.Stage, stage.KillsThisStage, stage.KillsRequired,
+                        NumberFormatter.Format(stage.HealthMultiplier, 2),
+                        NumberFormatter.Format(stage.GoldMultiplier, 2)));
+
+                    // 밸런스의 핵심 지표. 1로 내려앉으면 공격력 강화가 죽고,
+                    // 계속 불어나면 후반이 늘어진다
+                    if (combat != null && spawner != null)
+                    {
+                        var averageHealth = spawner.AverageBaseHealth * stage.HealthMultiplier;
+                        int hits = StageCurve.HitsToKill(averageHealth, combat.Damage);
+                        Row("처치당 타격", hits + "대   (평균 체력 " +
+                            NumberFormatter.Format(averageHealth) + " / 데미지 " +
+                            NumberFormatter.Format(combat.Damage) + ")");
+                    }
+                }
+
+                if (session != null)
+                    Row("초당 골드", session.EstimateGoldPerSecond().ToString("F2") +
+                                     "   (방치 시 절반)");
+
                 if (spawner != null)
                 {
                     int alive = 0;
@@ -340,7 +372,76 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("타격음 재생") && hitAudio != null) hitAudio.PlayHit();
                     if (GUILayout.Button("처치음 재생") && hitAudio != null) hitAudio.PlayKill();
                 }
+
+                using (new EditorGUI.DisabledScope(stage == null))
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("스테이지", GUILayout.Width(64f));
+                    if (GUILayout.Button("+1"))
+                        for (int n = stage.KillsThisStage; n < stage.KillsRequired; n++) stage.RegisterKill();
+                    if (GUILayout.Button("+10"))
+                        for (int n = 0; n < 10 * StageCurve.KillsPerStage; n++) stage.RegisterKill();
+                    if (GUILayout.Button("1로")) stage.SetProgress(1, 0);
+                }
             }
+
+            DrawSaveTools();
+        }
+
+        /**
+         * @brief 세이브와 방치 보상.
+         *
+         * 방치 보상은 실제로 몇 시간을 기다리지 않으면 확인할 방법이 없다. 저장된
+         * 시각을 과거로 돌린 뒤 다시 불러오면, 앱을 껐다 켠 것과 정확히 같은 경로를
+         * 탄다 - 보상 계산도 팝업도 실제 코드가 그대로 돈다.
+         */
+        private void DrawSaveTools()
+        {
+            EditorGUILayout.LabelField("세이브 / 방치 보상", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.SelectableLabel(
+                    SaveSystem.Exists ? SaveSystem.Path : SaveSystem.Path + "  (아직 없음)",
+                    GUILayout.Height(16f));
+
+                using (new EditorGUI.DisabledScope(session == null))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("지금 저장")) session.Save();
+                        if (GUILayout.Button("다시 불러오기")) session.ReloadFromDisk();
+                        if (GUILayout.Button("세이브 삭제")) session.DeleteSaveAndReload();
+                    }
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField("방치", GUILayout.Width(40f));
+                        offlineHours = EditorGUILayout.Slider(offlineHours, 0.1f, 12f);
+                        if (GUILayout.Button("적용", GUILayout.Width(60f))) SimulateOffline(offlineHours);
+                    }
+
+                    EditorGUILayout.HelpBox(
+                        "저장 -> 종료 시각을 " + offlineHours.ToString("F1") +
+                        "시간 전으로 되돌림 -> 다시 불러오기. 상한은 8시간이라 그보다 " +
+                        "크게 잡으면 '상한 도달' 표시를 확인할 수 있습니다.", MessageType.None);
+                }
+            }
+        }
+
+        private void SimulateOffline(float hours)
+        {
+            if (session == null) return;
+
+            session.Save();
+
+            var data = SaveSystem.Load();
+            // 저장 직후의 시각에서 빼야 한다. 지금 시각에서 빼면 자동 저장이 한 번
+            // 끼어들었을 때 그만큼이 사라진다
+            data.lastQuitUtcTicks -= (long)(hours * System.TimeSpan.TicksPerHour);
+            SaveSystem.Save(data);
+
+            session.ReloadFromDisk();
         }
 
         private void DrawScreenTools()

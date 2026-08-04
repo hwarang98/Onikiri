@@ -57,7 +57,12 @@ namespace Onikiri.EditorTools
 
         // 1080 폭 캔버스 기준 배치값. 55pt 글자가 들어가야 하므로 줄 높이는 넉넉히 준다
         private const float SidePadding = 48f;
-        private const float RowHeight = 156f;
+
+        /** 한 줄의 높이. 55pt 글자에 위아래 여백을 더한 값 */
+        private const float LineHeight = 72f;
+
+        /** 이름/비용 한 줄 + 증가폭 한 줄 */
+        private const float RowHeight = LineHeight * 2f + 24f;
         private const float RowGap = 24f;
         private const float TopPadding = 24f;
 
@@ -219,24 +224,23 @@ namespace Onikiri.EditorTools
             var button = go.AddComponent<Button>();
             button.targetGraphic = image;
 
-            // 이름은 왼쪽에서 늘어나고, 비용은 오른쪽 끝에 고정폭으로 붙는다.
-            // 비용은 자릿수가 계속 늘어나므로(10 -> 1.5K -> 3.2M) 오른쪽 정렬이라야
-            // 숫자가 자라도 줄 전체가 흔들리지 않는다
+            // 두 줄이다. 위는 이름과 비용, 아래는 이번 구매의 증가폭.
+            //
+            // 이름은 왼쪽에서 늘어나고 비용은 오른쪽 끝에 고정폭으로 붙는다. 비용은
+            // 자릿수가 계속 늘어나므로(10 -> 1.5K -> 3.2M) 오른쪽 정렬이라야 숫자가
+            // 자라도 줄 전체가 흔들리지 않는다
             var nameLabel = CreateLabel(go.transform, font, "Name", TextAlignmentOptions.Left);
-            var nameRect = (RectTransform)nameLabel.transform;
-            nameRect.anchorMin = Vector2.zero;
-            nameRect.anchorMax = Vector2.one;
-            nameRect.offsetMin = new Vector2(24f, 0f);
-            nameRect.offsetMax = new Vector2(-CostWidth - 24f, 0f);
+            PlaceStretched((RectTransform)nameLabel.transform, 24f, CostWidth + 24f, 10f, LineHeight);
 
             var costLabel = CreateLabel(go.transform, font, "Cost", TextAlignmentOptions.Right);
-            var costRect = (RectTransform)costLabel.transform;
-            costRect.anchorMin = new Vector2(1f, 0f);
-            costRect.anchorMax = new Vector2(1f, 1f);
-            costRect.pivot = new Vector2(1f, 0.5f);
-            costRect.sizeDelta = new Vector2(CostWidth, 0f);
-            costRect.anchoredPosition = new Vector2(-24f, 0f);
+            PlaceRight((RectTransform)costLabel.transform, 24f, 10f, LineHeight);
             costLabel.color = DimColor;
+
+            // 증가폭은 흐린 색으로 둔다. 이름과 비용이 먼저 읽히고, 값은 그 다음에
+            // 확인하는 정보다
+            var valueLabel = CreateLabel(go.transform, font, "Value", TextAlignmentOptions.Left);
+            PlaceStretched((RectTransform)valueLabel.transform, 24f, 24f, 10f + LineHeight, LineHeight);
+            valueLabel.color = DimColor;
 
             var upgradeButton = go.AddComponent<Onikiri.UI.UpgradeButton>();
             var so = new SerializedObject(upgradeButton);
@@ -244,10 +248,36 @@ namespace Onikiri.EditorTools
             so.FindProperty("trackIndex").intValue = index;
             so.FindProperty("button").objectReferenceValue = button;
             so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
+            so.FindProperty("valueLabel").objectReferenceValue = valueLabel;
             so.FindProperty("costLabel").objectReferenceValue = costLabel;
             so.FindProperty("affordableColor").colorValue = TextColor;
             so.FindProperty("unaffordableColor").colorValue = DimColor;
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /**
+         * @brief 부모 위쪽에 붙여 가로로 늘린다.
+         *
+         * 위 기준 앵커를 쓰면 offsetMin/Max만으로 위치와 크기가 완전히 결정되어,
+         * 부모 폭을 몰라도 "왼쪽 24, 오른쪽 300 비우고, 위에서 10 아래" 를 그대로 적을 수 있다.
+         */
+        private static void PlaceStretched(RectTransform rect, float left, float right, float top, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(left, -(top + height));
+            rect.offsetMax = new Vector2(-right, -top);
+        }
+
+        /** 오른쪽 끝에 고정폭으로 붙인다 */
+        private static void PlaceRight(RectTransform rect, float right, float top, float height)
+        {
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.sizeDelta = new Vector2(CostWidth, height);
+            rect.anchoredPosition = new Vector2(-right, -top);
         }
 
         private static TMP_Text CreateLabel(Transform parent, TMP_FontAsset font, string name,

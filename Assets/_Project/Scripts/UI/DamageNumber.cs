@@ -45,17 +45,26 @@ namespace Onikiri.UI
             if (label == null) label = GetComponent<TMP_Text>();
         }
 
-        public void Play(string text, Vector2 anchoredPosition, Color color, Action<DamageNumber> onFinished)
+        /**
+         * @brief 팝업 하나를 띄운다.
+         *
+         * fontSize는 아틀라스를 구운 크기의 정수배여야 한다. 그 사이 값을 넣으면
+         * 비트맵이 리샘플되어 래스터 폰트를 쓴 이유가 사라진다.
+         */
+        public void Play(string text, Vector2 anchoredPosition, Color color, float fontSize,
+                         Action<DamageNumber> onFinished)
         {
             finished = onFinished;
 
             label.text = text;
+            label.fontSize = fontSize;
             baseColor = color;
             label.color = color;
 
             if (shadow != null)
             {
                 shadow.text = text;
+                shadow.fontSize = fontSize;
                 shadow.color = new Color(0f, 0f, 0f, 0.75f);
             }
 

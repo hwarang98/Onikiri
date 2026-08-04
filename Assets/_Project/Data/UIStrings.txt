@@ -77,3 +77,4 @@ abcdefghijklmnopqrstuvwxyz
 KMBT
 +-*/=%.,:;!?'"()[]<>#&@~^_|\
 ×÷…·、。「」
+→←↑↓

@@ -73,6 +73,40 @@ namespace Onikiri.Core
         }
 
         /**
+         * @brief 강화 패널이 쓰는 스탯 표기. 1000 미만에서도 소수를 지킨다.
+         *
+         * Format은 1000 미만을 정수로 읽는다. 골드에는 그것이 맞다 - 404.8골드라는
+         * 것은 없다. 스탯에는 그 규칙이 치명적이다. 강화 버튼이 보여줘야 하는 것은
+         * 정확히 이 구간의 변화인데, 공격력 5 -> 5.6이 "5 -> 6"으로, 공격속도
+         * 1.15 -> 1.27이 "1 -> 1"로 뭉개진다. 뒤엣것은 버튼이 무엇을 파는지
+         * 아무것도 말해주지 않는다.
+         *
+         * 의미 없는 0은 떼어낸다. 좁은 폰 화면에서는 "5.00 -> 5.60"보다
+         * "5 -> 5.6"이 읽기 쉽다.
+         */
+        public static string FormatStat(BigDouble value, int decimals)
+        {
+            if (value.IsZero) return "0";
+            if (decimals < 0) decimals = 0;
+
+            // 1000 이상은 축약 표기가 그대로 맞다. 후반 공격력은 금방 그 범위로 간다
+            if (value.Abs().Exponent >= 3) return Format(value, decimals);
+
+            double rounded = Math.Round(value.ToDouble(), decimals);
+
+            // 반올림으로 1000에 닿으면 축약 표기로 넘긴다
+            if (Math.Abs(rounded) >= 1000d) return Format(BigDouble.FromDouble(rounded), decimals);
+
+            return TrimTrailingZeros(rounded.ToString("F" + decimals, CultureInfo.InvariantCulture));
+        }
+
+        private static string TrimTrailingZeros(string text)
+        {
+            if (text.IndexOf('.') < 0) return text;
+            return text.TrimEnd('0').TrimEnd('.');
+        }
+
+        /**
          * @brief 10^(3*tier) 크기에 해당하는 접미사.
          *
          * 두 글자 표기 범위를 벗어나면 null을 반환한다. 호출부는 지수 표기로 폴백한다.

@@ -32,6 +32,55 @@ namespace Onikiri.Progression
             return tracks[index];
         }
 
+        public UpgradeTrack GetTrack(string id)
+        {
+            if (tracks == null) return null;
+            foreach (var track in tracks)
+                if (track != null && track.Id == id) return track;
+            return null;
+        }
+
+        /**
+         * @brief 세이브 복원. 레벨을 넣은 뒤 스탯까지 다시 적용한다.
+         *
+         * 레벨만 되돌리고 적용을 잊으면 표시된 레벨과 실제 전투 스탯이 어긋난 채로
+         * 플레이가 시작된다.
+         */
+        public void RestoreLevels(string[] ids, int[] levels)
+        {
+            if (ids == null || levels == null) return;
+
+            int count = Mathf.Min(ids.Length, levels.Length);
+            for (int i = 0; i < count; i++)
+            {
+                var track = GetTrack(ids[i]);
+                // 세이브에 있지만 지금은 없는 트랙은 조용히 건너뛴다. 강화 목록이
+                // 바뀌어도 예전 세이브를 계속 읽을 수 있어야 한다
+                if (track != null) track.SetLevel(levels[i]);
+            }
+
+            ApplyAll();
+            Raise();
+        }
+
+        public string[] CollectIds()
+        {
+            if (tracks == null) return new string[0];
+
+            var ids = new string[tracks.Length];
+            for (int i = 0; i < tracks.Length; i++) ids[i] = tracks[i] != null ? tracks[i].Id : string.Empty;
+            return ids;
+        }
+
+        public int[] CollectLevels()
+        {
+            if (tracks == null) return new int[0];
+
+            var levels = new int[tracks.Length];
+            for (int i = 0; i < tracks.Length; i++) levels[i] = tracks[i] != null ? tracks[i].Level : 1;
+            return levels;
+        }
+
         private void Start()
         {
             // 레벨 1의 값도 반영해야 한다. 그러지 않으면 시작 스탯은 프리팹에 적힌 값,
@@ -78,6 +127,12 @@ namespace Onikiri.Progression
                     Debug.LogWarning("[Onikiri] Upgrade track '" + track.Id + "' has no stat wired.");
                     break;
             }
+        }
+
+        /** 강화 버튼이 "5 -> 5.6" 을 표시할 때 쓴다 */
+        public BigDouble NextValue(UpgradeTrack track)
+        {
+            return track != null ? track.ValueAtLevel(track.Level + 1) : BigDouble.Zero;
         }
 
         private void Raise()

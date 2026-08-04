@@ -24,6 +24,9 @@ namespace Onikiri.UI
         private Vector2Int appliedScreenSize;
         private ScreenOrientation appliedOrientation;
 
+        /** 믿을 수 없는 안전 영역을 이미 알렸는지. 매 프레임 도는 코드라 한 번만 남긴다 */
+        private bool reportedBadSafeArea;
+
         private void Awake()
         {
             rect = (RectTransform)transform;
@@ -58,6 +61,29 @@ namespace Onikiri.UI
             appliedSafeArea = safeArea;
             appliedScreenSize = screenSize;
             appliedOrientation = Screen.orientation;
+
+            // Screen.safeArea 가 Screen.width/height 와 어긋나는 경우가 있다. 에디터에서
+            // 1080x1920 게임 뷰에 960x2566 짜리 안전 영역이 돌아온 적이 있고, 그것을
+            // 그대로 나누면 세로 앵커가 1.34가 되어 UI 전체가 화면 밖으로 늘어난다.
+            // 그 상태에서 BattleStageLayout이 전투 밴드를 읽으므로 월드까지 함께 어긋난다.
+            //
+            // 안전 영역은 정의상 화면보다 클 수 없다. 그런 값은 믿지 않고 전체 화면으로
+            // 취급한다. 실기에서 값이 정상이면 아래 검사는 전부 통과한다
+            bool trustworthy = safeArea.width > 0f && safeArea.height > 0f
+                               && safeArea.xMin >= 0f && safeArea.yMin >= 0f
+                               && safeArea.xMax <= screenSize.x && safeArea.yMax <= screenSize.y;
+
+            if (!trustworthy)
+            {
+                if (!reportedBadSafeArea)
+                {
+                    reportedBadSafeArea = true;
+                    Debug.LogWarning("[Onikiri] Screen.safeArea " + safeArea + " does not fit the " +
+                                     screenSize.x + "x" + screenSize.y +
+                                     " screen; treating it as full screen.", this);
+                }
+                safeArea = new Rect(0f, 0f, screenSize.x, screenSize.y);
+            }
 
             // 앵커는 0~1 비율이므로 화면 픽셀을 그대로 나눠 쓸 수 있다. offsetMin/Max를
             // 쓰면 캔버스 스케일이 곱해져 기기마다 다른 값이 되어버린다

@@ -183,6 +183,11 @@ namespace Onikiri.EditorTools
             // 강화는 PlayerCombat이 씬에 있어야 배선할 수 있다
             UpgradePanelBuilder.Build();
 
+            // 세션은 마지막이다. 강화·스테이지·전투가 전부 자리를 잡은 뒤라야
+            // 세이브를 복원할 대상을 찾을 수 있다
+            var offlinePopup = WireOfflinePopup();
+            WireSession(spawner, offlinePopup);
+
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
@@ -298,6 +303,21 @@ namespace Onikiri.EditorTools
             if (Object.FindFirstObjectByType<AudioListener>() == null)
                 problems.Add("Scene has no AudioListener - all audio will be silent");
 
+            // 레이아웃 참조가 빠지면 배경과 지면선이 마지막으로 성공했을 때의 좌표에
+            // 얼어붙는다. 플레이는 정상으로 보이고 배경만 UI 밴드와 어긋난 채 남는다
+            var layoutObject = GameObject.Find("Battle");
+            var layout = layoutObject != null ? layoutObject.GetComponent<BattleStageLayout>() : null;
+            if (layout == null) problems.Add("Battle has no BattleStageLayout");
+            else
+            {
+                var layoutSo = new SerializedObject(layout);
+                RequireReference(layoutSo, "targetCamera", problems);
+                RequireReference(layoutSo, "battleArea", problems);
+                RequireReference(layoutSo, "backgroundRoot", problems);
+                RequireReference(layoutSo, "groundAnchor", problems);
+                RequireReference(layoutSo, "skyFill", problems);
+            }
+
             var spawnerObject = GameObject.Find("EnemySpawner");
             if (spawnerObject == null) { Debug.LogError("[Onikiri] EnemySpawner missing from scene."); return false; }
 
@@ -340,6 +360,21 @@ namespace Onikiri.EditorTools
 
             if (Object.FindFirstObjectByType<Onikiri.UI.SafeAreaFitter>() == null)
                 problems.Add("No SafeAreaFitter - UI will run under the notch");
+
+            // 세이브가 배선되지 않으면 플레이 중에는 아무 문제가 없어 보이고,
+            // 앱을 껐다 켠 뒤에야 진행이 사라진 것을 알게 된다
+            var battle = GameObject.Find("Battle");
+            var session = battle != null ? battle.GetComponent<Onikiri.Progression.GameSession>() : null;
+            if (session == null) problems.Add("Battle has no GameSession - nothing will be saved");
+            else
+            {
+                var sessionSo = new SerializedObject(session);
+                RequireReference(sessionSo, "upgrades", problems);
+                RequireReference(sessionSo, "stage", problems);
+                RequireReference(sessionSo, "combat", problems);
+                RequireReference(sessionSo, "spawner", problems);
+                RequireReference(sessionSo, "offlinePopup", problems);
+            }
 
             if (problems.Count > 0)
             {
@@ -396,12 +431,17 @@ namespace Onikiri.EditorTools
 
             var root = new GameObject("DamageNumber", typeof(RectTransform));
             var rect = (RectTransform)root.transform;
-            rect.sizeDelta = new Vector2(260f, 60f);
+            // 처치와 치명타는 160pt로 뜬다. 평타(80pt) 기준으로 잡으면 강조 숫자가
+            // 잘린다
+            rect.sizeDelta = new Vector2(520f, 200f);
 
             // 그림자를 먼저 만들어 뒤에 그려지게 하고 화면 픽셀 몇 개만큼 밀어둔다.
             // 비트맵 폰트는 SDF 아웃라인을 쓸 수 없고, 그림자가 없으면 흰 참격 위에
-            // 올라가는 순간 숫자를 읽을 수 없다
-            var shadow = CreateDamageLabel(root.transform, font, "Shadow", new Vector2(3f, -3f));
+            // 올라가는 순간 숫자를 읽을 수 없다.
+            //
+            // 오프셋 5는 아트 픽셀 하나다(Pixel Perfect 배율과 같은 값). 그보다 작으면
+            // 그림자가 픽셀 격자 사이에 놓여 글자 가장자리가 지저분해진다
+            var shadow = CreateDamageLabel(root.transform, font, "Shadow", new Vector2(5f, -5f));
             var label = CreateDamageLabel(root.transform, font, "Label", Vector2.zero);
 
             var popup = root.AddComponent<Onikiri.UI.DamageNumber>();
@@ -632,34 +672,73 @@ namespace Onikiri.EditorTools
             return spawner;
         }
 
-        /** Battle 루트에 지갑을, 상단 바에 골드 표시를 붙인다 */
+        /**
+         * @brief Battle 루트에 지갑/스테이지를, 상단 바에 골드·스테이지 표시를 붙인다.
+         *
+         * 상단 바는 세로 192px밖에 안 되므로 두 표시를 좌우로 나눈다. 골드는 왼쪽에서
+         * 자릿수가 계속 늘어나고, 스테이지는 오른쪽에 붙어 폭이 거의 변하지 않는다.
+         */
         private static void WireWalletAndHud()
         {
             var battle = GameObject.Find("Battle");
             if (battle.GetComponent<Onikiri.Progression.PlayerWallet>() == null)
                 battle.AddComponent<Onikiri.Progression.PlayerWallet>();
+            if (battle.GetComponent<Onikiri.Progression.StageProgress>() == null)
+                battle.AddComponent<Onikiri.Progression.StageProgress>();
 
             var topBar = MainSceneBuilder.FindBand("TopBar");
             if (topBar == null) return;
 
-            var existing = topBar.Find("GoldLabel");
+            var goldLabel = EnsureHudLabel(topBar, "GoldLabel", TMPro.TextAlignmentOptions.Left,
+                                           new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(48f, -46f));
+            goldLabel.text = "골드 0";
+
+            var stageLabel = EnsureHudLabel(topBar, "StageLabel", TMPro.TextAlignmentOptions.Right,
+                                            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48f, -46f));
+            stageLabel.text = "스테이지 1  0/10";
+
+            var hud = topBar.GetComponent<Onikiri.UI.HUDCurrency>();
+            if (hud == null) hud = topBar.gameObject.AddComponent<Onikiri.UI.HUDCurrency>();
+
+            var currencySo = new SerializedObject(hud);
+            currencySo.FindProperty("label").objectReferenceValue = goldLabel;
+            currencySo.FindProperty("prefix").stringValue = "골드 ";
+            currencySo.ApplyModifiedPropertiesWithoutUndo();
+
+            var stageHud = topBar.GetComponent<Onikiri.UI.HUDStage>();
+            if (stageHud == null) stageHud = topBar.gameObject.AddComponent<Onikiri.UI.HUDStage>();
+
+            var stageSo = new SerializedObject(stageHud);
+            stageSo.FindProperty("label").objectReferenceValue = stageLabel;
+            stageSo.FindProperty("prefix").stringValue = "스테이지 ";
+            stageSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /** 상단 바 라벨 하나. 위 기준 앵커라 상단 바 높이가 바뀌어도 위치가 유지된다 */
+        private static TMPro.TextMeshProUGUI EnsureHudLabel(
+            Transform parent, string name, TMPro.TextAlignmentOptions alignment,
+            Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPosition)
+        {
+            var existing = parent.Find(name);
             TMPro.TextMeshProUGUI label;
+
             if (existing != null)
             {
                 label = existing.GetComponent<TMPro.TextMeshProUGUI>();
             }
             else
             {
-                var go = new GameObject("GoldLabel", typeof(RectTransform));
-                go.transform.SetParent(topBar, false);
+                var go = new GameObject(name, typeof(RectTransform));
+                go.transform.SetParent(parent, false);
                 label = go.AddComponent<TMPro.TextMeshProUGUI>();
-
-                var rect = (RectTransform)go.transform;
-                rect.anchorMin = new Vector2(0f, 0f);
-                rect.anchorMax = new Vector2(1f, 1f);
-                rect.offsetMin = new Vector2(48f, 0f);
-                rect.offsetMax = new Vector2(-48f, -40f);
             }
+
+            var rect = (RectTransform)label.transform;
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = new Vector2(anchorMin.x, 1f);
+            rect.sizeDelta = new Vector2(560f, 72f);
+            rect.anchoredPosition = anchoredPosition;
 
             var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(GalmuriFontPath);
             if (font != null)
@@ -667,19 +746,154 @@ namespace Onikiri.EditorTools
                 label.font = font;
                 label.fontSharedMaterial = font.material;
             }
-            label.text = "골드 0";
-            // 33은 아틀라스를 구운 크기다. 글리프가 비트맵과 1:1로 그려진다
+
+            // 55는 아틀라스를 구운 크기다. 글리프가 비트맵과 1:1로 그려진다
             label.fontSize = Onikiri.UI.PixelFontSizes.GalmuriSmall;
-            label.alignment = TMPro.TextAlignmentOptions.Left;
+            label.alignment = alignment;
             label.color = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
             label.raycastTarget = false;
+            label.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
 
-            var hud = topBar.GetComponent<Onikiri.UI.HUDCurrency>();
-            if (hud == null) hud = topBar.gameObject.AddComponent<Onikiri.UI.HUDCurrency>();
+            return label;
+        }
 
-            var so = new SerializedObject(hud);
-            so.FindProperty("label").objectReferenceValue = label;
-            so.FindProperty("prefix").stringValue = "골드 ";
+        private static readonly Color PopupDimColor = new Color32(0x10, 0x0E, 0x18, 0xD0);
+        private static readonly Color PopupBoxColor = new Color32(0x3A, 0x35, 0x50, 0xFF);
+        private static readonly Color PopupTextColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
+
+        /**
+         * @brief 방치 보상 팝업.
+         *
+         * 안전 영역 루트의 마지막 자식이라 다른 밴드 위에 그려진다. 전체를 덮는
+         * 어두운 판이 뒤의 강화 버튼 입력을 막는 역할도 한다 - 팝업이 떠 있는데
+         * 뒤가 눌리면 보상을 확인하기 전에 강화가 되어버린다.
+         */
+        private static Onikiri.UI.OfflineRewardPopup WireOfflinePopup()
+        {
+            var safeArea = UpgradePanelBuilder.EnsureSafeArea();
+            if (safeArea == null) return null;
+
+            var existing = safeArea.Find("OfflinePopup");
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+
+            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(GalmuriFontPath);
+
+            var root = new GameObject("OfflinePopup", typeof(RectTransform));
+            root.transform.SetParent(safeArea, false);
+            root.transform.SetAsLastSibling();
+            Stretch((RectTransform)root.transform);
+
+            var dim = new GameObject("Dim", typeof(RectTransform));
+            dim.transform.SetParent(root.transform, false);
+            Stretch((RectTransform)dim.transform);
+            var dimImage = dim.AddComponent<UnityEngine.UI.Image>();
+            dimImage.color = PopupDimColor;
+
+            var box = new GameObject("Box", typeof(RectTransform));
+            box.transform.SetParent(root.transform, false);
+            var boxRect = (RectTransform)box.transform;
+            boxRect.anchorMin = boxRect.anchorMax = new Vector2(0.5f, 0.5f);
+            boxRect.pivot = new Vector2(0.5f, 0.5f);
+            boxRect.sizeDelta = new Vector2(920f, 560f);
+            boxRect.anchoredPosition = Vector2.zero;
+            box.AddComponent<UnityEngine.UI.Image>().color = PopupBoxColor;
+
+            var title = CreatePopupLabel(box.transform, font, "Title", Onikiri.UI.PixelFontSizes.GalmuriLarge, -40f);
+            title.text = "오프라인 보상";
+
+            var duration = CreatePopupLabel(box.transform, font, "Duration", Onikiri.UI.PixelFontSizes.GalmuriSmall, -190f);
+            duration.text = "자리를 비운 동안  0s";
+
+            var amount = CreatePopupLabel(box.transform, font, "Amount", Onikiri.UI.PixelFontSizes.GalmuriSmall, -280f);
+            amount.text = "0 획득했습니다";
+
+            var buttonObject = new GameObject("ClaimButton", typeof(RectTransform));
+            buttonObject.transform.SetParent(box.transform, false);
+            var buttonRect = (RectTransform)buttonObject.transform;
+            buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(0.5f, 1f);
+            buttonRect.pivot = new Vector2(0.5f, 1f);
+            buttonRect.sizeDelta = new Vector2(360f, 110f);
+            buttonRect.anchoredPosition = new Vector2(0f, -400f);
+
+            var buttonImage = buttonObject.AddComponent<UnityEngine.UI.Image>();
+            buttonImage.color = new Color32(0x6E, 0x68, 0xA0, 0xFF);
+            var button = buttonObject.AddComponent<UnityEngine.UI.Button>();
+            button.targetGraphic = buttonImage;
+
+            var buttonLabel = CreatePopupLabel(buttonObject.transform, font, "Label",
+                                               Onikiri.UI.PixelFontSizes.GalmuriSmall, -20f);
+            buttonLabel.text = "받기";
+
+            var popup = root.AddComponent<Onikiri.UI.OfflineRewardPopup>();
+            var so = new SerializedObject(popup);
+            so.FindProperty("root").objectReferenceValue = root;
+            so.FindProperty("titleLabel").objectReferenceValue = title;
+            so.FindProperty("durationLabel").objectReferenceValue = duration;
+            so.FindProperty("amountLabel").objectReferenceValue = amount;
+            so.FindProperty("claimButton").objectReferenceValue = button;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 씬에서는 꺼둔 채로 저장한다. 켜진 채로 저장되면 방치 보상이 없는
+            // 실행에서도 팝업이 화면을 가린 채 시작한다
+            root.SetActive(false);
+
+            return popup;
+        }
+
+        private static TMPro.TextMeshProUGUI CreatePopupLabel(
+            Transform parent, TMPro.TMP_FontAsset font, string name, float size, float top)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(24f, top - size * 1.3f);
+            rect.offsetMax = new Vector2(-24f, top);
+
+            var label = go.AddComponent<TMPro.TextMeshProUGUI>();
+            if (font != null)
+            {
+                label.font = font;
+                label.fontSharedMaterial = font.material;
+            }
+            label.fontSize = size;
+            label.alignment = TMPro.TextAlignmentOptions.Center;
+            label.color = PopupTextColor;
+            label.raycastTarget = false;
+            label.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            return label;
+        }
+
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        /** 세이브/로드와 방치 보상을 담당하는 세션 */
+        private static void WireSession(EnemySpawner spawner, Onikiri.UI.OfflineRewardPopup popup)
+        {
+            var battle = GameObject.Find("Battle");
+            var session = battle.GetComponent<Onikiri.Progression.GameSession>();
+            if (session == null) session = battle.AddComponent<Onikiri.Progression.GameSession>();
+
+            var samurai = GameObject.Find("Samurai");
+            var panel = MainSceneBuilder.FindBand("GrowthPanel");
+
+            var so = new SerializedObject(session);
+            so.FindProperty("upgrades").objectReferenceValue =
+                panel != null ? panel.GetComponent<Onikiri.Progression.UpgradeSystem>() : null;
+            so.FindProperty("stage").objectReferenceValue =
+                battle.GetComponent<Onikiri.Progression.StageProgress>();
+            so.FindProperty("combat").objectReferenceValue =
+                samurai != null ? samurai.GetComponent<PlayerCombat>() : null;
+            so.FindProperty("spawner").objectReferenceValue = spawner;
+            so.FindProperty("offlinePopup").objectReferenceValue = popup;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

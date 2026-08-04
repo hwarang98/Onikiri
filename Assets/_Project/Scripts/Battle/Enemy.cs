@@ -32,6 +32,8 @@ namespace Onikiri.Battle
 
         private EnemyDefinition definition;
         private BigDouble health;
+        private BigDouble maxHealth;
+        private BigDouble goldReward;
         private float groundY;
         private float targetX;
         private float hurtFlashRemaining;
@@ -42,17 +44,34 @@ namespace Onikiri.Battle
         public EnemyDefinition Definition { get { return definition; } }
         public float QueueSpacing { get { return definition != null ? definition.queueSpacing : 0.75f; } }
 
+        /**
+         * @brief 스폰 시점의 스테이지 배수가 적용된 값.
+         *
+         * 스폰할 때 확정하고 그 뒤로는 바꾸지 않는다. 스테이지가 오르는 순간 이미
+         * 화면에 있던 요괴가 갑자기 단단해지거나 보상이 달라지면, 플레이어 입장에서는
+         * 방금 때리던 대상이 이유 없이 변한 것으로 보인다.
+         */
+        public BigDouble MaxHealth { get { return maxHealth; } }
+        public BigDouble GoldReward { get { return goldReward; } }
+
         private void Awake()
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
             if (animator == null) animator = GetComponent<SpriteAnimator>();
         }
 
-        /** 풀에서 꺼낸 인스턴스를 spawnX 위치에서 살려낸다 */
-        public void Spawn(EnemyDefinition def, float spawnX, float ground, int sortingOrder)
+        /**
+         * @brief 풀에서 꺼낸 인스턴스를 spawnX 위치에서 살려낸다.
+         *
+         * 체력·골드 배수는 스테이지에서 온다. 정의 에셋의 값은 1스테이지 기준이다.
+         */
+        public void Spawn(EnemyDefinition def, float spawnX, float ground, int sortingOrder,
+                          BigDouble healthMultiplier, BigDouble goldMultiplier)
         {
             definition = def;
-            health = def.maxHealth;
+            maxHealth = def.maxHealth * healthMultiplier;
+            goldReward = def.goldReward * goldMultiplier;
+            health = maxHealth;
             groundY = ground;
             targetX = spawnX;
             hurtFlashRemaining = 0f;

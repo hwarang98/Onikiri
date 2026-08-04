@@ -72,9 +72,30 @@ namespace Onikiri.Battle
             Apply();
         }
 
+        /**
+         * @brief 참조가 빠졌다고 이미 알렸는지.
+         *
+         * 매 프레임 도는 코드라 그냥 로그를 남기면 콘솔이 잠기지만, 조용히 넘어가면
+         * 배경이 마지막으로 성공했을 때의 좌표에 얼어붙은 채로 남아 원인을 찾기 어렵다.
+         * 한 번만 알린다.
+         */
+        private bool reportedMissingReferences;
+
         private void Apply()
         {
-            if (targetCamera == null || battleArea == null) return;
+            if (targetCamera == null || battleArea == null)
+            {
+                if (!reportedMissingReferences)
+                {
+                    reportedMissingReferences = true;
+                    Debug.LogError("[Onikiri] BattleStageLayout is missing " +
+                                   (targetCamera == null ? "targetCamera " : "") +
+                                   (battleArea == null ? "battleArea " : "") +
+                                   "- the stage will stay frozen at its last good position.", this);
+                }
+                return;
+            }
+            reportedMissingReferences = false;
 
             int screenWidth = targetCamera.pixelWidth;
             int screenHeight = targetCamera.pixelHeight;

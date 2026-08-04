@@ -21,6 +21,11 @@ namespace Onikiri.UI
 
         [SerializeField] private Button button;
         [SerializeField] private TMP_Text nameLabel;
+
+        [Tooltip("이번 구매로 스탯이 얼마에서 얼마가 되는지. 이것이 없으면 비용만 " +
+                 "보이고 그 대가로 무엇을 얻는지는 보이지 않는다")]
+        [SerializeField] private TMP_Text valueLabel;
+
         [SerializeField] private TMP_Text costLabel;
 
         [Header("색")]
@@ -69,6 +74,20 @@ namespace Onikiri.UI
 
             if (nameLabel != null)
                 nameLabel.text = track.DisplayName + "  Lv." + track.Level;
+
+            if (valueLabel != null)
+            {
+                // Format이 아니라 FormatStat이다. Format은 1000 미만을 정수로 읽어서
+                // 이 버튼이 보여줘야 할 변화를 정확히 그 구간에서 지워버린다
+                // (5 -> 5.6이 "5 -> 6", 1.15 -> 1.27이 "1 -> 1").
+                //
+                // 소수 둘째 자리까지 두는 이유도 같다. 첫째 자리로는 공격속도의
+                // 1.15 -> 1.27이 둘 다 1.2로 뭉개진다
+                valueLabel.text = track.IsMaxed
+                    ? NumberFormatter.FormatStat(track.Value, 2)
+                    : NumberFormatter.FormatStat(track.Value, 2) + " → " +
+                      NumberFormatter.FormatStat(track.ValueAtLevel(track.Level + 1), 2);
+            }
 
             bool affordable = wallet != null && wallet.CanAfford(track.Cost);
 
