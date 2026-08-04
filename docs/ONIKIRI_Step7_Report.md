@@ -240,6 +240,8 @@ Assets/_Project/
 ├─ Scripts/Core/
 │  └─ SortingOrders.cs         BackgroundProp = -100 추가
 ├─ Editor/
+│  ├─ OnikiriTestPanel.cs      개발용 테스트 패널             [신규]
+│  ├─ GameViewSizes.cs         게임 뷰 해상도 전환            [신규]
 │  ├─ SfxTrimBuilder.cs        wav 트리밍 + 인코딩            [신규]
 │  ├─ UpgradePanelBuilder.cs   패널 구성 + 곡선 기록          [신규]
 │  ├─ PixelFontAssetBuilder.cs 샘플 배수 3 -> 5
@@ -257,7 +259,19 @@ Assets/_Project/
 
 `Onikiri.Runtime.asmdef`에 `UnityEngine.UI` 참조 추가 (Button 사용).
 
-메뉴: `Onikiri/Audio/Rebuild Trimmed SFX`
+메뉴: `Onikiri/Audio/Rebuild Trimmed SFX`, `Onikiri/Test Panel` (Ctrl+Shift+T)
+
+### 8.1 테스트 패널
+
+§7의 측정 실패를 반복하지 않기 위해 만들었습니다. 이 게임의 값 대부분이 화면만 봐서는 확인되지 않습니다 — 소리가 실제로 출력에 도달하는지, 공격속도 스탯이 실제 공격 횟수로 이어지는지, 풀이 조용히 증식하는지.
+
+패널이 두 함정을 대신 피해줍니다:
+
+- 공격 횟수를 **게임 시간**으로 나눕니다(§7.2). 실제 시간으로 나누면 에디터가 멈칫한 만큼 낮게 나옵니다.
+- 오디오는 `isPlaying`이 아니라 **리스너 출력 파형**을 읽습니다(§5-6단계 무음 사건). 리스너가 없으면 그 자리에서 에러 박스가 뜹니다.
+
+읽는 값: 화면 크기·안전 영역·픽셀 배율 / fps·timeScale / 공격속도 설정 대 실측 / 데미지·골드 / 요괴 생존 수 / 풀 증식 3종 / 오디오 진폭.
+조작: 골드 지급, 강화 +1·+10·최대, 공격속도 직접 설정, 시간 배속, 요괴 전멸, 효과음 재생, 9:16↔9:19.5↔9:21 전환, 스크린샷, 빌더 일괄 실행.
 
 ---
 
