@@ -112,3 +112,7 @@ InitTestScene*.unity*
 # Generated verification screenshots
 /[Aa]ssets/Screenshots/
 /[Aa]ssets/Screenshots.meta
+
+# Unity 크래시 복구 산출물
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta

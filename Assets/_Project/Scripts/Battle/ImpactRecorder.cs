@@ -4,16 +4,13 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// Development-only frame grabber used to review combat feel.
-    ///
-    /// Hit feel lives in a window about 70ms wide, which no manual screenshot can catch.
-    /// This dumps consecutive rendered frames to disk so the swing, the impact and the
-    /// hitstop can be inspected frame by frame afterwards.
-    ///
-    /// Waits on end-of-frame rather than a timer so it still records while a hitstop has
-    /// timeScale pinned at zero - which is exactly the part worth looking at.
-    /// </summary>
+    /**
+     * @brief 타격감을 검토하기 위한 개발 전용 프레임 그래버.
+     *
+     * 타격감은 약 70ms짜리 창 안에서 결정되는데, 수동 스크린샷으로는 잡을 수 없다.
+     * 연속된 렌더 프레임을 디스크로 떨궈서 스윙·임팩트·히트스톱을 나중에 프레임
+     * 단위로 들여다볼 수 있게 한다.
+     */
     public sealed class ImpactRecorder : MonoBehaviour
     {
         [SerializeField] private int frameCount = 40;
@@ -37,7 +34,7 @@ namespace Onikiri.Battle
             FramesWritten = 0;
             FreezeFrames = 0;
 
-            // Keeps the player loop ticking while the editor sits in the background.
+            // 에디터가 백그라운드에 있어도 플레이어 루프가 계속 돌게 한다
             Application.runInBackground = true;
             Directory.CreateDirectory(outputFolder);
 
@@ -52,9 +49,9 @@ namespace Onikiri.Battle
             {
                 yield return null;
 
-                // Render explicitly instead of waiting for end-of-frame: an unfocused
-                // editor stops repainting the Game view, which leaves WaitForEndOfFrame
-                // hanging forever and the recorder producing nothing.
+                // end-of-frame을 기다리지 않고 직접 렌더한다. 포커스를 잃은 에디터는
+                // Game 뷰 리페인트를 멈추고, 그러면 WaitForEndOfFrame이 영원히 반환되지
+                // 않아 녹화가 아무것도 만들지 못한다
                 var previousTarget = camera.targetTexture;
                 camera.targetTexture = renderTexture;
                 camera.Render();
@@ -66,8 +63,8 @@ namespace Onikiri.Battle
                 readback.Apply(false);
                 RenderTexture.active = previousActive;
 
-                // Frozen frames are the interesting ones, so record whether time was
-                // stopped when each frame was taken.
+                // 정지된 프레임이 정작 보고 싶은 것이므로, 각 프레임을 찍을 때
+                // 시간이 멈춰 있었는지를 파일명에 기록한다
                 bool frozen = Time.timeScale == 0f;
                 if (frozen) FreezeFrames++;
 

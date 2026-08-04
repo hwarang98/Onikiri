@@ -3,51 +3,53 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// Data for one enemy type. Stats and frames live in an asset rather than in code so
-    /// balancing and adding new yokai never needs a recompile (handoff spec section 5).
-    /// </summary>
+    /**
+     * @brief 적 한 종류의 데이터.
+     *
+     * 스탯과 프레임을 코드가 아니라 에셋에 두어, 밸런싱과 새 요괴 추가에 재컴파일이
+     * 필요하지 않게 한다 (사양서 5장).
+     */
     [CreateAssetMenu(menuName = "Onikiri/Enemy Definition", fileName = "EnemyDefinition")]
     public sealed class EnemyDefinition : ScriptableObject
     {
-        [Header("Identity")]
+        [Header("식별")]
         public string displayName = "Chochin-obake";
 
-        [Header("Animation")]
-        [Tooltip("Looping frames used while approaching and while waiting in the queue.")]
+        [Header("애니메이션")]
+        [Tooltip("접근 중과 큐에서 대기 중에 반복 재생할 프레임")]
         public Sprite[] idleFrames;
-        [Tooltip("Short flash played on taking a hit. Falls back to idle when empty.")]
+        [Tooltip("피격 시 짧게 재생. 비어 있으면 색 플래시로 대체된다")]
         public Sprite[] hurtFrames;
-        [Tooltip("Played once on death; the enemy returns to the pool on the last frame.")]
+        [Tooltip("사망 시 한 번 재생. 마지막 프레임에서 풀로 반환된다")]
         public Sprite[] deathFrames;
 
         public float frameRate = 12f;
 
-        [Header("Spawning")]
-        [Tooltip("Relative chance of this type appearing. Sets the size mix on screen: " +
-                 "small filler types carry a high weight, elites a low one.")]
+        [Header("스폰")]
+        [Tooltip("이 종류가 등장할 상대 확률. 화면의 크기 구성을 결정한다. " +
+                 "작은 필러는 높은 가중치, 정예는 낮은 가중치")]
         public float spawnWeight = 1f;
 
-        [Header("Combat")]
-        [Tooltip("BigDouble because late-stage yokai health leaves long's range behind; " +
-                 "damage numbers print through NumberFormatter for the same reason.")]
+        [Header("전투")]
+        [Tooltip("BigDouble인 이유는 후반 요괴 체력이 long 범위를 벗어나기 때문. " +
+                 "데미지 숫자를 NumberFormatter로 찍는 이유도 같다")]
         public BigDouble maxHealth = BigDouble.FromDouble(12d);
 
-        [Tooltip("Gold granted the moment this yokai's health reaches zero.")]
+        [Tooltip("이 요괴의 체력이 0이 되는 순간 지급할 골드")]
         public BigDouble goldReward = BigDouble.One;
 
-        [Tooltip("World units per second while walking in from the right.")]
+        [Tooltip("오른쪽에서 걸어 들어올 때의 초당 이동 거리 (world units)")]
         public float moveSpeed = 1.1f;
 
-        [Tooltip("Horizontal spacing kept between queued enemies, in world units.")]
+        [Tooltip("큐에 정렬된 적 사이의 가로 간격 (world units)")]
         public float queueSpacing = 0.75f;
 
-        [Header("Presentation")]
-        [Tooltip("Height above the ground line, for yokai that float rather than walk.")]
+        [Header("연출")]
+        [Tooltip("지면선 위 높이. 걷지 않고 떠다니는 요괴용")]
         public float hoverHeight = 0.12f;
 
-        [Tooltip("World units between the sprite pivot (canvas bottom) and the lowest drawn " +
-                 "pixel. Measured from the art by the build step - do not hand-edit.")]
+        [Tooltip("스프라이트 피벗(캔버스 하단)과 가장 아래 그려진 픽셀 사이의 거리. " +
+                 "빌드 단계가 아트에서 측정해 채운다. 손으로 고치지 말 것")]
         public float artBottomOffset;
     }
 }

@@ -4,48 +4,46 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// Keeps a steady stream of yokai walking in from off-screen right.
-    ///
-    /// The portrait battle area is only 6.75 world units wide, so the spec caps what is
-    /// readable at 3-5 enemies at once. Rather than spawning waves on a timer and hoping,
-    /// this tops the field back up to a target count, which keeps the screen busy without
-    /// ever crowding.
-    ///
-    /// Queue positions are recomputed every frame from the live enemy order, so enemies
-    /// line up behind each other instead of stacking on the same spot, and the queue closes
-    /// up automatically when a front enemy dies.
-    /// </summary>
+    /**
+     * @brief 화면 밖 오른쪽에서 요괴가 끊기지 않고 걸어 들어오게 유지한다.
+     *
+     * 세로 화면의 전투 영역은 가로 6.75 world units뿐이라, 사양서는 읽히는 한계를
+     * 동시 3~5마리로 잡았다. 타이머로 웨이브를 쏟아붓고 기대하는 대신 목표 생존 수를
+     * 유지하는 방식이라, 화면이 비지도 붐비지도 않는다.
+     *
+     * 큐 위치는 매 프레임 살아 있는 적의 순서로 다시 계산한다. 그래서 적들이 같은
+     * 자리에 겹치지 않고 뒤로 줄을 서며, 앞의 적이 죽으면 큐가 자동으로 당겨진다.
+     */
     public sealed class EnemySpawner : MonoBehaviour
     {
-        [Header("References")]
+        [Header("참조")]
         [SerializeField] private BattleStageLayout stage;
         [SerializeField] private Enemy enemyPrefab;
         [SerializeField] private EnemyDefinition[] definitions;
         [SerializeField] private Transform enemyParent;
 
-        [Header("Field")]
-        [Tooltip("How many yokai should be alive at once. The spec calls for 3-5 on screen.")]
+        [Header("필드")]
+        [Tooltip("동시에 살아 있어야 할 요괴 수. 사양서는 화면에 3~5마리를 요구한다")]
         [SerializeField] private int targetAlive = 4;
 
-        [Tooltip("Seconds between top-ups.")]
+        [Tooltip("보충 사이의 간격 (초)")]
         [SerializeField] private float spawnInterval = 1.1f;
 
-        [Tooltip("How far beyond the right screen edge they appear, in world units.")]
+        [Tooltip("화면 오른쪽 끝에서 얼마나 바깥에 나타날지 (world units)")]
         [SerializeField] private float offscreenMargin = 1.2f;
 
-        [Header("Queue")]
-        [Tooltip("World X the leading enemy stops at - just inside the player's reach.")]
+        [Header("큐")]
+        [Tooltip("선두 적이 멈추는 월드 X. 플레이어 사거리 안쪽")]
         [SerializeField] private float frontLineX = -0.9f;
 
-        [Header("Pool")]
+        [Header("풀")]
         [SerializeField] private int prewarm = 8;
 
         private ObjectPool<Enemy> pool;
         private readonly List<Enemy> active = new List<Enemy>();
         private float spawnTimer;
 
-        /// <summary>Live enemies, nearest to the player first.</summary>
+        /** 살아 있는 적. 플레이어에 가까운 순 */
         public IReadOnlyList<Enemy> Active { get { return active; } }
 
         public int PoolGrowthCount { get { return pool != null ? pool.GrowthCount : 0; } }
@@ -85,7 +83,7 @@ namespace Onikiri.Battle
 
             var enemy = pool.Get();
 
-            // Nearer enemies draw in front of the ones behind them.
+            // 가까운 적이 뒤쪽 적보다 앞에 그려진다
             int sorting = SortingOrders.EnemyBase + (active.Count % SortingOrders.EnemySlots);
 
             enemy.Killed += OnEnemyKilled;
@@ -94,10 +92,11 @@ namespace Onikiri.Battle
             active.Add(enemy);
         }
 
-        /// <summary>
-        /// Weighted pick, so the size mix on screen is authored rather than uniform: small
-        /// filler yokai carry a high weight and elites a low one.
-        /// </summary>
+        /**
+         * @brief 가중치 추첨. 화면의 크기 구성을 균등이 아니라 의도대로 만든다.
+         *
+         * 작은 필러 요괴는 높은 가중치를, 정예는 낮은 가중치를 갖는다.
+         */
         private EnemyDefinition PickDefinition()
         {
             float total = 0f;
@@ -132,10 +131,11 @@ namespace Onikiri.Battle
             pool.Release(enemy);
         }
 
-        /// <summary>
-        /// Walks the live enemies front to back and parks each one a fixed gap behind the
-        /// one ahead. Dying enemies are skipped so the queue closes up immediately.
-        /// </summary>
+        /**
+         * @brief 살아 있는 적을 앞에서 뒤로 훑으며 앞 적으로부터 일정 간격 뒤에 세운다.
+         *
+         * 죽어가는 적은 건너뛴다. 그래야 큐가 즉시 당겨진다.
+         */
         private void UpdateQueuePositions()
         {
             active.Sort(CompareByX);
@@ -156,7 +156,7 @@ namespace Onikiri.Battle
             return a.CurrentX.CompareTo(b.CurrentX);
         }
 
-        /// <summary>World X of the right screen edge. Width is constant across our phones.</summary>
+        /** 화면 오른쪽 끝의 월드 X. 대상 기기 전체에서 가로 폭은 일정하다 */
         private float RightEdgeX()
         {
             var camera = Camera.main;
@@ -164,7 +164,7 @@ namespace Onikiri.Battle
             return camera.transform.position.x + camera.orthographicSize * camera.aspect;
         }
 
-        /// <summary>Nearest living enemy within <paramref name="range"/> of <paramref name="fromX"/>.</summary>
+        /** fromX 로부터 range 안에 있는 가장 가까운 생존 적 */
         public Enemy FindNearestAlive(float fromX, float range)
         {
             Enemy best = null;

@@ -4,10 +4,11 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// One pooled slash effect. Plays its frames once at the impact point and reports back
-    /// so the owner can recycle it.
-    /// </summary>
+    /**
+     * @brief 풀링된 참격 이펙트 하나.
+     *
+     * 타격 지점에서 프레임을 한 번 재생하고, 소유자가 회수할 수 있도록 끝났음을 알린다.
+     */
     [RequireComponent(typeof(SpriteRenderer))]
     public sealed class SlashVfx : MonoBehaviour
     {
@@ -28,7 +29,7 @@ namespace Onikiri.Battle
             finished = onFinished;
 
             transform.position = position;
-            // A little rotation variety stops repeated swings looking like a stamp.
+            // 회전을 조금 흔들어야 반복되는 스윙이 도장 찍은 것처럼 보이지 않는다
             transform.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-12f, 12f));
 
             spriteRenderer.flipX = flip;

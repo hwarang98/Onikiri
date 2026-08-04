@@ -3,25 +3,25 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// Nudges the camera a couple of pixels on impact.
-    ///
-    /// Runs on unscaled time so it keeps moving while a hitstop has timeScale at zero -
-    /// a freeze that also shakes reads as a much heavier hit than either alone.
-    ///
-    /// Offsets are snapped to whole source pixels. A sub-pixel camera offset would fight
-    /// the Pixel Perfect Camera and make the whole scene shimmer instead of shake.
-    ///
-    /// Runs after <see cref="BattleStageLayout"/> (order 1000) so the layout always reads
-    /// an unshaken camera; see <see cref="BasePosition"/>.
-    /// </summary>
+    /**
+     * @brief 타격 순간 카메라를 몇 픽셀 흔든다.
+     *
+     * unscaled 시간으로 돌기 때문에 히트스톱이 timeScale을 0으로 붙잡고 있는 동안에도
+     * 계속 움직인다. 정지와 흔들림이 동시에 오면 각각보다 훨씬 무거운 타격으로 읽힌다.
+     *
+     * 오프셋은 원본 픽셀 단위로 반올림한다. 서브픽셀 오프셋은 Pixel Perfect Camera와
+     * 충돌해서 화면이 흔들리는 대신 전체가 일렁이게 만든다.
+     *
+     * BattleStageLayout(실행 순서 1000) 뒤에 돈다. 레이아웃이 항상 흔들리지 않은
+     * 카메라를 읽게 하기 위함이며, 자세한 것은 BasePosition 참고.
+     */
     [DefaultExecutionOrder(2000)]
     public sealed class ScreenShake : MonoBehaviour
     {
-        [Tooltip("Default shake strength in source pixels.")]
+        [Tooltip("기본 흔들림 세기 (원본 픽셀)")]
         [SerializeField] private float defaultPixels = 3f;
 
-        [Tooltip("Default shake length in seconds, before attack-speed scaling.")]
+        [Tooltip("공격속도 보정 전 기본 흔들림 길이 (초)")]
         [SerializeField] private float defaultSeconds = 0.1f;
 
         private Vector3 basePosition;
@@ -30,14 +30,13 @@ namespace Onikiri.Battle
         private float duration;
         private float pixels;
 
-        /// <summary>
-        /// The camera's position with the shake removed.
-        ///
-        /// Anything that positions world content relative to the camera must use this.
-        /// BattleStageLayout derives the battle band from the camera, and if it followed
-        /// the shaken position the background would move with the camera and cancel the
-        /// shake out entirely.
-        /// </summary>
+        /**
+         * @brief 흔들림을 제거한 카메라 위치.
+         *
+         * 카메라를 기준으로 월드 콘텐츠를 배치하는 쪽은 반드시 이 값을 써야 한다.
+         * BattleStageLayout은 카메라에서 전투 밴드를 유도하는데, 흔들린 위치를 따라가면
+         * 배경이 카메라와 함께 움직여 흔들림이 완전히 상쇄된다.
+         */
         public Vector3 BasePosition { get { return shaking ? basePosition : transform.position; } }
 
         public bool IsShaking { get { return shaking; } }
@@ -63,10 +62,12 @@ namespace Onikiri.Battle
             Shake(defaultSeconds, defaultPixels);
         }
 
-        /// <summary>
-        /// Starts a shake. Overlapping calls take the stronger of the two rather than
-        /// stacking, so a burst of hits cannot escalate into a permanent tremor.
-        /// </summary>
+        /**
+         * @brief 흔들림을 시작한다.
+         *
+         * 겹쳐 호출되면 누적하지 않고 더 강한 쪽을 취한다. 연타가 영구적인 진동으로
+         * 번지는 것을 막는다.
+         */
         public void Shake(float seconds, float strengthPixels)
         {
             if (seconds <= 0f || strengthPixels <= 0f) return;
@@ -100,8 +101,8 @@ namespace Onikiri.Battle
                 }
                 else
                 {
-                    // Track deliberate camera moves while idle so the shake never snaps
-                    // the camera back to a stale position.
+                    // 흔들리지 않는 동안의 의도적인 카메라 이동을 따라간다.
+                    // 그래야 흔들림이 끝날 때 낡은 위치로 튕겨 돌아가지 않는다
                     basePosition = transform.position;
                 }
                 return;

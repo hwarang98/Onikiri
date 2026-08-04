@@ -3,27 +3,27 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// The samurai's automatic iai attack.
-    ///
-    /// Idle games are watched, not played, so the whole loop is: wait for a yokai to come
-    /// into reach, swing on cooldown, and sell the contact. The selling is three things
-    /// landing on the same frame - the slash effect, the damage, and a hitstop - which is
-    /// why impact is scheduled off the attack animation rather than fired when the swing
-    /// starts.
-    /// </summary>
+    /**
+     * @brief 사무라이의 자동 발도 공격.
+     *
+     * 방치형은 플레이하는 것이 아니라 보는 것이므로 루프 전체는 단순하다.
+     * 요괴가 사거리에 들어오길 기다렸다가 쿨다운마다 휘두르고, 접촉을 납득시킨다.
+     * 납득시키는 것은 참격 이펙트·데미지·히트스톱 세 가지가 같은 프레임에 떨어지는
+     * 일이며, 임팩트를 스윙 시작 시점이 아니라 공격 애니메이션에서 유도하는 이유가
+     * 바로 이것이다.
+     */
     public sealed class PlayerCombat : MonoBehaviour
     {
         private enum State { Idle, Winding, Recovering }
 
-        [Header("References")]
+        [Header("참조")]
         [SerializeField] private EnemySpawner spawner;
         [SerializeField] private SpriteAnimator animator;
         [SerializeField] private SlashVfx slashPrefab;
         [SerializeField] private Transform vfxParent;
         [SerializeField] private Onikiri.UI.DamageNumberSpawner damageNumbers;
 
-        [Header("Animation")]
+        [Header("애니메이션")]
         [SerializeField] private Sprite[] idleFrames;
         [SerializeField] private Sprite[] attackFrames;
         [SerializeField] private Sprite[] slashFrames;
@@ -31,42 +31,42 @@ namespace Onikiri.Battle
         [SerializeField] private float attackFrameRate = 14f;
         [SerializeField] private float slashFrameRate = 24f;
 
-        [Header("Combat")]
-        [Tooltip("How far the samurai can reach, in world units.")]
+        [Header("전투")]
+        [Tooltip("사무라이의 사거리 (world units)")]
         [SerializeField] private float attackRange = 1.9f;
         [SerializeField] private float attacksPerSecond = 1.15f;
-        [Tooltip("BigDouble from the start - attack power is the main upgrade axis and " +
-                 "leaves long's range behind within hours of idle play.")]
+        [Tooltip("처음부터 BigDouble. 공격력은 주 성장 축이라 방치 몇 시간이면 " +
+                 "long 범위를 벗어난다")]
         [SerializeField] private BigDouble damage = BigDouble.FromDouble(5d);
 
-        [Tooltip("Fraction of the attack animation before the blade connects.")]
+        [Tooltip("칼이 닿기까지 공격 애니메이션에서 지나가는 비율")]
         [Range(0f, 1f)]
         [SerializeField] private float impactPoint = 0.45f;
 
-        [Header("Feel")]
+        [Header("타격감")]
         [SerializeField] private ScreenShake cameraShake;
         [SerializeField] private HitAudio hitAudio;
 
-        [Tooltip("Hitstop length at low attack speed, before scaling.")]
+        [Tooltip("보정 전, 낮은 공격속도에서의 히트스톱 길이")]
         [SerializeField] private float hitStopSeconds = 0.07f;
 
-        [Tooltip("Seconds of hitstop allowed per second of play. Caps the freeze once " +
-                 "attack speed climbs; see CombatFeel.")]
+        [Tooltip("플레이 1초당 허용되는 히트스톱 시간. 공격속도가 오르면 정지를 " +
+                 "제한한다. CombatFeel 참고")]
         [SerializeField] private float hitStopBudgetPerSecond = 0.3f;
 
-        [Tooltip("Shake length at low attack speed, before scaling.")]
+        [Tooltip("보정 전, 낮은 공격속도에서의 흔들림 길이")]
         [SerializeField] private float shakeSeconds = 0.1f;
 
-        [Tooltip("Seconds of shake allowed per second of play.")]
+        [Tooltip("플레이 1초당 허용되는 흔들림 시간")]
         [SerializeField] private float shakeBudgetPerSecond = 0.4f;
 
-        [Tooltip("Shake strength in source pixels.")]
+        [Tooltip("흔들림 세기 (원본 픽셀)")]
         [SerializeField] private float shakePixels = 3f;
 
-        [Tooltip("Where the slash appears, measured from the target towards the samurai.")]
+        [Tooltip("참격이 나타나는 위치. 대상에서 사무라이 쪽으로의 오프셋")]
         [SerializeField] private Vector2 slashOffset = new Vector2(-0.15f, 0.55f);
 
-        [Header("Pool")]
+        [Header("풀")]
         [SerializeField] private int slashPrewarm = 6;
 
         private ObjectPool<SlashVfx> slashPool;
@@ -74,10 +74,10 @@ namespace Onikiri.Battle
         private float cooldownRemaining;
         private float stateTimer;
 
-        /// <summary>Authored length of the swing, before attack speed compresses it.</summary>
+        /** 공격속도로 압축되기 전, 설계된 스윙 길이 */
         private float baseAttackDuration;
 
-        /// <summary>Length of the swing currently playing.</summary>
+        /** 현재 재생 중인 스윙의 길이 */
         private float attackDuration;
         private bool impactDelivered;
         private Enemy currentTarget;
@@ -138,12 +138,11 @@ namespace Onikiri.Battle
             float interval = 1f / Mathf.Max(0.01f, attacksPerSecond);
             cooldownRemaining = interval;
 
-            // The swing has to fit inside the attack interval, otherwise the animation
-            // becomes the real rate cap: a 7-frame swing at 14fps takes 0.5s, so the
-            // samurai would top out at 2 attacks/sec no matter how high the stat went -
-            // and attack speed is a core upgrade axis that has to keep mattering into the
-            // double digits. Compressing the clip also reads correctly: faster stat,
-            // visibly faster swing.
+            // 스윙이 공격 간격 안에 들어가야 한다. 아니면 애니메이션이 실제 공격
+            // 속도의 상한이 된다. 7프레임 14fps 스윙은 0.5초라, 스탯을 아무리 올려도
+            // 초당 2회에서 멈춘다. 공격속도는 두 자릿수까지 계속 의미가 있어야 하는
+            // 핵심 성장 축이다. 클립을 압축하면 연출상으로도 맞다. 스탯이 오르면
+            // 스윙도 눈에 띄게 빨라진다.
             attackDuration = Mathf.Min(baseAttackDuration, interval);
 
             if (attackFrames != null && attackFrames.Length > 0)
@@ -153,19 +152,19 @@ namespace Onikiri.Battle
             }
         }
 
-        /// <summary>The frame the blade lands: effect, damage and freeze together.</summary>
+        /** 칼이 닿는 프레임. 이펙트·데미지·정지가 동시에 일어난다 */
         private void DeliverImpact()
         {
             impactDelivered = true;
 
-            // The target can die or walk out of reach during the wind-up; re-acquire so the
-            // swing still connects with whatever is actually in front of the samurai.
+            // 예비 동작 도중 대상이 죽거나 사거리 밖으로 나갈 수 있다. 다시 탐색해서
+            // 스윙이 실제로 사무라이 앞에 있는 대상에게 닿게 한다
             if (currentTarget == null || !currentTarget.IsTargetable)
                 currentTarget = spawner.FindNearestAlive(transform.position.x, attackRange);
 
             if (currentTarget == null) return;
 
-            // Aim at the drawn sprite's centre, not the transform - see Enemy.HitPoint.
+            // transform이 아니라 그려진 스프라이트의 중심을 겨냥한다. Enemy.HitPoint 참고
             Vector3 impactPosition = currentTarget.HitPoint
                                      + new Vector3(slashOffset.x, slashOffset.y, 0f);
 
@@ -182,9 +181,8 @@ namespace Onikiri.Battle
                 else hitAudio.PlayHit();
             }
 
-            // All three land on the same frame. The freeze and the shake are both shortened
-            // as attack speed rises so late-game swinging does not become a constant
-            // stutter - see CombatFeel.
+            // 셋이 같은 프레임에 떨어진다. 정지와 흔들림은 공격속도가 오를수록 짧아져서
+            // 후반의 연속 스윙이 계속 끊기는 화면이 되지 않게 한다. CombatFeel 참고
             HitStop.Request(CombatFeel.ScaledDuration(hitStopSeconds, hitStopBudgetPerSecond, attacksPerSecond));
             ScreenShake.Request(cameraShake,
                 CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond),

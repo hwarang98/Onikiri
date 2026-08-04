@@ -3,16 +3,16 @@ using UnityEngine;
 
 namespace Onikiri.Core
 {
-    /// <summary>
-    /// Reusable pool of pooled components.
-    ///
-    /// Idle games spawn and kill enemies, damage numbers and hit effects constantly, and
-    /// per-spawn Instantiate/Destroy is the usual cause of GC hitches on mobile. Everything
-    /// is created once during prewarm and then recycled by toggling activation.
-    ///
-    /// If demand ever exceeds the prewarm the pool still grows rather than failing, but it
-    /// counts those growths so an undersized prewarm shows up instead of hiding.
-    /// </summary>
+    /**
+     * @brief 컴포넌트를 재사용하는 범용 오브젝트 풀.
+     *
+     * 방치형은 적·데미지 숫자·타격 이펙트를 끊임없이 만들고 없앤다.
+     * 스폰마다 Instantiate/Destroy를 하면 모바일에서 GC 히칭의 주범이 되므로,
+     * prewarm 시점에 한 번만 생성하고 이후에는 활성/비활성 토글로 돌려쓴다.
+     *
+     * prewarm을 넘어서는 수요가 오면 실패하지 않고 늘어나되, 그 횟수를 세어
+     * 드러낸다. 조용히 커지면 프레임 히칭의 원인을 찾을 수 없기 때문이다.
+     */
     public sealed class ObjectPool<T> where T : Component
     {
         private readonly T prefab;
@@ -20,7 +20,7 @@ namespace Onikiri.Core
         private readonly Stack<T> idle = new Stack<T>();
         private readonly List<T> all = new List<T>();
 
-        /// <summary>Instances created after prewarm because the pool ran dry.</summary>
+        /** prewarm 이후 풀이 비어 추가 생성된 인스턴스 수 */
         public int GrowthCount { get; private set; }
 
         public int CountAll { get { return all.Count; } }
@@ -70,7 +70,8 @@ namespace Onikiri.Core
         public void Release(T instance)
         {
             if (instance == null) return;
-            if (idle.Contains(instance)) return;   // double release would hand it out twice
+            // 이중 반환을 막지 않으면 같은 인스턴스가 두 번 배급된다
+            if (idle.Contains(instance)) return;
 
             instance.gameObject.SetActive(false);
             idle.Push(instance);

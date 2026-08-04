@@ -4,14 +4,15 @@ using UnityEngine;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Stamps <see cref="PixelArtImportSettings"/> onto art the first time it is imported,
-    /// so dropping a new pack into Assets/ThirdParty never silently lands at PPU 100 with
-    /// bilinear filtering.
-    ///
-    /// Only first import is touched (importSettingsMissing), otherwise every reimport would
-    /// wipe manual sprite slicing and pivot tweaks. Use the Onikiri menu to force a re-stamp.
-    /// </summary>
+    /**
+     * @brief 아트가 처음 임포트될 때 PixelArtImportSettings를 찍어준다.
+     *
+     * Assets/ThirdParty에 새 팩을 넣어도 조용히 PPU 100 + 이중선형 필터로 들어오는
+     * 일이 없게 한다.
+     *
+     * 첫 임포트(importSettingsMissing)에만 손댄다. 아니면 재임포트마다 수동 슬라이싱과
+     * 피벗 조정이 날아간다. 강제로 다시 찍으려면 Onikiri 메뉴를 쓸 것.
+     */
     public sealed class PixelArtImportPostprocessor : AssetPostprocessor
     {
         void OnPreprocessTexture()

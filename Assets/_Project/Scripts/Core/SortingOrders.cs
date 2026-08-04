@@ -1,43 +1,42 @@
 namespace Onikiri.Core
 {
-    /// <summary>
-    /// Every sorting order in the battle scene, in one place.
-    ///
-    /// Draw order back to front:
-    ///   sky fill -> parallax layers -> enemies -> player -> ground cover -> VFX -> UI
-    ///
-    /// Two deliberate choices worth knowing:
-    ///  - Enemies draw BEHIND the player. The samurai is the thing the eye should track,
-    ///    and enemies queue up to his right rather than overlapping him, so nothing is
-    ///    hidden in practice.
-    ///  - Ground cover (the grass layer) draws IN FRONT of both. Grass crossing the
-    ///    fighters' ankles is what makes them read as standing in the scene rather than
-    ///    pasted on top of it.
-    /// </summary>
+    /**
+     * @brief 전투 씬의 모든 정렬 순서를 한곳에 모은 정의.
+     *
+     * 뒤에서 앞 순서:
+     *   하늘 -> 패럴랙스 레이어 -> 적 -> 플레이어 -> 지면 덮개 -> VFX -> UI
+     *
+     * 의도적으로 정한 두 가지:
+     *  - 적은 플레이어 '뒤'에 그린다. 시선이 따라가야 할 대상은 사무라이이고,
+     *    적은 오른쪽에 큐로 정렬돼 겹치지 않으므로 실제로 가려지는 일이 없다.
+     *  - 지면 덮개(풀)는 둘 '앞'에 그린다. 풀이 발목을 가로질러야 씬 위에
+     *    붙여놓은 것이 아니라 씬 안에 서 있는 것으로 읽힌다.
+     */
     public static class SortingOrders
     {
-        /// <summary>Sky quad stretched over the whole camera, behind every parallax layer.</summary>
+        /** 카메라 전체를 덮는 하늘. 모든 패럴랙스 레이어보다 뒤 */
         public const int SkyFill = -300;
 
-        /// <summary>First parallax layer; each subsequent layer adds one.</summary>
+        /** 첫 패럴랙스 레이어. 레이어마다 1씩 증가 */
         public const int BackgroundBase = -200;
 
-        /// <summary>
-        /// Enemies occupy a small band so several on screen at once never z-fight.
-        /// Each enemy takes BaseEnemy + (slot % EnemySlots).
-        /// </summary>
+        /**
+         * @brief 적은 좁은 구간을 나눠 쓴다. 동시에 여러 마리가 나와도 z-fighting이 없다.
+         *
+         * 각 적은 EnemyBase + (슬롯 % EnemySlots) 를 갖는다.
+         */
         public const int EnemyBase = 0;
         public const int EnemySlots = 40;
 
         public const int Player = 50;
 
-        /// <summary>Grass drawn over the fighters' feet.</summary>
+        /** 파이터들의 발 위로 그려지는 풀 */
         public const int GroundCover = 70;
 
-        /// <summary>Slash effects always read on top of everyone.</summary>
+        /** 참격은 항상 모두의 위에 읽혀야 한다 */
         public const int Vfx = 100;
 
-        /// <summary>Reserved for the damage numbers added in a later step.</summary>
+        /** 데미지 숫자용 */
         public const int DamageNumber = 200;
     }
 }

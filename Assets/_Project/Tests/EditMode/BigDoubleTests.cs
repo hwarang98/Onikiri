@@ -43,8 +43,8 @@ namespace Onikiri.Tests
         [Test]
         public void Add_TinyTermIsAbsorbedByHugeTerm()
         {
-            // This is the whole point of the type: adding 1 gold to 1e100 gold must not
-            // corrupt the large value, and must not cost precision.
+            // 이 타입의 존재 이유 그 자체다. 1e100 골드에 1 골드를 더해도 큰 값이
+            // 손상되지 않아야 하고 정밀도도 잃지 않아야 한다
             var big = BigDouble.Create(1d, 100L);
             var sum = big + BigDouble.One;
             Assert.AreEqual(100L, sum.Exponent);
@@ -104,7 +104,7 @@ namespace Onikiri.Tests
         [Test]
         public void Compare_NegativesOrderCorrectly()
         {
-            // -1e50 is smaller than -1e10, despite the larger exponent.
+            // 지수부가 더 큰데도 -1e50이 -1e10보다 작다
             Assert.IsTrue(BigDouble.Create(-1d, 50L) < BigDouble.Create(-1d, 10L));
             Assert.IsTrue(BigDouble.FromDouble(-2d) < BigDouble.FromDouble(-1d));
         }
@@ -119,7 +119,7 @@ namespace Onikiri.Tests
         [Test]
         public void Pow_IdleCostCurveStaysAccurate()
         {
-            // The canonical idle upgrade curve: cost = base * 1.15^level.
+            // 방치형의 표준 업그레이드 곡선. cost = base * 1.15^level
             var result = BigDouble.Pow(BigDouble.FromDouble(1.15d), 100d);
             Assert.AreEqual(1174313.45d, result.ToDouble(), 1d);
         }
@@ -127,7 +127,7 @@ namespace Onikiri.Tests
         [Test]
         public void Pow_ExceedsDoubleRange()
         {
-            // 10^400 overflows a double but must be representable here.
+            // 10^400은 double 범위를 넘지만 여기서는 표현할 수 있어야 한다
             var result = BigDouble.Pow(BigDouble.FromDouble(10d), 400d);
             Assert.AreEqual(400L, result.Exponent);
             Assert.AreEqual(1d, result.Mantissa, 1e-6);
@@ -205,7 +205,7 @@ namespace Onikiri.Tests
         [Test]
         public void AccumulatingGold_StaysStableOverManyAdditions()
         {
-            // Simulates the real usage pattern: lots of small increments onto a total.
+            // 실제 사용 패턴 재현. 합계에 작은 값을 아주 많이 더한다
             var total = BigDouble.Zero;
             var perKill = BigDouble.FromDouble(12.5d);
             for (int i = 0; i < 10000; i++) total += perKill;
@@ -222,8 +222,8 @@ namespace Onikiri.Tests
         [Test]
         public void JsonUtility_RoundTripsAsSaveData()
         {
-            // MVP saves are PlayerPrefs + JsonUtility, so BigDouble has to survive a
-            // trip through Unity's serializer with its magnitude intact.
+            // MVP 세이브는 PlayerPrefs + JsonUtility라, BigDouble이 Unity 직렬화를
+            // 왕복하고도 크기를 그대로 유지해야 한다
             var original = new SaveProbe
             {
                 gold = BigDouble.Create(1.2345d, 987L),

@@ -4,11 +4,12 @@ using Onikiri.Core;
 
 namespace Onikiri.Tests
 {
-    /// <summary>
-    /// The stage must stay inside the BattleArea band on every phone shape we target.
-    /// CropFrame.None means taller screens show MORE world, so this is the regression
-    /// net for the whole "don't anchor to the camera centre" decision.
-    /// </summary>
+    /**
+     * @brief 스테이지는 대상 기기 전부에서 BattleArea 밴드 안에 있어야 한다.
+     *
+     * CropFrame.None 때문에 세로가 긴 화면일수록 월드를 더 보여준다. 이 테스트가
+     * "카메라 중심을 기준으로 잡지 않는다"는 결정 전체의 회귀 방지망이다.
+     */
     public class BattleLayoutTests
     {
         const int RefW = DisplayConfig.ReferenceWidth;    // 216
@@ -18,14 +19,14 @@ namespace Onikiri.Tests
         const float BandMin = DisplayConfig.GrowthPanelTop;  // 0.45
         const float BandMax = DisplayConfig.BattleAreaTop;   // 0.90
 
-        // Measured from the art: the walkable dirt surface sits 24px above the background's
-        // bottom edge (modal column height in Ground.png, not its tallest mound), and the
-        // samurai's tallest idle frame is 34px.
+        // 아트에서 실측한 값. 걸을 수 있는 흙 표면은 배경 밑단에서 24px 위에 있고
+        // (Ground.png 열별 높이의 최빈값이지 가장 높은 흙더미가 아니다),
+        // 사무라이의 가장 큰 idle 프레임은 34px 이다
         const float GroundSurfacePixels = 24f;
         const float CharacterPixelHeight = 34f;
         const float BackgroundPixelHeight = 180f;
 
-        // The three phone shapes named in the brief.
+        // 요구사항에 명시된 세 가지 기기 비율
         static readonly int[][] Screens =
         {
             new[] { 1080, 1920 },   // 9:16
@@ -41,8 +42,8 @@ namespace Onikiri.Tests
         [Test]
         public void PixelRatio_IsWidthLimitedOnEveryTargetPhone()
         {
-            // 1080 / 216 = 5 exactly; the height would allow 6 on tall screens, so the
-            // width is what pins the zoom. This is why world width stays constant.
+            // 1080 / 216 = 정확히 5. 세로가 긴 화면에서는 높이 기준으로 6까지 가능하므로
+            // 배율을 결정하는 것은 폭이다. 월드 가로 폭이 일정한 이유가 이것이다
             foreach (var s in Screens)
             {
                 Assert.AreEqual(5, BattleLayout.PixelRatio(s[0], s[1], RefW, RefH),
@@ -61,7 +62,7 @@ namespace Onikiri.Tests
         [Test]
         public void WorldWidth_IsIdenticalOnAllThreePhones()
         {
-            // Confirms the background never has to widen: 1080/(5*32) = 6.75 units always.
+            // 배경을 넓힐 필요가 없음을 확인한다. 1080/(5*32) = 항상 6.75 units
             foreach (var s in Screens)
             {
                 int ratio = BattleLayout.PixelRatio(s[0], s[1], RefW, RefH);
@@ -89,9 +90,9 @@ namespace Onikiri.Tests
         [Test]
         public void GroundY_MatchesHandComputedValues()
         {
-            // Pins the ground calibration itself. Getting this wrong does not fail any
-            // "is it inside the band" check - it just floats the character above the dirt,
-            // which is only visible by eye. So assert the numbers directly.
+            // 지면 보정값 자체를 못 박는다. 이걸 틀려도 "밴드 안에 있는가" 검사는
+            // 통과한다. 캐릭터가 흙 위에 떠 있을 뿐이고 그건 눈으로만 보인다.
+            // 그래서 숫자를 직접 단언한다
             Assert.AreEqual(0.15000f, BattleLayout.GroundY(BandFor(1080, 1920), GroundSurfacePixels, PPU), 1e-4f);
             Assert.AreEqual(0.01875f, BattleLayout.GroundY(BandFor(1080, 2340), GroundSurfacePixels, PPU), 1e-4f);
             Assert.AreEqual(-0.03750f, BattleLayout.GroundY(BandFor(1080, 2520), GroundSurfacePixels, PPU), 1e-4f);
@@ -109,7 +110,7 @@ namespace Onikiri.Tests
             }
         }
 
-        // ---- the actual requirement -------------------------------------------------
+        // ---- 요구사항 본체 ----------------------------------------------------------
 
         [Test]
         public void GroundLine_IsInsideBandOnEveryPhone()
@@ -140,7 +141,7 @@ namespace Onikiri.Tests
         [Test]
         public void GroundLine_SitsInLowerPortionOfBand()
         {
-            // A side-view stage wants headroom above the fighters, not below them.
+            // 사이드뷰 스테이지는 파이터 아래가 아니라 위에 여유 공간이 있어야 한다
             foreach (var s in Screens)
             {
                 var band = BandFor(s[0], s[1]);
@@ -153,9 +154,9 @@ namespace Onikiri.Tests
         [Test]
         public void TallPhones_ExposeSkyAboveTheBackground()
         {
-            // Documents a real limitation: the background art is only 180px (5.625 units)
-            // tall, so on 9:19.5 and taller the band is taller than the art. That gap is
-            // covered by the camera clear colour, which is set to the sky tone.
+            // 실제 한계를 문서화한다. 배경 아트가 180px(5.625 units)뿐이라 9:19.5
+            // 이상에서는 밴드가 아트보다 높다. 그 여백은 하늘 톤으로 맞춰둔 카메라
+            // 클리어 색이 덮는다
             var b16 = BandFor(1080, 1920);
             float top16 = b16.Bottom + BackgroundPixelHeight / PPU;
             Assert.GreaterOrEqual(top16, b16.Top, "9:16 should be fully covered by the art");
@@ -187,7 +188,7 @@ namespace Onikiri.Tests
         [Test]
         public void PixelRatio_NeverDropsBelowOne()
         {
-            // A tiny editor game view must not produce a zero or negative zoom.
+            // 아주 작은 에디터 게임 뷰에서도 배율이 0이나 음수가 되면 안 된다
             Assert.AreEqual(1, BattleLayout.PixelRatio(100, 100, RefW, RefH));
         }
     }

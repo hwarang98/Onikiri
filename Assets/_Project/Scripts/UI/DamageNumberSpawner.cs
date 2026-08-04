@@ -3,16 +3,15 @@ using UnityEngine;
 
 namespace Onikiri.UI
 {
-    /// <summary>
-    /// Pooled damage popups.
-    ///
-    /// These are the highest-frequency UI in the game - one per hit, and attack speed is an
-    /// upgrade axis - so they are pooled like everything else in combat and never
-    /// instantiated per hit.
-    ///
-    /// Values print through <see cref="NumberFormatter"/>, so the same "1.5K / 3.2M / 1.2aa"
-    /// notation used by the HUD applies here without a second formatting path.
-    /// </summary>
+    /**
+     * @brief 풀링된 데미지 팝업.
+     *
+     * 게임에서 가장 빈도가 높은 UI다. 타격마다 하나씩 생기는데 공격속도가 성장 축이므로,
+     * 전투의 다른 요소와 마찬가지로 풀링하며 타격마다 Instantiate하지 않는다.
+     *
+     * 값은 NumberFormatter를 통해 찍는다. HUD가 쓰는 "1.5K / 3.2M / 1.2aa" 표기가
+     * 별도 포맷 경로 없이 그대로 적용된다.
+     */
     public sealed class DamageNumberSpawner : MonoBehaviour
     {
         [SerializeField] private DamageNumber prefab;
@@ -20,14 +19,14 @@ namespace Onikiri.UI
         [SerializeField] private Camera worldCamera;
         [SerializeField] private Canvas canvas;
 
-        [Tooltip("Popups alive at once before the pool has to grow.")]
+        [Tooltip("풀이 늘어나기 전까지 동시에 살아 있을 수 있는 팝업 수")]
         [SerializeField] private int prewarm = 12;
 
         [SerializeField] private Color normalColor = new Color32(0xFF, 0xF4, 0xD6, 0xFF);
         [SerializeField] private Color killColor = new Color32(0xFF, 0x8A, 0x7A, 0xFF);
 
-        [Tooltip("World offset from the hit point. Lifted clear of the slash effect, which " +
-                 "is a big white shape the number would otherwise be lost inside.")]
+        [Tooltip("타격 지점으로부터의 월드 오프셋. 참격 이펙트를 피해 위로 띄운다. " +
+                 "참격은 큰 흰색 덩어리라 그 안에 들어가면 숫자가 묻힌다")]
         [SerializeField] private Vector2 worldOffset = new Vector2(0f, 0.85f);
 
         private ObjectPool<DamageNumber> pool;
@@ -43,7 +42,7 @@ namespace Onikiri.UI
             if (prefab != null) pool = new ObjectPool<DamageNumber>(prefab, container, prewarm);
         }
 
-        /// <summary>Shows <paramref name="amount"/> at a world position.</summary>
+        /** 월드 좌표에 amount를 표시한다 */
         public void Show(BigDouble amount, Vector3 worldPosition, bool wasKill)
         {
             if (pool == null || canvas == null) return;
@@ -51,7 +50,7 @@ namespace Onikiri.UI
             var screenPoint = worldCamera.WorldToScreenPoint(
                 worldPosition + new Vector3(worldOffset.x, worldOffset.y, 0f));
 
-            // Overlay canvases take a null camera here; passing one offsets everything.
+            // 오버레이 캔버스는 여기에 null 카메라를 넘겨야 한다. 카메라를 넘기면 전체가 어긋난다
             Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
 
             Vector2 anchored;

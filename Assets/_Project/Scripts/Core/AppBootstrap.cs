@@ -2,10 +2,11 @@ using UnityEngine;
 
 namespace Onikiri.Core
 {
-    /// <summary>
-    /// Applies runtime application settings that cannot live in Player Settings.
-    /// Runs before the first scene loads so it applies no matter which scene is played.
-    /// </summary>
+    /**
+     * @brief Player Settings로는 표현할 수 없는 런타임 설정을 적용한다.
+     *
+     * 첫 씬이 로드되기 전에 실행되므로 어느 씬에서 플레이해도 동일하게 걸린다.
+     */
     public static class AppBootstrap
     {
         public const int TargetFrameRate = 60;
@@ -13,11 +14,11 @@ namespace Onikiri.Core
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Initialize()
         {
-            // VSync would override targetFrameRate on platforms that support it.
+            // VSync를 켜두면 지원 플랫폼에서 targetFrameRate를 덮어쓴다
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = TargetFrameRate;
 
-            // An idle game is watched while not being touched; don't dim the screen.
+            // 방치형은 손대지 않는 동안에도 화면을 보게 되므로 화면이 꺼지면 안 된다
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
         }
     }

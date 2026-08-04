@@ -4,32 +4,32 @@ using UnityEngine;
 
 namespace Onikiri.UI
 {
-    /// <summary>
-    /// One pooled damage popup: appears at the hit, arcs upward and fades.
-    ///
-    /// Lives on the overlay canvas rather than in world space so the glyphs stay at an
-    /// exact multiple of the font's design size. A world-space label would scale with the
-    /// camera and land the pixel grid off-screen-pixel, undoing the raster atlas.
-    ///
-    /// Driven by scaled time so a hitstop freezes the popup along with everything else.
-    /// </summary>
+    /**
+     * @brief 풀링된 데미지 팝업 하나. 타격 지점에 나타나 위로 호를 그리며 사라진다.
+     *
+     * 월드 공간이 아니라 오버레이 캔버스에 둔다. 그래야 글자가 폰트 설계 크기의
+     * 정확한 정수배로 유지된다. 월드 공간 라벨은 카메라와 함께 스케일되면서 픽셀 격자가
+     * 화면 픽셀과 어긋나고, 래스터 아틀라스를 쓴 의미가 사라진다.
+     *
+     * 스케일 타임으로 돌기 때문에 히트스톱이 팝업도 함께 얼린다.
+     */
     public sealed class DamageNumber : MonoBehaviour
     {
         [SerializeField] private TMP_Text label;
-        [Tooltip("Dark copy drawn one step behind the label. A bitmap font cannot use TMP's " +
-                 "SDF outline, and without this the number vanishes against the white slash.")]
+        [Tooltip("라벨 뒤에 한 칸 밀려 그려지는 어두운 사본. 비트맵 폰트는 TMP의 SDF " +
+                 "아웃라인을 쓸 수 없어서, 이것이 없으면 흰 참격 위에서 숫자가 사라진다")]
         [SerializeField] private TMP_Text shadow;
         [SerializeField] private RectTransform rect;
 
-        [Header("Motion")]
+        [Header("모션")]
         [SerializeField] private float lifetime = 0.75f;
-        [Tooltip("Initial upward speed, in canvas units per second.")]
+        [Tooltip("초기 상승 속도 (캔버스 단위/초)")]
         [SerializeField] private float riseSpeed = 320f;
-        [Tooltip("Downward pull, so the popup arcs instead of sliding.")]
+        [Tooltip("아래로 당기는 힘. 팝업이 미끄러지지 않고 호를 그리게 한다")]
         [SerializeField] private float gravity = 520f;
-        [Tooltip("Random horizontal spread so stacked hits do not overlap exactly.")]
+        [Tooltip("가로 방향 랜덤 분산. 연속 타격이 정확히 겹치지 않게 한다")]
         [SerializeField] private float horizontalSpread = 60f;
-        [Tooltip("Fraction of life spent at full opacity before fading.")]
+        [Tooltip("사라지기 전 완전 불투명 상태로 유지하는 수명 비율")]
         [Range(0f, 1f)]
         [SerializeField] private float holdFraction = 0.35f;
 

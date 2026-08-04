@@ -5,15 +5,15 @@ using UnityEngine;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Renders sample text through the real font asset and writes it to disk, so the
-    /// rasterisation can be checked by eye.
-    ///
-    /// The failure this catches is specific: if the atlas was baked as SDF, or the atlas
-    /// texture ended up on bilinear filtering, or the font is drawn at a size that is not a
-    /// whole multiple of its 11px design size, the glyph edges go soft. That is invisible
-    /// in the inspector and obvious in a magnified render.
-    /// </summary>
+    /**
+     * @brief 실제 폰트 에셋으로 샘플 텍스트를 렌더해 디스크에 저장한다.
+     *
+     * 래스터 결과를 눈으로 확인하기 위한 것이다.
+     *
+     * 잡아내려는 실패는 구체적이다. 아틀라스가 SDF로 구워졌거나, 아틀라스 텍스처가
+     * 이중선형 필터로 들어갔거나, 설계 크기의 정수배가 아닌 크기로 그리면 글리프
+     * 가장자리가 뭉개진다. 인스펙터에서는 보이지 않고 확대 렌더에서는 명확하다.
+     */
     public static class FontProofSheet
     {
         private const string GalmuriPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
@@ -100,7 +100,7 @@ namespace Onikiri.EditorTools
             readback.Apply(false);
             RenderTexture.active = previous;
 
-            // Nearest-neighbour magnify so the pixel edges survive the inspection itself.
+            // 최근접 이웃으로 확대한다. 그래야 검사 과정 자체가 픽셀 경계를 뭉개지 않는다
             var zoomed = new Texture2D(width * zoom, height * zoom, TextureFormat.RGBA32, false);
             var source = readback.GetPixels32();
             var target = new Color32[width * zoom * height * zoom];

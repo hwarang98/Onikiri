@@ -7,18 +7,17 @@ using UnityEngine;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Collects every character the game actually displays, so the font atlas only has to
-    /// contain those.
-    ///
-    /// Korean is the reason this exists. Baking all 11,172 precomposed Hangul syllables at
-    /// 11px would produce a huge multi-page atlas for a mobile idle game that shows maybe
-    /// two hundred distinct characters. Extracting the real set keeps it to a single small
-    /// page, and re-running this after adding UI text keeps it honest.
-    ///
-    /// Sources: the hand-maintained UIStrings.txt, plus any TMP text already authored in
-    /// prefabs and the main scene.
-    /// </summary>
+    /**
+     * @brief 게임이 실제로 표시하는 글자만 모아, 폰트 아틀라스가 그것만 담게 한다.
+     *
+     * 이것이 존재하는 이유는 한글이다. 완성형 한글 11,172자를 전부 구우면, 실제로는
+     * 이백 자 남짓만 보여주는 모바일 방치형에 거대한 다중 페이지 아틀라스가 생긴다.
+     * 실제 사용 집합만 뽑으면 작은 한 페이지로 끝나고, UI 문구를 추가한 뒤 다시 돌리면
+     * 계속 정확하게 유지된다.
+     *
+     * 출처: 손으로 관리하는 UIStrings.txt, 그리고 프리팹과 메인 씬에 이미 작성된
+     * TMP 텍스트.
+     */
     public static class FontCharsetBuilder
     {
         public const string StringsPath = "Assets/_Project/Data/UIStrings.txt";
@@ -43,7 +42,7 @@ namespace Onikiri.EditorTools
                 characters.Count, fromFile, fromPrefabs, fromScene, CharsetPath));
         }
 
-        /// <summary>The characters to bake, as one string. Used by the font builder.</summary>
+        /** 구워야 할 글자들을 하나의 문자열로. 폰트 빌더가 쓴다 */
         public static string LoadCharset()
         {
             if (!File.Exists(CharsetPath))
@@ -64,7 +63,7 @@ namespace Onikiri.EditorTools
             int before = into.Count;
             foreach (var line in File.ReadAllLines(StringsPath, Encoding.UTF8))
             {
-                // '#' lines document the file rather than contributing glyphs.
+                // '#' 로 시작하는 줄은 파일 설명이지 글리프가 아니다
                 if (line.StartsWith("#")) continue;
                 AddAll(into, line);
             }
@@ -99,13 +98,13 @@ namespace Onikiri.EditorTools
 
             foreach (var c in source)
             {
-                // Whitespace and control characters have no glyph to bake.
+                // 공백과 제어 문자는 구울 글리프가 없다
                 if (c == ' ' || char.IsControl(c) || char.IsWhiteSpace(c)) continue;
                 into.Add(c);
             }
         }
 
-        /// <summary>Wraps at 64 characters purely so the file stays readable in a diff.</summary>
+        /** 64자마다 줄바꿈. 순전히 diff에서 읽기 좋게 하기 위함 */
         private static string BuildCharsetString(SortedSet<char> characters)
         {
             var builder = new StringBuilder();

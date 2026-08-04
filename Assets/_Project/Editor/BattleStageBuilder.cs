@@ -9,20 +9,21 @@ using Onikiri.Core;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Builds the step-3 battle stage into Main.unity: parallax background, ground anchor
-    /// and the samurai with his idle loop.
-    ///
-    /// Re-runnable, so it also documents exactly how the stage is assembled.
-    /// </summary>
+    /**
+     * @brief Main.unity에 전투 스테이지를 구성한다.
+     *
+     * 패럴랙스 배경, 지면 앵커, idle 루프를 도는 사무라이까지.
+     *
+     * 재실행 가능하므로 스테이지가 어떻게 조립되는지에 대한 문서 역할도 한다.
+     */
     public static class BattleStageBuilder
     {
-        // Tiny Pixel Japan is the background the handoff spec names, and unlike the forest
-        // packs it has an actual flat ground surface plus the sakura palette the brief asks
-        // for. Swap this block to change stages.
+        // Tiny Pixel Japan은 사양서가 지정한 배경 팩이다. 숲 팩들과 달리 실제로 평평한
+        // 지면이 있고, 요구사항에 있는 벚꽃 팔레트도 갖췄다. 스테이지를 바꾸려면 이
+        // 블록을 교체하면 된다.
         private const string BackgroundFolder = "Assets/ThirdParty/Backgrounds/TinyPixelJapan";
 
-        /// <summary>Back to front. Anything not found is skipped rather than failing the build.</summary>
+        /** 뒤에서 앞 순서. 없는 레이어는 빌드를 실패시키지 않고 건너뛴다 */
         private static readonly string[] BackgroundLayers =
         {
             "Sky",
@@ -38,44 +39,41 @@ namespace Onikiri.EditorTools
             "Gras"
         };
 
-        /// <summary>
-        /// Height of the walkable dirt surface above the background's bottom edge, in
-        /// source pixels.
-        ///
-        /// Measured as the most common per-column surface height in Ground.png (209 of 353
-        /// columns), NOT the topmost opaque pixel. The highest dirt mound reaches 30px but
-        /// only 8 columns are that tall, so calibrating to it left the character floating
-        /// 6px above the ground everyone else walks on.
-        /// </summary>
+        /**
+         * @brief 배경 밑단에서 걸을 수 있는 흙 표면까지의 높이 (원본 픽셀).
+         *
+         * Ground.png의 열별 표면 높이 중 최빈값으로 측정했다(353개 열 중 209개).
+         * 가장 높은 불투명 픽셀이 아니다. 가장 높은 흙더미는 30px까지 올라가지만 그
+         * 높이인 열은 8개뿐이라, 거기에 맞추면 캐릭터가 나머지 지면 위로 6px 떠버린다.
+         */
         private const float GroundSurfacePixels = 24f;
         private const float BackgroundPixelHeight = 180f;
 
-        // ------------------------------------------------------------------ colour grade
+        // ------------------------------------------------------------------ 색 그레이드
         //
-        // The background packs ship bright and warm, which flattens the scene and lets the
-        // sakura compete with the fighters. Tinting the sprite renderers by depth pushes the
-        // distance darker and cooler and leaves the near ground lightest, so the untinted
-        // characters read as the closest, brightest thing on screen.
+        // 배경 팩은 밝고 따뜻하게 나오는데, 그러면 씬이 평면적으로 보이고 벚꽃이
+        // 파이터와 시선을 다툰다. 스프라이트 렌더러를 깊이별로 틴트하면 원경이 어둡고
+        // 차가워지고 근경 지면이 가장 밝게 남아, 틴트하지 않은 캐릭터가 화면에서 가장
+        // 가깝고 밝은 것으로 읽힌다.
         //
-        // Characters and enemies are deliberately NOT tinted - that separation is the whole
-        // point of the grade.
+        // 캐릭터와 적은 의도적으로 틴트하지 않는다. 그 분리가 이 그레이드의 핵심이다.
 
-        /// <summary>Far layers: sky, clouds, Fuji.</summary>
+        /** 원경 레이어: 하늘, 구름, 후지산 */
         private static readonly Color FarTint = new Color32(0x6E, 0x68, 0xA0, 0xFF);
 
-        /// <summary>Mid layers: mountains and tree bands.</summary>
+        /** 중경 레이어: 산과 나무 띠 */
         private static readonly Color MidTint = new Color32(0x8B, 0x82, 0xB5, 0xFF);
 
-        /// <summary>Near layers: shrine, ground, grass.</summary>
+        /** 근경 레이어: 신사, 지면, 풀 */
         private static readonly Color NearTint = new Color32(0xA8, 0x9E, 0xCB, 0xFF);
 
-        /// <summary>Camera clear colour, behind the tinted sky fill.</summary>
+        /** 카메라 클리어 색. 틴트된 하늘 뒤에 깔린다 */
         private static readonly Color ClearColor = new Color32(0x2A, 0x27, 0x40, 0xFF);
 
         private static readonly string[] FarLayers = { "Sky", "Clouds", "Fuji" };
         private static readonly string[] NearLayers = { "Shrine_Single", "Shrine_Multiple", "House", "Ground", "Gras" };
 
-        /// <summary>Depth tint for a background layer. Anything unlisted is treated as mid.</summary>
+        /** 배경 레이어의 깊이 틴트. 목록에 없으면 중경으로 취급한다 */
         public static Color TintFor(string layerName)
         {
             foreach (var name in FarLayers) if (name == layerName) return FarTint;
@@ -90,14 +88,15 @@ namespace Onikiri.EditorTools
 
         private const float IdleFrameRate = 10f;
 
-        /// <summary>
-        /// Where the samurai is dropped on the FIRST build only. After that his transform
-        /// is authored in the Scene view and rebuilds preserve it, so this is a seed value
-        /// rather than the live setting. Visible world width is 6.75 units on every target
-        /// phone, so the usable range is roughly -3.375 .. 3.375; he sits left of centre
-        /// because enemies walk in from the right, but far enough right to clear the pagoda
-        /// that sits on the left edge of the background.
-        /// </summary>
+        /**
+         * @brief 최초 빌드에서만 사무라이를 놓을 위치.
+         *
+         * 이후에는 Scene 뷰에서 트랜스폼을 직접 잡고 리빌드가 그것을 보존하므로, 이
+         * 값은 실제 설정이 아니라 시드값이다. 가시 월드 폭은 대상 기기 전부에서
+         * 6.75 units이라 쓸 수 있는 범위는 대략 -3.375 ~ 3.375 다. 적이 오른쪽에서
+         * 오므로 중앙보다 왼쪽에 서되, 배경 왼쪽 끝의 오층탑과 겹치지 않을 만큼은
+         * 오른쪽에 둔다.
+         */
         public const float PlayerX = -1.2f;
 
         private const string SkyLayerName = "Sky";
@@ -122,10 +121,10 @@ namespace Onikiri.EditorTools
             var backgroundRoot = EnsureChild(battle.transform, "Background");
             var groundAnchor = EnsureChild(battle.transform, "GroundAnchor");
 
-            // Parent the fighters to the ground anchor so they inherit the ground line for
-            // free - no per-character layout code, and enemies added later come along too.
-            // Move existing roots across BEFORE creating any, or a rebuild ends up with two
-            // of each.
+            // 파이터를 지면 앵커의 자식으로 둬서 지면선을 그냥 상속받게 한다. 캐릭터마다
+            // 레이아웃 코드를 짤 필요가 없고, 나중에 추가되는 적도 따라온다.
+            // 기존 루트를 먼저 옮긴 다음에 생성해야 한다. 순서가 반대면 리빌드 때
+            // 각각 두 개씩 생긴다
             Reparent(battle.transform, groundAnchor, "Player");
             Reparent(battle.transform, groundAnchor, "Enemies");
             var player = EnsureChild(groundAnchor, "Player");
@@ -146,26 +145,27 @@ namespace Onikiri.EditorTools
             Debug.Log("[Onikiri] Battle stage built: background + ground anchor + samurai idle.");
         }
 
-        // ---------------------------------------------------------------- background
+        // ---------------------------------------------------------------- 배경
 
-        /// <summary>
-        /// Builds every background layer and returns the sky fill renderer.
-        ///
-        /// The sky is deliberately NOT a child of the background root. The other layers are
-        /// bottom-anchored to the battle band, whereas the sky is stretched over the whole
-        /// camera by <see cref="BattleStageLayout"/>, so it lives beside them under Battle.
-        /// Both jobs are done here rather than split across two builders - when the combat
-        /// builder also reparented the sky, rebuilds left a second stale copy behind and
-        /// mutating the hierarchy mid-iteration silently skipped a layer's sorting order.
-        /// </summary>
+        /**
+         * @brief 배경 레이어를 전부 만들고 하늘 렌더러를 반환한다.
+         *
+         * 하늘은 의도적으로 배경 루트의 자식이 아니다. 다른 레이어는 전투 밴드에 밑단이
+         * 고정되지만 하늘은 BattleStageLayout이 카메라 전체 크기로 늘리므로, Battle 아래에
+         * 나란히 둔다.
+         *
+         * 두 작업을 두 빌더로 나누지 않고 여기서 함께 처리한다. 결합 빌더도 하늘을
+         * 재부모화하던 시절에는 리빌드마다 낡은 사본이 하나씩 남았고, 순회 도중 계층을
+         * 바꾸는 바람에 레이어 하나가 정렬 순서 배정을 조용히 건너뛰었다.
+         */
         private static SpriteRenderer BuildBackground(Transform root, Transform battle)
         {
             for (int i = root.childCount - 1; i >= 0; i--)
                 Object.DestroyImmediate(root.GetChild(i).gameObject);
 
-            // Sweep every prior sky, not just the first match. An earlier version of this
-            // builder left the sky parented under Battle, so repeated rebuilds silently
-            // stacked up copies that all rendered on top of each other.
+            // 첫 번째 일치만이 아니라 이전 하늘을 전부 쓸어낸다. 이 빌더의 예전 버전이
+            // 하늘을 Battle 아래에 남겨두는 바람에, 리빌드를 반복할수록 사본이 조용히
+            // 쌓여 서로 겹쳐 그려졌다
             for (int i = battle.childCount - 1; i >= 0; i--)
             {
                 var child = battle.GetChild(i);
@@ -206,14 +206,14 @@ namespace Onikiri.EditorTools
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
                 renderer.color = TintFor(layerName);
-                // Grass jumps in front of the fighters so it crosses their feet; everything
-                // else stacks back to front in list order.
+                // 풀은 파이터 앞으로 올려 발을 가로지르게 한다. 나머지는 목록 순서대로
+                // 뒤에서 앞으로 쌓인다
                 renderer.sortingOrder = layerName == GroundCoverLayerName
                     ? SortingOrders.GroundCover
                     : order++;
 
-                // Sprites import with a centre pivot, so lift each layer by half its height
-                // to put its bottom edge on the root's origin (which sits on the band floor).
+                // 스프라이트는 중앙 피벗으로 임포트되므로, 각 레이어를 자기 높이의 절반만큼
+                // 올려 밑단이 루트 원점(밴드 바닥)에 오게 한다
                 go.transform.localPosition = new Vector3(0f, sprite.bounds.extents.y, 0f);
                 built++;
             }
@@ -222,7 +222,7 @@ namespace Onikiri.EditorTools
             return skyFill;
         }
 
-        // ---------------------------------------------------------------- animation
+        // ---------------------------------------------------------------- 애니메이션
 
         private static AnimationClip BuildIdleClip()
         {
@@ -281,7 +281,7 @@ namespace Onikiri.EditorTools
             return AnimatorController.CreateAnimatorControllerAtPathWithClip(ControllerPath, clip);
         }
 
-        /// <summary>Sprites named "NAME_0", "NAME_1"... sorted by their numeric suffix.</summary>
+        /** "NAME_0", "NAME_1" 형태의 스프라이트를 숫자 접미사 순으로 정렬해 반환 */
         private static List<Sprite> LoadOrderedSprites(string sheetPath)
         {
             var sprites = new List<Sprite>();
@@ -303,16 +303,15 @@ namespace Onikiri.EditorTools
             return 0;
         }
 
-        // ---------------------------------------------------------------- samurai
+        // ---------------------------------------------------------------- 사무라이
 
-        /// <summary>
-        /// Creates the samurai, or refreshes the existing one in place.
-        ///
-        /// The transform is deliberately left alone when the object already exists: where
-        /// the character stands is an art decision made by dragging him in the Scene view,
-        /// and a rebuild must not throw that away. <see cref="PlayerX"/> is only a starting
-        /// position for the very first build.
-        /// </summary>
+        /**
+         * @brief 사무라이를 생성하거나, 이미 있으면 제자리에서 갱신한다.
+         *
+         * 오브젝트가 이미 있으면 트랜스폼은 의도적으로 건드리지 않는다. 캐릭터를 어디에
+         * 세울지는 Scene 뷰에서 드래그해 정하는 아트 결정이고, 리빌드가 그것을 날려서는
+         * 안 된다. PlayerX는 최초 빌드에서만 쓰는 시작 위치다.
+         */
         private static void BuildSamurai(Transform player, AnimatorController controller)
         {
             var existing = player.Find("Samurai");
@@ -323,8 +322,8 @@ namespace Onikiri.EditorTools
             {
                 go = new GameObject("Samurai");
                 go.transform.SetParent(player, false);
-                // Local Y of zero: the ground anchor supplies the world height, and the
-                // sprite pivot is already on the character's feet.
+                // 로컬 Y는 0. 월드 높이는 지면 앵커가 공급하고, 스프라이트 피벗은
+                // 이미 캐릭터의 발에 있다
                 go.transform.localPosition = new Vector3(PlayerX, 0f, 0f);
             }
             else
@@ -354,7 +353,7 @@ namespace Onikiri.EditorTools
                 : "[Onikiri] Samurai refreshed, keeping position " + go.transform.localPosition + ".");
         }
 
-        // ---------------------------------------------------------------- wiring
+        // ---------------------------------------------------------------- 배선
 
         private static void WireLayout(GameObject battle, Camera camera, Transform backgroundRoot,
                                        Transform groundAnchor, SpriteRenderer skyFill)
@@ -381,7 +380,7 @@ namespace Onikiri.EditorTools
             return band as RectTransform;
         }
 
-        // ---------------------------------------------------------------- helpers
+        // ---------------------------------------------------------------- 헬퍼
 
         private static Transform EnsureChild(Transform parent, string name)
         {

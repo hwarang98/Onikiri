@@ -6,24 +6,22 @@ using UnityEngine.TextCore.LowLevel;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Bakes TMP font assets for pixel fonts.
-    ///
-    /// TMP defaults to signed distance field rendering, which is exactly wrong here. SDF
-    /// reconstructs glyph edges analytically and anti-aliases them, so an 11px bitmap face
-    /// comes out soft and blurred - the letters stop matching the pixel art around them.
-    /// The settings that matter:
-    ///
-    ///   sampling point size = the font's design size (11 for Galmuri11), never "auto"
-    ///   padding             = 0        (padding only exists to give SDF spread room)
-    ///   render mode         = RASTER_HINTED (1-bit coverage, hinted to the pixel grid)
-    ///   atlas filter        = Point    (bilinear would smear it again at draw time)
-    ///   material shader     = TextMeshPro/Bitmap, not any Distance Field variant
-    ///
-    /// Displayed sizes must then be integer multiples of the design size, or the glyph grid
-    /// lands between screen pixels and the crispness is lost anyway. See
-    /// <see cref="Onikiri.UI.PixelFontSizes"/>.
-    /// </summary>
+    /**
+     * @brief 픽셀 폰트용 TMP 폰트 에셋을 굽는다.
+     *
+     * TMP는 기본이 SDF 렌더링인데 여기서는 정확히 틀린 선택이다. SDF는 글리프 경계를
+     * 해석적으로 복원하며 안티에일리어싱을 넣기 때문에, 11px 비트맵 서체가 흐릿하게
+     * 나오고 주변 픽셀 아트와 톤이 어긋난다. 중요한 설정은 다음과 같다:
+     *
+     *   샘플링 크기   = 설계 크기의 정수배 (자동 계산 금지)
+     *   패딩          = 1  (아래 AtlasPadding 주석 참고)
+     *   렌더 모드     = RASTER_HINTED (픽셀 격자에 힌팅된 1비트 커버리지)
+     *   아틀라스 필터 = Point (이중선형이면 그리는 시점에 다시 뭉갠다)
+     *   머티리얼 셰이더 = TextMeshPro/Bitmap. Distance Field 계열이 아니다
+     *
+     * 표시 크기는 아틀라스를 구운 크기의 정수배여야 한다. 아니면 글리프 격자가 화면
+     * 픽셀 사이에 놓여 선명함이 사라진다. Onikiri.UI.PixelFontSizes 참고.
+     */
     public static class PixelFontAssetBuilder
     {
         private const string FontFolder = "Assets/_Project/Art/Fonts";
@@ -32,42 +30,45 @@ namespace Onikiri.EditorTools
         private const int AtlasWidth = 1024;
         private const int AtlasHeight = 1024;
 
-        /// <summary>
-        /// One transparent pixel of margin around each glyph.
-        ///
-        /// Zero padding is the intuitive choice for a raster atlas - there is no distance
-        /// field that needs spread room - but TMP derives glyph quad size from the font's
-        /// metrics while sampling the packed rect, and at padding 0 those disagree by one
-        /// pixel (a glyph with 10x11 metrics packs into a 9x10 rect). Every glyph then gets
-        /// stretched by ~10/9, and with point sampling that duplicates and drops pixel rows,
-        /// which reads as broken, overlapping letterforms.
-        ///
-        /// Padding 1 makes rect = metrics + 2 and the mapping exact. It costs a pixel of
-        /// transparent margin per glyph and softens nothing.
-        /// </summary>
+        /**
+         * @brief 글리프마다 투명 여백 1픽셀.
+         *
+         * 래스터 아틀라스에는 퍼짐 공간이 필요한 distance field가 없으니 패딩 0이
+         * 직관적인 선택이다. 그런데 TMP는 폰트 메트릭으로 글리프 쿼드 크기를 정하면서
+         * 패킹된 rect를 샘플링한다. 패딩 0에서는 이 둘이 1픽셀 어긋난다
+         * (메트릭 10x11인 글리프가 9x10 rect로 패킹된다). 그러면 모든 글리프가 약 10/9로
+         * 늘어나고, Point 샘플링이 픽셀 행을 복제하거나 누락시켜 글자가 깨지고 겹쳐 보인다.
+         *
+         * 패딩 1이면 rect = 메트릭 + 2 가 되어 매핑이 정확해진다. 글리프마다 투명 여백
+         * 1픽셀을 쓸 뿐 흐려지는 것은 없다.
+         */
         private const int AtlasPadding = 1;
 
-        /// <summary>Size the Galmuri11 face was drawn at.</summary>
+        /** Galmuri11 폰트가 그려진 크기 */
         public const int GalmuriDesignSize = 11;
 
-        /// <summary>
-        /// Integer multiple the atlas is rasterised at. Display sizes must be this multiple
-        /// (33) or a further multiple of the design size.
-        /// </summary>
+        /**
+         * @brief 아틀라스를 래스터하는 정수 배수.
+         *
+         * 표시 크기는 이 값(33)이거나 그 배수여야 한다.
+         */
         public const int GalmuriSampleMultiple = 3;
 
-        /// <summary>
-        /// Size the Thaleah face was drawn at, taken from the legacy bitmap font that ships
-        /// alongside it (ThaleahFat.fontsettings, m_FontSize: 16).
-        /// </summary>
+        /**
+         * @brief Thaleah 폰트가 그려진 크기.
+         *
+         * 함께 배포되는 레거시 비트맵 폰트에서 확인했다 (ThaleahFat.fontsettings 의
+         * m_FontSize: 16).
+         */
         public const int ThaleahDesignSize = 16;
         public const int ThaleahSampleMultiple = 3;
 
-        /// <summary>
-        /// Thaleah is a Latin display face used only for damage popups, so it only needs
-        /// digits, separators and the magnitude suffixes NumberFormatter emits. Feeding it
-        /// the full UI charset would just log a warning per missing Hangul glyph.
-        /// </summary>
+        /**
+         * @brief Thaleah는 데미지 팝업에만 쓰는 라틴 디스플레이 서체다.
+         *
+         * 숫자, 구분자, NumberFormatter가 내는 자릿수 접미사만 있으면 된다. 전체 UI
+         * 문자셋을 먹이면 없는 한글 글리프마다 경고만 쌓인다.
+         */
         private const string NumberCharset =
             "0123456789.,+-x" +
             "KMBT" +
@@ -79,14 +80,13 @@ namespace Onikiri.EditorTools
             FontCharsetBuilder.Rebuild();
             var charset = FontCharsetBuilder.LoadCharset();
 
-            // Sampled at 3x the design size, not at the design size.
+            // 설계 크기가 아니라 그 3배로 샘플링한다.
             //
-            // Rasterising the outline at exactly 11 produces glyph bitmaps one pixel
-            // shorter than the metrics TMP builds quads from, so every glyph gets stretched
-            // by 11/10 and point sampling duplicates rows - the letterforms visibly break.
-            // A pixel font's outlines are axis-aligned rectangles, so rasterising at an
-            // integer multiple yields exact NxN blocks and the rounding error becomes
-            // negligible. Display size then matches the sampling size 1:1.
+            // 외곽선을 정확히 11로 래스터하면 TMP가 쿼드를 만드는 메트릭보다 1픽셀 작은
+            // 글리프 비트맵이 나온다. 그러면 모든 글리프가 11/10으로 늘어나고 Point
+            // 샘플링이 행을 복제해 글자 형태가 눈에 띄게 깨진다. 픽셀 폰트의 외곽선은
+            // 축 정렬 사각형이므로 정수배로 래스터하면 정확히 NxN 블록이 나오고 반올림
+            // 오차가 무시할 수준이 된다. 표시 크기는 샘플링 크기와 1:1로 맞춘다.
             Build(GalmuriSourcePath, "Galmuri11",
                   GalmuriDesignSize * GalmuriSampleMultiple, charset);
 
@@ -99,15 +99,16 @@ namespace Onikiri.EditorTools
 
         private const string GalmuriSourcePath = FontFolder + "/Galmuri11.ttf";
 
-        /// <summary>Imported from the Asset Store package, left where it landed.</summary>
+        /** Asset Store 패키지에서 임포트된 위치 그대로 둔 경로 */
         private const string ThaleahSourcePath =
             "Assets/Thaleah_PixelFont/Materials/ThaleahFat_TTF.ttf";
 
-        /// <summary>
-        /// Bakes one font. <paramref name="samplingPointSize"/> must be a whole multiple of
-        /// the size the face was drawn at, and display sizes must then match it or a
-        /// multiple of it.
-        /// </summary>
+        /**
+         * @brief 폰트 하나를 굽는다.
+         *
+         * samplingPointSize는 폰트가 그려진 크기의 정수배여야 하고, 표시 크기는 그것과
+         * 같거나 그 배수여야 한다.
+         */
         public static TMP_FontAsset Build(string sourcePath, string fontName,
                                           int samplingPointSize, string charset)
         {
@@ -120,8 +121,8 @@ namespace Onikiri.EditorTools
 
             int designPointSize = samplingPointSize;
             string outputPath = OutputFolder + "/" + fontName + " SDF.asset";
-            // Named "<font> SDF" only because that is the convention TMP tooling expects;
-            // the contents are a raster atlas.
+            // 이름에 SDF가 붙는 것은 TMP 도구가 기대하는 관례일 뿐이고,
+            // 내용물은 래스터 아틀라스다
 
             var fontAsset = TMP_FontAsset.CreateFontAsset(
                 sourceFont,
@@ -145,8 +146,8 @@ namespace Onikiri.EditorTools
             if (!allAdded && !string.IsNullOrEmpty(missing))
                 Debug.LogWarning("[Onikiri] " + fontName + " is missing glyphs for: " + missing);
 
-            // Freeze it: a static asset will not silently rasterise new glyphs at runtime,
-            // which would bypass every setting above.
+            // 고정시킨다. 정적 에셋은 런타임에 새 글리프를 몰래 래스터하지 않는다.
+            // 그렇지 않으면 위의 모든 설정을 우회하게 된다
             fontAsset.atlasPopulationMode = AtlasPopulationMode.Static;
 
             ApplyPointFiltering(fontAsset);
@@ -185,10 +186,10 @@ namespace Onikiri.EditorTools
                 return;
             }
 
-            // Swap the shader on the material TMP already built, rather than creating a
-            // fresh one. A new Material starts with default values for _TextureWidth /
-            // _TextureHeight / _GradientScale, and TMP computes glyph UVs from those - get
-            // them wrong and glyphs render displaced with neighbouring glyphs bleeding in.
+            // 새로 만들지 않고 TMP가 이미 만들어 둔 머티리얼의 셰이더만 교체한다.
+            // 새 Material은 _TextureWidth / _TextureHeight / _GradientScale 이 기본값으로
+            // 시작하는데, TMP는 그 값들로 글리프 UV를 계산한다. 값이 틀리면 글리프가
+            // 밀려 그려지고 옆 글리프가 번져 들어온다
             var material = fontAsset.material;
             if (material == null)
             {
@@ -202,19 +203,20 @@ namespace Onikiri.EditorTools
 
             material.name = fontAsset.name + " Material";
 
-            // Property names, not ShaderUtilities.ID_*: those cached IDs are populated
-            // lazily and are still 0 here, so SetFloat(0, ...) silently writes nothing and
-            // the atlas dimensions stay zero - which is exactly what mangles the glyphs.
+            // ShaderUtilities.ID_* 가 아니라 프로퍼티 이름을 쓴다. 그 캐시된 ID들은
+            // 지연 초기화라 여기서는 아직 0이고, SetFloat(0, ...) 은 조용히 아무것도
+            // 쓰지 않아 아틀라스 크기가 0으로 남는다. 글리프가 깨지는 원인이 바로 이것이다
             material.SetTexture("_MainTex", fontAsset.atlasTexture);
             material.SetFloat("_TextureWidth", fontAsset.atlasWidth);
             material.SetFloat("_TextureHeight", fontAsset.atlasHeight);
             material.SetFloat("_GradientScale", fontAsset.atlasPadding + 1);
         }
 
-        /// <summary>
-        /// Writes the font asset with its atlas texture and material nested inside it, so
-        /// the whole font is one file to move or delete.
-        /// </summary>
+        /**
+         * @brief 아틀라스 텍스처와 머티리얼을 폰트 에셋 안에 중첩해 저장한다.
+         *
+         * 폰트 전체가 파일 하나가 되어 옮기거나 지우기 쉬워진다.
+         */
         private static void SaveWithSubAssets(TMP_FontAsset fontAsset, string path)
         {
             var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);

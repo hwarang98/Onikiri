@@ -5,13 +5,12 @@ using UnityEngine;
 
 namespace Onikiri.UI
 {
-    /// <summary>
-    /// Gold readout in the top bar.
-    ///
-    /// Event-driven rather than polled in Update: the balance only changes on a kill, and
-    /// re-formatting a BigDouble every frame for a number that rarely moves is wasted work
-    /// on a phone.
-    /// </summary>
+    /**
+     * @brief 상단 바의 골드 표시.
+     *
+     * Update에서 폴링하지 않고 이벤트로 갱신한다. 잔액은 처치할 때만 바뀌는데,
+     * 거의 변하지 않는 숫자를 매 프레임 BigDouble에서 포맷하는 것은 폰에서 낭비다.
+     */
     public sealed class HUDCurrency : MonoBehaviour
     {
         [SerializeField] private TMP_Text label;

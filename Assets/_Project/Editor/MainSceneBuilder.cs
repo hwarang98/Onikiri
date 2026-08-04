@@ -12,14 +12,15 @@ using UnityEngine.InputSystem.UI;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Builds Assets/_Project/Scenes/Main.unity from scratch: portrait Pixel Perfect
-    /// camera, a 1080x1920 overlay canvas, and empty containers for the four screen
-    /// bands described in the handoff spec.
-    ///
-    /// Re-runnable — it overwrites the scene, so it doubles as documentation of exactly
-    /// how the scene is configured.
-    /// </summary>
+    /**
+     * @brief Assets/_Project/Scenes/Main.unity 를 처음부터 만든다.
+     *
+     * 세로 Pixel Perfect 카메라, 1080x1920 오버레이 캔버스, 그리고 사양서가 정의한
+     * 화면 4분할 컨테이너를 빈 채로 배치한다.
+     *
+     * 재실행 가능하며 씬을 덮어쓴다. 따라서 씬이 어떻게 구성돼 있는지에 대한 문서
+     * 역할도 겸한다.
+     */
     public static class MainSceneBuilder
     {
         public const string ScenePath = "Assets/_Project/Scenes/Main.unity";
@@ -51,7 +52,7 @@ namespace Onikiri.EditorTools
 
             var cam = go.AddComponent<Camera>();
             cam.orthographic = true;
-            // Pixel Perfect Camera drives this at runtime; set it so the editor view matches.
+            // 런타임에는 Pixel Perfect Camera가 이 값을 덮어쓴다. 에디터 뷰를 맞추기 위해 설정
             cam.orthographicSize = DisplayConfig.CameraWorldHeight * 0.5f;
             cam.nearClipPlane = -100f;
             cam.farClipPlane = 100f;
@@ -64,15 +65,21 @@ namespace Onikiri.EditorTools
             urp.renderPostProcessing = false;
             urp.renderShadows = false;
 
+            // Unity가 기본 생성하는 Main Camera에는 딸려 오지만, 손으로 만든 카메라에는
+            // 없다. 씬에 리스너가 없으면 AudioSource.Play()는 성공하고 isPlaying도 true를
+            // 반환한다. 소리만 출력에 도달하지 않으므로, 무음을 알아채기 전까지는
+            // 모든 것이 정상으로 보인다
+            go.AddComponent<AudioListener>();
+
             var ppc = go.AddComponent<PixelPerfectCamera>();
             ppc.assetsPPU = DisplayConfig.PixelsPerUnit;
             ppc.refResolutionX = DisplayConfig.ReferenceWidth;
             ppc.refResolutionY = DisplayConfig.ReferenceHeight;
-            // No letter/pillarboxing: taller phones (9:21) simply reveal more world
-            // instead of getting black bars.
+            // 레터/필러박스를 쓰지 않는다. 세로가 긴 기기(9:21)는 검은 띠 대신
+            // 월드를 더 보여준다
             ppc.cropFrame = PixelPerfectCamera.CropFrame.None;
-            // Snap rendering to the pixel grid without forcing an upscale render texture,
-            // so VFX and damage numbers can still move smoothly.
+            // 업스케일 렌더 텍스처를 강제하지 않고 픽셀 격자에만 스냅한다.
+            // 그래야 VFX와 데미지 숫자가 부드럽게 움직일 수 있다
             ppc.gridSnapping = PixelPerfectCamera.GridSnapping.PixelSnapping;
         }
 
@@ -87,16 +94,16 @@ namespace Onikiri.EditorTools
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(DisplayConfig.DesignWidth, DisplayConfig.DesignHeight);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            // Width priority (0). In portrait the width is the constrained axis: matching
-            // width keeps UI at 1:1 on any 9:16-9:21 phone and lets the extra height become
-            // free space. Matching height instead would overflow horizontally on tall phones.
+            // 폭 우선(0). 세로 화면에서는 폭이 고정축이다. 폭에 맞추면 9:16~9:21 어느
+            // 기기에서도 UI가 1:1로 유지되고 남는 높이는 여백이 된다. 높이에 맞추면
+            // 세로가 긴 기기에서 가로로 넘친다
             scaler.matchWidthOrHeight = 0f;
             scaler.referencePixelsPerUnit = 100f;
 
             go.AddComponent<GraphicRaycaster>();
 
-            // Four screen bands from the spec, bottom-up: tab bar 10%, growth 35%,
-            // battle 45%, top bar 10%. Left empty on purpose - contents come later.
+            // 사양서의 화면 4분할. 아래에서 위로 탭바 10%, 성장 35%, 전투 45%, 상단 10%.
+            // 내용물은 나중에 채우므로 의도적으로 비워 둔다
             CreateBand(go.transform, "BottomTabBar", 0f, DisplayConfig.BottomTabBarTop);
             CreateBand(go.transform, "GrowthPanel", DisplayConfig.BottomTabBarTop, DisplayConfig.GrowthPanelTop);
             CreateBand(go.transform, "BattleArea", DisplayConfig.GrowthPanelTop, DisplayConfig.BattleAreaTop);
@@ -129,7 +136,7 @@ namespace Onikiri.EditorTools
 
         static void CreateWorldRoots()
         {
-            // Empty parents so later steps have obvious places to put things.
+            // 이후 단계에서 무엇을 어디에 둘지 분명해지도록 빈 부모만 만들어 둔다
             new GameObject("--- WORLD ---").transform.position = Vector3.zero;
             var battle = new GameObject("Battle");
             new GameObject("Background").transform.SetParent(battle.transform, false);

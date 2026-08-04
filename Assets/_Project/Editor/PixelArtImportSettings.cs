@@ -5,22 +5,22 @@ using UnityEngine;
 
 namespace Onikiri.EditorTools
 {
-    /// <summary>
-    /// Project-wide pixel-art import standard.
-    ///
-    /// Every art pack we imported ships at a different canvas size (samurai 96x96,
-    /// enemies 92x92, boss 184x184, slashes 64/128), but the *drawn* art inside those
-    /// canvases is all at roughly the same scale (34px samurai vs 32-46px enemies).
-    /// So a single PPU makes every pack line up on screen with no per-pack rescaling.
-    ///
-    /// PPU 32 pairs with a 216x384 Pixel Perfect reference resolution, which is an
-    /// exact 5x integer upscale of the 1080x1920 design resolution.
-    /// </summary>
+    /**
+     * @brief 프로젝트 전체의 픽셀 아트 임포트 기준.
+     *
+     * 임포트한 아트 팩은 캔버스 크기가 제각각이지만(사무라이 96x96, 적 92x92,
+     * 보스 184x184, 참격 64/128), 그 캔버스 안에 실제로 그려진 아트는 대략 같은
+     * 스케일이다(사무라이 34px 대 적 32~46px). 그래서 단일 PPU만으로 팩별 재스케일
+     * 없이 화면에서 크기가 맞는다.
+     *
+     * PPU 32는 Pixel Perfect 기준 해상도 216x384와 짝을 이루며, 이는 설계 해상도
+     * 1080x1920의 정확한 5배 정수배다.
+     */
     public static class PixelArtImportSettings
     {
         public const int PixelsPerUnit = DisplayConfig.PixelsPerUnit;
 
-        /// <summary>Roots this standard applies to.</summary>
+        /** 이 기준이 적용되는 루트 경로 */
         public static readonly string[] ScopedRoots =
         {
             "Assets/ThirdParty/",
@@ -37,10 +37,11 @@ namespace Onikiri.EditorTools
             return false;
         }
 
-        /// <summary>
-        /// Side-view characters pivot at their feet so a 92px and a 184px frame still
-        /// stand on the same ground line. Everything else pivots at center.
-        /// </summary>
+        /**
+         * @brief 사이드뷰 캐릭터는 발에 피벗을 둔다.
+         *
+         * 그래야 92px 프레임과 184px 프레임이 같은 지면선에 선다. 그 외에는 중앙 피벗.
+         */
         public static SpriteAlignment PivotFor(string assetPath)
         {
             if (assetPath.Contains("/Characters/") || assetPath.Contains("/Enemies/"))
@@ -52,10 +53,10 @@ namespace Onikiri.EditorTools
         {
             importer.textureType = TextureImporterType.Sprite;
 
-            // Never demote an already-sliced sheet back to a single sprite. Doing so
-            // deletes every SpriteRect, which silently breaks every prefab and animation
-            // clip referencing those sprites. Only sheets that have never been sliced get
-            // the Single default.
+            // 이미 슬라이싱된 시트를 단일 스프라이트로 되돌리는 일은 절대 없어야 한다.
+            // 그러면 모든 SpriteRect가 삭제되고, 그 스프라이트를 참조하던 프리팹과
+            // 애니메이션 클립이 조용히 전부 깨진다. 슬라이싱된 적 없는 시트에만
+            // Single 기본값을 준다
             bool alreadySliced = importer.spriteImportMode == SpriteImportMode.Multiple;
             if (!alreadySliced) importer.spriteImportMode = SpriteImportMode.Single;
 
@@ -66,20 +67,20 @@ namespace Onikiri.EditorTools
             importer.alphaIsTransparency = true;
             importer.npotScale = TextureImporterNPOTScale.None;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
-            // Sheets run up to ~1560px wide; the 2048 default would silently downscale
-            // anything larger, which destroys pixel alignment.
+            // 시트는 가로 약 1560px까지 간다. 기본값 2048이면 그보다 큰 것을 조용히
+            // 축소해 픽셀 정렬이 깨진다
             importer.maxTextureSize = 4096;
 
             var settings = new TextureImporterSettings();
             importer.ReadTextureSettings(settings);
-            // On a sliced sheet the pivot lives per-SpriteRect, and those were authored by
-            // the slicer against measured art. Leave them alone.
+            // 슬라이싱된 시트에서는 피벗이 SpriteRect마다 따로 있고, 그것은 슬라이서가
+            // 실측한 아트를 기준으로 지정한 값이다. 건드리지 않는다
             if (!alreadySliced) settings.spriteAlignment = (int)PivotFor(importer.assetPath);
             settings.spriteMeshType = SpriteMeshType.FullRect;
             settings.spriteExtrude = 0;
             importer.SetTextureSettings(settings);
 
-            // Block-compression on mobile smears pixel art, so force uncompressed RGBA.
+            // 모바일의 블록 압축은 픽셀 아트를 뭉갠다. 무압축 RGBA를 강제한다
             ApplyPlatform(importer, "Android");
             ApplyPlatform(importer, "iPhone");
         }
@@ -106,14 +107,14 @@ namespace Onikiri.EditorTools
 
             if (importer.assetPath.Contains("/Enemies/"))
             {
-                // Canvas space keeps every trimmed frame aligned to the original artboard,
-                // so one pivot holds for a whole animation.
+                // 캔버스 공간을 쓰면 트리밍된 모든 프레임이 원본 아트보드 기준으로
+                // 정렬되므로, 애니메이션 전체에 피벗 하나가 통한다.
                 //
-                // The pivot is the canvas edge, NOT the art. Where the art sits inside that
-                // canvas varies per yokai (the lantern draws from 20px up, the wisp from
-                // 34px), so trying to bake a feet-line into the import needs a different
-                // number per file. Instead EnemyDefinition measures the offset off the
-                // imported sprite and Enemy compensates at spawn time.
+                // 이 피벗은 아트가 아니라 캔버스 가장자리다. 캔버스 안에서 아트가 놓이는
+                // 위치는 요괴마다 다르다(등롱은 20px 위, 도깨비불은 34px). 그래서 발
+                // 기준선을 임포트에 굽는 방식은 파일마다 다른 값을 요구한다. 대신
+                // EnemyDefinition이 임포트된 스프라이트에서 오프셋을 측정하고 Enemy가
+                // 스폰 시점에 보정한다
                 importer.pivotSpace = PivotSpaces.Canvas;
                 importer.pivotAlignment = SpriteAlignment.BottomCenter;
             }
@@ -121,8 +122,8 @@ namespace Onikiri.EditorTools
             {
                 importer.pivotAlignment = PivotFor(importer.assetPath);
             }
-            // Aseprite frame tags become animation clips, which is why we import the
-            // .aseprite sources for enemies instead of the untagged loose PNG frames.
+            // Aseprite 프레임 태그가 애니메이션 클립이 된다. 적을 낱장 PNG가 아니라
+            // .aseprite 원본으로 임포트하는 이유가 이것이다
             importer.generateAnimationClips = true;
             importer.generateModelPrefab = false;
         }

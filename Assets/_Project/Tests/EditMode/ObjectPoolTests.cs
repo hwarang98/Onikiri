@@ -4,11 +4,13 @@ using UnityEngine;
 
 namespace Onikiri.Tests
 {
-    /// <summary>
-    /// The spec forbids per-spawn Instantiate/Destroy, so these pin the behaviour that
-    /// guarantee rests on: prewarm covers demand, released instances come back, and any
-    /// growth beyond the prewarm is reported rather than hidden.
-    /// </summary>
+    /**
+     * @brief 사양서가 스폰마다의 Instantiate/Destroy를 금지하므로, 그 보장이 기대는
+     *        동작을 못 박는 테스트들.
+     *
+     * prewarm이 수요를 감당하고, 반환된 인스턴스가 다시 나오며, prewarm을 넘는 증식은
+     * 숨겨지지 않고 보고된다.
+     */
     public class ObjectPoolTests
     {
         private GameObject prefabObject;
@@ -130,9 +132,9 @@ namespace Onikiri.Tests
         [Test]
         public void SpawnerSizedPool_NeverGrowsUnderItsIntendedLoad()
         {
-            // The spawner keeps 4 yokai alive from a pool of 8, recycling on death.
-            // Simulated here so an undersized prewarm shows up as a failing test rather
-            // than as a frame hitch on a phone.
+            // 스포너는 8개 풀에서 요괴 4마리를 유지하며 죽을 때마다 재활용한다.
+            // 여기서 재현해 두면 prewarm이 부족할 때 폰에서의 프레임 히칭이 아니라
+            // 실패하는 테스트로 먼저 드러난다
             var pool = new ObjectPool<SpriteRenderer>(prefab, parent, 8);
             var live = new System.Collections.Generic.List<SpriteRenderer>();
 

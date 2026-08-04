@@ -2,23 +2,22 @@ using UnityEngine;
 
 namespace Onikiri.Battle
 {
-    /// <summary>
-    /// Freezes game time for a few dozen milliseconds on impact.
-    ///
-    /// This is the cheapest and most effective part of making a hit feel like it connected:
-    /// the swing, the enemy and the slash effect all stop dead for a moment, which reads as
-    /// weight. Because everything gameplay-side runs on scaled time, one timeScale change
-    /// covers all of it.
-    ///
-    /// Recovery is driven by unscaled time, otherwise a zero timeScale would never tick the
-    /// timer back down and the game would hang.
-    /// </summary>
+    /**
+     * @brief 타격 순간 게임 시간을 수십 밀리초 동안 정지시킨다.
+     *
+     * 타격이 '맞았다'고 느끼게 만드는 가장 싸고 효과적인 수단이다. 스윙과 적과
+     * 참격 이펙트가 한순간 동시에 멈추면 그것이 무게로 읽힌다. 게임플레이 쪽은
+     * 전부 스케일 타임으로 돌아가므로 timeScale 하나만 건드리면 전부 걸린다.
+     *
+     * 복구는 unscaled 시간으로 돈다. timeScale이 0인 상태에서 스케일 타임으로
+     * 재면 타이머가 영원히 줄지 않아 게임이 멈춘 채로 남는다.
+     */
     [DefaultExecutionOrder(-100)]
     public sealed class HitStop : MonoBehaviour
     {
         public static HitStop Instance { get; private set; }
 
-        [Tooltip("Time scale restored once a freeze ends.")]
+        [Tooltip("정지가 끝난 뒤 복구할 타임스케일")]
         [SerializeField] private float normalTimeScale = 1f;
 
         private float remainingUnscaled;
@@ -40,7 +39,7 @@ namespace Onikiri.Battle
             if (Instance == this)
             {
                 Instance = null;
-                // Never leave the game frozen because this object went away mid-freeze.
+                // 정지 도중 이 오브젝트가 사라져서 게임이 멈춘 채로 남는 일은 없어야 한다
                 if (Time.timeScale == 0f) Time.timeScale = normalTimeScale;
             }
         }
@@ -54,10 +53,11 @@ namespace Onikiri.Battle
             }
         }
 
-        /// <summary>
-        /// Freezes for <paramref name="seconds"/> of real time. Overlapping calls extend
-        /// rather than stack, so a flurry of hits cannot compound into a long stall.
-        /// </summary>
+        /**
+         * @brief 실제 시간 기준 seconds 만큼 정지시킨다.
+         *
+         * 겹쳐 호출되면 누적되지 않고 연장된다. 연타가 긴 정지로 불어나는 것을 막는다.
+         */
         public void Freeze(float seconds)
         {
             if (seconds <= 0f) return;

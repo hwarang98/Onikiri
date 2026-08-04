@@ -4,24 +4,23 @@ using UnityEngine;
 
 namespace Onikiri.Progression
 {
-    /// <summary>
-    /// The player's currency.
-    ///
-    /// Gold is a <see cref="BigDouble"/> from the very first coin, not a long that gets
-    /// promoted later. In an idle game the total passes long's range within hours of play,
-    /// and retrofitting the number type afterwards means touching every system that ever
-    /// reads a balance.
-    /// </summary>
+    /**
+     * @brief 플레이어의 재화.
+     *
+     * 골드는 첫 코인부터 BigDouble이다. 나중에 long에서 승격시키는 방식이 아니다.
+     * 방치형은 플레이 몇 시간 만에 합계가 long 범위를 넘어가고, 그때 가서 숫자 타입을
+     * 바꾸면 잔액을 읽는 모든 시스템을 손대야 한다.
+     */
     public sealed class PlayerWallet : MonoBehaviour
     {
         public static PlayerWallet Instance { get; private set; }
 
         [SerializeField] private BigDouble gold;
 
-        /// <summary>Raised on every balance change, with the new total.</summary>
+        /** 잔액이 바뀔 때마다 새 합계와 함께 발생 */
         public event Action<BigDouble> GoldChanged;
 
-        /// <summary>Running total of everything ever earned. Useful for later prestige maths.</summary>
+        /** 지금까지 획득한 누적 총액. 나중에 환생 계산에 쓴다 */
         public BigDouble LifetimeGold { get; private set; }
 
         public BigDouble Gold { get { return gold; } }
@@ -60,7 +59,7 @@ namespace Onikiri.Progression
             return gold >= cost;
         }
 
-        /// <summary>Spends only if affordable; returns whether the purchase happened.</summary>
+        /** 감당 가능할 때만 소비한다. 구매가 성사됐는지를 반환 */
         public bool TrySpend(BigDouble cost)
         {
             if (cost.IsNegative || !CanAfford(cost)) return false;
@@ -70,7 +69,7 @@ namespace Onikiri.Progression
             return true;
         }
 
-        /// <summary>Used by save/load, which restores a balance rather than earning it.</summary>
+        /** 세이브/로드용. 획득이 아니라 잔액을 복원하는 경로 */
         public void SetBalance(BigDouble value, BigDouble lifetime)
         {
             gold = value;

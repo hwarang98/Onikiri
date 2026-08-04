@@ -4,38 +4,37 @@ using UnityEngine;
 
 namespace Onikiri.Core
 {
-    /// <summary>
-    /// Arbitrary-magnitude number stored as <c>mantissa * 10^exponent</c>.
-    ///
-    /// Idle games blow past <see cref="long"/> within hours of play, so every currency,
-    /// damage and cost value in ONIKIRI uses this type instead of long/double.
-    ///
-    /// The mantissa is always normalized to 1 &lt;= |mantissa| &lt; 10 (or exactly 0), and
-    /// the exponent is a long, so the representable range is roughly 10^±9.2e18 — far
-    /// beyond anything the game can reach. Precision stays at double's ~15 significant
-    /// digits regardless of magnitude, which is exactly what an idle game wants: you
-    /// care about "1.53 septillion", not the last digit.
-    ///
-    /// Unity-serializable, so it drops straight into JsonUtility save data.
-    /// </summary>
+    /**
+     * @brief 가수부 * 10^지수부 형태로 저장하는 임의 크기 숫자.
+     *
+     * 방치형은 플레이 몇 시간이면 long 범위를 넘어간다. 그래서 ONIKIRI의 모든 재화,
+     * 데미지, 비용 값은 long/double 대신 이 타입을 쓴다.
+     *
+     * 가수부는 항상 1 <= |가수부| < 10 으로 정규화되고(또는 정확히 0), 지수부는 long이라
+     * 표현 범위가 대략 10^±9.2e18 이다. 게임이 도달할 수 있는 어떤 값보다도 크다.
+     * 정밀도는 크기와 무관하게 double의 유효자리 15자리 수준을 유지하는데, 방치형이
+     * 원하는 것이 정확히 이것이다. "1.53 자" 가 중요하지 마지막 자리는 중요하지 않다.
+     *
+     * Unity 직렬화가 되므로 JsonUtility 세이브 데이터에 그대로 들어간다.
+     */
     [Serializable]
     public struct BigDouble : IComparable<BigDouble>, IEquatable<BigDouble>
     {
         [SerializeField] private double m;
         [SerializeField] private long e;
 
-        /// <summary>Normalized to 1 &lt;= |mantissa| &lt; 10, or 0.</summary>
+        /** 1 <= |가수부| < 10 으로 정규화된 값. 또는 0 */
         public double Mantissa { get { return m; } }
         public long Exponent { get { return e; } }
 
         public static readonly BigDouble Zero = new BigDouble(0d, 0L);
         public static readonly BigDouble One = new BigDouble(1d, 0L);
 
-        /// <summary>
-        /// Adding two values further apart than this in magnitude cannot change the
-        /// larger one — double has ~15-17 significant digits, so the smaller term
-        /// falls off the end.
-        /// </summary>
+        /**
+         * @brief 이보다 크기 차이가 나는 두 값을 더해도 큰 쪽은 바뀌지 않는다.
+         *
+         * double의 유효자리가 15~17자리라 작은 항이 끝에서 잘려 나가기 때문이다.
+         */
         private const int SignificantExponentGap = 17;
 
         private BigDouble(double mantissa, long exponent)
@@ -44,9 +43,9 @@ namespace Onikiri.Core
             e = exponent;
         }
 
-        // ---------------------------------------------------------------- construction
+        // ---------------------------------------------------------------- 생성
 
-        /// <summary>Builds a normalized value from an arbitrary mantissa/exponent pair.</summary>
+        /** 임의의 가수부/지수부 쌍에서 정규화된 값을 만든다 */
         public static BigDouble Create(double mantissa, long exponent)
         {
             if (mantissa == 0d || double.IsNaN(mantissa) || double.IsInfinity(mantissa))
@@ -59,7 +58,7 @@ namespace Onikiri.Core
             int shift = (int)Math.Floor(Math.Log10(abs));
             double normalized = mantissa / Math.Pow(10d, shift);
 
-            // Log10 rounding can land us a hair outside [1,10); nudge back in.
+            // Log10 반올림으로 [1,10) 밖으로 살짝 벗어날 수 있다. 다시 안으로 밀어 넣는다
             double normAbs = Math.Abs(normalized);
             if (normAbs >= 10d) { normalized /= 10d; shift++; }
             else if (normAbs < 1d) { normalized *= 10d; shift--; }
@@ -72,22 +71,24 @@ namespace Onikiri.Core
             return Create(value, 0L);
         }
 
-        /// <summary>Exact reconstruction from saved fields — no re-normalization cost.</summary>
+        /** 저장된 필드로부터의 정확한 복원. 재정규화 비용이 없다 */
         public static BigDouble FromComponents(double mantissa, long exponent)
         {
             return Create(mantissa, exponent);
         }
 
-        // ---------------------------------------------------------------- state
+        // ---------------------------------------------------------------- 상태
 
         public bool IsZero { get { return m == 0d; } }
         public bool IsNegative { get { return m < 0d; } }
         public bool IsPositive { get { return m > 0d; } }
 
-        /// <summary>
-        /// Collapses to a plain double. Returns ±Infinity when the value is too large
-        /// for double, so never use this for game state — only for ratios and lerps.
-        /// </summary>
+        /**
+         * @brief 평범한 double로 축소한다.
+         *
+         * double로 담기에 너무 크면 ±Infinity를 반환한다. 게임 상태에는 절대 쓰지 말 것.
+         * 비율 계산과 보간에만 쓴다.
+         */
         public double ToDouble()
         {
             if (m == 0d) return 0d;
@@ -101,14 +102,14 @@ namespace Onikiri.Core
             return m < 0d ? new BigDouble(-m, e) : this;
         }
 
-        /// <summary>log10 of the absolute value. NaN for zero.</summary>
+        /** 절대값의 log10. 0이면 NaN */
         public double Log10()
         {
             if (m == 0d) return double.NaN;
             return e + Math.Log10(Math.Abs(m));
         }
 
-        // ---------------------------------------------------------------- arithmetic
+        // ---------------------------------------------------------------- 사칙연산
 
         public static BigDouble operator -(BigDouble v)
         {
@@ -127,7 +128,7 @@ namespace Onikiri.Core
             long gap = larger.e - smaller.e;
             if (gap > SignificantExponentGap) return larger;
 
-            // Re-express the smaller term in the larger term's exponent, then normalize.
+            // 작은 항을 큰 항의 지수부 기준으로 다시 표현한 뒤 정규화한다
             double combined = larger.m + smaller.m * Math.Pow(10d, -gap);
             return Create(combined, larger.e);
         }
@@ -150,10 +151,11 @@ namespace Onikiri.Core
             return Create(a.m / b.m, a.e - b.e);
         }
 
-        /// <summary>
-        /// Exponentiation. Idle cost curves are <c>base * growth^level</c>, so this is
-        /// on the hot path for the upgrade panel.
-        /// </summary>
+        /**
+         * @brief 거듭제곱.
+         *
+         * 방치형 비용 곡선이 base * growth^level 형태라, 업그레이드 패널의 핫 패스다.
+         */
         public static BigDouble Pow(BigDouble value, double power)
         {
             if (power == 0d) return One;
@@ -163,12 +165,12 @@ namespace Onikiri.Core
             bool negativeBase = value.m < 0d;
             bool integerPower = Math.Abs(power % 1d) < 1e-12;
 
-            // A negative base only has a real result for integer powers.
+            // 음수 밑은 정수 지수에서만 실수 결과를 갖는다
             if (negativeBase && !integerPower) return Zero;
 
-            // Fast path: when both the base and the result fit in a double, go through
-            // Math.Pow directly. It is meaningfully more accurate than the log route,
-            // and covers the common case of small growth factors like 1.15^level.
+            // 빠른 경로. 밑과 결과가 모두 double에 담기면 Math.Pow로 바로 간다.
+            // log 경로보다 의미 있게 정확하고, 1.15^level 같은 작은 성장 계수라는
+            // 가장 흔한 경우를 커버한다
             if (value.e > -60L && value.e < 60L && Math.Abs(power) < 5000d)
             {
                 double direct = Math.Pow(value.ToDouble(), power);
@@ -187,7 +189,7 @@ namespace Onikiri.Core
 
             var result = Create(newMantissa, newExponent);
 
-            // (-x)^odd stays negative.
+            // (-x)의 홀수 제곱은 음수로 남는다
             if (negativeBase && Math.Abs(power % 2d) > 0.5d) result = -result;
             return result;
         }
@@ -202,7 +204,7 @@ namespace Onikiri.Core
             return a.CompareTo(b) <= 0 ? a : b;
         }
 
-        // ---------------------------------------------------------------- comparison
+        // ---------------------------------------------------------------- 비교
 
         public int CompareTo(BigDouble other)
         {
@@ -216,7 +218,7 @@ namespace Onikiri.Core
             bool aNegative = m < 0d;
             if (aNegative != (other.m < 0d)) return aNegative ? -1 : 1;
 
-            // For negative values a bigger exponent means a smaller number.
+            // 음수에서는 지수부가 클수록 더 작은 수다
             int sign = aNegative ? -1 : 1;
             if (e != other.e) return e > other.e ? sign : -sign;
             return m.CompareTo(other.m);
@@ -244,19 +246,20 @@ namespace Onikiri.Core
         public static bool operator <=(BigDouble a, BigDouble b) { return a.CompareTo(b) <= 0; }
         public static bool operator >=(BigDouble a, BigDouble b) { return a.CompareTo(b) >= 0; }
 
-        // ---------------------------------------------------------------- conversion
+        // ---------------------------------------------------------------- 변환
 
         public static implicit operator BigDouble(double value) { return FromDouble(value); }
         public static implicit operator BigDouble(float value) { return FromDouble(value); }
         public static implicit operator BigDouble(int value) { return FromDouble(value); }
         public static implicit operator BigDouble(long value) { return FromDouble(value); }
 
-        // ---------------------------------------------------------------- text
+        // ---------------------------------------------------------------- 문자열
 
-        /// <summary>
-        /// Round-trippable exact form (e.g. "1.5E+12"). This is the debug/serialization
-        /// representation — use <see cref="NumberFormatter"/> for anything player-facing.
-        /// </summary>
+        /**
+         * @brief 왕복 가능한 정확한 표기 (예: "1.5E+12").
+         *
+         * 디버그/직렬화용이다. 플레이어에게 보이는 것은 NumberFormatter를 쓸 것.
+         */
         public override string ToString()
         {
             if (m == 0d) return "0";

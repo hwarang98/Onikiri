@@ -20,7 +20,7 @@ namespace Onikiri.Tests
             Assert.AreEqual("999", NumberFormatter.Format(BigDouble.FromDouble(999d)));
         }
 
-        // The four notations named explicitly in the handoff spec.
+        // 사양서에 명시된 네 가지 표기
         [Test]
         public void SpecExamples_MatchExactly()
         {
@@ -54,9 +54,9 @@ namespace Onikiri.Tests
         [Test]
         public void RoundingCarriesIntoNextTier()
         {
-            // 999,999 rounds to 1000.0K, which must be shown as 1.0M instead.
+            // 999,999는 1000.0K로 반올림되는데, 1.0M으로 보여야 한다
             Assert.AreEqual("1.0M", NumberFormatter.Format(BigDouble.FromDouble(999999d)));
-            // 999.6 rounds to 1000, which must become 1.0K rather than "1000".
+            // 999.6은 1000으로 반올림되는데, "1000"이 아니라 1.0K가 되어야 한다
             Assert.AreEqual("1.0K", NumberFormatter.Format(BigDouble.FromDouble(999.6d)));
         }
 
@@ -90,14 +90,14 @@ namespace Onikiri.Tests
             Assert.AreEqual("az", NumberFormatter.SuffixForTier(5 + 25));
             Assert.AreEqual("ba", NumberFormatter.SuffixForTier(5 + 26));
             Assert.AreEqual("zz", NumberFormatter.SuffixForTier(5 + 26 * 26 - 1));
-            // Past "zz" there is no suffix and the caller falls back to scientific.
+            // "zz"를 넘으면 접미사가 없고 호출부가 지수 표기로 폴백한다
             Assert.IsNull(NumberFormatter.SuffixForTier(5 + 26 * 26));
         }
 
         [Test]
         public void AstronomicalValues_FallBackToScientific()
         {
-            // Well past "zz" (~10^2042).
+            // "zz"(약 10^2042)를 한참 넘어선 값
             string formatted = NumberFormatter.Format(BigDouble.Create(1.2d, 5000L));
             Assert.IsTrue(formatted.Contains("e5000"), "Expected scientific fallback, got " + formatted);
         }
