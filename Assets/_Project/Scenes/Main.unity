@@ -144,7 +144,7 @@ Transform:
   m_GameObject: {fileID: 222233081}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.86812514, z: 0}
+  m_LocalPosition: {x: 0, y: -1.0382814, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -312,7 +312,7 @@ Transform:
   m_GameObject: {fileID: 328582445}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.11812514, z: 0}
+  m_LocalPosition: {x: 0, y: -0.28828144, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -596,6 +596,7 @@ GameObject:
   - component: {fileID: 537370016}
   - component: {fileID: 537370015}
   - component: {fileID: 537370019}
+  - component: {fileID: 537370020}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -751,6 +752,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.ScreenShake
   defaultPixels: 3
   defaultSeconds: 0.1
+--- !u!81 &537370020
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 537370014}
+  m_Enabled: 1
 --- !u!1 &641238895
 GameObject:
   m_ObjectHideFlags: 0
@@ -822,7 +831,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 2
-  m_Size: {x: 10.025, y: 19.3625}
+  m_Size: {x: 9.5, y: 22.765625}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
