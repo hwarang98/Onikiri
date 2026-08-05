@@ -396,7 +396,33 @@ namespace Onikiri.EditorTools
                 {
                     var upgradeSo = new SerializedObject(system);
                     RequireReference(upgradeSo, "combat", problems);
+                    RequireReference(upgradeSo, "health", problems);
                     RequireArray(upgradeSo, "tracks", problems);
+
+                    // 행 수가 트랙 수와 다르면 화면에 유령 텍스트가 남는다.
+                    //
+                    // 11단계에서 행의 부모를 Viewport/Content로 옮기면서 패널 직속에
+                    // 있던 옛 행 넷이 지워지지 않고 남았다. 뒤에 그려지기 때문에
+                    // 새 행 사이의 틈으로 옛 수치가 비쳐 보였고, 화면에서는
+                    // "글자가 겹친다"로만 보여 원인을 찾기 어려웠다.
+                    //
+                    // 이런 겹침은 눈으로 찾을 것이 아니라 빌드가 세어야 한다
+                    var content = panel.Find("Viewport/Content");
+                    if (content == null) problems.Add("GrowthPanel has no Viewport/Content");
+                    else if (content.childCount != system.TrackCount)
+                    {
+                        problems.Add(string.Format(
+                            "GrowthPanel has {0} rows but {1} tracks - stale rows would show through",
+                            content.childCount, system.TrackCount));
+                    }
+
+                    // 패널 직속에는 Viewport 하나뿐이어야 한다. 그 외는 전부 잔재다
+                    for (int i = 0; i < panel.childCount; i++)
+                    {
+                        if (panel.GetChild(i).name == "Viewport") continue;
+                        problems.Add("GrowthPanel has a stray child '" + panel.GetChild(i).name
+                                     + "' outside the scroll viewport - it renders behind the rows");
+                    }
                 }
             }
 

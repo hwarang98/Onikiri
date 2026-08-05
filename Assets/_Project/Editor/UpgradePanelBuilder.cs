@@ -232,7 +232,14 @@ namespace Onikiri.EditorTools
             for (int i = 0; i < Specs.Length; i++)
                 BuildRow(content, system, font, i);
 
-            Debug.Log("[Onikiri] Upgrade panel built: " + Specs.Length + " tracks (scrollable).");
+            // 축이 줄어든 경우의 잔재도 지운다. BuildRow는 자기가 만들 이름만
+            // 지우므로 Specs 밖으로 밀려난 행은 아무도 건드리지 않는다 - 패널
+            // 직속에 남아 있던 유령 행과 같은 종류의 버그다
+            for (int i = content.childCount - 1; i >= Specs.Length; i--)
+                Object.DestroyImmediate(content.GetChild(i).gameObject);
+
+            Debug.Log("[Onikiri] Upgrade panel built: " + Specs.Length + " tracks (scrollable), "
+                      + content.childCount + " rows under Content.");
             return system;
         }
 
@@ -247,6 +254,23 @@ namespace Onikiri.EditorTools
          */
         private static RectTransform EnsureScroll(Transform panel)
         {
+            // 11단계에서 행의 부모가 패널에서 Viewport/Content로 바뀌었다. 그런데
+            // 행을 지우는 코드도 함께 옮겨가는 바람에, 10단계까지 패널 바로 아래에
+            // 만들어져 있던 행들이 아무도 지우지 않는 채로 남았다.
+            //
+            // 남은 행은 Viewport보다 앞 형제라 **뒤에 그려진다.** 새 행 사이의
+            // 틈으로 옛 수치가 비쳐 보이는 유령 텍스트가 그것이다. 화면에는
+            // "글자가 겹쳐 보인다"로만 나타나서 원인을 찾기 어려웠다.
+            //
+            // 패널의 직속 자식은 Viewport 하나뿐이어야 한다. 빌더가 단일 출처인
+            // 이상 그 외의 것은 전부 이전 세대의 잔재다
+            for (int i = panel.childCount - 1; i >= 0; i--)
+            {
+                var child = panel.GetChild(i);
+                if (child.name == "Viewport") continue;
+                Object.DestroyImmediate(child.gameObject);
+            }
+
             var viewport = panel.Find("Viewport");
             if (viewport == null)
             {
