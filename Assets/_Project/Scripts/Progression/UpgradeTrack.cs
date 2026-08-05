@@ -30,8 +30,23 @@ namespace Onikiri.Progression
             Multiplicative
         }
 
+        /**
+         * @brief 효과값을 화면에 어떻게 읽히게 할 것인가.
+         *
+         * 축마다 단위가 다르다. 공격력 3.21M, 공격속도 3.88, 치명타 확률 12.0%,
+         * 치명타 피해 x2.00. 숫자만 찍으면 확률 0.12가 "0.12"로 나와서 무엇의
+         * 0.12인지 알 수 없다.
+         */
+        public enum Display
+        {
+            Plain,
+            Percent,
+            Multiplier
+        }
+
         [SerializeField] private string id;
         [SerializeField] private string displayName;
+        [SerializeField] private Display display = Display.Plain;
 
         [Tooltip("현재 레벨. 1부터 시작한다")]
         [SerializeField] private int level = 1;
@@ -74,6 +89,26 @@ namespace Onikiri.Progression
         public int MaxLevel { get { return maxLevel; } }
 
         public bool IsMaxed { get { return maxLevel > 0 && level >= maxLevel; } }
+
+        /**
+         * @brief 효과값 하나를 사람이 읽는 문자열로.
+         *
+         * 소수 둘째 자리까지 두는 이유는 버튼이 보여줘야 할 변화가 그 자리에서
+         * 일어나기 때문이다. 첫째 자리로는 공격속도 1.15 -> 1.27이 둘 다 1.2로
+         * 뭉개지고, 치명타 확률 12.0% -> 12.5%는 아예 사라진다.
+         */
+        public string Format(BigDouble value)
+        {
+            switch (display)
+            {
+                case Display.Percent:
+                    return (value.ToDouble() * 100d).ToString("F1") + "%";
+                case Display.Multiplier:
+                    return "x" + NumberFormatter.FormatStat(value, 2);
+                default:
+                    return NumberFormatter.FormatStat(value, 2);
+            }
+        }
 
         /**
          * @brief 다음 레벨의 비용.
@@ -181,9 +216,11 @@ namespace Onikiri.Progression
         public UpgradeTrack(string id, string displayName,
                             BigDouble baseCost, double costGrowth,
                             Curve curve, BigDouble baseValue, double step,
-                            int maxLevel = 0, double valueCeiling = 0d)
+                            int maxLevel = 0, double valueCeiling = 0d,
+                            Display display = Display.Plain)
         {
             this.valueCeiling = valueCeiling;
+            this.display = display;
             this.id = id;
             this.displayName = displayName;
             this.baseCost = baseCost;

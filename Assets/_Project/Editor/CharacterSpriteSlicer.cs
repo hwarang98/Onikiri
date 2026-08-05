@@ -182,6 +182,22 @@ namespace Onikiri.EditorTools
             // 9칸만 그려져 있고, 끝에 빈 프레임이 남으면 이펙트 마지막이 끊겨 보인다
             var pixels = LoadReadableCopy(assetPath);
 
+            // 이미 잘려 있던 스프라이트의 GUID를 이름으로 찾아둔다.
+            //
+            // 매번 GUID.Generate()를 부르면 슬라이싱할 때마다 .meta의 spriteID가
+            // 전부 새로 찍힌다. 참조가 깨지지는 않는다 - 실제로 쓰이는 것은
+            // internalID이고 그쪽은 이름 표(ISpriteNameFileIdDataProvider)가
+            // 유지해준다. 하지만 빌더를 돌릴 때마다 의미 없는 diff가 수십 줄씩
+            // 쌓이고, 그 안에 진짜 변경이 섞이면 알아볼 수 없게 된다.
+            //
+            // 빌더는 몇 번을 돌려도 같은 결과여야 한다.
+            var existingIds = new Dictionary<string, GUID>();
+            foreach (var rect in provider.GetSpriteRects())
+            {
+                if (rect != null && !string.IsNullOrEmpty(rect.name))
+                    existingIds[rect.name] = rect.spriteID;
+            }
+
             var rects = new List<SpriteRect>();
             int index = 0;
             int skipped = 0;
@@ -200,13 +216,18 @@ namespace Onikiri.EditorTools
                         continue;
                     }
 
+                    string spriteName = baseName + "_" + index;
+
+                    GUID id;
+                    if (!existingIds.TryGetValue(spriteName, out id)) id = GUID.Generate();
+
                     var spriteRect = new SpriteRect
                     {
-                        name = baseName + "_" + index,
+                        name = spriteName,
                         rect = cell,
                         alignment = SpriteAlignment.Custom,
                         pivot = pivot,
-                        spriteID = GUID.Generate()
+                        spriteID = id
                     };
                     rects.Add(spriteRect);
                     index++;

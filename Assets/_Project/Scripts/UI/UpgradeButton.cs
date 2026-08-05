@@ -90,9 +90,8 @@ namespace Onikiri.UI
                 // 소수 둘째 자리까지 두는 이유도 같다. 첫째 자리로는 공격속도의
                 // 1.15 -> 1.27이 둘 다 1.2로 뭉개진다
                 valueLabel.text = capped
-                    ? NumberFormatter.FormatStat(track.Value, 2)
-                    : NumberFormatter.FormatStat(track.Value, 2) + " → " +
-                      NumberFormatter.FormatStat(track.ValueAtLevel(track.Level + 1), 2);
+                    ? track.Format(track.Value)
+                    : track.Format(track.Value) + " → " + track.Format(track.ValueAtLevel(track.Level + 1));
             }
 
             bool affordable = wallet != null && wallet.CanAfford(track.Cost);

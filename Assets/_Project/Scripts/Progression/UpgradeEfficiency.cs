@@ -11,39 +11,47 @@ namespace Onikiri.Progression
      * 8단계 시점에 공격력의 1/88까지 벌어져 있었고, 그 상태에서는 아무도 그 버튼을
      * 누르지 않는다. 화면에는 멀쩡한 버튼으로 보이므로 눈으로는 알 수 없다.
      *
-     * 핵심은 **구조**다. 값이 선형이고 비용이 지수면 그 축은 반드시 죽는다. 언제
-     * 죽느냐만 계수가 정한다. 두 축이 끝까지 나란히 가려면 둘 다 곱연산이고 비용
-     * 증가율이 같아야 한다. 그러면 아래 비율이 레벨과 무관하게 일정해진다.
+     * 핵심은 **구조**다. DPS 기여가 선형이고 비용이 지수면 그 축은 반드시 죽는다.
+     * 언제 죽느냐만 계수가 정한다.
      *
-     * DPS = 공격력 x 공격속도 이므로, 어느 축이든 "값을 몇 % 올리는가"가 곧
-     * "DPS를 몇 % 올리는가"다. 그래서 축 종류에 상관없이 같은 자로 잴 수 있다.
+     * **10단계에서 측정 기준이 바뀌었다.** 축이 둘일 때는 DPS = 공격력 x 공격속도라
+     * "값이 몇 % 오르는가"가 곧 "DPS가 몇 % 오르는가"였다. 치명타가 들어오면서
+     * 그것이 깨진다 - 치명타율 12% -> 12.5%는 값으로는 4.2% 증가지만 DPS로는
+     * 0.45%뿐이고, 그 차이가 치명타 배수(다른 축)에 달려 있다.
+     *
+     * 그래서 이제 값이 아니라 **DPS를 직접 잰다**. CombatStats가 네 축을 합쳐
+     * 기대 DPS를 내고, 여기서는 "이 축만 한 레벨 올렸을 때 그 DPS가 몇 % 오르는가"를
+     * 본다. 축이 늘어나도 이 정의는 그대로다.
      */
     public static class UpgradeEfficiency
     {
         /**
-         * @brief 한 레벨 구매가 값을 올리는 비율.
+         * @brief 이 축을 한 레벨 올릴 때 기대 DPS가 오르는 비율.
          *
-         * 곱연산이면 레벨과 무관하게 일정하고(step - 1), 합연산이면 레벨이 오를수록
-         * 0으로 수렴한다. 축이 죽는 과정이 정확히 이 수치의 감소다.
+         * 상한을 걷어낸 곡선으로 잰다. 이 지표가 보는 것은 **곡선의 형태**이지
+         * 지금 실제로 낼 수 있는 값이 아니다. 상한이 걸린 값을 쓰면 상한 위에서
+         * 증가율이 0이 되고, 두 축의 비율이 무한대로 발산해 "그 축이 죽었다"는
+         * 결론이 나온다. 그건 틀렸다 - 상한 위의 레벨은 팔리지 않으므로 죽은
+         * 버튼이 아니라 아예 없는 버튼이다.
+         *
+         * 새 축을 추가할 때 잡아야 하는 것도 형태다. 상한을 붙이면 어떤 나쁜
+         * 곡선이든 그 지점부터는 검사를 통과해버린다.
          */
         public static double RelativeGain(UpgradeTrack track, int level)
         {
-            if (track == null) return 0d;
+            if (track == null || !CombatStats.FeedsDps(track.Id)) return 0d;
 
-            // 상한을 걷어낸 곡선으로 잰다. 이 지표가 보는 것은 **곡선의 형태**이지
-            // 지금 실제로 낼 수 있는 값이 아니다.
-            //
-            // 상한이 걸린 값을 쓰면 상한 위에서 증가율이 0이 되고, 두 축의 비율이
-            // 무한대로 발산해 "공격속도가 죽었다"는 결론이 나온다. 그건 틀린 결론이다 -
-            // 상한 위의 레벨은 팔리지 않으므로(IsMaxed) 죽은 버튼이 아니라 아예
-            // 없는 버튼이고, 죽은 버튼은 "눌리는데 값어치가 없는 것"을 말한다.
-            //
-            // 새 축을 추가할 때 잡아야 하는 것도 형태다. 상한을 붙이면 어떤 나쁜
-            // 곡선이든 그 지점부터는 검사를 통과해버린다.
-            double current = track.UncappedValueAtLevel(level).ToDouble();
+            var baseline = CombatStats.AtLevel(level);
+
+            double current = baseline
+                .With(track.Id, track.UncappedValueAtLevel(level).ToDouble())
+                .ExpectedDps;
+
+            double next = baseline
+                .With(track.Id, track.UncappedValueAtLevel(level + 1).ToDouble())
+                .ExpectedDps;
+
             if (current <= 0d || double.IsNaN(current) || double.IsInfinity(current)) return 0d;
-
-            double next = track.UncappedValueAtLevel(level + 1).ToDouble();
             if (double.IsNaN(next) || double.IsInfinity(next)) return 0d;
 
             return next / current - 1d;
@@ -84,22 +92,20 @@ namespace Onikiri.Progression
         /**
          * @brief 이 축이 구조적으로 죽는가.
          *
-         * 값이 합연산인데 비용이 지수면 참이다. 계수와 무관하게 성립하므로,
-         * 새 강화를 추가할 때 이 검사 하나로 같은 실수를 막을 수 있다.
+         * DPS 기여 증가율이 레벨과 함께 줄어들면 참이다.
+         *
+         * 값이 가산이라는 것만으로는 판정하지 않는다. 치명타율은 가산이지만
+         * 죽지 않는다 - DPS 기여가 rate x (mult - 1) 이라 치명타 피해 축이 함께
+         * 자라면 확률 한 칸의 값어치도 함께 자라기 때문이다. 판정 기준은 언제나
+         * 값이 아니라 DPS다.
          */
         public static bool DecaysStructurally(UpgradeTrack track, int fromLevel, int toLevel)
         {
             if (track == null || toLevel <= fromLevel) return false;
 
-            double first = GainPerGold(track, fromLevel);
-            double last = GainPerGold(track, toLevel);
-            if (first <= 0d) return false;
-
-            // 비용이 지수로 오르므로 절대값은 어느 축이든 줄어든다. 문제는 그 감소가
-            // 다른 축보다 훨씬 가파른 경우이고, 그것은 Ratio로 잡는다. 여기서는
-            // 값 자체의 증가율이 줄어드는지만 본다 - 곱연산이면 일정해야 한다
             double gainFirst = RelativeGain(track, fromLevel);
             double gainLast = RelativeGain(track, toLevel);
+            if (gainFirst <= 0d) return false;
 
             return gainLast < gainFirst * 0.9d;
         }
@@ -109,7 +115,7 @@ namespace Onikiri.Progression
         {
             if (track == null) return "(없음)";
 
-            return string.Format("{0} Lv.{1}  +{2:P1} / {3}골드",
+            return string.Format("{0} Lv.{1}  +{2:P2} DPS / {3}골드",
                 track.DisplayName, level,
                 RelativeGain(track, level),
                 NumberFormatter.Format(track.CostAtLevel(level)));

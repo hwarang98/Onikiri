@@ -1,3 +1,4 @@
+using System;
 using Onikiri.Core;
 
 namespace Onikiri.Progression
@@ -46,18 +47,69 @@ namespace Onikiri.Progression
         // ---------------------------------------------------------------- 보스
 
         /**
-         * @brief 보스 체력 = 해당 스테이지 잡몹 체력 x 이 값.
+         * @brief 1스테이지 보스의 체력 배수 (해당 스테이지 잡몹 체력 기준).
          *
-         * 8이라는 숫자의 뜻은 "잡몹 여덟 마리 분량"이 아니라 **제한 시간의 압박**이다.
-         * 잡몹은 큐로 한 마리씩 들어오므로 처치 속도가 스폰 간격에 묶여 있지만,
-         * 보스는 처음부터 전부 나와 있어서 순수하게 DPS로만 깎인다. 그래서 이 값은
-         * 곧 "30초 안에 초당 얼마를 넣어야 하는가"를 정한다.
+         * 이 값의 뜻은 "잡몹 몇 마리 분량"이 아니라 **제한 시간의 압박**이다.
+         * 잡몹은 큐로 한 마리씩 들어오므로 처치 속도가 스폰 공급에 묶이지만,
+         * 보스는 처음부터 나와 있어서 순수하게 DPS로만 깎인다.
          *
-         * HitsToKill이 스테이지 내내 5~12대 범위를 유지하므로, 보스는 40~96대다.
-         * 지금 공격속도(1.15~3.88회/초)에서 11~35초 - 제한 시간 30초를 아슬아슬하게
-         * 걸치도록 의도한 값이다. 강화가 뒤처지면 실패하고, 따라가면 통과한다.
+         * 8은 무강화 플레이어가 1스테이지 보스를 아슬아슬하게 잡는 값이다
+         * (17.7초 / 때릴 수 있는 24.7초). 첫 보스는 벽이 아니라 튜토리얼이어야 한다.
          */
-        public const double BossHealthMultiplier = 8d;
+        public const double BossHealthMultiplierBase = 8d;
+
+        /**
+         * @brief 스테이지마다 체력 배수에 추가로 곱하는 값.
+         *
+         * 9단계에서는 배수가 8 고정이었고, 그 결과 곡선을 따라가는 플레이어의
+         * 보스 여유가 2.1배에서 5.6배로 발산했다. 5스테이지부터 제한 시간이
+         * 아무 일도 하지 않는다는 뜻이다. 10단계에서 치명타 두 축이 들어오면서
+         * 그 발산은 20스테이지 기준 82배까지 커졌다.
+         *
+         * 원인은 단순하다. 잡몹 체력은 스테이지마다 1.55배로 자라는데 플레이어의
+         * DPS는 골드(1.72배)로 사는 강화 레벨을 통해 그보다 빨리 자란다. 보스가
+         * 잡몹과 같은 비율로만 자라면 그 차이가 그대로 여유가 된다.
+         *
+         * **고정 배율로는 안 된다.** 처음에 1.225 하나로 맞춰봤더니 1~20 스테이지는
+         * 밴드에 들어갔지만 30스테이지에서 여유가 0.88로 떨어져 보스가 벽이 됐다.
+         * 플레이어의 DPS 성장률이 일정하지 않기 때문이다 - 초반에는 치명타 두 축이
+         * 바닥에서 자라며 빠르게 오르고, 공격속도가 Lv.32에서, 치명타율이 Lv.97에서
+         * 상한에 닿으면 성장이 공격력과 치명타 피해 둘로 좁아져 느려진다.
+         *
+         * 그래서 배율도 같은 모양으로 **감쇠**시킨다. 초반 1.34에서 시작해
+         * 후반 1.065로 수렴한다. 후자는 우연한 값이 아니라 관측값이다 - 상한에
+         * 닿은 뒤 DPS는 스테이지마다 약 1.72배로 자라고 잡몹 체력은 1.55배로
+         * 자라므로, 그 차이 1.72/1.55 = 1.11 근처가 평형이다.
+         *
+         * 계수는 시뮬레이션으로 찾았다. 1~20 여유의 최대/최소 비가 가장 작아지는
+         * 지점이며(1.22배), 동시에 50스테이지까지 여유가 1 아래로 내려가지 않는다.
+         */
+        public const double BossHealthRampStart = 1.34d;
+        public const double BossHealthRampFinal = 1.065d;
+
+        /** 램프가 Start에서 Final로 내려오는 속도. 1에 가까울수록 천천히 */
+        public const double BossHealthRampDecay = 0.93d;
+
+        /**
+         * @brief 이 스테이지 보스의 체력 배수.
+         *
+         * 닫힌 식이 없어 곱을 직접 돈다. 스테이지 수만큼의 반복이고 호출은
+         * 보스 스폰과 시뮬레이션뿐이라 비용은 문제가 되지 않는다.
+         */
+        public static double BossHealthMultiplier(int stage)
+        {
+            double multiplier = BossHealthMultiplierBase;
+            int steps = StepsFrom(stage);
+
+            for (int k = 0; k < steps; k++)
+            {
+                double ramp = BossHealthRampFinal
+                            + (BossHealthRampStart - BossHealthRampFinal) * Math.Pow(BossHealthRampDecay, k);
+                multiplier *= ramp;
+            }
+
+            return multiplier;
+        }
 
         /**
          * @brief 보스 골드 = 해당 스테이지 잡몹 골드 x 이 값.
@@ -71,9 +123,9 @@ namespace Onikiri.Progression
         /** 보스전 제한 시간 (초). 초과하면 스테이지 실패 - 패널티는 없다 */
         public const float BossTimeLimitSeconds = 30f;
 
-        public static BigDouble BossHealth(BigDouble stageMobHealth)
+        public static BigDouble BossHealth(BigDouble stageMobHealth, int stage)
         {
-            return stageMobHealth * BigDouble.FromDouble(BossHealthMultiplier);
+            return stageMobHealth * BigDouble.FromDouble(BossHealthMultiplier(stage));
         }
 
         public static BigDouble BossGold(BigDouble stageMobGold)
@@ -90,7 +142,7 @@ namespace Onikiri.Progression
          */
         public static BigDouble BossHealthForStage(BigDouble averageMobHealth, int stage)
         {
-            return BossHealth(averageMobHealth * HealthMultiplier(stage));
+            return BossHealth(averageMobHealth * HealthMultiplier(stage), stage);
         }
 
         public static BigDouble BossGoldForStage(BigDouble averageMobGold, int stage)

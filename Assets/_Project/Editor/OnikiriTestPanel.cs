@@ -368,9 +368,12 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("시간 배속", GUILayout.Width(64f));
-                    if (GUILayout.Button("0.25x")) Time.timeScale = 0.25f;
-                    if (GUILayout.Button("1x")) Time.timeScale = 1f;
-                    if (GUILayout.Button("4x")) Time.timeScale = 4f;
+                    // Time.timeScale을 직접 쓰지 않는다. 히트스톱이 정지 직전 값을
+                    // 기억했다가 되돌리는 구조라, 정지 중에 직접 바꾼 값은 기억에
+                    // 반영되지 않아 다음 해제에서 지워진다. HitStop 참고
+                    if (GUILayout.Button("0.25x")) HitStop.RequestBaseTimeScale(0.25f);
+                    if (GUILayout.Button("1x")) HitStop.RequestBaseTimeScale(1f);
+                    if (GUILayout.Button("4x")) HitStop.RequestBaseTimeScale(4f);
                 }
 
                 using (new EditorGUI.DisabledScope(spawner == null))

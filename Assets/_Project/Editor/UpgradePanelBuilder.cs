@@ -32,6 +32,9 @@ namespace Onikiri.EditorTools
 
             /** 0이면 없음. 구매(MaxLevel)가 아니라 효과값을 막는다 */
             public double ValueCeiling;
+
+            /** 효과값의 표시 단위 */
+            public UpgradeTrack.Display Display;
         }
 
         private static readonly TrackSpec[] Specs =
@@ -71,19 +74,58 @@ namespace Onikiri.EditorTools
                 // 업데이트에서 예전 레벨은 남고 효과만 막힌다. UpgradeTrack 참고
                 MaxLevel = AttackSpeedCurve.MaxLevel,
                 ValueCeiling = AttackSpeedCurve.Ceiling
+            },
+            // 치명타 확률: 가산 + 상한 60%.
+            //
+            // 확률은 곱연산으로 키울 수 없다. 1을 넘는 순간 의미를 잃기 때문이다.
+            // 8단계의 공격속도가 가산이라 죽었던 것과 다른 점은 DPS 기여 구조다 -
+            // 확률의 기여는 rate x (배수 - 1) 이라, 치명타 피해 축이 함께 자라면
+            // 확률 한 칸의 값어치도 함께 자란다. CritRateCurve 참고.
+            new TrackSpec {
+                Id = UpgradeSystem.CritRateId, DisplayName = "치명타 확률",
+                BaseCost = CritRateCurve.BaseCost, CostGrowth = CritRateCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Additive,
+                BaseValue = CritRateCurve.BaseValue, Step = CritRateCurve.Step,
+                MaxLevel = CritRateCurve.MaxLevel, ValueCeiling = CritRateCurve.Ceiling,
+                Display = UpgradeTrack.Display.Percent
+            },
+            // 치명타 피해: 곱연산 + 상한 없음.
+            //
+            // 공격력과 함께 후반 DPS를 끝까지 끌고 간다. 이 축만 DPS 기여율이
+            // 레벨과 함께 **커진다** - 배수가 커질수록 치명타가 DPS의 대부분을
+            // 차지하게 되기 때문이다. CritDamageCurve 참고.
+            new TrackSpec {
+                Id = UpgradeSystem.CritDamageId, DisplayName = "치명타 피해",
+                BaseCost = CritDamageCurve.BaseCost, CostGrowth = CritDamageCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Multiplicative,
+                BaseValue = CritDamageCurve.BaseValue, Step = CritDamageCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.Multiplier
             }
         };
 
         // 1080 폭 캔버스 기준 배치값. 55pt 글자가 들어가야 하므로 줄 높이는 넉넉히 준다
         private const float SidePadding = 48f;
 
-        /** 한 줄의 높이. 55pt 글자에 위아래 여백을 더한 값 */
-        private const float LineHeight = 72f;
+        /**
+         * @brief 한 줄의 높이. 55pt 글자에 위아래 여백을 더한 값.
+         *
+         * 10단계에서 축이 둘에서 넷으로 늘면서 72에서 줄였다. 성장 패널은 화면
+         * 높이의 35%(1920 기준 672px)로 고정이고 그 안에 네 줄이 들어가야 한다.
+         *
+         *   여백 12 + 줄 4개 + 사이 간격 3개 <= 672
+         *
+         * 스크롤을 넣는 선택지도 있었지만 하지 않았다. 방치형의 성장 패널은
+         * "지금 살 수 있는 것이 무엇인가"를 한눈에 보여주는 화면이고, 스크롤은
+         * 그 목록의 일부를 숨긴다. 축이 여섯을 넘어가면 그때는 탭으로 나누는 것이
+         * 스크롤보다 낫다.
+         */
+        private const float LineHeight = 62f;
 
         /** 이름/비용 한 줄 + 증가폭 한 줄 */
-        private const float RowHeight = LineHeight * 2f + 24f;
-        private const float RowGap = 24f;
-        private const float TopPadding = 24f;
+        private const float RowHeight = LineHeight * 2f + 20f;
+        private const float RowGap = 14f;
+        private const float TopPadding = 12f;
 
         /** 비용 칸의 고정 폭. "1.5K" 정도는 물론 "999.9aa"도 잘리지 않는 크기 */
         private const float CostWidth = 300f;
@@ -197,6 +239,7 @@ namespace Onikiri.EditorTools
                 element.FindPropertyRelative("curve").enumValueIndex = (int)spec.Curve;
                 element.FindPropertyRelative("step").doubleValue = spec.Step;
                 element.FindPropertyRelative("valueCeiling").doubleValue = spec.ValueCeiling;
+                element.FindPropertyRelative("display").enumValueIndex = (int)spec.Display;
 
                 SetBigDouble(element.FindPropertyRelative("baseCost"), spec.BaseCost);
                 SetBigDouble(element.FindPropertyRelative("baseValue"), spec.BaseValue);

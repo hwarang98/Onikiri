@@ -235,31 +235,85 @@ namespace Onikiri.EditorTools
          * @brief 아틀라스 텍스처와 머티리얼을 폰트 에셋 안에 중첩해 저장한다.
          *
          * 폰트 전체가 파일 하나가 되어 옮기거나 지우기 쉬워진다.
+         *
+         * **기존 에셋이 있으면 그 안을 덮어쓴다. 지우고 다시 만들지 않는다.**
+         *
+         * 예전에는 DeleteAsset -> CreateAsset 이었다. 그러면 같은 경로에 새 GUID가
+         * 생기고, 씬과 프리팹의 TMP 컴포넌트가 들고 있던 폰트 참조가 전부 끊긴다.
+         * 증상이 고약하다 - 라틴 문자는 TMP 기본 폴백으로 멀쩡히 나오고 한글만
+         * □가 되어, 폰트 참조가 끊긴 것이 아니라 글리프를 안 구운 것처럼 보인다.
+         * 9단계에서 이것 때문에 "폰트를 다시 구우면 반드시 씬을 다시 빌드할 것"이라는
+         * 규칙을 문서에 적었는데, 규칙으로 남길 문제가 아니라 고칠 문제였다.
+         *
+         * EditorUtility.CopySerialized로 내용만 옮기면 파일도 GUID도 그대로다.
          */
         private static void SaveWithSubAssets(TMP_FontAsset fontAsset, string path)
         {
             var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
-            if (existing != null) AssetDatabase.DeleteAsset(path);
 
-            AssetDatabase.CreateAsset(fontAsset, path);
-
-            if (fontAsset.atlasTextures != null)
+            if (existing == null)
             {
-                for (int i = 0; i < fontAsset.atlasTextures.Length; i++)
+                AssetDatabase.CreateAsset(fontAsset, path);
+                AttachSubAssets(fontAsset, fontAsset);
+                Finish(fontAsset, path);
+                return;
+            }
+
+            // 이전에 매달려 있던 아틀라스/머티리얼을 떼어낸다. 남겨두면 재빌드마다
+            // 파일 안에 쓰이지 않는 텍스처가 쌓인다.
+            //
+            // DestroyImmediate(sub, true)가 아니라 RemoveObjectFromAsset을 쓴다.
+            // 전자는 "Destroying assets is not permitted" 를 뱉는다 - 파일에 속한
+            // 오브젝트를 지우는 것과 파일에서 떼어내는 것은 다른 동작이고,
+            // 여기서 필요한 것은 후자다. 떼어낸 오브젝트는 저장 시점에 회수된다
+            foreach (var sub in AssetDatabase.LoadAllAssetRepresentationsAtPath(path))
+            {
+                if (sub == null || sub == existing) continue;
+                AssetDatabase.RemoveObjectFromAsset(sub);
+            }
+
+            // 새로 구운 내용을 기존 인스턴스에 복사한다. GUID와 fileID가 유지되므로
+            // 씬의 참조가 그대로 살아 있다
+            EditorUtility.CopySerialized(fontAsset, existing);
+            AttachSubAssets(fontAsset, existing);
+
+            Finish(existing, path);
+        }
+
+        /**
+         * @brief 아틀라스와 머티리얼을 폰트 에셋의 자식으로 매단다.
+         *
+         * source는 방금 구운 것, owner는 파일에 실제로 존재하는 에셋이다. 재빌드에서는
+         * 둘이 다르다 - 내용은 새로 구운 쪽에서 오고 파일 정체성은 기존 쪽이 갖는다.
+         */
+        private static void AttachSubAssets(TMP_FontAsset source, TMP_FontAsset owner)
+        {
+            if (source.atlasTextures != null)
+            {
+                for (int i = 0; i < source.atlasTextures.Length; i++)
                 {
-                    var texture = fontAsset.atlasTextures[i];
+                    var texture = source.atlasTextures[i];
                     if (texture == null) continue;
-                    texture.name = fontAsset.name + " Atlas" + (i > 0 ? " " + i : string.Empty);
-                    AssetDatabase.AddObjectToAsset(texture, fontAsset);
+                    texture.name = owner.name + " Atlas" + (i > 0 ? " " + i : string.Empty);
+                    AssetDatabase.AddObjectToAsset(texture, owner);
                 }
             }
 
-            if (fontAsset.material != null)
+            if (source.material != null)
             {
-                fontAsset.material.name = fontAsset.name + " Material";
-                AssetDatabase.AddObjectToAsset(fontAsset.material, fontAsset);
+                source.material.name = owner.name + " Material";
+                AssetDatabase.AddObjectToAsset(source.material, owner);
             }
 
+            // 복사된 owner가 source의 서브에셋을 가리키도록 다시 연결한다.
+            // CopySerialized는 참조를 그대로 복사하지만, 위에서 이름과 소유자를
+            // 바꿨으므로 여기서 한 번 더 못 박아 둔다
+            owner.atlasTextures = source.atlasTextures;
+            owner.material = source.material;
+        }
+
+        private static void Finish(TMP_FontAsset fontAsset, string path)
+        {
             EditorUtility.SetDirty(fontAsset);
             AssetDatabase.SaveAssets();
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);

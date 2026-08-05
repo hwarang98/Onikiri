@@ -17,12 +17,34 @@ namespace Onikiri.Battle
     {
         public static HitStop Instance { get; private set; }
 
-        [Tooltip("정지가 끝난 뒤 복구할 타임스케일")]
+        /**
+         * @brief 정지가 끝난 뒤 복구할 타임스케일.
+         *
+         * 예전에는 이 값이 곧 복구값이었고 항상 1이었다. 그래서 정지가 끝날 때마다
+         * 외부에서 걸어둔 배속이 1로 지워졌다 - 테스트 패널에서 4배속을 걸고 전투를
+         * 보면 **첫 타격에 1배속으로 돌아갔다.** 배속이 안 걸리는 것처럼 보이는 것도
+         * 아니고, 잠깐 걸렸다가 조용히 풀리므로 원인을 찾기 어려웠다.
+         *
+         * 이제 이것은 기본값일 뿐이고, 실제 복구값은 정지 직전의 타임스케일을 기억한다.
+         */
+        [Tooltip("복구할 타임스케일의 기본값. 실제로는 정지 직전 값을 기억해 되돌린다")]
         [SerializeField] private float normalTimeScale = 1f;
 
         private float remainingUnscaled;
 
+        /**
+         * @brief 정지가 끝나면 되돌아갈 타임스케일.
+         *
+         * 정지에 **들어가는 순간에만** 갱신한다. 정지 중에 다시 Freeze가 불리면
+         * (연타 구간에서는 늘 그렇다) 그때의 타임스케일은 0이므로, 그것을 기억하면
+         * 정지가 끝나도 0에 머물러 게임이 멈춘 채로 남는다.
+         */
+        private float restoreTimeScale = 1f;
+
         public bool IsFrozen { get { return remainingUnscaled > 0f; } }
+
+        /** 정지가 끝난 뒤 돌아갈 배속. 테스트 패널이 표시에 쓴다 */
+        public float BaseTimeScale { get { return remainingUnscaled > 0f ? restoreTimeScale : Time.timeScale; } }
 
         private void Awake()
         {
@@ -32,6 +54,7 @@ namespace Onikiri.Battle
                 return;
             }
             Instance = this;
+            restoreTimeScale = normalTimeScale;
         }
 
         private void OnDestroy()
@@ -39,8 +62,10 @@ namespace Onikiri.Battle
             if (Instance == this)
             {
                 Instance = null;
-                // 정지 도중 이 오브젝트가 사라져서 게임이 멈춘 채로 남는 일은 없어야 한다
-                if (Time.timeScale == 0f) Time.timeScale = normalTimeScale;
+                // 정지 도중 이 오브젝트가 사라져서 게임이 멈춘 채로 남는 일은 없어야 한다.
+                // 기억해둔 값이 0이면 그것도 믿을 수 없으므로 기본값으로 되돌린다
+                if (Time.timeScale == 0f)
+                    Time.timeScale = restoreTimeScale > 0f ? restoreTimeScale : normalTimeScale;
             }
         }
 
@@ -49,8 +74,29 @@ namespace Onikiri.Battle
             if (remainingUnscaled > 0f)
             {
                 remainingUnscaled = 0f;
-                Time.timeScale = normalTimeScale;
+                Time.timeScale = restoreTimeScale > 0f ? restoreTimeScale : normalTimeScale;
             }
+        }
+
+        /**
+         * @brief 배속을 건다. 히트스톱이 끝나도 이 값이 유지된다.
+         *
+         * Time.timeScale을 직접 쓰지 말고 이쪽을 쓴다. 직접 쓰면 다음 타격의
+         * 히트스톱이 끝날 때 그 값이 지워진다 - 정지 직전 값을 기억하는 구조라
+         * 정지 중에 바꾼 값은 기억에 반영되지 않기 때문이다.
+         */
+        public void SetBaseTimeScale(float value)
+        {
+            restoreTimeScale = Mathf.Max(0f, value);
+
+            // 정지 중이 아니면 즉시 반영한다. 정지 중이면 해제될 때 이 값으로 돌아간다
+            if (remainingUnscaled <= 0f) Time.timeScale = restoreTimeScale;
+        }
+
+        public static void RequestBaseTimeScale(float value)
+        {
+            if (Instance != null) Instance.SetBaseTimeScale(value);
+            else Time.timeScale = value;
         }
 
         /**
@@ -61,6 +107,10 @@ namespace Onikiri.Battle
         public void Freeze(float seconds)
         {
             if (seconds <= 0f) return;
+
+            // 정지에 처음 들어가는 순간에만 복구값을 갱신한다. 이미 정지 중이면
+            // 지금의 타임스케일은 0이고, 그것을 기억하면 영원히 풀리지 않는다
+            if (remainingUnscaled <= 0f && Time.timeScale > 0f) restoreTimeScale = Time.timeScale;
 
             remainingUnscaled = Mathf.Max(remainingUnscaled, seconds);
             Time.timeScale = 0f;
@@ -79,7 +129,9 @@ namespace Onikiri.Battle
             if (remainingUnscaled <= 0f)
             {
                 remainingUnscaled = 0f;
-                Time.timeScale = normalTimeScale;
+                // 1이 아니라 정지 직전의 값으로 돌아간다. 이 한 줄이 배속을
+                // 전투 중에도 유지되게 한다
+                Time.timeScale = restoreTimeScale;
             }
         }
     }

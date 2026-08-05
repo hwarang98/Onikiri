@@ -36,13 +36,32 @@ namespace Onikiri.Progression
         public struct StageResult
         {
             public int Stage;
+
+            /** 잡몹 10마리에 걸린 총 시간 */
             public double MobSeconds;
+
+            /** 스테이지 끝 시점의 잡몹 한 마리 처치 시간 */
+            public double MobKillSeconds;
+
+            /** 그때 수렴한 보충 간격. 하한 0.4초에 닿았는지 보는 값 */
+            public double SpawnInterval;
+
             public double BossKillSeconds;
             public bool BossCleared;
+
+            /** 때릴 수 있는 시간 / 실제 처치 시간. 1.5~3.0 밴드가 목표다 */
+            public double BossMargin;
+
             public int AttackPowerLevel;
             public int AttackSpeedLevel;
+            public int CritRateLevel;
+            public int CritDamageLevel;
+
             public double Damage;
             public double AttacksPerSecond;
+            public double CritRate;
+            public double CritMultiplier;
+            public double ExpectedDps;
         }
 
         public struct Field
@@ -66,15 +85,15 @@ namespace Onikiri.Progression
          * 치명타를 빼면 실제보다 12% 낮게 나온다. 보스전은 제한 시간 판정이라
          * 그 12%가 통과와 실패를 가르는 구간이 실제로 존재한다.
          */
-        public static double ExpectedDps(double damage, double attacksPerSecond)
+        public static double ExpectedDps(CombatStats stats)
         {
-            return damage * attacksPerSecond * CombatBaseline.ExpectedDamageMultiplier;
+            return stats.ExpectedDps;
         }
 
         /** 지금 스탯으로 이 체력을 깎는 데 걸리는 시간 */
-        public static double SecondsToKill(double health, double damage, double attacksPerSecond)
+        public static double SecondsToKill(double health, CombatStats stats)
         {
-            double dps = ExpectedDps(damage, attacksPerSecond);
+            double dps = stats.ExpectedDps;
             if (dps <= 0d) return double.PositiveInfinity;
             return health / dps;
         }
@@ -85,11 +104,10 @@ namespace Onikiri.Progression
          * 체력 계산은 StageCurve.BossHealthForStage를 그대로 쓴다. BossFight가
          * 실제로 스폰할 때 부르는 것과 같은 함수다.
          */
-        public static double BossKillSeconds(double averageMobHealth, int stage,
-                                             double damage, double attacksPerSecond)
+        public static double BossKillSeconds(double averageMobHealth, int stage, CombatStats stats)
         {
             var health = StageCurve.BossHealthForStage(BigDouble.FromDouble(averageMobHealth), stage);
-            return SecondsToKill(health.ToDouble(), damage, attacksPerSecond);
+            return SecondsToKill(health.ToDouble(), stats);
         }
 
         /**
@@ -108,11 +126,9 @@ namespace Onikiri.Progression
             get { return StageCurve.BossTimeLimitSeconds - BossWalkInSeconds; }
         }
 
-        public static bool BossClears(double averageMobHealth, int stage,
-                                      double damage, double attacksPerSecond)
+        public static bool BossClears(double averageMobHealth, int stage, CombatStats stats)
         {
-            return BossKillSeconds(averageMobHealth, stage, damage, attacksPerSecond)
-                   <= BossDamageWindowSeconds;
+            return BossKillSeconds(averageMobHealth, stage, stats) <= BossDamageWindowSeconds;
         }
 
         /**
@@ -120,8 +136,10 @@ namespace Onikiri.Progression
          *
          * 게이트가 언제부터 무는지를 재는 기준선이다.
          */
-        public static double StartingDamage { get { return AttackPowerCurve.ValueAtLevel(1); } }
-        public static double StartingAttacksPerSecond { get { return AttackSpeedCurve.CappedValueAtLevel(1); } }
+        public static CombatStats StartingStats { get { return CombatStats.CappedAtLevel(1); } }
+
+        public static double StartingDamage { get { return StartingStats.Damage; } }
+        public static double StartingAttacksPerSecond { get { return StartingStats.AttacksPerSecond; } }
 
         /**
          * @brief 강화를 전혀 하지 않은 플레이어가 처음 실패하는 스테이지.
@@ -133,7 +151,7 @@ namespace Onikiri.Progression
         {
             for (int stage = 1; stage <= searchTo; stage++)
             {
-                if (!BossClears(averageMobHealth, stage, StartingDamage, StartingAttacksPerSecond))
+                if (!BossClears(averageMobHealth, stage, StartingStats))
                     return stage;
             }
             return -1;
@@ -150,8 +168,7 @@ namespace Onikiri.Progression
         {
             var results = new List<StageResult>();
 
-            int powerLevel = 1;
-            int speedLevel = 1;
+            var levels = new Levels();
             double purse = 0d;
 
             for (int stage = 1; stage <= throughStage; stage++)
@@ -160,40 +177,83 @@ namespace Onikiri.Progression
                 double goldPerMob = field.AverageMobGold * StageCurve.GoldMultiplier(stage).ToDouble();
 
                 double mobSeconds = 0d;
+                double lastKill = 0d;
+                double lastInterval = 0d;
+
                 for (int k = 0; k < StageCurve.KillsPerStage; k++)
                 {
-                    double kill = SecondsToKill(mobHealth,
-                        AttackPowerCurve.ValueAtLevel(powerLevel),
-                        AttackSpeedCurve.CappedValueAtLevel(speedLevel));
+                    double kill = SecondsToKill(mobHealth, levels.Stats);
 
-                    // 요괴 공급이 하한이다. 아무리 세도 다음 요괴를 기다려야 한다
-                    mobSeconds += Math.Max(kill, field.SpawnInterval);
+                    // 보충 간격은 고정이 아니라 처치 속도에 수렴한다. 그래서 처치가
+                    // 빨라지면 파밍 시간도 함께 줄어든다 - 9단계에서 11.0초에
+                    // 고정되던 지점이 여기다. 하한 0.4초. SpawnPacing 참고
+                    double interval = SpawnPacing.SettledInterval(kill);
+                    mobSeconds += Math.Max(kill, interval);
+
+                    lastKill = kill;
+                    lastInterval = interval;
 
                     purse += goldPerMob;
-                    Buy(ref powerLevel, ref speedLevel, ref purse);
+                    Buy(ref levels, ref purse);
                 }
 
-                double damage = AttackPowerCurve.ValueAtLevel(powerLevel);
-                double aps = AttackSpeedCurve.CappedValueAtLevel(speedLevel);
-                double bossKill = BossKillSeconds(field.AverageMobHealth, stage, damage, aps);
+                var stats = levels.Stats;
+                double bossKill = BossKillSeconds(field.AverageMobHealth, stage, stats);
 
                 purse += goldPerMob * StageCurve.BossGoldMultiplier;
-                Buy(ref powerLevel, ref speedLevel, ref purse);
+                Buy(ref levels, ref purse);
 
                 results.Add(new StageResult
                 {
                     Stage = stage,
                     MobSeconds = mobSeconds,
+                    MobKillSeconds = lastKill,
+                    SpawnInterval = lastInterval,
                     BossKillSeconds = bossKill,
                     BossCleared = bossKill <= BossDamageWindowSeconds,
-                    AttackPowerLevel = powerLevel,
-                    AttackSpeedLevel = speedLevel,
-                    Damage = damage,
-                    AttacksPerSecond = aps
+                    BossMargin = BossDamageWindowSeconds / bossKill,
+                    AttackPowerLevel = levels.Power,
+                    AttackSpeedLevel = levels.Speed,
+                    CritRateLevel = levels.CritRate,
+                    CritDamageLevel = levels.CritDamage,
+                    Damage = stats.Damage,
+                    AttacksPerSecond = stats.AttacksPerSecond,
+                    CritRate = stats.CritRate,
+                    CritMultiplier = stats.CritMultiplier,
+                    ExpectedDps = stats.ExpectedDps
                 });
             }
 
             return results;
+        }
+
+        /** 네 축의 레벨. 구매 정책이 이것을 굴린다 */
+        private struct Levels
+        {
+            public int Power;
+            public int Speed;
+            public int CritRate;
+            public int CritDamage;
+
+            /** 0으로 시작하지 않는다. 모든 축은 레벨 1이 시작 스탯이다 */
+            public int P { get { return Power < 1 ? 1 : Power; } }
+            public int S { get { return Speed < 1 ? 1 : Speed; } }
+            public int R { get { return CritRate < 1 ? 1 : CritRate; } }
+            public int D { get { return CritDamage < 1 ? 1 : CritDamage; } }
+
+            public CombatStats Stats
+            {
+                get
+                {
+                    return new CombatStats
+                    {
+                        Damage = AttackPowerCurve.ValueAtLevel(P),
+                        AttacksPerSecond = AttackSpeedCurve.CappedValueAtLevel(S),
+                        CritRate = CritRateCurve.CappedValueAtLevel(R),
+                        CritMultiplier = CritDamageCurve.ValueAtLevel(D)
+                    };
+                }
+            }
         }
 
         /**
@@ -216,31 +276,102 @@ namespace Onikiri.Progression
             return total;
         }
 
-        private static void Buy(ref int powerLevel, ref int speedLevel, ref double purse)
+        /**
+         * @brief 골드가 되는 대로, 지금 골드당 DPS 이득이 가장 큰 축을 산다.
+         *
+         * 축이 둘일 때는 "더 싼 쪽"으로 충분했다. 두 축의 효율 비율이 레벨과
+         * 무관하게 일정해서 비용 비교가 곧 효율 비교였기 때문이다.
+         *
+         * 넷이 되면 그것이 성립하지 않는다. 치명타 피해는 레벨이 오를수록 DPS
+         * 기여가 커지고 치명타 확률은 언덕을 그린다. 그래서 실제 효율
+         * (UpgradeEfficiency가 재는 것과 같은 값)로 고른다 - 시뮬레이션의 구매
+         * 정책과 게임이 플레이어에게 보여주는 지표가 같은 함수여야 한다.
+         */
+        private static void Buy(ref Levels levels, ref double purse)
         {
             // 무한 루프 방어. 비용이 0이 되는 곡선이 들어오면 여기서 멈춘다
             for (int guard = 0; guard < 100000; guard++)
             {
-                double powerCost = AttackPowerCurve.CostAtLevel(powerLevel);
-                double speedCost = AttackSpeedCurve.CostAtLevel(speedLevel);
-                bool speedBuyable = speedLevel < AttackSpeedCurve.MaxLevel;
+                int bestAxis = -1;
+                double bestGain = 0d;
+                double bestCost = 0d;
 
-                if (speedBuyable && speedCost <= powerCost && speedCost <= purse)
+                for (int axis = 0; axis < 4; axis++)
                 {
-                    purse -= speedCost;
-                    speedLevel++;
-                    continue;
+                    double cost;
+                    if (!TryCost(levels, axis, out cost) || cost > purse) continue;
+
+                    double gain = GainPerGoldFor(levels, axis);
+                    if (gain <= bestGain) continue;
+
+                    bestGain = gain;
+                    bestAxis = axis;
+                    bestCost = cost;
                 }
 
-                if (powerCost <= purse)
-                {
-                    purse -= powerCost;
-                    powerLevel++;
-                    continue;
-                }
+                if (bestAxis < 0) break;
 
-                break;
+                purse -= bestCost;
+                switch (bestAxis)
+                {
+                    case 0: levels.Power = levels.P + 1; break;
+                    case 1: levels.Speed = levels.S + 1; break;
+                    case 2: levels.CritRate = levels.R + 1; break;
+                    case 3: levels.CritDamage = levels.D + 1; break;
+                }
             }
+        }
+
+        /** 살 수 있으면 비용을 낸다. 상한에 닿은 축은 false */
+        private static bool TryCost(Levels levels, int axis, out double cost)
+        {
+            cost = 0d;
+            switch (axis)
+            {
+                case 0:
+                    cost = AttackPowerCurve.CostAtLevel(levels.P);
+                    return true;
+                case 1:
+                    if (levels.S >= AttackSpeedCurve.MaxLevel) return false;
+                    cost = AttackSpeedCurve.CostAtLevel(levels.S);
+                    return true;
+                case 2:
+                    if (levels.R >= CritRateCurve.MaxLevel) return false;
+                    cost = CritRateCurve.CostAtLevel(levels.R);
+                    return true;
+                default:
+                    cost = CritDamageCurve.CostAtLevel(levels.D);
+                    return true;
+            }
+        }
+
+        /**
+         * @brief 이 축을 한 레벨 올릴 때의 골드당 DPS 증가율.
+         *
+         * 상한이 적용된 실제 스탯으로 잰다. UpgradeEfficiency는 상한을 걷어낸
+         * 곡선으로 재는데(형태를 보는 지표라서), 여기서는 반대로 플레이어가 실제로
+         * 얻는 것을 알아야 한다 - 상한에 막힌 축을 사는 것은 골드 낭비다.
+         */
+        private static double GainPerGoldFor(Levels levels, int axis)
+        {
+            double cost;
+            if (!TryCost(levels, axis, out cost) || cost <= 0d) return 0d;
+
+            var before = levels.Stats;
+
+            var after = levels;
+            switch (axis)
+            {
+                case 0: after.Power = levels.P + 1; break;
+                case 1: after.Speed = levels.S + 1; break;
+                case 2: after.CritRate = levels.R + 1; break;
+                default: after.CritDamage = levels.D + 1; break;
+            }
+
+            double dpsBefore = before.ExpectedDps;
+            if (dpsBefore <= 0d) return 0d;
+
+            return (after.Stats.ExpectedDps / dpsBefore - 1d) / cost;
         }
     }
 }

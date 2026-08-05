@@ -182,6 +182,36 @@ namespace Onikiri.Battle
         }
 
         /**
+         * @brief 치명타 확률. 10단계부터 강화 대상이다.
+         *
+         * 0~1로 자른다. 곡선의 상한은 UpgradeTrack의 valueCeiling이 걸지만,
+         * 스탯을 밀어넣는 경로가 강화 하나뿐이라는 보장은 없다(테스트 패널,
+         * 세이브 복원). 값이 1을 넘으면 모든 타격이 치명타가 되어 강조가 무의미해진다.
+         */
+        public float CritChance
+        {
+            get { return critChance; }
+            set { critChance = Mathf.Clamp01(value); }
+        }
+
+        /** 치명타 배수. 상한이 없는 축이라 아래로만 막는다 */
+        public float CritMultiplier
+        {
+            get { return critMultiplier; }
+            set { critMultiplier = Mathf.Max(1f, value); }
+        }
+
+        /** 치명타 기대값을 포함한 초당 피해. 테스트 패널과 방치 보상이 쓴다 */
+        public BigDouble ExpectedDps
+        {
+            get
+            {
+                float factor = 1f + critChance * (critMultiplier - 1f);
+                return damage * BigDouble.FromDouble(attacksPerSecond * factor);
+            }
+        }
+
+        /**
          * @brief 시작 이후 실제로 시작된 스윙 수.
          *
          * 공격속도 스탯이 실제 공격 횟수로 이어지는지 확인하는 용도다. 애니메이션

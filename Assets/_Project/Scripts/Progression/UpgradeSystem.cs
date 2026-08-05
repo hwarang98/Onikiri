@@ -17,6 +17,8 @@ namespace Onikiri.Progression
         /** 트랙 식별자. 스탯 적용이 이 문자열로 갈린다 */
         public const string AttackPowerId = "attack_power";
         public const string AttackSpeedId = "attack_speed";
+        public const string CritRateId = "crit_rate";
+        public const string CritDamageId = "crit_damage";
 
         [SerializeField] private PlayerCombat combat;
         [SerializeField] private UpgradeTrack[] tracks;
@@ -126,6 +128,16 @@ namespace Onikiri.Progression
                     // 나오지만, 둘 중 하나를 고치고 다른 하나를 잊었을 때 스탯이
                     // 조용히 어긋나는 것보다 잘리는 편이 낫다
                     combat.AttacksPerSecond = (float)track.Value.ToDouble();
+                    break;
+
+                case CritRateId:
+                    // 확률이라 상한이 트랙의 valueCeiling에서 이미 걸린다.
+                    // PlayerCombat도 0~1로 자르지만 그건 이중 안전장치다
+                    combat.CritChance = (float)track.Value.ToDouble();
+                    break;
+
+                case CritDamageId:
+                    combat.CritMultiplier = (float)track.Value.ToDouble();
                     break;
 
                 default:

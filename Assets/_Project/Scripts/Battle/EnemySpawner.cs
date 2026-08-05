@@ -26,8 +26,18 @@ namespace Onikiri.Battle
         [Tooltip("동시에 살아 있어야 할 요괴 수. 사양서는 화면에 3~5마리를 요구한다")]
         [SerializeField] private int targetAlive = 4;
 
-        [Tooltip("보충 사이의 간격 (초)")]
+        [Tooltip("보충 사이의 간격 (초). 성장하지 않은 상태의 시작값이며, " +
+                 "필드가 굶으면 SpawnPacing 규칙에 따라 줄어든다")]
         [SerializeField] private float spawnInterval = 1.1f;
+
+        /**
+         * @brief 지금 실제로 쓰고 있는 보충 간격.
+         *
+         * spawnInterval은 시작값이고 이쪽이 살아 움직인다. 둘을 나눈 이유는
+         * 인스펙터의 값이 런타임에 조용히 바뀌면 씬을 저장할 때 그 값이 굳어버리기
+         * 때문이다 - 다음 실행이 0.4초에서 시작하게 된다.
+         */
+        private float currentInterval;
 
         [Tooltip("화면 오른쪽 끝에서 얼마나 바깥에 나타날지 (world units)")]
         [SerializeField] private float offscreenMargin = 1.2f;
@@ -59,8 +69,17 @@ namespace Onikiri.Battle
 
         public int PoolGrowthCount { get { return pool != null ? pool.GrowthCount : 0; } }
 
-        /** 방치 보상이 요괴 공급 상한을 계산할 때 쓴다 */
-        public float SpawnInterval { get { return spawnInterval; } }
+        /**
+         * @brief 방치 보상이 요괴 공급 상한을 계산할 때 쓴다.
+         *
+         * 인스펙터의 시작값이 아니라 **지금 쓰고 있는 간격**을 준다. 10단계부터
+         * 간격이 처치 속도에 따라 좁아지므로, 시작값을 쓰면 성장한 플레이어의
+         * 방치 수입이 실제보다 최대 세 배 적게 계산된다.
+         */
+        public float SpawnInterval
+        {
+            get { return currentInterval > 0f ? currentInterval : spawnInterval; }
+        }
 
         /**
          * @brief 스폰 가중치로 평균 낸 1스테이지 기준 체력과 골드.
@@ -96,6 +115,7 @@ namespace Onikiri.Battle
         {
             if (enemyParent == null) enemyParent = transform;
             pool = new ObjectPool<Enemy>(enemyPrefab, enemyParent, prewarm);
+            currentInterval = spawnInterval;
         }
 
         private void Update()
@@ -105,12 +125,24 @@ namespace Onikiri.Battle
             if (spawningSuspended) return;
 
             spawnTimer -= Time.deltaTime;
-            if (spawnTimer <= 0f && CountAlive() < targetAlive)
-            {
-                Spawn();
-                spawnTimer = spawnInterval;
-            }
+            if (spawnTimer > 0f) return;
+
+            // 보충 시점에 필드가 목표에 못 미치면 굶고 있다는 뜻이다 - 요괴가
+            // 들어오는 것보다 빨리 죽는다. 그때 간격을 좁힌다. 반대로 목표를
+            // 채우고 있으면 쌓이고 있으므로 되돌린다. SpawnPacing 참고.
+            //
+            // 이 되먹임이 9단계의 병목을 푼다. 예전에는 간격이 1.1초 고정이라
+            // 공격력을 아무리 올려도 잡몹 파밍이 10 x 1.1초에 묶여 있었다
+            bool starved = CountAlive() < targetAlive;
+            currentInterval = SpawnPacing.Next(currentInterval, starved);
+
+            if (starved) Spawn();
+
+            spawnTimer = currentInterval;
         }
+
+        /** 지금 간격. 테스트 패널이 병목이 풀렸는지 볼 때 쓴다 */
+        public float CurrentSpawnInterval { get { return currentInterval; } }
 
         // ---------------------------------------------------------------- 보스전 제어
 
@@ -130,6 +162,11 @@ namespace Onikiri.Battle
         {
             spawningSuspended = false;
             spawnTimer = 0f;
+
+            // 간격도 시작값으로 되돌린다. 보스전 동안 필드가 비어 있었으므로
+            // 되먹임 입장에서는 계속 굶은 상태였고, 그대로 두면 파밍 복귀 직후
+            // 하한(0.4초)에서 시작해 요괴 넷이 한꺼번에 쏟아진다
+            currentInterval = spawnInterval;
         }
 
         /**

@@ -210,80 +210,34 @@ namespace Onikiri.Tests
 
         // ---------------------------------------------------------------- 보스
 
+        /**
+         * @brief 보스 보상이 스테이지에 맞춰 오르는지.
+         *
+         * 체력 배수는 10단계부터 스테이지에 따라 함께 오른다(BossHealthGrowth).
+         * 골드 배수는 고정이다 - 보상까지 함께 부풀리면 보스 한 번이 그 스테이지의
+         * 파밍 전체보다 커져서, 잡몹을 잡을 이유가 사라진다.
+         */
         [Test]
         public void BossRewards_ScaleWithTheStage()
         {
             var mobHealth = BigDouble.FromDouble(AverageHealth);
             var mobGold = BigDouble.FromDouble(AverageGold);
 
-            Assert.AreEqual(AverageHealth * StageCurve.BossHealthMultiplier,
-                            StageCurve.BossHealth(mobHealth).ToDouble(), 1e-6d);
+            Assert.AreEqual(AverageHealth * StageCurve.BossHealthMultiplierBase,
+                            StageCurve.BossHealth(mobHealth, 1).ToDouble(), 1e-6d);
             Assert.AreEqual(AverageGold * StageCurve.BossGoldMultiplier,
                             StageCurve.BossGold(mobGold).ToDouble(), 1e-6d);
 
-            // 골드 배수가 체력 배수보다 커야 도전할 이유가 생긴다. 같거나 작으면
-            // 보스는 "위험하기만 한 잡몹"이 된다
-            Assert.Greater(StageCurve.BossGoldMultiplier, StageCurve.BossHealthMultiplier,
+            // 골드 배수가 1스테이지 체력 배수보다 커야 도전할 이유가 생긴다.
+            // 같거나 작으면 보스는 "위험하기만 한 잡몹"이 된다
+            Assert.Greater(StageCurve.BossGoldMultiplier, StageCurve.BossHealthMultiplierBase,
                 "the boss pays no premium for the 30s risk");
+
+            // 체력 배수는 스테이지를 따라 오른다. 9단계에서는 고정이었고 그 때문에
+            // 제한 시간이 5스테이지부터 무의미해졌다
+            Assert.Greater(StageCurve.BossHealthMultiplier(10), StageCurve.BossHealthMultiplier(1),
+                "boss health multiplier is flat again - the time limit stops biting");
         }
 
-        /**
-         * @brief 보스가 제한 시간 안에 잡히는 구간에 있는지.
-         *
-         * 잡몹을 따라가는 만큼만 강화한 플레이어가 보스에서 막히면 게이트가 아니라
-         * 벽이다. 반대로 항상 여유롭게 잡히면 게이트가 아무 일도 하지 않는다.
-         * 스테이지 진행 시뮬레이션과 같은 구매 정책으로 돌려서 그 사이에 있는지 본다.
-         */
-        [Test]
-        public void Boss_IsBeatableWithinTheTimeLimit()
-        {
-            int level = 1;
-            double purse = 0d;
-            double worstMargin = double.MaxValue;
-            int worstStage = 0;
-
-            for (int stage = 1; stage <= 50; stage++)
-            {
-                double damage = DamageBase * Math.Pow(DamageStep, level - 1);
-                double mobHealth = AverageHealth * Math.Pow(StageCurve.HealthGrowth, stage - 1);
-                double bossHealth = mobHealth * StageCurve.BossHealthMultiplier;
-
-                // 공격속도는 상한까지만 오른다. 보스전은 순수 DPS 싸움이라 이 상한이
-                // 그대로 제한 시간의 여유를 정한다
-                double aps = Math.Min(AttackSpeedCurve.Ceiling,
-                                      AttackSpeedCurve.ValueAtLevel(SpeedLevelFor(stage)));
-
-                double secondsToKill = bossHealth / (damage * aps);
-                double margin = StageCurve.BossTimeLimitSeconds / secondsToKill;
-
-                if (margin < worstMargin) { worstMargin = margin; worstStage = stage; }
-
-                purse += StageCurve.KillsPerStage * AverageGold * Math.Pow(StageCurve.GoldGrowth, stage - 1);
-                purse += AverageGold * Math.Pow(StageCurve.GoldGrowth, stage - 1) * StageCurve.BossGoldMultiplier;
-
-                while (true)
-                {
-                    double cost = CostBase * Math.Pow(CostGrowth, level - 1);
-                    if (cost > purse) break;
-                    purse -= cost;
-                    level++;
-                }
-            }
-
-            Assert.Greater(worstMargin, 1d, string.Format(
-                "stage {0}'s boss cannot be killed in {1}s even with the curve's own upgrade pace " +
-                "- the gate is a wall, not a checkpoint (needed {2:F1}x more time)",
-                worstStage, StageCurve.BossTimeLimitSeconds, 1d / worstMargin));
-
-            // 항상 두 배 이상 여유가 있으면 제한 시간이 아무것도 하지 않는다
-            Assert.Less(worstMargin, 4d, string.Format(
-                "every boss finishes with {0:F1}x time to spare - the 30s limit never bites", worstMargin));
-        }
-
-        /** 공격속도는 공격력보다 늦게 산다고 가정한다. 비용이 같은 곡선이라 번갈아 오른다 */
-        static int SpeedLevelFor(int stage)
-        {
-            return Math.Min(AttackSpeedCurve.MaxLevel, 1 + stage / 2);
-        }
     }
 }

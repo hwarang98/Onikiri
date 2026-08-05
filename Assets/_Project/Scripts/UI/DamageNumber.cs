@@ -40,6 +40,21 @@ namespace Onikiri.UI
                  "때리는 동안 아무 일도 일어나지 않은 것처럼 보인다")]
         [SerializeField] private float mergePunchScale = 1.15f;
 
+        /**
+         * @brief 치명타가 섞였을 때의 튀는 배율.
+         *
+         * 치명타는 이미 색(금색)과 크기(2배)로 구분된다. 그런데 **합산 중에는 그
+         * 구분이 잘 전달되지 않는다.** 평타 세 대가 합쳐진 숫자가 이미 떠 있는
+         * 상태에서 네 번째가 치명타면, 색과 크기가 그 자리에서 바뀔 뿐이라
+         * "원래 저랬나?" 로 읽힌다. 새로 뜨는 숫자였다면 등장 자체가 신호가 되는데
+         * 합산에는 등장이 없다.
+         *
+         * 그래서 치명타가 섞이는 순간에만 더 크게 튀긴다. 움직임은 색이나 크기와
+         * 달리 '변화' 그 자체라서, 이미 떠 있는 숫자에서도 새 사건으로 읽힌다.
+         */
+        [Tooltip("치명타가 섞인 합산에서의 튀는 배율. 평타보다 크게 잡는다")]
+        [SerializeField] private float critPunchScale = 1.4f;
+
         [Tooltip("튄 스케일이 1로 돌아오는 데 걸리는 시간")]
         [SerializeField] private float mergePunchDecay = 0.12f;
 
@@ -51,6 +66,9 @@ namespace Onikiri.UI
 
         /** 합산 직후 남아 있는 스케일 여분. 0이면 원래 크기 */
         private float punchRemaining;
+
+        /** 지금 진행 중인 튀김의 목표 배율. 평타와 치명타가 다르다 */
+        private float punchScale;
 
         /**
          * @brief 이 팝업이 지금까지 합산한 데미지.
@@ -88,7 +106,8 @@ namespace Onikiri.UI
          * 비트맵이 리샘플되어 래스터 폰트를 쓴 이유가 사라진다.
          */
         public void Play(string text, Vector2 anchoredPosition, Color color, float fontSize,
-                         BigDouble amount, object targetKey, Action<DamageNumber> onFinished)
+                         BigDouble amount, object targetKey, bool emphasised,
+                         Action<DamageNumber> onFinished)
         {
             finished = onFinished;
             Accumulated = amount;
@@ -107,6 +126,11 @@ namespace Onikiri.UI
             punchRemaining = 0f;
             rect.localScale = Vector3.one;
 
+            // 첫 숫자가 치명타면 등장부터 튀긴다. 합산이 아니라 새로 뜨는 경우라
+            // 등장 자체가 이미 신호이긴 하지만, 평타 사이에서 한 번 더 도드라져야
+            // 초당 네 번 구간에서 눈에 걸린다
+            if (emphasised) StartPunch(true);
+
             gameObject.SetActive(true);
         }
 
@@ -116,7 +140,7 @@ namespace Onikiri.UI
          * 수명은 되돌리지 않고 유지 구간의 시작으로만 당긴다. 완전히 초기화하면
          * 연타가 이어지는 동안 숫자가 화면에 영원히 붙어 있게 된다.
          */
-        public void Merge(BigDouble amount, string text, Color color, float fontSize)
+        public void Merge(BigDouble amount, string text, Color color, float fontSize, bool emphasised)
         {
             Accumulated += amount;
             SetText(text, color, fontSize);
@@ -135,6 +159,20 @@ namespace Onikiri.UI
             // 폰트 크기가 아니라 트랜스폼 스케일을 쓴다. 비트맵 폰트라 fontSize를
             // 정수배 사이의 값으로 흔들면 글리프가 리샘플되어 흐려지고, 강조하려던
             // 숫자가 오히려 읽기 어려워진다. 스케일은 메시를 그대로 두고 늘린다
+            StartPunch(emphasised);
+        }
+
+        /**
+         * @brief 튀김을 시작한다. 진행 중이면 더 큰 쪽이 이긴다.
+         *
+         * 치명타 직후에 평타가 합산되면서 튀김을 작게 덮어쓰면, 강조가 나타나자마자
+         * 사라진다. 강조는 한 방향으로만 올라간다 - 색·크기와 같은 규칙이다
+         * (DamageNumberSpawner의 mergedStyle 참고).
+         */
+        private void StartPunch(bool emphasised)
+        {
+            float target = emphasised ? critPunchScale : mergePunchScale;
+            punchScale = punchRemaining > 0f ? Mathf.Max(punchScale, target) : target;
             punchRemaining = 1f;
         }
 
@@ -172,7 +210,7 @@ namespace Onikiri.UI
             if (punchRemaining > 0f)
             {
                 punchRemaining = Mathf.Max(0f, punchRemaining - Time.deltaTime / Mathf.Max(0.0001f, mergePunchDecay));
-                float scale = Mathf.Lerp(1f, mergePunchScale, punchRemaining);
+                float scale = Mathf.Lerp(1f, punchScale, punchRemaining);
                 rect.localScale = new Vector3(scale, scale, 1f);
             }
 

@@ -73,15 +73,37 @@ namespace Onikiri.Tests
                                     60);
         }
 
+        static UpgradeTrack CritRate()
+        {
+            return new UpgradeTrack(UpgradeSystem.CritRateId, "치명타 확률",
+                                    BigDouble.FromDouble(CritRateCurve.BaseCost),
+                                    CritRateCurve.CostGrowth,
+                                    UpgradeTrack.Curve.Additive,
+                                    BigDouble.FromDouble(CritRateCurve.BaseValue),
+                                    CritRateCurve.Step,
+                                    CritRateCurve.MaxLevel, CritRateCurve.Ceiling);
+        }
+
+        static UpgradeTrack CritDamage()
+        {
+            return new UpgradeTrack(UpgradeSystem.CritDamageId, "치명타 피해",
+                                    BigDouble.FromDouble(CritDamageCurve.BaseCost),
+                                    CritDamageCurve.CostGrowth,
+                                    UpgradeTrack.Curve.Multiplicative,
+                                    BigDouble.FromDouble(CritDamageCurve.BaseValue),
+                                    CritDamageCurve.Step);
+        }
+
         /**
          * @brief 지금 게임에 있는 성장 축 전부.
          *
-         * 새 축은 여기에만 추가하면 아래 검사가 전부 따라온다. 9단계 이후의
-         * 치명타 확률·피해, 골드 획득량이 이 목록으로 온다.
+         * 새 축은 여기에만 추가하면 아래 검사가 전부 따라온다. 골드 획득량이
+         * 다음 후보인데, 그 축은 DPS에 기여하지 않으므로 이 지표로는 잴 수 없다 -
+         * 그때는 "골드당 골드"라는 별도 자가 필요하다.
          */
         static UpgradeTrack[] Axes()
         {
-            return new[] { AttackPower(), AttackSpeed() };
+            return new[] { AttackPower(), AttackSpeed(), CritRate(), CritDamage() };
         }
 
         /** 구간 전체에서 두 축이 가장 크게 벌어지는 지점 */
@@ -166,10 +188,70 @@ namespace Onikiri.Tests
         [Test]
         public void MultiplicativeTrack_KeepsItsRelativeGain()
         {
-            // 곱연산의 정의. 레벨이 아무리 올라도 "몇 % 오르는가"는 그대로다
+            // 곱연산의 정의. 레벨이 아무리 올라도 "DPS가 몇 % 오르는가"는 그대로다.
+            // 공격력은 DPS에 직접 곱해지므로 값 증가율이 곧 DPS 증가율이다
             var power = AttackPower();
             Assert.AreEqual(0.12d, UpgradeEfficiency.RelativeGain(power, 1), 1e-9d);
             Assert.AreEqual(0.12d, UpgradeEfficiency.RelativeGain(power, MaxLevelChecked), 1e-9d);
+        }
+
+        /**
+         * @brief 치명타율은 가산이지만 죽지 않는다.
+         *
+         * 8단계의 공격속도와 형태가 같은데(가산 값 + 지수 비용) 결과가 다르다.
+         * 차이는 DPS 기여 구조에 있다 - 확률의 기여는 rate x (배수 - 1) 이라,
+         * 치명타 피해 축이 함께 자라면 확률 한 칸의 값어치도 함께 자란다.
+         *
+         * 이 테스트가 지키는 것은 계수가 아니라 **그 관계**다. 둘 중 하나를 빼거나
+         * 비용 증가율을 다르게 두면 여기서 걸린다.
+         */
+        [Test]
+        public void AdditiveCritRate_DoesNotDecay_BecauseCritDamageGrowsWithIt()
+        {
+            var rate = CritRate();
+
+            double atOne = UpgradeEfficiency.RelativeGain(rate, 1);
+            double atFifty = UpgradeEfficiency.RelativeGain(rate, 50);
+            double atTop = UpgradeEfficiency.RelativeGain(rate, MaxLevelChecked);
+
+            Assert.Greater(atOne, 0d);
+            Assert.IsFalse(UpgradeEfficiency.DecaysStructurally(rate, 1, MaxLevelChecked),
+                string.Format("치명타율의 DPS 기여가 {0:P2} -> {1:P2} 로 무너졌다. " +
+                              "치명타 피해가 함께 자라지 않으면 이 축은 8단계의 공격속도가 된다",
+                              atOne, atTop));
+
+            // 언덕 모양이어야 한다. 중간이 양 끝보다 높다
+            Assert.Greater(atFifty, atOne);
+            Assert.Greater(atFifty, atTop);
+        }
+
+        /**
+         * @brief 치명타 피해는 레벨이 오를수록 세진다.
+         *
+         * 배수가 커지면 치명타가 DPS의 대부분을 차지하게 되어, 배수를 3% 올리는
+         * 것이 DPS를 거의 3% 올리는 일이 된다. 상한(step - 1 = 3%)에 수렴한다.
+         */
+        [Test]
+        public void CritDamage_GainGrowsTowardItsStep()
+        {
+            var damage = CritDamage();
+
+            double atOne = UpgradeEfficiency.RelativeGain(damage, 1);
+            double atTop = UpgradeEfficiency.RelativeGain(damage, MaxLevelChecked);
+
+            Assert.Less(atOne, atTop, "치명타 피해의 기여가 레벨과 함께 커지지 않는다");
+            Assert.AreEqual(CritDamageCurve.Step - 1d, atTop, 0.002d,
+                "Lv." + MaxLevelChecked + "에서 step - 1 에 수렴하지 않았다");
+        }
+
+        /** 치명타 축이 DPS 공식을 실제로 지나는지. 지나지 않으면 효율이 0으로 나온다 */
+        [Test]
+        public void CritAxes_FeedTheDpsFormula()
+        {
+            foreach (var track in Axes())
+                Assert.IsTrue(CombatStats.FeedsDps(track.Id),
+                    "'" + track.DisplayName + "' 이 DPS 공식에 연결돼 있지 않다. " +
+                    "효율이 0으로 나와 비교에서 조용히 빠진다");
         }
 
         /**

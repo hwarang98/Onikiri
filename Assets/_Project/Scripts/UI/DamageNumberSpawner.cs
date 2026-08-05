@@ -88,8 +88,13 @@ namespace Onikiri.UI
                     lastStyle[targetKey] = mergedStyle;
 
                     var total = existing.Accumulated + amount;
+                    // 이번에 들어온 타격이 강조 대상이면 크게 튀긴다. mergedStyle이
+                    // 아니라 style을 보는 이유는, 이미 치명타로 올라간 숫자에 평타가
+                    // 더해질 때마다 매번 크게 튀면 강조가 평범해지기 때문이다.
+                    // 튀김은 '지금 무슨 일이 있었나'를 말한다
                     existing.Merge(amount, NumberFormatter.Format(total),
-                                   ColorFor(mergedStyle), FontSizeFor(mergedStyle));
+                                   ColorFor(mergedStyle), FontSizeFor(mergedStyle),
+                                   style != DamageStyle.Normal);
                     return;
                 }
                 active.Remove(targetKey);
@@ -109,7 +114,8 @@ namespace Onikiri.UI
 
             var popup = pool.Get();
             popup.Play(NumberFormatter.Format(amount), anchored,
-                       ColorFor(style), FontSizeFor(style), amount, targetKey, Release);
+                       ColorFor(style), FontSizeFor(style), amount, targetKey,
+                       style != DamageStyle.Normal, Release);
 
             if (targetKey != null)
             {

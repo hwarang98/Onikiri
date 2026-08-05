@@ -22,10 +22,11 @@ namespace Onikiri.Progression
          *
          *   1  8단계. 스테이지는 10처치마다 자동으로 올랐다
          *   2  9단계. 보스가 스테이지 게이트가 됐고 bossKillCount가 생겼다
+         *   3  10단계. 치명타 확률·피해 축이 생겼다
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
 
         public int version = CurrentVersion;
 
@@ -112,8 +113,53 @@ namespace Onikiri.Progression
                 data.version = 2;
             }
 
+            if (data.version == 2)
+            {
+                // v2에는 치명타 축이 없었다. 목록에 없는 트랙은 UpgradeSystem이
+                // 조용히 건너뛰므로 사실 아무것도 하지 않아도 동작한다. 그런데
+                // 그러면 세이브에 그 축이 **없는** 상태로 남아, 처음 저장될 때까지
+                // "레벨 1이라서 없는 것"과 "저장된 적이 없어서 없는 것"이 구분되지
+                // 않는다. 명시적으로 레벨 1을 적어 넣는다.
+                EnsureTrack(data, UpgradeSystem.CritRateId);
+                EnsureTrack(data, UpgradeSystem.CritDamageId);
+                data.version = 3;
+            }
+
             data.version = CurrentVersion;
             return true;
+        }
+
+        /**
+         * @brief 세이브에 없는 강화 트랙을 레벨 1로 추가한다.
+         *
+         * 이미 있으면 건드리지 않는다. 마이그레이션이 두 번 돌아도(멱등성) 레벨이
+         * 초기화되지 않아야 한다 - 저장 실패 후 재시도 같은 경로에서 실제로 두 번
+         * 돌 수 있다.
+         */
+        private static void EnsureTrack(SaveData data, string id)
+        {
+            if (data.upgradeIds == null) data.upgradeIds = new string[0];
+            if (data.upgradeLevels == null) data.upgradeLevels = new int[0];
+
+            for (int i = 0; i < data.upgradeIds.Length; i++)
+                if (data.upgradeIds[i] == id) return;
+
+            var ids = new string[data.upgradeIds.Length + 1];
+            var levels = new int[ids.Length];
+
+            for (int i = 0; i < data.upgradeIds.Length; i++)
+            {
+                ids[i] = data.upgradeIds[i];
+                // 예전 세이브의 두 배열 길이가 어긋나 있을 수 있다. 짧은 쪽을 넘어가면
+                // 레벨 1로 채운다 - 손상된 파일이 예외를 던지지 않게
+                levels[i] = i < data.upgradeLevels.Length ? data.upgradeLevels[i] : 1;
+            }
+
+            ids[ids.Length - 1] = id;
+            levels[levels.Length - 1] = 1;
+
+            data.upgradeIds = ids;
+            data.upgradeLevels = levels;
         }
 
         /** 저장된 시각. 없으면 null (첫 실행이라 방치 보상이 없다) */

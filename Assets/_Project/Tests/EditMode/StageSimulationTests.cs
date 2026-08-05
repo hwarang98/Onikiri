@@ -146,8 +146,9 @@ namespace Onikiri.Tests
 
                 // 시뮬레이션이 내부에서 쓰는 체력을 되짚는다.
                 // 시간 = 체력 / DPS 이므로 시간 x DPS 가 곧 체력이다
-                double seconds = StageSimulation.BossKillSeconds(field.AverageMobHealth, stage, 1d, 1d);
-                double fromSimulation = seconds * StageSimulation.ExpectedDps(1d, 1d);
+                var unit = new CombatStats { Damage = 1d, AttacksPerSecond = 1d, CritRate = 0d, CritMultiplier = 1d };
+                double seconds = StageSimulation.BossKillSeconds(field.AverageMobHealth, stage, unit);
+                double fromSimulation = seconds * StageSimulation.ExpectedDps(unit);
 
                 Assert.AreEqual(fromFight, fromSimulation, fromFight * 1e-9d,
                     "stage " + stage + ": 보스 체력이 전투와 시뮬레이션에서 다르다");
@@ -182,8 +183,7 @@ namespace Onikiri.Tests
             var field = FieldFromAssets();
 
             double seconds = StageSimulation.BossKillSeconds(
-                field.AverageMobHealth, 1,
-                StageSimulation.StartingDamage, StageSimulation.StartingAttacksPerSecond);
+                field.AverageMobHealth, 1, StageSimulation.StartingStats);
 
             Assert.Less(seconds, StageSimulation.BossDamageWindowSeconds, string.Format(
                 "무강화로 1스테이지 보스에 {0:F1}초가 걸린다 (때릴 수 있는 시간 {1:F1}초). " +
@@ -219,14 +219,21 @@ namespace Onikiri.Tests
         [Test]
         public void ExpectedDps_IncludesCrit()
         {
-            double plain = 5d * 1.15d;
-            double expected = StageSimulation.ExpectedDps(5d, 1.15d);
+            var start = StageSimulation.StartingStats;
+            double plain = start.Damage * start.AttacksPerSecond;
 
-            Assert.Greater(expected, plain, "치명타가 기대 DPS에 반영되지 않았다");
-            Assert.AreEqual(plain * CombatBaseline.ExpectedDamageMultiplier, expected, 1e-9d);
+            Assert.Greater(start.ExpectedDps, plain, "치명타가 기대 DPS에 반영되지 않았다");
+            // CombatBaseline은 float이고 곡선은 double이다. 1e-9로 재면 그 변환
+            // 오차에 걸린다 - 검사하려는 것은 정밀도가 아니라 "치명타가 들어갔는가"다
+            Assert.AreEqual(plain * CombatBaseline.ExpectedDamageMultiplier, start.ExpectedDps, 1e-6d);
 
             // 12% 확률 x 2배 = 1.12배
             Assert.AreEqual(1.12f, CombatBaseline.ExpectedDamageMultiplier, 1e-6f);
+
+            // 시작 스탯이 곧 두 치명타 곡선의 Lv.1이어야 한다. 어긋나면 첫 구매에서
+            // 수치가 튄다
+            Assert.AreEqual(CombatBaseline.CritChance, start.CritRate, 1e-9d);
+            Assert.AreEqual(CombatBaseline.CritMultiplier, start.CritMultiplier, 1e-9d);
         }
 
         /**
@@ -266,6 +273,120 @@ namespace Onikiri.Tests
             }
         }
 
+        // ------------------------------------------------------------ 보스 여유 밴드
+
+        /** 여유가 머물러야 하는 구간. 아래로 나가면 벽, 위로 나가면 제한 시간이 무의미 */
+        const double MarginFloor = 1.5d;
+        const double MarginCeiling = 3.0d;
+
+        /**
+         * @brief 곡선을 따라가는 플레이어의 보스 여유가 밴드 안에 머무는지.
+         *
+         * 9단계에서는 2.1배 -> 5.6배로 발산했고, 10단계에서 치명타 두 축이 들어오자
+         * 20스테이지 기준 82배까지 벌어졌다. 보스 체력 배수를 스테이지에 따라
+         * 올려(BossHealthGrowth) 그것을 잡았다.
+         *
+         * 이 테스트가 지키는 것은 계수가 아니라 **관계**다. 새 성장 축을 추가하면
+         * 플레이어 DPS가 다시 빨라지고 여유가 위로 새어 나간다. 그때 여기서 걸린다.
+         */
+        [Test]
+        public void BossMargin_StaysInBandThrough20()
+        {
+            var results = StageSimulation.Run(20, FieldFromAssets());
+
+            foreach (var row in results)
+            {
+                Assert.GreaterOrEqual(row.BossMargin, MarginFloor, string.Format(
+                    "stage {0}: 여유 {1:F2}배 - 곡선을 따라왔는데도 보스가 벽이다 " +
+                    "(처치 {2:F1}초 / 때릴 수 있는 {3:F1}초)",
+                    row.Stage, row.BossMargin, row.BossKillSeconds, StageSimulation.BossDamageWindowSeconds));
+
+                Assert.LessOrEqual(row.BossMargin, MarginCeiling, string.Format(
+                    "stage {0}: 여유 {1:F2}배 - 제한 시간이 아무 일도 하지 않는다 " +
+                    "(공격력 Lv.{2} 속도 Lv.{3} 치명타율 Lv.{4} 피해 Lv.{5})",
+                    row.Stage, row.BossMargin,
+                    row.AttackPowerLevel, row.AttackSpeedLevel,
+                    row.CritRateLevel, row.CritDamageLevel));
+            }
+        }
+
+        // ------------------------------------------------------------ 잡몹 병목
+
+        /**
+         * @brief 잡몹 파밍 시간이 DPS에 다시 반응하는지.
+         *
+         * 9단계에서는 4스테이지부터 11.0초에 고정됐다 - 10마리 x 보충 간격 1.1초.
+         * 공격력을 아무리 올려도 파밍이 1초도 빨라지지 않는 구간이었다.
+         *
+         * 이제 보충 간격이 처치 속도에 수렴하므로(SpawnPacing) 하한 0.4초에
+         * 닿기 전까지는 계속 줄어든다.
+         */
+        [Test]
+        public void MobFarmingTime_RespondsToDps()
+        {
+            var results = StageSimulation.Run(10, FieldFromAssets());
+
+            // 9단계의 고정값. 여기에 머물러 있으면 병목이 그대로다
+            const double OldFloor = StageCurve.KillsPerStage * SpawnPacing.BaseInterval;
+
+            double first = results[0].MobSeconds;
+            double sixth = results[5].MobSeconds;
+
+            Assert.Less(sixth, first * 0.5d, string.Format(
+                "1스테이지 {0:F1}초 -> 6스테이지 {1:F1}초. 파밍 시간이 DPS에 반응하지 않는다",
+                first, sixth));
+
+            Assert.Less(sixth, OldFloor, string.Format(
+                "6스테이지 파밍이 {0:F1}초 - 9단계의 공급 하한 {1:F1}초를 넘지 못했다",
+                sixth, OldFloor));
+
+            // 하한 아래로는 내려가지 않는다. 그 아래는 요괴가 걸어 들어오는 것이
+            // 보이지 않고 오른쪽에서 튀어나오는 것처럼 된다
+            foreach (var row in results)
+            {
+                Assert.GreaterOrEqual(row.SpawnInterval, SpawnPacing.MinInterval - 1e-6d,
+                    "stage " + row.Stage + ": 보충 간격이 하한 아래로 내려갔다");
+                Assert.LessOrEqual(row.SpawnInterval, SpawnPacing.BaseInterval + 1e-6d,
+                    "stage " + row.Stage + ": 보충 간격이 시작값보다 커졌다");
+            }
+        }
+
+        /**
+         * @brief 동시 생존 수는 건드리지 않았다.
+         *
+         * 세로 화면의 전투 영역은 가로 6.75 units뿐이고 핸드오프 문서가 읽히는
+         * 한계를 3~5마리로 잡았다. 병목을 푸는 방법으로 '더 많이'가 아니라
+         * '더 빨리'를 고른 이유이며, 그 선택이 코드에 남아 있어야 한다.
+         */
+        [Test]
+        public void SpawnPacing_DoesNotRaiseTheAliveCount()
+        {
+            Assert.AreEqual(1.1f, SpawnPacing.BaseInterval, 1e-6f);
+            Assert.AreEqual(0.4f, SpawnPacing.MinInterval, 1e-6f);
+
+            // 좁히는 쪽이 되돌리는 쪽보다 빨라야 성장이 곧바로 체감된다
+            Assert.Less(SpawnPacing.TightenFactor, 1f);
+            Assert.Greater(SpawnPacing.RelaxFactor, 1f);
+            Assert.Less(SpawnPacing.RelaxFactor - 1f, 1f - SpawnPacing.TightenFactor,
+                "간격이 되돌아가는 속도가 좁아지는 속도보다 빠르면 스테이지가 오를 때마다 화면이 빈다");
+        }
+
+        [Test]
+        public void SpawnPacing_ConvergesToKillTime()
+        {
+            // 되먹임이 실제로 처치 시간에 수렴하는지. 시뮬레이션이 SettledInterval로
+            // 건너뛰는 그 평형을 런타임 규칙으로 직접 돌려 확인한다
+            foreach (double killTime in new[] { 0.2d, 0.7d, 1.5d })
+            {
+                float interval = SpawnPacing.BaseInterval;
+                for (int step = 0; step < 200; step++)
+                    interval = SpawnPacing.Next(interval, interval > killTime);
+
+                Assert.AreEqual(SpawnPacing.SettledInterval(killTime), interval,
+                    0.06f, "처치 " + killTime + "초에서 수렴값이 어긋난다");
+            }
+        }
+
         /**
          * @brief 1~5 스테이지 소요 시간이 보고서에 적은 값에서 벗어나지 않는지.
          *
@@ -278,8 +399,8 @@ namespace Onikiri.Tests
             var results = StageSimulation.Run(5, FieldFromAssets());
             double total = StageSimulation.TotalSeconds(results);
 
-            Assert.AreEqual(135d, total, 10d,
-                "1~5 스테이지 소요 시간이 " + total.ToString("F0") + "초로 바뀌었다 (보고서 기준 135초)");
+            Assert.AreEqual(158d, total, 12d,
+                "1~5 스테이지 소요 시간이 " + total.ToString("F0") + "초로 바뀌었다 (보고서 기준 158초)");
         }
 
         // ------------------------------------------------------------ 꽃잎 예산
