@@ -99,24 +99,49 @@ namespace Onikiri.Tests
         /**
          * @brief 두 축이 서로 다른 구간을 맡는지.
          *
-         * 유효체력만 놓고 보면 체력과 회복은 거의 같은 일을 한다 - 제한 시간이
-         * 고정이라 회복 1/초는 그 시간만큼의 체력과 같다. step을 다르게 둔 것이
-         * 두 축에 역할을 주는 유일한 장치이므로, 그 차이가 실제로 존재하는지
-         * 여기서 확인한다.
+         * 회복을 최대 체력 비례로 바꾸면서 **역할을 나누는 장치가 바뀌었다.**
+         *
+         * 예전에는 step이 달라서(1.10 대 1.115) 지분이 옮겨갔다. 이제 두 축의
+         * step이 같으므로 순수 증가율은 둘 다 10%로 수렴한다 - 체력은 정확히
+         * 10% 고정이고, 회복은 비율이 자랄수록 10%에 가까워진다.
+         *
+         * 역할을 나누는 것은 이제 **비용**이다. 회복이 더 싸므로(4 대 9) 골드당
+         * 이득이 어느 레벨부터 회복 쪽으로 넘어간다. 그 교차점이 플레이어가
+         * 실제로 도달하는 구간 안에 있어야 회복 버튼이 눌린다.
          */
         [Test]
-        public void HealthLeadsEarly_RegenLeadsLate()
+        public void HealthLeadsEarly_RegenTakesOverByGoldValue()
         {
             var health = Health();
             var regen = Regen();
 
+            // 순수 증가율은 초반에 체력이 앞선다
             Assert.Greater(SurvivalEfficiency.RelativeGain(health, 1),
                            SurvivalEfficiency.RelativeGain(regen, 1),
                            "초반에는 체력이 유효체력의 큰 쪽을 맡아야 한다");
 
-            Assert.Greater(SurvivalEfficiency.RelativeGain(regen, MaxLevelChecked),
-                           SurvivalEfficiency.RelativeGain(health, MaxLevelChecked),
-                           "후반에는 회복이 앞서야 한다. 아니면 두 축이 같은 버튼이다");
+            // 그리고 둘 다 step - 1 로 수렴한다
+            Assert.AreEqual(HealthCurve.Step - 1d,
+                            SurvivalEfficiency.RelativeGain(health, MaxLevelChecked), 1e-6d);
+            Assert.AreEqual(HealthCurve.Step - 1d,
+                            SurvivalEfficiency.RelativeGain(regen, MaxLevelChecked), 1e-3d);
+
+            // 골드당으로 보면 어느 지점에서 회복이 앞선다. 그 지점이 없으면
+            // 회복은 영원히 눌리지 않는 버튼이다
+            int crossover = -1;
+            for (int level = 1; level <= MaxLevelChecked; level++)
+            {
+                if (SurvivalEfficiency.GainPerGold(regen, level) >= SurvivalEfficiency.GainPerGold(health, level))
+                {
+                    crossover = level;
+                    break;
+                }
+            }
+
+            Assert.AreNotEqual(-1, crossover, "회복이 골드당으로 체력을 한 번도 앞서지 않는다");
+            Assert.LessOrEqual(crossover, 30, string.Format(
+                "회복이 Lv.{0}에서야 앞선다. 20스테이지 시점의 체력 레벨보다 뒤면 " +
+                "플레이어는 그 버튼을 만나지 못한다", crossover));
         }
 
         /**
@@ -191,11 +216,29 @@ namespace Onikiri.Tests
         [Test]
         public void EffectiveHealth_ConvertsRegenByFightDuration()
         {
-            double ehp = SurvivalEfficiency.EffectiveHealth(100d, 2d);
+            // 회복은 **초당 최대 체력의 몇 %**다. 10%/s에 30초면 체력 세 배치를
+            // 더 버티는 셈이므로 유효체력은 최대 체력의 4배가 된다
+            double ehp = SurvivalEfficiency.EffectiveHealth(100d, 0.10d);
 
-            // 회복 2/초 x 30초 = 체력 60과 같다
-            Assert.AreEqual(100d + 2d * StageCurve.BossTimeLimitSeconds, ehp, 1e-9d);
+            Assert.AreEqual(100d * (1d + 0.10d * StageCurve.BossTimeLimitSeconds), ehp, 1e-9d);
+            Assert.AreEqual(400d, ehp, 1e-9d);
             Assert.AreEqual(StageCurve.BossTimeLimitSeconds, SurvivalEfficiency.ReferenceFightSeconds, 1e-9d);
+        }
+
+        /**
+         * @brief 비례이므로 체력을 올리면 회복의 절대량도 함께 오른다.
+         *
+         * 이것이 절대량 모델과 갈리는 지점이다. 예전에는 두 축이 자릿수 경주를
+         * 했고 지는 쪽이 화면에서 죽었다. HealthRegenCurve 참고.
+         */
+        [Test]
+        public void RaisingHealth_AlsoRaisesAbsoluteRegen()
+        {
+            double lowHealth = HealthRegenCurve.PerSecondAt(1, 100d);
+            double highHealth = HealthRegenCurve.PerSecondAt(1, 400d);
+
+            Assert.AreEqual(lowHealth * 4d, highHealth, 1e-9d,
+                "체력을 네 배로 올렸는데 초당 회복량이 그대로다");
         }
 
         [Test]

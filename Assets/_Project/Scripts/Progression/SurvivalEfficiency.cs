@@ -42,9 +42,21 @@ namespace Onikiri.Progression
             get { return StageCurve.BossTimeLimitSeconds; }
         }
 
-        public static double EffectiveHealth(double maxHealth, double regenPerSecond)
+        /**
+         * @brief 유효체력.
+         *
+         * regenFraction은 **초당 최대 체력의 몇 %**다(절대량이 아니다).
+         * 그래서 식이 곱으로 정리된다:
+         *
+         *     EHP = 최대체력 x (1 + 비율 x 전투시간)
+         *
+         * 이 모양 덕분에 체력 축의 기여율이 레벨과 무관하게 일정해진다.
+         * 절대 회복량을 쓰면 두 축이 자릿수 경주를 하게 되고, 지는 쪽은
+         * 곡선이 건강해도 화면에서 눌리지 않는 버튼이 된다. HealthRegenCurve 참고.
+         */
+        public static double EffectiveHealth(double maxHealth, double regenFraction)
         {
-            return maxHealth + regenPerSecond * ReferenceFightSeconds;
+            return maxHealth * (1d + regenFraction * ReferenceFightSeconds);
         }
 
         /** 모든 생존 축이 이 레벨일 때의 유효체력 */
@@ -64,13 +76,13 @@ namespace Onikiri.Progression
             if (track == null || !FeedsSurvival(track.Id)) return 0d;
 
             double health = HealthCurve.ValueAtLevel(level);
-            double regen = HealthRegenCurve.ValueAtLevel(level);
+            double regenFraction = HealthRegenCurve.ValueAtLevel(level);
 
-            double current = EffectiveHealth(health, regen);
+            double current = EffectiveHealth(health, regenFraction);
             if (current <= 0d) return 0d;
 
             double next = track.Id == UpgradeSystem.HealthId
-                ? EffectiveHealth(track.UncappedValueAtLevel(level + 1).ToDouble(), regen)
+                ? EffectiveHealth(track.UncappedValueAtLevel(level + 1).ToDouble(), regenFraction)
                 : EffectiveHealth(health, track.UncappedValueAtLevel(level + 1).ToDouble());
 
             if (double.IsNaN(next) || double.IsInfinity(next)) return 0d;

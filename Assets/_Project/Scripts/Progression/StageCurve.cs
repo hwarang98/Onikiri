@@ -142,12 +142,26 @@ namespace Onikiri.Progression
          */
         public static BigDouble BossHealthForStage(BigDouble averageMobHealth, int stage)
         {
-            return BossHealth(averageMobHealth * HealthMultiplier(stage), stage);
+            var health = BossHealth(averageMobHealth * HealthMultiplier(stage), stage);
+
+            // 챕터 보스는 더 무겁다. **이 한 줄이 빠져 있었다.**
+            //
+            // BossCurve에 상수를 선언하고 "1보다 큰가"만 검사하는 테스트를 뒀는데,
+            // 그 값이 실제로 쓰이는지는 아무도 확인하지 않았다. 치명타 축에서
+            // 같은 함정을 막으려고 CritAxes_FeedTheDpsFormula 를 만들어 놓고
+            // 여기서는 그러지 않았다. 상수의 존재는 연결의 증거가 아니다
+            return BossCurve.IsChapterBoss(stage)
+                ? health * BigDouble.FromDouble(BossCurve.ChapterHealthMultiplier)
+                : health;
         }
 
         public static BigDouble BossGoldForStage(BigDouble averageMobGold, int stage)
         {
-            return BossGold(averageMobGold * GoldMultiplier(stage));
+            var gold = BossGold(averageMobGold * GoldMultiplier(stage));
+
+            return BossCurve.IsChapterBoss(stage)
+                ? gold * BigDouble.FromDouble(BossCurve.ChapterGoldMultiplier)
+                : gold;
         }
 
         /** stage(1부터)의 체력 배수. 1스테이지는 1배 */

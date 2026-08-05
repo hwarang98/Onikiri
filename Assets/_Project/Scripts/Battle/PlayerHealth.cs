@@ -44,7 +44,10 @@ namespace Onikiri.Battle
         [SerializeField] private int deathPetalBursts = 3;
 
         private double maxHealth = 100d;
-        private double regenPerSecond = 1d;
+
+        /** 초당 회복 **비율** (최대 체력 대비). 절대량이 아니다 */
+        private double regenFraction = 0.01d;
+
         private double current;
         private float flashRemaining;
 
@@ -59,7 +62,12 @@ namespace Onikiri.Battle
 
         public double MaxHealth { get { return maxHealth; } }
         public double Current { get { return current; } }
-        public double RegenPerSecond { get { return regenPerSecond; } }
+
+        /** 초당 회복 비율. 강화가 밀어넣는 값 */
+        public double RegenFraction { get { return regenFraction; } }
+
+        /** 지금 최대 체력 기준의 초당 절대 회복량. HUD와 실패 문구가 쓴다 */
+        public double RegenPerSecond { get { return maxHealth * regenFraction; } }
         public bool IsAlive { get { return current > 0d; } }
         public bool IsEngaged { get { return engaged; } }
 
@@ -95,10 +103,11 @@ namespace Onikiri.Battle
             }
         }
 
+        /** 강화가 밀어넣는 값. 초당 회복 **비율**이다 */
         public double RegenStat
         {
-            get { return regenPerSecond; }
-            set { regenPerSecond = System.Math.Max(0d, value); }
+            get { return regenFraction; }
+            set { regenFraction = System.Math.Max(0d, value); }
         }
 
         // ---------------------------------------------------------------- 전투
@@ -200,9 +209,11 @@ namespace Onikiri.Battle
 
             if (!engaged || !IsAlive) return;
 
-            if (regenPerSecond > 0d && current < maxHealth)
+            // 비율을 절대량으로 바꿔 적용한다. 체력을 올리면 회복량도 함께 오른다
+            double perSecond = maxHealth * regenFraction;
+            if (perSecond > 0d && current < maxHealth)
             {
-                current = System.Math.Min(maxHealth, current + regenPerSecond * Time.deltaTime);
+                current = System.Math.Min(maxHealth, current + perSecond * Time.deltaTime);
                 Raise();
             }
         }

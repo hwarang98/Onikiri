@@ -275,9 +275,19 @@ namespace Onikiri.Tests
 
         // ------------------------------------------------------------ 보스 여유 밴드
 
-        /** 여유가 머물러야 하는 구간. 아래로 나가면 벽, 위로 나가면 제한 시간이 무의미 */
+        /**
+         * @brief 여유가 머물러야 하는 구간. 아래로 나가면 벽, 위로 나가면 제한 시간이 무의미.
+         *
+         * **보스 유형마다 다르다.** 챕터 보스는 챕터의 마지막 관문이므로 더
+         * 빡빡해야 하고, 그래서 아래쪽 한계가 일반 스테이지보다 낮다.
+         * 두 밴드에 같은 바닥을 쓰면 "챕터가 더 빡빡해야 한다"와 "어느 보스도
+         * 벽이면 안 된다"가 서로를 막는다.
+         */
         const double MarginFloor = 1.5d;
         const double MarginCeiling = 3.0d;
+
+        const double ChapterMarginFloor = 1.3d;
+        const double ChapterMarginCeiling = 2.0d;
 
         /**
          * @brief 곡선을 따라가는 플레이어의 보스 여유가 밴드 안에 머무는지.
@@ -296,15 +306,20 @@ namespace Onikiri.Tests
 
             foreach (var row in results)
             {
-                Assert.GreaterOrEqual(row.BossMargin, MarginFloor, string.Format(
-                    "stage {0}: 여유 {1:F2}배 - 곡선을 따라왔는데도 보스가 벽이다 " +
-                    "(처치 {2:F1}초 / 때릴 수 있는 {3:F1}초)",
-                    row.Stage, row.BossMargin, row.BossKillSeconds, StageSimulation.BossDamageWindowSeconds));
+                double floor = row.IsChapterBoss ? ChapterMarginFloor : MarginFloor;
+                double ceiling = row.IsChapterBoss ? ChapterMarginCeiling : MarginCeiling;
+                string kind = row.IsChapterBoss ? "챕터" : "일반";
 
-                Assert.LessOrEqual(row.BossMargin, MarginCeiling, string.Format(
-                    "stage {0}: 여유 {1:F2}배 - 제한 시간이 아무 일도 하지 않는다 " +
-                    "(공격력 Lv.{2} 속도 Lv.{3} 치명타율 Lv.{4} 피해 Lv.{5})",
-                    row.Stage, row.BossMargin,
+                Assert.GreaterOrEqual(row.BossMargin, floor, string.Format(
+                    "stage {0}({1}): 여유 {2:F2}배 - 곡선을 따라왔는데도 보스가 벽이다 " +
+                    "(처치 {3:F1}초 / 때릴 수 있는 {4:F1}초)",
+                    row.Stage, kind, row.BossMargin, row.BossKillSeconds,
+                    StageSimulation.BossDamageWindowSeconds));
+
+                Assert.LessOrEqual(row.BossMargin, ceiling, string.Format(
+                    "stage {0}({1}): 여유 {2:F2}배 - 제한 시간이 아무 일도 하지 않는다 " +
+                    "(공격력 Lv.{3} 속도 Lv.{4} 치명타율 Lv.{5} 피해 Lv.{6})",
+                    row.Stage, kind, row.BossMargin,
                     row.AttackPowerLevel, row.AttackSpeedLevel,
                     row.CritRateLevel, row.CritDamageLevel));
             }
@@ -330,6 +345,41 @@ namespace Onikiri.Tests
                     "(체력 Lv.{3} {4:F0} / 회복 Lv.{5} {6:F2}/s)",
                     row.Stage, row.IsChapterBoss ? "챕터" : "일반", row.SurvivalMargin,
                     row.HealthLevel, row.MaxHealth, row.RegenLevel, row.RegenPerSecond));
+            }
+        }
+
+        /**
+         * @brief 모든 성장 축이 20스테이지까지 최소 한 번은 팔린다.
+         *
+         * 밴드 검사는 곡선의 **형태**만 본다. 형태가 건강해도 다른 축이 계속
+         * 더 나으면 그 버튼은 화면에서 한 번도 눌리지 않고, 플레이어에게는
+         * 8단계의 죽은 공격속도와 똑같이 보인다. 차이는 "언젠가는 살 만해진다"
+         * 뿐인데, 그 언젠가가 20스테이지 밖이면 없는 것과 같다.
+         *
+         * 그래서 형태와 별개로 **생존성**을 따로 검사한다. 새 축을 추가할 때
+         * 밴드만 맞추고 끝내지 않도록 하는 것이 목적이다.
+         */
+        [Test]
+        public void EveryAxisIsBoughtAtLeastOnceThrough20()
+        {
+            var final = StageSimulation.Run(20, FieldFromAssets())[19];
+
+            var levels = new[]
+            {
+                new { Name = "공격력",      Level = final.AttackPowerLevel },
+                new { Name = "공격속도",    Level = final.AttackSpeedLevel },
+                new { Name = "치명타 확률", Level = final.CritRateLevel },
+                new { Name = "치명타 피해", Level = final.CritDamageLevel },
+                new { Name = "체력",        Level = final.HealthLevel },
+                new { Name = "체력 회복",   Level = final.RegenLevel },
+            };
+
+            foreach (var axis in levels)
+            {
+                Assert.Greater(axis.Level, 1, string.Format(
+                    "'{0}' 이 20스테이지까지 한 번도 팔리지 않았다 (Lv.{1}). " +
+                    "곡선의 형태가 건강해도 눌리지 않으면 죽은 버튼이다",
+                    axis.Name, axis.Level));
             }
         }
 
@@ -425,14 +475,30 @@ namespace Onikiri.Tests
             Assert.IsFalse(BossCurve.IsChapterBoss(6));
 
             // 챕터 보스 밴드는 일반보다 아래쪽이다
-            Assert.LessOrEqual(chapterBest, 2.0d, string.Format(
+            Assert.LessOrEqual(chapterBest, ChapterMarginCeiling, string.Format(
                 "챕터 보스 여유가 {0:F2}까지 올라간다 - 일반 스테이지와 구분되지 않는다", chapterBest));
-            Assert.GreaterOrEqual(chapterWorst, 1.3d, string.Format(
+            Assert.GreaterOrEqual(chapterWorst, ChapterMarginFloor, string.Format(
                 "챕터 보스 여유가 {0:F2}로 내려간다 - 벽이다", chapterWorst));
+
+            // 챕터가 실제로 더 빡빡한지. 밴드가 겹치기만 해서는 차등이 아니다
+            Assert.Less(chapterWorst, stageWorst, string.Format(
+                "챕터 최악 여유 {0:F2}가 일반 최악 {1:F2}보다 크다 - 차등이 없다",
+                chapterWorst, stageWorst));
         }
 
+        /**
+         * @brief 챕터 배수가 **실제로 적용되는지**.
+         *
+         * 상수가 1보다 큰지만 검사하던 테스트가 있었고, 그것은 통과하는데
+         * `ChapterHealthMultiplier`는 어디에서도 쓰이지 않았다. 골드 배수도
+         * 시뮬레이션에만 있고 실제 전투에는 없었다. 상수의 존재는 연결의
+         * 증거가 아니다 - 값이 흘러가는 끝에서 재야 한다.
+         *
+         * 5스테이지(챕터)와 6스테이지(일반)를 나란히 놓고 배수가 보이는지 본다.
+         * 스테이지가 하나 다르므로 곡선 성장분을 나눠서 걷어낸다.
+         */
         [Test]
-        public void ChapterBossMultipliers_AreAboveOne()
+        public void ChapterMultipliers_AreActuallyApplied()
         {
             Assert.Greater(BossCurve.ChapterHealthMultiplier, 1d);
             Assert.Greater(BossCurve.ChapterGoldMultiplier, 1d);
@@ -440,6 +506,37 @@ namespace Onikiri.Tests
 
             // 골드가 체력보다 후해야 챕터 보스에 도전할 이유가 생긴다
             Assert.Greater(BossCurve.ChapterGoldMultiplier, BossCurve.ChapterHealthMultiplier);
+
+            var field = FieldFromAssets();
+            var mobHealth = BigDouble.FromDouble(field.AverageMobHealth);
+            var mobGold = BigDouble.FromDouble(field.AverageMobGold);
+
+            // 체력: 챕터 5 / 일반 4 에서 곡선 성장분을 걷어내면 챕터 배수만 남는다
+            double chapterHealth = StageCurve.BossHealthForStage(mobHealth, 5).ToDouble();
+            double plainHealth = StageCurve.BossHealthForStage(mobHealth, 4).ToDouble();
+            double curveGrowth = StageCurve.HealthMultiplier(5).ToDouble() / StageCurve.HealthMultiplier(4).ToDouble()
+                               * StageCurve.BossHealthMultiplier(5) / StageCurve.BossHealthMultiplier(4);
+
+            Assert.AreEqual(BossCurve.ChapterHealthMultiplier,
+                            chapterHealth / plainHealth / curveGrowth, 1e-6d,
+                "챕터 보스 체력에 ChapterHealthMultiplier 가 적용되지 않았다");
+
+            // 골드
+            double chapterGold = StageCurve.BossGoldForStage(mobGold, 5).ToDouble();
+            double plainGold = StageCurve.BossGoldForStage(mobGold, 4).ToDouble();
+            double goldGrowth = StageCurve.GoldMultiplier(5).ToDouble() / StageCurve.GoldMultiplier(4).ToDouble();
+
+            Assert.AreEqual(BossCurve.ChapterGoldMultiplier,
+                            chapterGold / plainGold / goldGrowth, 1e-6d,
+                "챕터 보스 골드에 ChapterGoldMultiplier 가 적용되지 않았다");
+
+            // 공격력
+            double chapterAttack = BossCurve.AttackDamageForStage(5);
+            double plainAttack = BossCurve.AttackDamageForStage(4);
+
+            Assert.AreEqual(BossCurve.ChapterAttackMultiplier,
+                            chapterAttack / plainAttack / BossCurve.AttackGrowth, 1e-6d,
+                "챕터 보스 공격력에 ChapterAttackMultiplier 가 적용되지 않았다");
         }
 
         [Test]

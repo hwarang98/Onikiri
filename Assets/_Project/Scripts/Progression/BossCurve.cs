@@ -43,8 +43,13 @@ namespace Onikiri.Progression
          * 일반 보스 위에 곱해진다. 챕터의 마지막 관문이므로 그 앞의 넷보다
          * 확실히 무거워야 하지만, 여유 밴드를 벗어나면 벽이 된다. 시뮬레이션에서
          * 챕터 스테이지의 여유가 1.3~2.0에 들어오는 값으로 잡았다.
+         *
+         * 1.5에서 1.7로 올렸다. 회복 축을 최대 체력 비례로 바꾸자 골드가 그쪽으로
+         * 흘러 화력 성장이 조금 느려졌고, 그만큼 보스 처치가 길어져 챕터 여유가
+         * 2.15까지 올라갔다(일반 스테이지 밴드와 겹친다). 계수 하나가 다른 축의
+         * 곡선에 묶여 있다는 뜻이고, 새 축을 건드릴 때마다 여기를 다시 봐야 한다.
          */
-        public const double ChapterHealthMultiplier = 1.5d;
+        public const double ChapterHealthMultiplier = 1.25d;
 
         /** 챕터 보스의 골드 추가 배수. 위험이 큰 만큼 보상도 크다 */
         public const double ChapterGoldMultiplier = 2d;

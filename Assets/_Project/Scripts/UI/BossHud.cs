@@ -132,12 +132,20 @@ namespace Onikiri.UI
                 if (playerHealthFill != null) playerHealthFill.fillAmount = playerHealth.Fraction;
 
                 // 숫자는 정수로만 바꾼다. 회복이 매 프레임 소수점을 올리는데
-                // 그때마다 TMP 메시를 다시 만들면 보스전 내내 재생성이 돈다
-                int shown = Mathf.CeilToInt((float)playerHealth.Current);
+                // 그때마다 TMP 메시를 다시 만들면 보스전 내내 재생성이 돈다.
+                //
+                // 현재값은 올림, 최대값은 반올림을 쓰다가 "2811 / 2810"이 나왔다.
+                // 체력이 가득 찬 상태에서 소수점이 남으면 올림과 반올림이 서로 다른
+                // 정수로 가기 때문이다. 둘 다 올림으로 맞추고, 표시값을 최대값에서
+                // 한 번 더 자른다 - 회복이 상한을 넘지 않는데 화면만 넘는 것은
+                // 계산이 틀린 것처럼 보인다
+                int max = Mathf.CeilToInt((float)playerHealth.MaxHealth);
+                int shown = Mathf.Min(max, Mathf.CeilToInt((float)playerHealth.Current));
+
                 if (shown != shownPlayerHealth && playerHealthLabel != null)
                 {
                     shownPlayerHealth = shown;
-                    playerHealthLabel.text = shown + " / " + Mathf.RoundToInt((float)playerHealth.MaxHealth);
+                    playerHealthLabel.text = shown + " / " + max;
                 }
             }
 

@@ -107,7 +107,9 @@ namespace Onikiri.Progression
                 case Display.Multiplier:
                     return "x" + NumberFormatter.FormatStat(value, 2);
                 case Display.PerSecond:
-                    return NumberFormatter.FormatStat(value, 2) + "/s";
+                    // 최대 체력 대비 비율이다. 절대량으로 읽히면 "1/s"가
+                    // 체력 100에서도 100000에서도 같아 보인다
+                    return (value.ToDouble() * 100d).ToString("F1") + "%/s";
                 default:
                     return NumberFormatter.FormatStat(value, 2);
             }

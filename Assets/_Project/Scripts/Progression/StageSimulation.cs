@@ -248,8 +248,10 @@ namespace Onikiri.Progression
                 // 보스 보상을 받은 뒤의 구매는 **다음** 스테이지를 대비한다.
                 // 생존 축이 "다음 보스에게 죽지 않을 만큼"을 기준으로 사기 때문에
                 // 여기서 stage를 넘기면 이미 지나간 보스를 대비하게 된다
-                purse += goldPerMob * StageCurve.BossGoldMultiplier
-                         * (BossCurve.IsChapterBoss(stage) ? BossCurve.ChapterGoldMultiplier : 1d);
+                // 챕터 배수는 BossGoldForStage 안에 들어 있다. 여기서 또 곱하면
+                // 두 번 적용된다 - 시뮬레이션만 후하게 계산하는 상태가 된다
+                purse += StageCurve.BossGoldForStage(
+                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble();
                 Buy(ref levels, ref purse, stage + 1);
 
                 results.Add(new StageResult
@@ -298,11 +300,16 @@ namespace Onikiri.Progression
             public int G { get { return Regen < 1 ? 1 : Regen; } }
 
             public double MaxHealth { get { return HealthCurve.ValueAtLevel(H); } }
-            public double RegenPerSecond { get { return HealthRegenCurve.ValueAtLevel(G); } }
+
+            /** 초당 회복 비율 (최대 체력 대비) */
+            public double RegenFraction { get { return HealthRegenCurve.ValueAtLevel(G); } }
+
+            /** 초당 절대 회복량. 표에 찍을 때만 쓴다 */
+            public double RegenPerSecond { get { return MaxHealth * RegenFraction; } }
 
             public double EffectiveHealth
             {
-                get { return SurvivalEfficiency.EffectiveHealth(MaxHealth, RegenPerSecond); }
+                get { return SurvivalEfficiency.EffectiveHealth(MaxHealth, RegenFraction); }
             }
 
             /** 0으로 시작하지 않는다. 모든 축은 레벨 1이 시작 스탯이다 */
@@ -391,7 +398,7 @@ namespace Onikiri.Progression
                 // 골드당 %EHP가 큰 쪽. UpgradeEfficiency가 아니라
                 // SurvivalEfficiency와 같은 자다
                 double healthGain = (SurvivalEfficiency.EffectiveHealth(
-                        HealthCurve.ValueAtLevel(levels.H + 1), levels.RegenPerSecond)
+                        HealthCurve.ValueAtLevel(levels.H + 1), levels.RegenFraction)
                     / levels.EffectiveHealth - 1d) / healthCost;
                 double regenGain = (SurvivalEfficiency.EffectiveHealth(
                         levels.MaxHealth, HealthRegenCurve.ValueAtLevel(levels.G + 1))
