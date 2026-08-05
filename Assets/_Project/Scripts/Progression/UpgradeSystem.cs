@@ -20,7 +20,12 @@ namespace Onikiri.Progression
         public const string CritRateId = "crit_rate";
         public const string CritDamageId = "crit_damage";
 
+        /** 생존 축. DPS에 기여하지 않으므로 효율을 재는 자가 다르다 */
+        public const string HealthId = "health";
+        public const string HealthRegenId = "health_regen";
+
         [SerializeField] private PlayerCombat combat;
+        [SerializeField] private PlayerHealth health;
         [SerializeField] private UpgradeTrack[] tracks;
 
         /** 레벨이나 잔액이 바뀌어 버튼 표시를 갱신해야 할 때 발생 */
@@ -111,7 +116,20 @@ namespace Onikiri.Progression
 
         private void Apply(UpgradeTrack track)
         {
-            if (track == null || combat == null) return;
+            if (track == null) return;
+
+            // 생존 축은 PlayerHealth로 간다. combat이 없어도 적용돼야 하므로
+            // 아래 전투 스탯보다 먼저 처리한다
+            if (track.Id == HealthId || track.Id == HealthRegenId)
+            {
+                if (health == null) return;
+
+                if (track.Id == HealthId) health.MaxHealthStat = track.Value.ToDouble();
+                else health.RegenStat = track.Value.ToDouble();
+                return;
+            }
+
+            if (combat == null) return;
 
             switch (track.Id)
             {

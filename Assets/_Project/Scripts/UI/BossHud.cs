@@ -37,6 +37,20 @@ namespace Onikiri.UI
         [Tooltip("Image.type = Filled 여야 한다. fillAmount만 건드리므로 메시 재생성이 없다")]
         [SerializeField] private Image healthFill;
 
+        /**
+         * @brief 플레이어 체력 바. **보스전 중에만 뜬다.**
+         *
+         * 파밍 중에는 체력이 깎일 일이 없다 - 잡몹은 공격하지 않는다. 아무 일도
+         * 일어나지 않는 화면에 항상 가득 찬 바를 하나 더 얹으면, 그 바는 정보가
+         * 아니라 배경이 되고 정작 보스전에서 줄어들 때도 눈에 덜 걸린다.
+         *
+         * 상시 표시가 필요해지는 것은 파밍 중에도 체력이 변할 때다. 그때 다시
+         * 판단하면 된다.
+         */
+        [SerializeField] private Onikiri.Battle.PlayerHealth playerHealth;
+        [SerializeField] private Image playerHealthFill;
+        [SerializeField] private TMP_Text playerHealthLabel;
+
         [Header("결과")]
         [SerializeField] private GameObject resultRoot;
         [SerializeField] private TMP_Text resultLabel;
@@ -47,6 +61,9 @@ namespace Onikiri.UI
          * -1로 시작해 첫 프레임에서 반드시 한 번 갱신되게 한다.
          */
         private int shownSeconds = -1;
+
+        /** 마지막으로 찍은 플레이어 체력. 정수가 바뀔 때만 다시 그린다 */
+        private int shownPlayerHealth = -1;
 
         private void Start()
         {
@@ -95,7 +112,11 @@ namespace Onikiri.UI
 
             // 새 전투가 시작될 때마다 시계 표시를 무효화한다. 그러지 않으면 이전
             // 전투가 끝난 초와 같은 값으로 시작하는 경우 첫 갱신이 통째로 생략된다
-            if (phase != BossFight.Phase.Fighting) shownSeconds = -1;
+            if (phase != BossFight.Phase.Fighting)
+            {
+                shownSeconds = -1;
+                shownPlayerHealth = -1;
+            }
         }
 
         private void Update()
@@ -105,6 +126,20 @@ namespace Onikiri.UI
             // fillAmount는 셰이더 파라미터라 메시를 다시 만들지 않는다. 매 프레임
             // 써도 되는 몇 안 되는 UI 값이고, 체력 바는 끊기면 곧바로 티가 난다
             if (healthFill != null) healthFill.fillAmount = fight.BossHealthFraction;
+
+            if (playerHealth != null)
+            {
+                if (playerHealthFill != null) playerHealthFill.fillAmount = playerHealth.Fraction;
+
+                // 숫자는 정수로만 바꾼다. 회복이 매 프레임 소수점을 올리는데
+                // 그때마다 TMP 메시를 다시 만들면 보스전 내내 재생성이 돈다
+                int shown = Mathf.CeilToInt((float)playerHealth.Current);
+                if (shown != shownPlayerHealth && playerHealthLabel != null)
+                {
+                    shownPlayerHealth = shown;
+                    playerHealthLabel.text = shown + " / " + Mathf.RoundToInt((float)playerHealth.MaxHealth);
+                }
+            }
 
             // 남은 시간은 올림한다. 29.4초를 "29"로 찍으면 시작하자마자 1초가
             // 사라진 것처럼 보이고, 0은 시간이 실제로 다 됐을 때만 나와야 한다

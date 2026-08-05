@@ -108,7 +108,13 @@ namespace Onikiri.Progression
             return copy;
         }
 
-        /** 이 축이 DPS에 기여하는 통로가 있는가. 없으면 효율을 잴 수 없다 */
+        /**
+         * @brief 이 축이 DPS에 기여하는 통로가 있는가. 없으면 이 자로는 잴 수 없다.
+         *
+         * 11단계의 체력·회복은 여기서 false다. 그 축들은 SurvivalEfficiency가
+         * 유효체력으로 잰다. 두 자는 단위가 달라 나눌 수 없고, 그래서 공격 계열과
+         * 생존 계열의 균형은 지표가 아니라 시뮬레이션 게이트로 잡는다.
+         */
         public static bool FeedsDps(string trackId)
         {
             return trackId == UpgradeSystem.AttackPowerId

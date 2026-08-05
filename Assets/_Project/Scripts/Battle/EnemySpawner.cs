@@ -197,16 +197,23 @@ namespace Onikiri.Battle
          * 잡몹과 같은 Enemy이고 같은 풀에서 나온다. 다른 것은 정의 에셋, 스탯,
          * 그리고 정렬 순서뿐이다.
          */
-        public Enemy SpawnBoss(EnemyDefinition definition, BigDouble health, BigDouble gold)
+        public Enemy SpawnBoss(EnemyDefinition definition, BigDouble health, BigDouble gold,
+                               float scale, Color tint, double attackDamage, bool walkIn)
         {
             if (definition == null) return null;
 
             var boss = pool.Get();
 
+            // 챕터 보스만 화면 밖에서 걸어 들어온다. 일반 스테이지 보스는 큐 앞줄에
+            // 바로 선다 - 워크인 5.3초가 매 스테이지 반복되면 제한 시간의 18%가
+            // 기다림으로 사라진다. BossCurve 참고
+            float spawnX = walkIn ? RightEdgeX() + offscreenMargin : frontLineX;
+
             boss.Killed += OnEnemyKilled;
             boss.Died += OnEnemyDied;
-            boss.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY,
-                       Onikiri.Core.SortingOrders.Boss, health, gold, true);
+            boss.Spawn(definition, spawnX, stage.GroundY,
+                       Onikiri.Core.SortingOrders.Boss, health, gold, true,
+                       scale, tint, attackDamage);
             active.Add(boss);
 
             return boss;

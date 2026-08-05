@@ -24,6 +24,16 @@ namespace Onikiri.EditorTools
         private const string BossHurtSheet = BossSpriteFolder + "/HURT.png";
         private const string BossDeathSheet = BossSpriteFolder + "/DEATH.png";
 
+        /**
+         * @brief 보스 공격 클립.
+         *
+         * 팩에 이미 있다 - ATTACK 1 이 7프레임이다. 대체 연출을 만들 필요가 없었다.
+         * ATTACK 2(5프레임)와 3(7프레임)도 있지만 1을 쓴다. 2는 너무 짧아
+         * 2초 주기에서 예비 동작이 보이지 않고, 3은 점프가 섞여 제자리에 선
+         * 보스의 동작으로 읽히지 않는다.
+         */
+        private const string BossAttackSheet = BossSpriteFolder + "/ATTACK 1.png";
+
         private const string DataFolder = "Assets/_Project/Data";
         private const string BossDefinitionPath = DataFolder + "/Enemy_DarkSamurai.asset";
         private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
@@ -37,6 +47,48 @@ namespace Onikiri.EditorTools
         private static readonly Color ButtonColor = new Color32(0x8C, 0x3A, 0x4E, 0xFF);
         private static readonly Color HealthColor = new Color32(0xC8, 0x3A, 0x46, 0xFF);
         private static readonly Color HealthBackColor = new Color32(0x1A, 0x16, 0x24, 0xD0);
+
+        /**
+         * @brief 확대판 보스의 틴트.
+         *
+         * 크기만 두 배로 키우면 "같은 놈이 커진 것"으로 읽힌다. 붉게 물들여
+         * 우두머리라는 신호를 하나 더 얹는다. 완전히 다른 색으로 칠하지 않는
+         * 이유는 그러면 어느 잡몹의 우두머리인지가 사라지기 때문이다.
+         *
+         * **밝은 값이어야 한다.** SpriteRenderer.color는 곱연산이라 어두운 틴트는
+         * 스프라이트를 더 어둡게만 만든다. 처음에 #C87890을 썼다가 원래도 어두운
+         * 요괴 아트가 검은 덩어리가 됐다. 빨강을 255로 두고 초록·파랑만 낮추면
+         * 밝기를 유지한 채 색조만 붉은 쪽으로 민다.
+         */
+        private static readonly Color StageBossTint = new Color32(0xFF, 0xC0, 0xC8, 0xFF);
+
+        /** 플레이어 체력 바 색. 보스 체력(붉은색)과 구분되는 초록 계열 */
+        private static readonly Color PlayerHealthColor = new Color32(0x6E, 0xC8, 0x7A, 0xFF);
+
+        private const string DataFolderForMobs = "Assets/_Project/Data";
+
+        /**
+         * @brief 일반 스테이지 보스로 쓸 잡몹 정의들.
+         *
+         * 보스 정의(가중치 0)는 빠진다. 이름순으로 정렬해 스테이지 -> 잡몹 대응이
+         * 빌드할 때마다 달라지지 않게 한다 - 무작위면 재도전마다 다른 놈이 나와
+         * "이 스테이지의 우두머리"라는 인상이 생기지 않는다.
+         */
+        private static List<EnemyDefinition> LoadMobDefinitions()
+        {
+            var definitions = new List<EnemyDefinition>();
+
+            foreach (var guid in AssetDatabase.FindAssets("t:EnemyDefinition", new[] { DataFolderForMobs }))
+            {
+                var definition = AssetDatabase.LoadAssetAtPath<EnemyDefinition>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (definition == null || definition.spawnWeight <= 0f) continue;
+                definitions.Add(definition);
+            }
+
+            definitions.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+            return definitions;
+        }
 
         // ---------------------------------------------------------------- 정의 에셋
 
@@ -64,6 +116,9 @@ namespace Onikiri.EditorTools
             definition.idleFrames = OrderedSprites(BossIdleSheet).ToArray();
             definition.hurtFrames = OrderedSprites(BossHurtSheet).ToArray();
             definition.deathFrames = OrderedSprites(BossDeathSheet).ToArray();
+            definition.attackFrames = OrderedSprites(BossAttackSheet).ToArray();
+            definition.attackInterval = (float)BossCurve.AttackIntervalSeconds;
+            definition.attackImpactPoint = 0.55f;
 
             // 잡몹보다 느린 12fps다. 보스는 26프레임짜리 사망 연출을 들고 있어서
             // 잡몹과 같은 속도로 돌리면 죽는 데 2초가 넘게 걸린다. 그 길이가
@@ -92,9 +147,11 @@ namespace Onikiri.EditorTools
             EditorUtility.SetDirty(definition);
 
             Debug.Log(string.Format(
-                "[Onikiri] Boss '{0}': idle={1} hurt={2} death={3} frames.",
+                "[Onikiri] Boss '{0}': idle={1} hurt={2} death={3} attack={4} frames, " +
+                "attack every {5}s.",
                 definition.displayName, definition.idleFrames.Length,
-                definition.hurtFrames.Length, definition.deathFrames.Length));
+                definition.hurtFrames.Length, definition.deathFrames.Length,
+                definition.attackFrames.Length, definition.attackInterval));
 
             return definition;
         }
@@ -123,13 +180,40 @@ namespace Onikiri.EditorTools
 
             var panel = MainSceneBuilder.FindBand("GrowthPanel");
 
+            var samurai = GameObject.Find("Samurai");
+
             var fightSo = new SerializedObject(fight);
             fightSo.FindProperty("spawner").objectReferenceValue = spawner;
             fightSo.FindProperty("progress").objectReferenceValue = battle.GetComponent<StageProgress>();
+            fightSo.FindProperty("playerHealth").objectReferenceValue =
+                samurai != null ? samurai.GetComponent<PlayerHealth>() : null;
             fightSo.FindProperty("bossDefinition").objectReferenceValue = definition;
+
+            // 일반 스테이지 보스로 쓸 잡몹들. 스테이지로 하나를 고른다
+            var stageBosses = LoadMobDefinitions();
+            var stageBossArray = fightSo.FindProperty("stageBossDefinitions");
+            stageBossArray.arraySize = stageBosses.Count;
+            for (int i = 0; i < stageBosses.Count; i++)
+                stageBossArray.GetArrayElementAtIndex(i).objectReferenceValue = stageBosses[i];
+
+            // 확대 배율은 **정수만** 쓴다.
+            //
+            // Pixel Perfect Camera가 아트 픽셀 하나를 화면 픽셀 N개로 늘린다
+            // (1080 폭에서 N = 5). 스프라이트를 s배로 키우면 아트 픽셀 하나가
+            // 화면에서 s x N 픽셀이 되는데, 이 값이 정수가 아니면 어떤 픽셀은
+            // 7개, 어떤 픽셀은 8개로 그려져 격자가 눈에 띄게 일그러진다.
+            //
+            // 1.5배는 1080에서 7.5px이라 탈락이다. 1.2/1.4/1.6은 1080에서는
+            // 정수가 되지만(6/7/8) 배율 N은 기기 해상도에 따라 달라지므로
+            // 그 기기에서만 맞는 값이다. **어떤 N에서도 정수인 것은 정수 배율뿐이다.**
+            fightSo.FindProperty("stageBossScale").floatValue = 2f;
+            fightSo.FindProperty("stageBossTint").colorValue = StageBossTint;
             fightSo.FindProperty("upgrades").objectReferenceValue =
                 panel != null ? panel.GetComponent<UpgradeSystem>() : null;
+            // 전체 등장 연출은 챕터 보스 전용이다. 일반 스테이지 보스는 0.4초만
+            // 스친다 - 매 스테이지 6초씩 반복되면 연출이 대기 시간이 된다
             fightSo.FindProperty("introSeconds").floatValue = 1f;
+            fightSo.FindProperty("stageBossIntroSeconds").floatValue = 0.4f;
             fightSo.FindProperty("failSeconds").floatValue = 3f;
             fightSo.FindProperty("bossName").stringValue = BossDisplayName;
             fightSo.ApplyModifiedPropertiesWithoutUndo();
@@ -236,6 +320,46 @@ namespace Onikiri.EditorTools
             // 스프라이트가 없으면 Filled가 무시된다. 내장 흰색 UI 스프라이트를 쓴다
             fillImage.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
 
+            // --- 플레이어 체력 바: 전투 밴드 아래쪽. 보스 바와 화면 반대편에 둔다.
+            //     둘이 붙어 있으면 어느 쪽이 내 체력인지 매번 확인해야 한다
+            var playerBack = new GameObject("PlayerHealthBack", typeof(RectTransform));
+            playerBack.transform.SetParent(fightHud.transform, false);
+            var playerBackRect = (RectTransform)playerBack.transform;
+            // 보스 바(밴드 위쪽)와 같은 하늘 영역에 두되 시계 아래로 한 칸 띄운다.
+            //
+            // 처음에는 밴드 아래쪽에 뒀는데, 그 자리가 지면선이라 체력 바와 숫자가
+            // 사무라이의 발과 풀 위에 겹쳤다. 전투 중 계속 떠 있는 표시라 그동안
+            // 싸움이 가려진다. 위쪽은 비어 있고, 무엇보다 두 체력 바를 같은 영역에
+            // 두면 "누구 체력인가"를 색으로만 구분하면 된다 - 붉은색이 보스,
+            // 초록색이 나다
+            playerBackRect.anchorMin = new Vector2(0f, 1f);
+            playerBackRect.anchorMax = new Vector2(1f, 1f);
+            playerBackRect.pivot = new Vector2(0.5f, 1f);
+            playerBackRect.offsetMin = new Vector2(60f, -196f);
+            playerBackRect.offsetMax = new Vector2(-60f, -162f);
+            playerBack.AddComponent<Image>().color = HealthBackColor;
+
+            var playerFillGo = new GameObject("PlayerHealthFill", typeof(RectTransform));
+            playerFillGo.transform.SetParent(playerBack.transform, false);
+            Stretch((RectTransform)playerFillGo.transform);
+            var playerFill = playerFillGo.AddComponent<Image>();
+            playerFill.color = PlayerHealthColor;
+            playerFill.type = Image.Type.Filled;
+            playerFill.fillMethod = Image.FillMethod.Horizontal;
+            playerFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            playerFill.fillAmount = 1f;
+            playerFill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+
+            var playerHealthLabel = CreateLabel(fightHud.transform, font, "PlayerHealthLabel",
+                                                PixelFontSizesSmall, TextAlignmentOptions.Center);
+            var playerLabelRect = (RectTransform)playerHealthLabel.transform;
+            playerLabelRect.anchorMin = new Vector2(0.5f, 1f);
+            playerLabelRect.anchorMax = new Vector2(0.5f, 1f);
+            playerLabelRect.pivot = new Vector2(0.5f, 1f);
+            playerLabelRect.sizeDelta = new Vector2(500f, 70f);
+            playerLabelRect.anchoredPosition = new Vector2(0f, -200f);
+            playerHealthLabel.text = "100 / 100";
+
             var timerLabel = CreateLabel(fightHud.transform, font, "Timer",
                                          PixelFontSizesSmall, TextAlignmentOptions.Center);
             var timerRect = (RectTransform)timerLabel.transform;
@@ -280,6 +404,12 @@ namespace Onikiri.EditorTools
             hudSo.FindProperty("fightRoot").objectReferenceValue = fightHud;
             hudSo.FindProperty("timerLabel").objectReferenceValue = timerLabel;
             hudSo.FindProperty("healthFill").objectReferenceValue = fillImage;
+
+            var samuraiForHud = GameObject.Find("Samurai");
+            hudSo.FindProperty("playerHealth").objectReferenceValue =
+                samuraiForHud != null ? samuraiForHud.GetComponent<PlayerHealth>() : null;
+            hudSo.FindProperty("playerHealthFill").objectReferenceValue = playerFill;
+            hudSo.FindProperty("playerHealthLabel").objectReferenceValue = playerHealthLabel;
             hudSo.FindProperty("resultRoot").objectReferenceValue = result;
             hudSo.FindProperty("resultLabel").objectReferenceValue = resultLabel;
             hudSo.ApplyModifiedPropertiesWithoutUndo();

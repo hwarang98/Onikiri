@@ -62,6 +62,18 @@ namespace Onikiri.Progression
             public double CritRate;
             public double CritMultiplier;
             public double ExpectedDps;
+
+            public int HealthLevel;
+            public int RegenLevel;
+            public double MaxHealth;
+            public double RegenPerSecond;
+
+            /** 유효체력 / 이 보스가 제한 시간 동안 낼 피해. 1 아래면 죽는다 */
+            public double SurvivalMargin;
+            public bool Survived;
+
+            /** 이 스테이지가 챕터 보스인가 */
+            public bool IsChapterBoss;
         }
 
         public struct Field
@@ -157,6 +169,35 @@ namespace Onikiri.Progression
             return -1;
         }
 
+        /** 강화를 전혀 하지 않은 플레이어의 유효체력 */
+        public static double StartingEffectiveHealth
+        {
+            get
+            {
+                return SurvivalEfficiency.EffectiveHealth(
+                    HealthCurve.ValueAtLevel(1), HealthRegenCurve.ValueAtLevel(1));
+            }
+        }
+
+        /**
+         * @brief 강화를 전혀 하지 않은 플레이어가 처음 **죽는** 스테이지.
+         *
+         * 시간 초과로 막히는 스테이지와 다른 값이다. 둘이 같으면 체력 축이
+         * 아무 일도 하지 않는다는 뜻이고, 체력 게이트가 화력 게이트보다 한참
+         * 뒤에 오면 생존 축을 살 이유가 늦게 생긴다.
+         */
+        public static int FirstStageThatKillsAnUnupgradedPlayer(int searchTo)
+        {
+            double ehp = StartingEffectiveHealth;
+
+            for (int stage = 1; stage <= searchTo; stage++)
+            {
+                double incoming = BossCurve.TotalDamageOverFight(stage, StageCurve.BossTimeLimitSeconds);
+                if (ehp < incoming) return stage;
+            }
+            return -1;
+        }
+
         /**
          * @brief 1스테이지부터 throughStage까지를 돌린다.
          *
@@ -194,14 +235,22 @@ namespace Onikiri.Progression
                     lastInterval = interval;
 
                     purse += goldPerMob;
-                    Buy(ref levels, ref purse);
+                    Buy(ref levels, ref purse, stage);
                 }
 
                 var stats = levels.Stats;
                 double bossKill = BossKillSeconds(field.AverageMobHealth, stage, stats);
 
-                purse += goldPerMob * StageCurve.BossGoldMultiplier;
-                Buy(ref levels, ref purse);
+                // 이 보스가 제한 시간을 다 쓰면 낼 총 피해. 유효체력이 이보다
+                // 작으면 시간이 다 되기 전에 죽는다
+                double incoming = BossCurve.TotalDamageOverFight(stage, StageCurve.BossTimeLimitSeconds);
+
+                // 보스 보상을 받은 뒤의 구매는 **다음** 스테이지를 대비한다.
+                // 생존 축이 "다음 보스에게 죽지 않을 만큼"을 기준으로 사기 때문에
+                // 여기서 stage를 넘기면 이미 지나간 보스를 대비하게 된다
+                purse += goldPerMob * StageCurve.BossGoldMultiplier
+                         * (BossCurve.IsChapterBoss(stage) ? BossCurve.ChapterGoldMultiplier : 1d);
+                Buy(ref levels, ref purse, stage + 1);
 
                 results.Add(new StageResult
                 {
@@ -220,20 +269,41 @@ namespace Onikiri.Progression
                     AttacksPerSecond = stats.AttacksPerSecond,
                     CritRate = stats.CritRate,
                     CritMultiplier = stats.CritMultiplier,
-                    ExpectedDps = stats.ExpectedDps
+                    ExpectedDps = stats.ExpectedDps,
+
+                    HealthLevel = levels.H,
+                    RegenLevel = levels.G,
+                    MaxHealth = levels.MaxHealth,
+                    RegenPerSecond = levels.RegenPerSecond,
+                    SurvivalMargin = incoming > 0d ? levels.EffectiveHealth / incoming : double.PositiveInfinity,
+                    Survived = levels.EffectiveHealth >= incoming,
+                    IsChapterBoss = BossCurve.IsChapterBoss(stage)
                 });
             }
 
             return results;
         }
 
-        /** 네 축의 레벨. 구매 정책이 이것을 굴린다 */
+        /** 여섯 축의 레벨. 구매 정책이 이것을 굴린다 */
         private struct Levels
         {
             public int Power;
             public int Speed;
             public int CritRate;
             public int CritDamage;
+            public int Health;
+            public int Regen;
+
+            public int H { get { return Health < 1 ? 1 : Health; } }
+            public int G { get { return Regen < 1 ? 1 : Regen; } }
+
+            public double MaxHealth { get { return HealthCurve.ValueAtLevel(H); } }
+            public double RegenPerSecond { get { return HealthRegenCurve.ValueAtLevel(G); } }
+
+            public double EffectiveHealth
+            {
+                get { return SurvivalEfficiency.EffectiveHealth(MaxHealth, RegenPerSecond); }
+            }
 
             /** 0으로 시작하지 않는다. 모든 축은 레벨 1이 시작 스탯이다 */
             public int P { get { return Power < 1 ? 1 : Power; } }
@@ -287,8 +357,55 @@ namespace Onikiri.Progression
          * (UpgradeEfficiency가 재는 것과 같은 값)로 고른다 - 시뮬레이션의 구매
          * 정책과 게임이 플레이어에게 보여주는 지표가 같은 함수여야 한다.
          */
-        private static void Buy(ref Levels levels, ref double purse)
+        /**
+         * @brief 여섯 축의 구매 정책.
+         *
+         * **생존이 먼저, 그 다음이 화력이다.**
+         *
+         *   1. 다음 보스에게 죽지 않을 만큼 생존 축을 산다. 생존 축 둘 중에서는
+         *      골드당 %EHP가 큰 쪽을 고른다.
+         *   2. 남는 골드로 화력 축을 산다. 넷 중에서는 골드당 %DPS가 큰 쪽.
+         *
+         * 순서를 이렇게 둔 이유는 두 자원의 성질이 다르기 때문이다. 화력이 모자라면
+         * 보스전이 길어질 뿐이지만 생존이 모자라면 **그 스테이지에 아예 들어갈 수
+         * 없다.** 실제 플레이어도 죽고 나면 체력부터 올린다.
+         *
+         * "죽지 않을 만큼"에는 여유를 둔다. 정확히 맞추면 스테이지가 오르는 순간마다
+         * 한 번씩 죽고, 그 죽음은 정보가 아니라 반복 작업이 된다.
+         */
+        private const double SurvivalSafetyMargin = 1.15d;
+
+        private static void Buy(ref Levels levels, ref double purse, int nextStage)
         {
+            // 생존 먼저. 다음 보스가 낼 총 피해를 여유를 두고 넘길 때까지 산다
+            double needed = BossCurve.TotalDamageOverFight(nextStage, StageCurve.BossTimeLimitSeconds)
+                            * SurvivalSafetyMargin;
+
+            for (int guard = 0; guard < 100000; guard++)
+            {
+                if (levels.EffectiveHealth >= needed) break;
+
+                double healthCost = HealthCurve.CostAtLevel(levels.H);
+                double regenCost = HealthRegenCurve.CostAtLevel(levels.G);
+
+                // 골드당 %EHP가 큰 쪽. UpgradeEfficiency가 아니라
+                // SurvivalEfficiency와 같은 자다
+                double healthGain = (SurvivalEfficiency.EffectiveHealth(
+                        HealthCurve.ValueAtLevel(levels.H + 1), levels.RegenPerSecond)
+                    / levels.EffectiveHealth - 1d) / healthCost;
+                double regenGain = (SurvivalEfficiency.EffectiveHealth(
+                        levels.MaxHealth, HealthRegenCurve.ValueAtLevel(levels.G + 1))
+                    / levels.EffectiveHealth - 1d) / regenCost;
+
+                bool buyHealth = healthGain >= regenGain;
+                double cost = buyHealth ? healthCost : regenCost;
+                if (cost > purse) break;
+
+                purse -= cost;
+                if (buyHealth) levels.Health = levels.H + 1;
+                else levels.Regen = levels.G + 1;
+            }
+
             // 무한 루프 방어. 비용이 0이 되는 곡선이 들어오면 여기서 멈춘다
             for (int guard = 0; guard < 100000; guard++)
             {

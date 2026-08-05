@@ -101,6 +101,26 @@ namespace Onikiri.EditorTools
                 BaseValue = CritDamageCurve.BaseValue, Step = CritDamageCurve.Step,
                 MaxLevel = 0, ValueCeiling = 0d,
                 Display = UpgradeTrack.Display.Multiplier
+            },
+            // 체력: 곱연산 + 상한 없음. 보스 공격력이 스테이지마다 지수로 오르므로
+            // 같은 형태여야 따라간다
+            new TrackSpec {
+                Id = UpgradeSystem.HealthId, DisplayName = "체력 강화",
+                BaseCost = HealthCurve.BaseCost, CostGrowth = HealthCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Multiplicative,
+                BaseValue = HealthCurve.BaseValue, Step = HealthCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.Plain
+            },
+            // 체력 회복: 초당 회복량. 가산으로 두면 8단계 공격속도와 같은 이유로
+            // 죽으므로 곱연산이다. HealthRegenCurve 참고
+            new TrackSpec {
+                Id = UpgradeSystem.HealthRegenId, DisplayName = "체력 회복",
+                BaseCost = HealthRegenCurve.BaseCost, CostGrowth = HealthRegenCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Multiplicative,
+                BaseValue = HealthRegenCurve.BaseValue, Step = HealthRegenCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.PerSecond
             }
         };
 
@@ -110,15 +130,19 @@ namespace Onikiri.EditorTools
         /**
          * @brief 한 줄의 높이. 55pt 글자에 위아래 여백을 더한 값.
          *
-         * 10단계에서 축이 둘에서 넷으로 늘면서 72에서 줄였다. 성장 패널은 화면
-         * 높이의 35%(1920 기준 672px)로 고정이고 그 안에 네 줄이 들어가야 한다.
+         * 10단계에서 축이 둘에서 넷으로 늘면서 72에서 62로 줄였다. 11단계에서
+         * 여섯이 되면서 **더 줄일 수 없는 지점에 닿았다.**
          *
-         *   여백 12 + 줄 4개 + 사이 간격 3개 <= 672
+         *   성장 패널 높이 = 1920 x 35% = 672px
+         *   여섯 줄이 들어가려면 한 줄에 최대 약 104px
+         *   한 줄은 55pt 글자 두 줄이므로 최소 62 x 2 + 여백
          *
-         * 스크롤을 넣는 선택지도 있었지만 하지 않았다. 방치형의 성장 패널은
-         * "지금 살 수 있는 것이 무엇인가"를 한눈에 보여주는 화면이고, 스크롤은
-         * 그 목록의 일부를 숨긴다. 축이 여섯을 넘어가면 그때는 탭으로 나누는 것이
-         * 스크롤보다 낫다.
+         * 글자를 줄이는 선택지는 없다. 55는 아틀라스를 구운 크기이고 그 사이 값을
+         * 쓰면 비트맵이 리샘플되어 흐려진다(PixelFontSizes).
+         *
+         * 그래서 스크롤을 넣었다. 10단계 주석에 "축이 여섯을 넘어가면 탭으로
+         * 나누는 것이 스크롤보다 낫다"고 적었는데, 지금이 정확히 여섯이고
+         * 12단계가 UI 개편이다. 탭은 그때 만들고 지금은 목록이 잘리지 않게만 한다.
          */
         private const float LineHeight = 62f;
 
@@ -200,14 +224,86 @@ namespace Onikiri.EditorTools
             var system = panel.GetComponent<UpgradeSystem>();
             if (system == null) system = panel.gameObject.AddComponent<UpgradeSystem>();
 
-            WriteTracks(system, combat);
+            WriteTracks(system, combat, samurai != null ? samurai.GetComponent<PlayerHealth>() : null);
+
+            var content = EnsureScroll(panel);
 
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath);
             for (int i = 0; i < Specs.Length; i++)
-                BuildRow(panel, system, font, i);
+                BuildRow(content, system, font, i);
 
-            Debug.Log("[Onikiri] Upgrade panel built: " + Specs.Length + " tracks.");
+            Debug.Log("[Onikiri] Upgrade panel built: " + Specs.Length + " tracks (scrollable).");
             return system;
+        }
+
+        /**
+         * @brief 성장 패널을 스크롤 가능하게 만들고 행이 들어갈 Content를 돌려준다.
+         *
+         * 여섯 축이 화면 높이에 물리적으로 들어가지 않는다(LineHeight 주석 참고).
+         * 글자를 줄이면 픽셀 폰트가 흐려지므로 목록을 스크롤한다.
+         *
+         * RectMask2D를 쓴다 - Mask와 달리 스텐실 버퍼를 쓰지 않아 오버레이 캔버스에서
+         * 드로우 콜이 늘지 않고, 사각형으로 자르는 것이 여기서 필요한 전부다.
+         */
+        private static RectTransform EnsureScroll(Transform panel)
+        {
+            var viewport = panel.Find("Viewport");
+            if (viewport == null)
+            {
+                var go = new GameObject("Viewport", typeof(RectTransform));
+                go.transform.SetParent(panel, false);
+                viewport = go.transform;
+            }
+
+            var viewportRect = (RectTransform)viewport;
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+
+            if (viewport.GetComponent<RectMask2D>() == null)
+                viewport.gameObject.AddComponent<RectMask2D>();
+
+            var content = viewport.Find("Content");
+            if (content == null)
+            {
+                var go = new GameObject("Content", typeof(RectTransform));
+                go.transform.SetParent(viewport, false);
+                content = go.transform;
+            }
+
+            var contentRect = (RectTransform)content;
+            // 위에서 아래로 자란다. 스크롤은 이 rect를 위아래로 움직인다
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.offsetMin = new Vector2(0f, 0f);
+            contentRect.offsetMax = new Vector2(0f, 0f);
+            contentRect.sizeDelta = new Vector2(0f, TopPadding + Specs.Length * (RowHeight + RowGap));
+            contentRect.anchoredPosition = Vector2.zero;
+
+            var scroll = panel.GetComponent<ScrollRect>();
+            if (scroll == null) scroll = panel.gameObject.AddComponent<ScrollRect>();
+
+            scroll.content = contentRect;
+            scroll.viewport = viewportRect;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            // Elastic이 기본인데 손을 떼면 튕겨 돌아온다. 목록은 그냥 멈추는 편이
+            // 읽기 쉽고, 튕김은 이 화면에서 아무것도 알려주지 않는다
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40f;
+            scroll.inertia = true;
+            scroll.decelerationRate = 0.12f;
+
+            // 패널 자체가 드래그를 받으려면 레이캐스트 대상이 있어야 한다.
+            // 보이지 않는 판을 깔되 색은 완전 투명으로 둔다
+            var blocker = panel.GetComponent<Image>();
+            if (blocker == null) blocker = panel.gameObject.AddComponent<Image>();
+            blocker.color = new Color(0f, 0f, 0f, 0f);
+            blocker.raycastTarget = true;
+
+            return contentRect;
         }
 
         /**
@@ -216,10 +312,11 @@ namespace Onikiri.EditorTools
          * UpgradeTrack은 MonoBehaviour가 아니라 직렬화 클래스라, 인스턴스를 만들어
          * 대입하는 대신 SerializedProperty로 필드를 하나씩 쓴다.
          */
-        private static void WriteTracks(UpgradeSystem system, PlayerCombat combat)
+        private static void WriteTracks(UpgradeSystem system, PlayerCombat combat, PlayerHealth health)
         {
             var so = new SerializedObject(system);
             so.FindProperty("combat").objectReferenceValue = combat;
+            so.FindProperty("health").objectReferenceValue = health;
 
             var tracks = so.FindProperty("tracks");
             // 기존 레벨은 유지한다. 곡선을 손볼 때마다 플레이 진행이 초기화되면
@@ -260,7 +357,7 @@ namespace Onikiri.EditorTools
             property.FindPropertyRelative("e").longValue = big.Exponent;
         }
 
-        private static void BuildRow(Transform panel, UpgradeSystem system, TMP_FontAsset font, int index)
+        private static void BuildRow(RectTransform panel, UpgradeSystem system, TMP_FontAsset font, int index)
         {
             string rowName = "Upgrade" + index;
 

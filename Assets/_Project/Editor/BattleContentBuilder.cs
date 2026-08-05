@@ -229,6 +229,17 @@ namespace Onikiri.EditorTools
             definition.hurtFrames = new Sprite[0];
             definition.deathFrames = FramesFromClip(aseprite, tier.DeathClip);
             definition.frameRate = 12f;
+
+            // 이 정의는 잡몹으로도, 그 스테이지의 '거대' 보스로도 쓰인다.
+            // 공격 주기를 적어두지만 **잡몹은 이것으로 공격하지 않는다** -
+            // Enemy는 스폰 시점에 받은 공격력이 0이면 주기를 아예 돌리지 않고,
+            // 잡몹 스폰 경로는 0을 넘긴다. 보스로 스폰될 때만 깨어나는 값이다
+            definition.attackInterval = (float)BossCurve.AttackIntervalSeconds;
+            definition.attackImpactPoint = 0.5f;
+            // 잡몹 팩에는 공격 태그가 없다. 비워 두면 Enemy가 idle을 유지한 채
+            // 주기만 돌리고, 타격은 피격 플래시와 데미지 숫자로 읽힌다
+            definition.attackFrames = new Sprite[0];
+
             definition.spawnWeight = tier.SpawnWeight;
             definition.maxHealth = BigDouble.FromDouble(tier.Health);
             definition.moveSpeed = tier.MoveSpeed;
@@ -415,10 +426,33 @@ namespace Onikiri.EditorTools
                 RequireReference(bossSo, "progress", problems);
                 RequireReference(bossSo, "bossDefinition", problems);
                 RequireReference(bossSo, "upgrades", problems);
+                // 이것이 없으면 보스가 때려도 아무 일도 일어나지 않는다.
+                // 화면에서는 정상으로 보이고 플레이어는 영원히 죽지 않는다
+                RequireReference(bossSo, "playerHealth", problems);
+                RequireArray(bossSo, "stageBossDefinitions", problems);
 
-                var definition = bossSo.FindProperty("bossDefinition").objectReferenceValue as EnemyDefinition;
-                if (definition != null && (definition.idleFrames == null || definition.idleFrames.Length == 0))
+                var bossDef = bossSo.FindProperty("bossDefinition").objectReferenceValue as EnemyDefinition;
+                if (bossDef != null && (bossDef.idleFrames == null || bossDef.idleFrames.Length == 0))
                     problems.Add("Boss definition has no idle frames - the boss would be invisible");
+                if (bossDef != null && (bossDef.attackFrames == null || bossDef.attackFrames.Length == 0))
+                    problems.Add("Boss definition has no attack frames - the boss would hit without telegraphing");
+
+                // 확대 배율이 정수가 아니면 픽셀 격자가 어긋난다. BossContentBuilder 참고
+                float stageBossScale = bossSo.FindProperty("stageBossScale").floatValue;
+                if (!Mathf.Approximately(stageBossScale, Mathf.Round(stageBossScale)))
+                    problems.Add("stageBossScale " + stageBossScale + " is not an integer"
+                                 + " - the pixel grid would break at some device scales");
+            }
+
+            // 플레이어 체력이 없으면 보스전에서 아무도 죽지 않는다
+            var playerHealthComponent = samurai.GetComponent<PlayerHealth>();
+            if (playerHealthComponent == null) problems.Add("Samurai has no PlayerHealth");
+            else
+            {
+                var healthSo = new SerializedObject(playerHealthComponent);
+                RequireArray(healthSo, "hurtFrames", problems);
+                RequireArray(healthSo, "deathFrames", problems);
+                RequireReference(healthSo, "sakura", problems);
             }
 
             var bossHud = Object.FindFirstObjectByType<Onikiri.UI.BossHud>();
@@ -1088,15 +1122,54 @@ namespace Onikiri.EditorTools
 
             // 꽃잎은 참격이 지나간 방향으로 흩어진다. 사무라이의 발도는 오른쪽 위로
             // 향하고, 그 방향이 아트의 흰 궤적과 같아야 참격과 꽃잎이 한 동작으로 읽힌다
-            so.FindProperty("sakura").objectReferenceValue = SakuraContentBuilder.Wire(vfxRoot);
+            var sakura = SakuraContentBuilder.Wire(vfxRoot);
+            so.FindProperty("sakura").objectReferenceValue = sakura;
             so.FindProperty("slashDirection").vector2Value = new Vector2(1f, 0.45f);
 
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            WirePlayerHealth(samurai, animator, sakura);
 
             Debug.Log(string.Format("[Onikiri] Player combat: idle={0} attack={1} slash={2} frames.",
                 OrderedSprites(SamuraiIdle).Count,
                 OrderedSprites(SamuraiAttack).Count,
                 OrderedSprites(SlashSheet).Count));
+        }
+
+        private const string SamuraiHurt = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/HURT.png";
+        private const string SamuraiDeath = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/DEATH.png";
+
+        /**
+         * @brief 플레이어의 체력. 보스만 이것을 깎는다.
+         *
+         * 피격/사망 애니메이션은 Mattz 팩에 이미 있다(HURT 4프레임, DEATH 9프레임).
+         * 새 아트를 만들지 않았다.
+         */
+        private static void WirePlayerHealth(GameObject samurai, SpriteAnimator animator, SakuraBurst sakura)
+        {
+            var health = samurai.GetComponent<PlayerHealth>();
+            if (health == null) health = samurai.AddComponent<PlayerHealth>();
+
+            var so = new SerializedObject(health);
+            so.FindProperty("spriteRenderer").objectReferenceValue = samurai.GetComponent<SpriteRenderer>();
+            so.FindProperty("animator").objectReferenceValue = animator;
+
+            AssignSprites(so.FindProperty("hurtFrames"), OrderedSprites(SamuraiHurt));
+            AssignSprites(so.FindProperty("deathFrames"), OrderedSprites(SamuraiDeath));
+
+            so.FindProperty("hurtFrameRate").floatValue = 14f;
+            so.FindProperty("deathFrameRate").floatValue = 10f;
+            so.FindProperty("hurtFlashSeconds").floatValue = 0.14f;
+
+            // 쓰러짐 연출은 타격용 꽃잎 발생기를 그대로 쓴다. 새 이펙트를 만들지
+            // 않고 있는 것을 겹쳐 쓰는 쪽이 화면의 언어를 하나로 유지한다
+            so.FindProperty("sakura").objectReferenceValue = sakura;
+            so.FindProperty("deathPetalBursts").intValue = 3;
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            Debug.Log(string.Format("[Onikiri] Player health: hurt={0} death={1} frames.",
+                OrderedSprites(SamuraiHurt).Count, OrderedSprites(SamuraiDeath).Count));
         }
 
         /**

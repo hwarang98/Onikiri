@@ -310,6 +310,149 @@ namespace Onikiri.Tests
             }
         }
 
+        // ------------------------------------------------------------ 생존 게이트
+
+        /**
+         * @brief 곡선을 따라온 플레이어는 보스전에서 죽지 않는다.
+         *
+         * 공격 계열과 생존 계열의 균형은 자로 잴 수 없다 - %DPS와 %EHP는 단위가
+         * 달라 나눌 수 없다. 그래서 균형은 지표가 아니라 **이 게이트**로 잡는다.
+         */
+        [Test]
+        public void FollowingTheCurve_NeverDiesThrough20()
+        {
+            var results = StageSimulation.Run(20, FieldFromAssets());
+
+            foreach (var row in results)
+            {
+                Assert.IsTrue(row.Survived, string.Format(
+                    "stage {0}({1}): 생존 여유 {2:F2} - 곡선을 따라왔는데도 죽는다 " +
+                    "(체력 Lv.{3} {4:F0} / 회복 Lv.{5} {6:F2}/s)",
+                    row.Stage, row.IsChapterBoss ? "챕터" : "일반", row.SurvivalMargin,
+                    row.HealthLevel, row.MaxHealth, row.RegenLevel, row.RegenPerSecond));
+            }
+        }
+
+        /**
+         * @brief 체력 게이트가 실제로 무는가.
+         *
+         * 무강화 플레이어가 죽는 스테이지가 존재해야 하고, 시간 초과로 막히는
+         * 스테이지보다 **뒤**여야 한다. 앞이면 플레이어가 화력을 배우기 전에
+         * 체력부터 요구받는다.
+         */
+        [Test]
+        public void HealthGate_BitesAfterTheDamageGate()
+        {
+            var field = FieldFromAssets();
+
+            int blocked = StageSimulation.FirstStageThatBlocksAnUnupgradedPlayer(field.AverageMobHealth, 50);
+            int killed = StageSimulation.FirstStageThatKillsAnUnupgradedPlayer(50);
+
+            Assert.AreNotEqual(-1, killed, "50스테이지까지 무강화로 죽지 않는다면 체력 축이 아무것도 하지 않는다");
+            Assert.Greater(killed, blocked, string.Format(
+                "체력 게이트({0}스테이지)가 화력 게이트({1}스테이지)보다 먼저 온다. " +
+                "플레이어가 화력을 배우기 전에 체력부터 요구받는다", killed, blocked));
+
+            // 지금 곡선의 실제 값. 여기가 바뀌면 보고서도 함께 바뀌어야 한다
+            Assert.AreEqual(2, blocked);
+            Assert.AreEqual(5, killed);
+        }
+
+        /**
+         * @brief 화력만 올리는 정책은 죽는다.
+         *
+         * 체력 게이트가 무는 증거다. 생존 축을 사지 않으면 어느 스테이지부터
+         * 유효체력이 보스의 총 피해에 미치지 못한다.
+         */
+        [Test]
+        public void DamageOnlyPolicy_DiesWhereBalancedPolicySurvives()
+        {
+            var field = FieldFromAssets();
+            var balanced = StageSimulation.Run(20, field);
+
+            // 화력만 올린 플레이어의 유효체력은 시작값 그대로다
+            double damageOnlyEhp = StageSimulation.StartingEffectiveHealth;
+
+            int firstDeath = -1;
+            foreach (var row in balanced)
+            {
+                double incoming = BossCurve.TotalDamageOverFight(row.Stage, StageCurve.BossTimeLimitSeconds);
+                if (damageOnlyEhp < incoming) { firstDeath = row.Stage; break; }
+            }
+
+            Assert.AreNotEqual(-1, firstDeath,
+                "화력만 올려도 20스테이지까지 죽지 않는다면 생존 축을 살 이유가 없다");
+
+            // 같은 스테이지에서 균형 정책은 살아남는다
+            var balancedAtDeath = balanced[firstDeath - 1];
+            Assert.IsTrue(balancedAtDeath.Survived, string.Format(
+                "stage {0}에서 균형 정책도 죽는다 - 비교가 성립하지 않는다", firstDeath));
+
+            Assert.Greater(balancedAtDeath.MaxHealth, HealthCurve.ValueAtLevel(1),
+                "균형 정책이 체력을 한 번도 사지 않았다");
+        }
+
+        // ------------------------------------------------------------ 보스 이원화
+
+        /**
+         * @brief 챕터 보스는 5스테이지마다, 그리고 더 빡빡해야 한다.
+         *
+         * 일반 스테이지 보스보다 여유가 작아야 챕터의 마지막이라는 무게가 생긴다.
+         * 반대로 벽이 되면 그 앞의 넷이 의미를 잃는다.
+         */
+        [Test]
+        public void ChapterBosses_AreTighterThanStageBosses()
+        {
+            var results = StageSimulation.Run(20, FieldFromAssets());
+
+            double chapterWorst = double.MaxValue, chapterBest = 0d;
+            double stageWorst = double.MaxValue;
+            int chapterCount = 0;
+
+            foreach (var row in results)
+            {
+                if (row.IsChapterBoss)
+                {
+                    chapterCount++;
+                    if (row.BossMargin < chapterWorst) chapterWorst = row.BossMargin;
+                    if (row.BossMargin > chapterBest) chapterBest = row.BossMargin;
+                }
+                else if (row.BossMargin < stageWorst) stageWorst = row.BossMargin;
+            }
+
+            Assert.AreEqual(4, chapterCount, "20스테이지에 챕터 보스가 넷이어야 한다 (5, 10, 15, 20)");
+            Assert.IsTrue(BossCurve.IsChapterBoss(5) && BossCurve.IsChapterBoss(20));
+            Assert.IsFalse(BossCurve.IsChapterBoss(6));
+
+            // 챕터 보스 밴드는 일반보다 아래쪽이다
+            Assert.LessOrEqual(chapterBest, 2.0d, string.Format(
+                "챕터 보스 여유가 {0:F2}까지 올라간다 - 일반 스테이지와 구분되지 않는다", chapterBest));
+            Assert.GreaterOrEqual(chapterWorst, 1.3d, string.Format(
+                "챕터 보스 여유가 {0:F2}로 내려간다 - 벽이다", chapterWorst));
+        }
+
+        [Test]
+        public void ChapterBossMultipliers_AreAboveOne()
+        {
+            Assert.Greater(BossCurve.ChapterHealthMultiplier, 1d);
+            Assert.Greater(BossCurve.ChapterGoldMultiplier, 1d);
+            Assert.Greater(BossCurve.ChapterAttackMultiplier, 1d);
+
+            // 골드가 체력보다 후해야 챕터 보스에 도전할 이유가 생긴다
+            Assert.Greater(BossCurve.ChapterGoldMultiplier, BossCurve.ChapterHealthMultiplier);
+        }
+
+        [Test]
+        public void ChapterIsDerivedFromStage_NoNewSaveField()
+        {
+            // 챕터가 스테이지에서 유도되므로 세이브에 새 필드가 필요 없다
+            Assert.AreEqual(1, BossCurve.ChapterOf(1));
+            Assert.AreEqual(1, BossCurve.ChapterOf(5));
+            Assert.AreEqual(2, BossCurve.ChapterOf(6));
+            Assert.AreEqual(2, BossCurve.ChapterOf(10));
+            Assert.AreEqual(3, BossCurve.ChapterOf(11));
+        }
+
         // ------------------------------------------------------------ 잡몹 병목
 
         /**

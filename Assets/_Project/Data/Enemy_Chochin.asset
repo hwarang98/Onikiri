@@ -48,5 +48,8 @@ MonoBehaviour:
     e: 1
   moveSpeed: 0.8
   queueSpacing: 1.5
+  attackFrames: []
+  attackInterval: 2
+  attackImpactPoint: 0.5
   hoverHeight: 0.1
   artBottomOffset: 0.65625

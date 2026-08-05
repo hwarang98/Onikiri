@@ -23,10 +23,11 @@ namespace Onikiri.Progression
          *   1  8단계. 스테이지는 10처치마다 자동으로 올랐다
          *   2  9단계. 보스가 스테이지 게이트가 됐고 bossKillCount가 생겼다
          *   3  10단계. 치명타 확률·피해 축이 생겼다
+         *   4  11단계. 체력·체력회복 축이 생겼다
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 4;
 
         public int version = CurrentVersion;
 
@@ -123,6 +124,15 @@ namespace Onikiri.Progression
                 EnsureTrack(data, UpgradeSystem.CritRateId);
                 EnsureTrack(data, UpgradeSystem.CritDamageId);
                 data.version = 3;
+            }
+
+            if (data.version == 3)
+            {
+                // v3에는 생존 축이 없었다. v2 -> v3 과 같은 이유로 명시적으로
+                // 레벨 1을 적어 넣는다
+                EnsureTrack(data, UpgradeSystem.HealthId);
+                EnsureTrack(data, UpgradeSystem.HealthRegenId);
+                data.version = 4;
             }
 
             data.version = CurrentVersion;

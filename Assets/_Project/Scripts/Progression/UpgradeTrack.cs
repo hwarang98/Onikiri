@@ -41,7 +41,8 @@ namespace Onikiri.Progression
         {
             Plain,
             Percent,
-            Multiplier
+            Multiplier,
+            PerSecond
         }
 
         [SerializeField] private string id;
@@ -105,6 +106,8 @@ namespace Onikiri.Progression
                     return (value.ToDouble() * 100d).ToString("F1") + "%";
                 case Display.Multiplier:
                     return "x" + NumberFormatter.FormatStat(value, 2);
+                case Display.PerSecond:
+                    return NumberFormatter.FormatStat(value, 2) + "/s";
                 default:
                     return NumberFormatter.FormatStat(value, 2);
             }

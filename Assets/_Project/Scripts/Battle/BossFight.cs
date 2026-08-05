@@ -35,17 +35,36 @@ namespace Onikiri.Battle
     {
         public enum Phase { Farming, Intro, Fighting, Failed }
 
+        /** 실패한 이유. 문구가 갈린다 */
+        public enum FailureReason { TimeOut, Death }
+
         [Header("참조")]
         [SerializeField] private EnemySpawner spawner;
         [SerializeField] private StageProgress progress;
+        [SerializeField] private PlayerHealth playerHealth;
+
+        [Tooltip("챕터 보스(5의 배수 스테이지). 다크 사무라이")]
         [SerializeField] private EnemyDefinition bossDefinition;
+
+        [Tooltip("일반 스테이지 보스로 쓸 잡몹 정의들. 스테이지로 하나를 고른다")]
+        [SerializeField] private EnemyDefinition[] stageBossDefinitions;
+
+        [Tooltip("잡몹을 보스로 쓸 때의 확대 배율. 정수만 쓴다 - 픽셀 격자가 " +
+                 "어긋나지 않는 유일한 값이다")]
+        [SerializeField] private float stageBossScale = 2f;
+
+        [Tooltip("확대판 보스의 틴트. 같은 놈이 커진 것이 아니라 우두머리로 읽히게 한다")]
+        [SerializeField] private Color stageBossTint = new Color32(0xFF, 0xC0, 0xC8, 0xFF);
 
         [Tooltip("실패 문구가 어느 축을 올리라고 안내할지 판단하는 데 쓴다")]
         [SerializeField] private UpgradeSystem upgrades;
 
         [Header("연출")]
-        [Tooltip("이름이 뜨고 화면이 어두워져 있는 시간. 보스가 들어오기 전이다")]
+        [Tooltip("챕터 보스의 등장 연출 시간. 화면이 어두워지고 이름이 뜬다")]
         [SerializeField] private float introSeconds = 1f;
+
+        [Tooltip("일반 스테이지 보스의 등장 시간. 이름만 짧게 스친다")]
+        [SerializeField] private float stageBossIntroSeconds = 0.4f;
 
         [Tooltip("실패 문구를 붙들고 있는 시간. 그 뒤 잡몹 파밍으로 돌아간다")]
         [SerializeField] private float failSeconds = 3f;
@@ -64,7 +83,28 @@ namespace Onikiri.Battle
         private string failureMessage = string.Empty;
 
         public Phase Current { get { return phase; } }
-        public string BossName { get { return bossName; } }
+
+        /** 지금(또는 다음) 보스가 챕터 보스인가. 연출과 배수가 갈린다 */
+        public bool IsChapterBoss
+        {
+            get { return progress != null && BossCurve.IsChapterBoss(progress.Stage); }
+        }
+
+        /**
+         * @brief 화면에 세울 보스 이름.
+         *
+         * 챕터 보스만 고유 이름을 갖는다. 일반 스테이지 보스는 잡몹의 확대판이라
+         * 그 잡몹의 이름 앞에 우두머리 표시를 붙인다.
+         */
+        public string BossName
+        {
+            get
+            {
+                if (IsChapterBoss) return bossName;
+                var definition = StageBossDefinition();
+                return definition != null ? "거대 " + definition.displayName : bossName;
+            }
+        }
         public Enemy Boss { get { return boss; } }
         public string FailureMessage { get { return failureMessage; } }
 
@@ -109,9 +149,45 @@ namespace Onikiri.Battle
             }
         }
 
+        /**
+         * @brief 일반 스테이지 보스로 쓸 잡몹 정의.
+         *
+         * 스테이지로 고른다. 무작위로 뽑으면 재도전할 때마다 다른 놈이 나와서
+         * "이 스테이지의 우두머리"라는 인상이 생기지 않는다.
+         */
+        private EnemyDefinition StageBossDefinition()
+        {
+            if (stageBossDefinitions == null || stageBossDefinitions.Length == 0) return bossDefinition;
+
+            int stage = progress != null ? progress.Stage : 1;
+            int index = Mathf.Abs(stage - 1) % stageBossDefinitions.Length;
+            return stageBossDefinitions[index] != null ? stageBossDefinitions[index] : bossDefinition;
+        }
+
+        /** 이번 보스가 한 번 때릴 때의 피해 */
+        public double BossAttackDamage
+        {
+            get { return BossCurve.AttackDamageForStage(progress != null ? progress.Stage : 1); }
+        }
+
+        /** 보스가 플레이어를 때렸다 */
+        private void OnBossAttacked(Enemy attacker)
+        {
+            if (phase != Phase.Fighting || playerHealth == null) return;
+            playerHealth.TakeDamage(attacker.AttackDamage);
+        }
+
+        /** 플레이어가 쓰러졌다. 시간 초과와 같은 '스테이지 실패'로 합류한다 */
+        private void OnPlayerDied()
+        {
+            if (phase != Phase.Fighting) return;
+            Fail(FailureReason.Death);
+        }
+
         private void OnEnable()
         {
             if (spawner != null) spawner.EnemyKilled += OnEnemyKilled;
+            if (playerHealth != null) playerHealth.Died += OnPlayerDied;
 
             // 할당량이 차는 순간 도전 버튼이 떠야 한다. 그 사건은 StageProgress에서
             // 나오므로 여기서 받아 그대로 넘긴다. HUD가 두 곳을 구독하게 두면
@@ -122,6 +198,7 @@ namespace Onikiri.Battle
         private void OnDisable()
         {
             if (spawner != null) spawner.EnemyKilled -= OnEnemyKilled;
+            if (playerHealth != null) playerHealth.Died -= OnPlayerDied;
             if (progress != null) progress.Changed -= Raise;
         }
 
@@ -149,7 +226,11 @@ namespace Onikiri.Battle
             // 지난 판의 실패 문구를 들고 가지 않는다. 읽는 쪽이 Failed 상태에서만
             // 보긴 하지만, 남아 있으면 디버그 표시가 "지금 실패한 것처럼" 보인다
             failureMessage = string.Empty;
-            timer = introSeconds;
+
+            // 전체 연출(화면 어둡게 + 이름 + 워크인)은 챕터 보스 전용이다.
+            // 일반 스테이지 보스는 짧은 이름만 띄우고 곧바로 싸운다 - 매 스테이지
+            // 6초씩 반복되면 연출은 무게가 아니라 대기 시간이 된다. BossCurve 참고
+            timer = IsChapterBoss ? introSeconds : stageBossIntroSeconds;
             SetPhase(Phase.Intro);
         }
 
@@ -170,8 +251,8 @@ namespace Onikiri.Battle
                 case Phase.Fighting:
                     // 보스가 스폰에 실패했거나(정의 누락) 어떤 이유로 사라졌으면
                     // 시계만 도는 상태로 30초를 버리지 않고 즉시 정리한다
-                    if (boss == null || !boss.IsAlive) { Fail(); break; }
-                    if (timer <= 0f) Fail();
+                    if (boss == null || !boss.IsAlive) { Fail(FailureReason.TimeOut); break; }
+                    if (timer <= 0f) Fail(FailureReason.TimeOut);
                     break;
 
                 case Phase.Failed:
@@ -194,7 +275,23 @@ namespace Onikiri.Battle
                 return;
             }
 
-            boss = spawner.SpawnBoss(bossDefinition, BossMaxHealth, BossGoldReward);
+            bool chapter = IsChapterBoss;
+
+            // 챕터 보스는 화면 밖에서 걸어 들어온다. 일반 보스는 큐 앞줄에 바로
+            // 선다 - 워크인 5.3초가 매 스테이지 반복되면 제한 시간의 18%가
+            // 기다림으로 사라진다
+            boss = spawner.SpawnBoss(
+                chapter ? bossDefinition : StageBossDefinition(),
+                BossMaxHealth, BossGoldReward,
+                chapter ? 1f : stageBossScale,
+                chapter ? Color.white : stageBossTint,
+                BossAttackDamage,
+                chapter);
+
+            if (boss != null) boss.Attacked += OnBossAttacked;
+
+            if (playerHealth != null) playerHealth.BeginFight();
+
             timer = StageCurve.BossTimeLimitSeconds;
             SetPhase(Phase.Fighting);
         }
@@ -215,9 +312,10 @@ namespace Onikiri.Battle
             ReturnToFarming();
         }
 
-        private void Fail()
+        private void Fail(FailureReason reason)
         {
-            failureMessage = BuildFailureMessage();
+            LastFailure = reason;
+            failureMessage = BuildFailureMessage(reason);
 
             // 보스를 보상 없이 치운다. 남겨두면 파밍으로 돌아간 뒤에도 필드에 서
             // 있고, 잡몹 큐의 앞을 막아 사무라이가 보스만 때리게 된다
@@ -234,7 +332,7 @@ namespace Onikiri.Battle
          * 보스는 이미 정리 직전이므로 여기서 먼저 읽어야 한다. Fail()이 이것을
          * ClearField보다 앞에서 부르는 이유다.
          */
-        private string BuildFailureMessage()
+        private string BuildFailureMessage(FailureReason reason)
         {
             var dealt = boss != null ? boss.DamageTaken : BigDouble.Zero;
             var maxHealth = boss != null ? boss.MaxHealth : BossMaxHealth;
@@ -246,8 +344,22 @@ namespace Onikiri.Battle
                 for (int i = 0; i < tracks.Length; i++) tracks[i] = upgrades.GetTrack(i);
             }
 
+            if (reason == FailureReason.Death && playerHealth != null)
+            {
+                double incoming = BossCurve.TotalDamageOverFight(
+                    progress != null ? progress.Stage : 1, StageCurve.BossTimeLimitSeconds);
+
+                double effectiveHealth = SurvivalEfficiency.EffectiveHealth(
+                    playerHealth.MaxHealth, playerHealth.RegenPerSecond);
+
+                return BossFailureAdvice.DeathMessage(incoming, effectiveHealth, tracks);
+            }
+
             return BossFailureAdvice.Message(maxHealth, dealt, tracks);
         }
+
+        /** 마지막 실패의 이유. 테스트 패널과 보고가 읽는다 */
+        public FailureReason LastFailure { get; private set; }
 
         /**
          * @brief 잡몹 파밍으로 되돌린다.
@@ -258,6 +370,9 @@ namespace Onikiri.Battle
         private void ReturnToFarming()
         {
             if (spawner != null) spawner.ResumeSpawning();
+            // 체력은 파밍으로 돌아가며 가득 찬다. 회복에 시간을 들이지 않는
+            // 이유는 PlayerHealth.EndFight 참고
+            if (playerHealth != null) playerHealth.EndFight();
             SetPhase(Phase.Farming);
         }
 

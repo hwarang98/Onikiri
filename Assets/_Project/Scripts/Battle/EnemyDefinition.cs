@@ -44,6 +44,18 @@ namespace Onikiri.Battle
         [Tooltip("큐에 정렬된 적 사이의 가로 간격 (world units)")]
         public float queueSpacing = 0.75f;
 
+        [Header("공격 (보스 전용)")]
+        [Tooltip("공격 시 재생할 프레임. 비어 있으면 idle 유지 + 이펙트로 대체한다. " +
+                 "잡몹은 플레이어를 공격하지 않으므로 비워 둔다")]
+        public Sprite[] attackFrames;
+
+        [Tooltip("공격 사이의 간격 (초). 0이면 공격하지 않는다")]
+        public float attackInterval;
+
+        [Tooltip("칼이 닿기까지 공격 애니메이션에서 지나가는 비율")]
+        [Range(0f, 1f)]
+        public float attackImpactPoint = 0.55f;
+
         [Header("연출")]
         [Tooltip("지면선 위 높이. 걷지 않고 떠다니는 요괴용")]
         public float hoverHeight = 0.12f;

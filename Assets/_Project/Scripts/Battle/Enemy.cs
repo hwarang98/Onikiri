@@ -38,6 +38,24 @@ namespace Onikiri.Battle
         private float targetX;
         private float hurtFlashRemaining;
 
+        /** 확대 배율과 틴트. 보스 유형에 따라 스폰 시점에 정해진다 */
+        private float bodyScale = 1f;
+        private Color baseTint = Color.white;
+
+        /** 공격 주기. 0이면 공격하지 않는다 (잡몹) */
+        private float attackTimer;
+        private bool swingStarted;
+
+        /**
+         * @brief 한 번 때릴 때의 피해량. 0이면 공격하지 않는다.
+         *
+         * 스폰 시점에 확정한다. 스테이지 배율이 이미 곱해진 값이다.
+         */
+        public double AttackDamage { get; private set; }
+
+        /** 이 요괴가 플레이어를 때렸다. 사거리 안이고 주기가 찼을 때 발생 */
+        public event Action<Enemy> Attacked;
+
         public State CurrentState { get; private set; }
         public bool IsAlive { get { return CurrentState == State.Approaching || CurrentState == State.Engaged; } }
         public bool IsTargetable { get { return IsAlive; } }
@@ -106,20 +124,33 @@ namespace Onikiri.Battle
          * 남아 있으면 스포너와 여기 양쪽에 밸런스 계산이 흩어진다.
          */
         public void Spawn(EnemyDefinition def, float spawnX, float ground, int sortingOrder,
-                          BigDouble totalHealth, BigDouble goldOnKill, bool isBoss = false)
+                          BigDouble totalHealth, BigDouble goldOnKill, bool isBoss = false,
+                          float scale = 1f, Color tint = default(Color), double attackDamage = 0d)
         {
             definition = def;
             maxHealth = totalHealth;
             goldReward = goldOnKill;
             IsBoss = isBoss;
             health = maxHealth;
+
+            AttackDamage = attackDamage;
+            attackTimer = 0f;
+            swingStarted = false;
+
+            // 잡몹 확대판 보스용. 정수 배율만 쓴다 - 픽셀 격자가 어긋나는 이유는
+            // BossContentBuilder에 적어뒀다
+            transform.localScale = new Vector3(scale, scale, 1f);
+            bodyScale = scale;
             groundY = ground;
             targetX = spawnX;
             hurtFlashRemaining = 0f;
             CurrentState = State.Approaching;
 
             spriteRenderer.sortingOrder = sortingOrder;
-            spriteRenderer.color = Color.white;
+            // 틴트는 "같은 놈이 커진 것"이 아니라 "우두머리"로 읽히게 하는 장치다.
+            // 기본값(투명 검정)이면 손대지 않는다
+            baseTint = tint.a > 0f ? tint : Color.white;
+            spriteRenderer.color = baseTint;
             // 적은 오른쪽에서 와서 플레이어를 바라본다. 원본 아트가 그려진 방향의 반대다
             spriteRenderer.flipX = true;
 
@@ -204,12 +235,16 @@ namespace Onikiri.Battle
             if (hurtFlashRemaining > 0f)
             {
                 hurtFlashRemaining -= Time.deltaTime;
-                // 피격 시 붉은 흰색으로 번쩍였다가 원래 색으로 돌아온다
+                // 피격 시 붉은 흰색으로 번쩍였다가 원래 색으로 돌아온다.
+                // 돌아갈 색은 흰색이 아니라 이 개체의 틴트다 - 확대판 보스는
+                // 물들여 두었으므로 흰색으로 돌리면 맞을 때마다 색이 벗겨진다
                 float t = Mathf.Clamp01(hurtFlashRemaining / 0.08f);
-                spriteRenderer.color = Color.Lerp(Color.white, new Color(1f, 0.45f, 0.45f), t);
+                spriteRenderer.color = Color.Lerp(baseTint, new Color(1f, 0.45f, 0.45f), t);
             }
 
             if (CurrentState != State.Approaching && CurrentState != State.Engaged) return;
+
+            UpdateAttack();
 
             var position = transform.position;
             float step = definition.moveSpeed * Time.deltaTime;
@@ -229,6 +264,50 @@ namespace Onikiri.Battle
         }
 
         /**
+         * @brief 보스의 공격 주기.
+         *
+         * 큐 앞줄에 도착한 뒤에만 돈다(Engaged). 걸어 들어오는 동안 때리면
+         * 화면 밖에서 피해가 들어오고, 플레이어는 무엇에 맞았는지 알 수 없다.
+         *
+         * 잡몹은 attackInterval이 0이라 이 함수가 즉시 빠져나간다. 잡몹이
+         * 공격하지 않는 것은 성능 최적화가 아니라 설계다 - PlayerHealth 참고.
+         */
+        private void UpdateAttack()
+        {
+            if (AttackDamage <= 0d || definition == null || definition.attackInterval <= 0f) return;
+            if (CurrentState != State.Engaged) return;
+
+            float interval = definition.attackInterval;
+            attackTimer += Time.deltaTime;
+
+            // 애니메이션은 타격보다 lead 시간만큼 먼저 시작한다. 플레이어의
+            // PlayerCombat과 같은 규칙이다 - 칼이 닿는 프레임과 피해가 들어가는
+            // 순간이 겹쳐야 한 사건으로 읽힌다
+            float swingDuration = definition.attackFrames != null && definition.attackFrames.Length > 0
+                ? Mathf.Min(definition.attackFrames.Length / definition.frameRate, interval)
+                : 0f;
+            float lead = swingDuration * definition.attackImpactPoint;
+
+            if (!swingStarted && attackTimer >= interval - lead)
+            {
+                if (swingDuration > 0f)
+                {
+                    float rate = definition.attackFrames.Length / Mathf.Max(0.0001f, swingDuration);
+                    animator.Play(definition.attackFrames, rate, false, PlayIdle);
+                }
+                swingStarted = true;
+            }
+
+            if (attackTimer < interval) return;
+
+            attackTimer -= interval;
+            swingStarted = false;
+
+            var handler = Attacked;
+            if (handler != null) handler(this);
+        }
+
+        /**
          * @brief 가장 아래 그려진 픽셀이 지면에서 정확히 hoverHeight 만큼 뜨는 월드 Y.
          *
          * 스프라이트 피벗은 아트가 아니라 캔버스 가장자리이고, 요괴마다 캔버스 안에서
@@ -236,7 +315,9 @@ namespace Onikiri.Battle
          */
         private float RestingY()
         {
-            return groundY + definition.hoverHeight - definition.artBottomOffset;
+            // 보정값에 배율을 곱한다. artBottomOffset은 배율 1의 스프라이트에서
+            // 측정한 값이라, 확대판 보스에 그대로 쓰면 발이 지면에 파묻힌다
+            return groundY + definition.hoverHeight - definition.artBottomOffset * bodyScale;
         }
 
         /** 스포너가 필드를 비울 때 쓰는 강제 초기화 */
@@ -246,6 +327,16 @@ namespace Onikiri.Battle
             animator.Stop();
             Died = null;
             Killed = null;
+            Attacked = null;
+
+            // 풀로 돌아가는 인스턴스는 확대판 보스였을 수 있다. 배율과 틴트를
+            // 되돌리지 않으면 다음에 잡몹으로 재사용될 때 두 배 크기의 물든
+            // 요괴가 나온다
+            bodyScale = 1f;
+            baseTint = Color.white;
+            AttackDamage = 0d;
+            transform.localScale = Vector3.one;
+            if (spriteRenderer != null) spriteRenderer.color = Color.white;
         }
     }
 }

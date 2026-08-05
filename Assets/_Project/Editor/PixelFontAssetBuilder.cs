@@ -249,35 +249,31 @@ namespace Onikiri.EditorTools
          */
         private static void SaveWithSubAssets(TMP_FontAsset fontAsset, string path)
         {
-            var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
-
-            if (existing == null)
-            {
-                AssetDatabase.CreateAsset(fontAsset, path);
-                AttachSubAssets(fontAsset, fontAsset);
-                Finish(fontAsset, path);
-                return;
-            }
-
-            // 이전에 매달려 있던 아틀라스/머티리얼을 떼어낸다. 남겨두면 재빌드마다
-            // 파일 안에 쓰이지 않는 텍스처가 쌓인다.
+            // 10단계에서 GUID를 보존하려고 기존 에셋 안에 내용만 부어 넣는 방식을
+            // 넣었다가 11단계에서 되돌렸다. **문자셋이 바뀌지 않을 때만 동작했다.**
             //
-            // DestroyImmediate(sub, true)가 아니라 RemoveObjectFromAsset을 쓴다.
-            // 전자는 "Destroying assets is not permitted" 를 뱉는다 - 파일에 속한
-            // 오브젝트를 지우는 것과 파일에서 떼어내는 것은 다른 동작이고,
-            // 여기서 필요한 것은 후자다. 떼어낸 오브젝트는 저장 시점에 회수된다
-            foreach (var sub in AssetDatabase.LoadAllAssetRepresentationsAtPath(path))
-            {
-                if (sub == null || sub == existing) continue;
-                AssetDatabase.RemoveObjectFromAsset(sub);
-            }
+            // 글리프 수가 231에서 237로 늘어나자 화면의 모든 한글이 엉뚱한 글자로
+            // 바뀌었다. 폰트 에셋의 GUID는 지켰지만 씬의 TMP 컴포넌트는
+            // fontSharedMaterial 도 따로 들고 있고, 아틀라스·머티리얼·글리프 테이블
+            // 셋이 한 벌로 맞아야 하는데 그중 일부만 갈아끼우면 매핑이 어긋난다.
+            // 아틀라스 픽셀을 기존 텍스처에 복사하고 머티리얼 프로퍼티까지 옮겨봐도
+            // 마찬가지였다.
+            //
+            // 10단계의 검증이 부족했다. 그때는 문자셋이 그대로인 상태로만 다시
+            // 구웠고, 그 경우에는 테이블이 동일해서 우연히 맞았다.
+            //
+            // 지우고 다시 만드는 쪽으로 되돌린다. GUID가 바뀌므로 **폰트를 다시
+            // 구운 뒤에는 Build Combat Content 를 다시 돌려야 한다.** 규칙으로
+            // 남기는 것이 마음에 들지는 않지만, 글자가 조용히 깨지는 것보다는
+            // 한 단계를 더 밟는 편이 낫다. 제대로 고치려면 TMP가 폰트 에셋을
+            // 어떻게 캐시하는지까지 들어가야 하고, 그것은 12단계 UI 개편에서
+            // 폰트 파이프라인을 통째로 볼 때 할 일이다.
+            var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+            if (existing != null) AssetDatabase.DeleteAsset(path);
 
-            // 새로 구운 내용을 기존 인스턴스에 복사한다. GUID와 fileID가 유지되므로
-            // 씬의 참조가 그대로 살아 있다
-            EditorUtility.CopySerialized(fontAsset, existing);
-            AttachSubAssets(fontAsset, existing);
-
-            Finish(existing, path);
+            AssetDatabase.CreateAsset(fontAsset, path);
+            AttachSubAssets(fontAsset, fontAsset);
+            Finish(fontAsset, path);
         }
 
         /**
