@@ -36,6 +36,16 @@ namespace Onikiri.Core
         public const int EnemyBase = 0;
         public const int EnemySlots = 40;
 
+        /**
+         * @brief 보스는 잡몹 구간 바로 위, 플레이어 아래다.
+         *
+         * 플레이어 위로 올리지 않는 것은 잡몹과 같은 이유다 - 시선이 따라가야 할
+         * 대상은 사무라이다. 잡몹 구간(0~39) 위에 두는 이유는 보스전에서 필드가
+         * 비워지긴 하지만, 실패 직후 잡몹이 돌아오는 한두 프레임 동안 겹칠 수 있고
+         * 그때 보스가 잡몹에 가리면 안 되기 때문이다.
+         */
+        public const int Boss = EnemyBase + EnemySlots;
+
         public const int Player = 50;
 
         /** 파이터들의 발 위로 그려지는 풀 */

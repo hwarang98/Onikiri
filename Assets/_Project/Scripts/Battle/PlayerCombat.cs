@@ -84,6 +84,13 @@ namespace Onikiri.Battle
         [Tooltip("참격이 나타나는 위치. 대상에서 사무라이 쪽으로의 오프셋")]
         [SerializeField] private Vector2 slashOffset = new Vector2(-0.15f, 0.55f);
 
+        [Tooltip("타격마다 터지는 벚꽃잎. 비어 있어도 전투는 그대로 돈다")]
+        [SerializeField] private SakuraBurst sakura;
+
+        [Tooltip("참격이 지나가는 기준 방향. 사무라이는 오른쪽 위로 벤다. " +
+                 "꽃잎은 이 방향을 중심으로 부채꼴로 흩어진다")]
+        [SerializeField] private Vector2 slashDirection = new Vector2(1f, 0.45f);
+
         [Header("풀")]
         [SerializeField] private int slashPrewarm = 6;
 
@@ -97,8 +104,8 @@ namespace Onikiri.Battle
          */
         private float attackTimer;
 
-        /** 공격속도로 압축되기 전, 설계된 스윙 길이 */
-        private float baseAttackDuration;
+        /** 공격속도로 압축되기 전, 설계된 스윙 길이. 0이면 아직 재지 않았다 */
+        private float measuredAttackDuration;
 
         /** 이번 주기의 스윙 애니메이션이 이미 시작됐는지 */
         private bool swingStarted;
@@ -114,6 +121,8 @@ namespace Onikiri.Battle
 
         public int SlashPoolGrowthCount { get { return slashPool != null ? slashPool.GrowthCount : 0; } }
 
+        public int SakuraPoolGrowthCount { get { return sakura != null ? sakura.PoolGrowthCount : 0; } }
+
         /**
          * @brief 업그레이드가 스탯을 갱신하는 진입점.
          *
@@ -126,10 +135,50 @@ namespace Onikiri.Battle
             set { damage = value; }
         }
 
+        /**
+         * @brief 설계된 스윙 길이. 프레임 수를 프레임레이트로 나눈 값이다.
+         *
+         * Awake가 아니라 여기서 늦게 재는 이유는, 강화가 Start에서 스탯을 밀어넣을 때
+         * 이미 상한이 필요하기 때문이다. Awake에서만 재면 실행 순서가 조금만 달라져도
+         * 상한이 0인 상태로 클램프가 돌아 공격속도가 0에 붙는다.
+         */
+        public float BaseAttackDuration
+        {
+            get
+            {
+                if (measuredAttackDuration <= 0f)
+                {
+                    measuredAttackDuration = attackFrames != null && attackFrames.Length > 0 && attackFrameRate > 0f
+                        ? attackFrames.Length / attackFrameRate
+                        : 0.4f;
+                }
+                return measuredAttackDuration;
+            }
+        }
+
+        /**
+         * @brief 아트가 허용하는 최대 공격속도.
+         *
+         * 튜닝 값이 아니라 계산 결과다. 스윙은 CombatFeel.MaxAnimationSpeed 배까지만
+         * 당길 수 있고 공격 간격 안에 들어가야 하므로, 상한은 클립 길이 하나로 정해진다.
+         * 클립을 다른 것으로 바꾸면 상한도 따라 움직인다.
+         */
+        public float MaxAttacksPerSecond
+        {
+            get { return CombatFeel.MaxAttacksPerSecond(BaseAttackDuration); }
+        }
+
+        /**
+         * @brief 공격속도. 아트가 정한 상한에서 잘린다.
+         *
+         * 클램프를 여기 둔 이유는 진입점이 하나여야 하기 때문이다. 강화·테스트 패널·
+         * 세이브 복원이 각자 값을 넣는데, 그중 하나라도 상한을 잊으면 스윙이 프레임
+         * 단위로 깜빡이는 상태가 되고 그건 화면을 봐야만 알 수 있다.
+         */
         public float AttacksPerSecond
         {
             get { return attacksPerSecond; }
-            set { attacksPerSecond = Mathf.Max(0.01f, value); }
+            set { attacksPerSecond = Mathf.Clamp(value, 0.01f, MaxAttacksPerSecond); }
         }
 
         /**
@@ -146,9 +195,9 @@ namespace Onikiri.Battle
             if (vfxParent == null) vfxParent = transform;
             if (slashPrefab != null) slashPool = new ObjectPool<SlashVfx>(slashPrefab, vfxParent, slashPrewarm);
 
-            baseAttackDuration = attackFrames != null && attackFrames.Length > 0
-                ? attackFrames.Length / attackFrameRate
-                : 0.4f;
+            // 인스펙터에 상한을 넘는 값이 남아 있을 수 있다. 프로퍼티를 거쳐 한 번
+            // 통과시켜 씬의 값과 코드가 정한 상한을 처음부터 맞춰둔다
+            AttacksPerSecond = attacksPerSecond;
         }
 
         private void Start()
@@ -162,8 +211,16 @@ namespace Onikiri.Battle
 
             // 스윙은 공격 간격 안에 들어가야 한다. 아니면 다음 스윙이 시작될 때
             // 이전 스윙이 아직 재생 중이라 동작이 뭉개진다. 스탯이 오르면 스윙도
-            // 눈에 띄게 빨라지므로 연출상으로도 맞다
-            float swingDuration = Mathf.Min(baseAttackDuration, interval);
+            // 눈에 띄게 빨라지므로 연출상으로도 맞다.
+            //
+            // 다만 무한히 당기지는 않는다. 2배속 아래로 내려가면 프레임 하나가 화면
+            // 프레임 하나보다 짧아져 발도 동작이 아니라 깜빡임으로 읽힌다. 공격속도
+            // 자체가 MaxAttacksPerSecond에서 잘리므로 정상 경로에서는 이 하한에 정확히
+            // 닿을 뿐 넘지 않는다. 여기 클램프는 테스트 패널이 상한 밖의 값을 직접
+            // 밀어넣을 때를 위한 것이다
+            float swingDuration = Mathf.Max(
+                CombatFeel.MinSwingDuration(BaseAttackDuration),
+                Mathf.Min(BaseAttackDuration, interval));
             float lead = swingDuration * impactPoint;
 
             var target = spawner != null
@@ -218,6 +275,11 @@ namespace Onikiri.Battle
             // transform이 아니라 그려진 스프라이트의 중심을 겨냥한다. Enemy.HitPoint 참고
             var hitPoint = target.HitPoint;
             SpawnSlash(hitPoint + new Vector3(slashOffset.x, slashOffset.y, 0f));
+
+            // 꽃잎은 참격 오프셋을 쓰지 않는다. 참격은 이펙트 아트의 중심을 맞추려고
+            // 칼 쪽으로 당겨져 있지만, 꽃잎은 베인 대상에서 떨어져 나가는 것이므로
+            // 요괴가 그려진 자리에서 나와야 한다
+            if (sakura != null) sakura.Play(hitPoint, slashDirection, attacksPerSecond);
 
             target.TakeDamage(dealt);
             bool killed = !target.IsAlive;

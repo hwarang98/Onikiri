@@ -54,6 +54,43 @@ namespace Onikiri.Battle
         public BigDouble MaxHealth { get { return maxHealth; } }
         public BigDouble GoldReward { get { return goldReward; } }
 
+        /**
+         * @brief 보스인가.
+         *
+         * 스포너가 이것으로 두 가지를 가른다. 처치가 스테이지 할당량에 들어가는지,
+         * 그리고 죽었을 때 보스전을 끝내야 하는지다. 별도 클래스를 만들지 않은 이유는
+         * 보스와 잡몹이 하는 일이 완전히 같기 때문이다 - 걸어와서 멈추고 맞고 죽는다.
+         * 다른 것은 체력·보상·연출뿐이고 그것은 전부 스폰 시점의 값이다.
+         */
+        public bool IsBoss { get; private set; }
+
+        /** 체력 비율 0~1. 보스 체력 바가 쓴다 */
+        public float HealthFraction
+        {
+            get
+            {
+                if (maxHealth <= BigDouble.Zero) return 0f;
+                if (health <= BigDouble.Zero) return 0f;
+                return Mathf.Clamp01((float)(health / maxHealth).ToDouble());
+            }
+        }
+
+        /**
+         * @brief 이 개체가 지금까지 받은 총 피해.
+         *
+         * 실패 화면이 "몇 배 모자랐는가"를 계산할 때 쓴다. 남은 체력이 아니라 받은
+         * 피해라야 한다 - 실패 시점에 이미 죽어 사라진 개체를 붙들고 있을 필요가 없고,
+         * 제한 시간 동안의 실제 DPS가 그대로 드러난다.
+         */
+        public BigDouble DamageTaken
+        {
+            get
+            {
+                var dealt = maxHealth - health;
+                return dealt > BigDouble.Zero ? dealt : BigDouble.Zero;
+            }
+        }
+
         private void Awake()
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -63,14 +100,18 @@ namespace Onikiri.Battle
         /**
          * @brief 풀에서 꺼낸 인스턴스를 spawnX 위치에서 살려낸다.
          *
-         * 체력·골드 배수는 스테이지에서 온다. 정의 에셋의 값은 1스테이지 기준이다.
+         * 체력과 골드는 배수가 아니라 **확정된 절대값**으로 받는다. 예전에는 배수를
+         * 넘겨 여기서 곱했는데, 보스는 스테이지 배수 위에 다시 보스 배수가 얹히고
+         * 기준이 되는 잡몹도 정의 에셋 하나가 아니라 가중 평균이라, 곱셈이 이 안에
+         * 남아 있으면 스포너와 여기 양쪽에 밸런스 계산이 흩어진다.
          */
         public void Spawn(EnemyDefinition def, float spawnX, float ground, int sortingOrder,
-                          BigDouble healthMultiplier, BigDouble goldMultiplier)
+                          BigDouble totalHealth, BigDouble goldOnKill, bool isBoss = false)
         {
             definition = def;
-            maxHealth = def.maxHealth * healthMultiplier;
-            goldReward = def.goldReward * goldMultiplier;
+            maxHealth = totalHealth;
+            goldReward = goldOnKill;
+            IsBoss = isBoss;
             health = maxHealth;
             groundY = ground;
             targetX = spawnX;

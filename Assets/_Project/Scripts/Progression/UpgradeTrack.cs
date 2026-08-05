@@ -52,6 +52,22 @@ namespace Onikiri.Progression
         [Tooltip("Additive면 레벨당 더할 값, Multiplicative면 레벨당 곱할 배수")]
         [SerializeField] private double step = 1.12d;
 
+        /**
+         * @brief 효과값의 상한. 0이면 없음.
+         *
+         * maxLevel과 다른 것이다. maxLevel은 **더 팔지 않는다**는 뜻이고, 이것은
+         * **더 세지지 않는다**는 뜻이다. 보통은 둘이 같은 곳에서 나오지만
+         * (공격속도는 아트가 정한 상한 하나에서 둘 다 유도된다), 세이브를 복원할 때
+         * 갈라진다.
+         *
+         * 예전 세이브에 상한보다 높은 레벨이 들어 있을 수 있다. 그 레벨을 잘라버리면
+         * 플레이어가 산 것이 사라지고, 나중에 상한이 올라가도 돌아오지 않는다.
+         * 레벨은 그대로 두고 효과만 여기서 막으면, 상한이 오르는 순간 그 레벨이
+         * 곧바로 제 값을 낸다.
+         */
+        [Tooltip("효과값의 상한. 0이면 없음. maxLevel과 달리 구매가 아니라 값을 막는다")]
+        [SerializeField] private double valueCeiling;
+
         public string Id { get { return id; } }
         public string DisplayName { get { return displayName; } }
         public int Level { get { return level; } }
@@ -85,9 +101,40 @@ namespace Onikiri.Progression
         public BigDouble ValueAtLevel(int atLevel)
         {
             int steps = Mathf.Max(0, atLevel - 1);
+            var raw = curve == Curve.Additive
+                ? baseValue + BigDouble.FromDouble(step) * steps
+                : baseValue * BigDouble.Pow(BigDouble.FromDouble(step), steps);
+
+            if (valueCeiling <= 0d) return raw;
+
+            var ceiling = BigDouble.FromDouble(valueCeiling);
+            return raw > ceiling ? ceiling : raw;
+        }
+
+        /** 상한을 무시한 곡선 그대로의 값. 상한이 올라갔을 때 무엇이 돌아오는지를 본다 */
+        public BigDouble UncappedValueAtLevel(int atLevel)
+        {
+            int steps = Mathf.Max(0, atLevel - 1);
             return curve == Curve.Additive
                 ? baseValue + BigDouble.FromDouble(step) * steps
                 : baseValue * BigDouble.Pow(BigDouble.FromDouble(step), steps);
+        }
+
+        /** 지금 레벨의 효과가 상한에 막혀 있는가. UI가 "MAX"를 판단할 때 쓴다 */
+        public bool IsValueCapped
+        {
+            get { return valueCeiling > 0d && UncappedValueAtLevel(level) > BigDouble.FromDouble(valueCeiling); }
+        }
+
+        /**
+         * @brief 상한을 올린다. 아트나 규칙이 바뀌었을 때 곡선을 다시 열어주는 경로.
+         *
+         * 레벨을 건드리지 않으므로, 상한 위에 잠들어 있던 레벨이 그대로 깨어난다.
+         */
+        public void SetValueCeiling(double value, int newMaxLevel)
+        {
+            valueCeiling = Mathf.Max(0f, (float)value);
+            maxLevel = Mathf.Max(0, newMaxLevel);
         }
 
         /**
@@ -106,10 +153,22 @@ namespace Onikiri.Progression
             return true;
         }
 
-        /** 세이브/로드용 */
+        /**
+         * @brief 세이브/로드용. 저장된 레벨을 **자르지 않는다**.
+         *
+         * 예전에는 maxLevel로 잘랐다. 그러면 상한이 내려간 업데이트에서 플레이어가
+         * 산 레벨이 영구히 사라진다 - 9단계에서 공격속도 상한을 51에서 32로 낮췄을 때
+         * Lv.44 세이브가 정확히 그렇게 됐다. 골드는 이미 썼는데 되돌릴 방법이 없다.
+         *
+         * 이제 레벨은 그대로 남고 효과만 valueCeiling에서 막힌다. 상한이 다시 오르면
+         * (더 긴 공격 클립, 새 규칙) 잠들어 있던 레벨이 그대로 제 값을 낸다.
+         *
+         * 구매는 여전히 maxLevel에서 막힌다. IsMaxed 참고 - 상한 위의 레벨은
+         * "더 살 수 없는 상태"로 읽히므로 UI 동작은 달라지지 않는다.
+         */
         public void SetLevel(int value)
         {
-            level = Mathf.Max(1, maxLevel > 0 ? Mathf.Min(value, maxLevel) : value);
+            level = Mathf.Max(1, value);
         }
 
         /**
@@ -122,8 +181,9 @@ namespace Onikiri.Progression
         public UpgradeTrack(string id, string displayName,
                             BigDouble baseCost, double costGrowth,
                             Curve curve, BigDouble baseValue, double step,
-                            int maxLevel = 0)
+                            int maxLevel = 0, double valueCeiling = 0d)
         {
+            this.valueCeiling = valueCeiling;
             this.id = id;
             this.displayName = displayName;
             this.baseCost = baseCost;

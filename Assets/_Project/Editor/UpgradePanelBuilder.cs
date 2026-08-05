@@ -29,6 +29,9 @@ namespace Onikiri.EditorTools
             public double BaseValue;
             public double Step;
             public int MaxLevel;
+
+            /** 0이면 없음. 구매(MaxLevel)가 아니라 효과값을 막는다 */
+            public double ValueCeiling;
         }
 
         private static readonly TrackSpec[] Specs =
@@ -38,9 +41,10 @@ namespace Onikiri.EditorTools
             // 곡선값과 시작 스탯이 어긋나면 첫 구매에서 수치가 튄다
             new TrackSpec {
                 Id = UpgradeSystem.AttackPowerId, DisplayName = "공격력 강화",
-                BaseCost = 10d, CostGrowth = 1.15d,
-                Curve = UpgradeTrack.Curve.Multiplicative, BaseValue = 5d, Step = 1.12d,
-                MaxLevel = 0
+                BaseCost = AttackPowerCurve.BaseCost, CostGrowth = AttackPowerCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Multiplicative,
+                BaseValue = AttackPowerCurve.BaseValue, Step = AttackPowerCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d
             },
             // 공격속도: 공격력과 같은 형태의 곱연산 + 상한.
             //
@@ -55,12 +59,18 @@ namespace Onikiri.EditorTools
             // 한쪽 레벨이 오르면 그쪽 비용이 올라 자연히 다른 쪽 차례가 온다.
             // UpgradeEfficiencyTests가 이 관계를 못 박는다.
             //
-            // 상한 51에서 1.15 x 1.04^50 = 8.17회/초. 이전 상한 8.23과 사실상 같다.
+            // 상한은 여기 적지 않고 아트에서 유도한다. AttackSpeedCurve 참고.
+            // 지금 클립(7프레임 / 14fps) 기준으로 Lv.32 = 3.88회/초다.
             new TrackSpec {
                 Id = UpgradeSystem.AttackSpeedId, DisplayName = "공격속도 강화",
-                BaseCost = 4d, CostGrowth = 1.15d,
-                Curve = UpgradeTrack.Curve.Multiplicative, BaseValue = 1.15d, Step = 1.04d,
-                MaxLevel = 51
+                BaseCost = AttackSpeedCurve.BaseCost, CostGrowth = AttackSpeedCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Multiplicative,
+                BaseValue = AttackSpeedCurve.BaseValue, Step = AttackSpeedCurve.Step,
+                // MaxLevel은 "더 팔지 않는다", ValueCeiling은 "더 세지지 않는다"이다.
+                // 둘 다 같은 상한에서 나오지만 세이브 복원에서 갈라진다 - 상한을 낮춘
+                // 업데이트에서 예전 레벨은 남고 효과만 막힌다. UpgradeTrack 참고
+                MaxLevel = AttackSpeedCurve.MaxLevel,
+                ValueCeiling = AttackSpeedCurve.Ceiling
             }
         };
 
@@ -186,6 +196,7 @@ namespace Onikiri.EditorTools
                 element.FindPropertyRelative("costGrowth").doubleValue = spec.CostGrowth;
                 element.FindPropertyRelative("curve").enumValueIndex = (int)spec.Curve;
                 element.FindPropertyRelative("step").doubleValue = spec.Step;
+                element.FindPropertyRelative("valueCeiling").doubleValue = spec.ValueCeiling;
 
                 SetBigDouble(element.FindPropertyRelative("baseCost"), spec.BaseCost);
                 SetBigDouble(element.FindPropertyRelative("baseValue"), spec.BaseValue);

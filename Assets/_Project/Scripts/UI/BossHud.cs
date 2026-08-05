@@ -1,0 +1,123 @@
+using Onikiri.Battle;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace Onikiri.UI
+{
+    /**
+     * @brief 보스전 화면. 도전 버튼, 등장 연출, 시계와 체력 바, 실패 문구.
+     *
+     * 네 덩어리가 한 컴포넌트에 있는 이유는 이들이 서로 배타적이기 때문이다. 어느
+     * 하나가 떠 있으면 나머지는 반드시 꺼져 있어야 하고, 그 규칙을 여러 컴포넌트에
+     * 나눠 두면 "실패 문구 위에 도전 버튼이 겹쳐 있는" 상태가 조합으로 생긴다.
+     * 상태 하나에 화면 하나를 대응시키면 그런 조합이 존재할 수 없다.
+     *
+     * 갱신은 두 갈래다. 상태 전환은 BossFight.Changed 이벤트로, 시계와 체력 바는
+     * 여기서 직접 읽는다. 시계를 이벤트로 받으면 매 프레임 TMP 메시를 다시 만들게
+     * 되는데, 표시는 1초 단위라 그중 대부분이 같은 글자를 다시 그리는 일이다.
+     */
+    public sealed class BossHud : MonoBehaviour
+    {
+        [SerializeField] private BossFight fight;
+
+        [Header("도전")]
+        [SerializeField] private GameObject challengeRoot;
+        [SerializeField] private Button challengeButton;
+        [SerializeField] private TMP_Text challengeLabel;
+
+        [Header("등장 연출")]
+        [Tooltip("화면 전체를 덮는 어두운 판. 보스가 들어오기 전 1초 동안 떠 있다")]
+        [SerializeField] private GameObject introRoot;
+        [SerializeField] private TMP_Text introLabel;
+
+        [Header("전투")]
+        [SerializeField] private GameObject fightRoot;
+        [SerializeField] private TMP_Text timerLabel;
+        [Tooltip("Image.type = Filled 여야 한다. fillAmount만 건드리므로 메시 재생성이 없다")]
+        [SerializeField] private Image healthFill;
+
+        [Header("결과")]
+        [SerializeField] private GameObject resultRoot;
+        [SerializeField] private TMP_Text resultLabel;
+
+        /**
+         * @brief 마지막으로 화면에 찍은 남은 초.
+         *
+         * -1로 시작해 첫 프레임에서 반드시 한 번 갱신되게 한다.
+         */
+        private int shownSeconds = -1;
+
+        private void Start()
+        {
+            if (fight != null) fight.Changed += Refresh;
+            if (challengeButton != null) challengeButton.onClick.AddListener(OnChallengeClicked);
+
+            Refresh();
+        }
+
+        private void OnDestroy()
+        {
+            if (fight != null) fight.Changed -= Refresh;
+            if (challengeButton != null) challengeButton.onClick.RemoveListener(OnChallengeClicked);
+        }
+
+        private void OnChallengeClicked()
+        {
+            if (fight != null) fight.Challenge();
+        }
+
+        /**
+         * @brief 상태 하나에 화면 하나.
+         *
+         * 매번 넷을 전부 껐다 필요한 것만 켠다. "이전 상태에서 무엇이 켜져 있었는지"를
+         * 따지지 않으므로 전환 표를 유지할 필요가 없다.
+         */
+        private void Refresh()
+        {
+            if (fight == null) return;
+
+            var phase = fight.Current;
+
+            Show(challengeRoot, phase == BossFight.Phase.Farming && fight.CanChallenge);
+            Show(introRoot, phase == BossFight.Phase.Intro);
+            Show(fightRoot, phase == BossFight.Phase.Fighting);
+            Show(resultRoot, phase == BossFight.Phase.Failed);
+
+            if (phase == BossFight.Phase.Intro && introLabel != null)
+                introLabel.text = fight.BossName;
+
+            if (phase == BossFight.Phase.Failed && resultLabel != null)
+                resultLabel.text = fight.FailureMessage;
+
+            if (phase == BossFight.Phase.Farming && challengeLabel != null)
+                challengeLabel.text = "보스 도전";
+
+            // 새 전투가 시작될 때마다 시계 표시를 무효화한다. 그러지 않으면 이전
+            // 전투가 끝난 초와 같은 값으로 시작하는 경우 첫 갱신이 통째로 생략된다
+            if (phase != BossFight.Phase.Fighting) shownSeconds = -1;
+        }
+
+        private void Update()
+        {
+            if (fight == null || fight.Current != BossFight.Phase.Fighting) return;
+
+            // fillAmount는 셰이더 파라미터라 메시를 다시 만들지 않는다. 매 프레임
+            // 써도 되는 몇 안 되는 UI 값이고, 체력 바는 끊기면 곧바로 티가 난다
+            if (healthFill != null) healthFill.fillAmount = fight.BossHealthFraction;
+
+            // 남은 시간은 올림한다. 29.4초를 "29"로 찍으면 시작하자마자 1초가
+            // 사라진 것처럼 보이고, 0은 시간이 실제로 다 됐을 때만 나와야 한다
+            int seconds = Mathf.CeilToInt(fight.SecondsLeft);
+            if (seconds == shownSeconds) return;
+
+            shownSeconds = seconds;
+            if (timerLabel != null) timerLabel.text = seconds + "초";
+        }
+
+        private static void Show(GameObject target, bool visible)
+        {
+            if (target != null && target.activeSelf != visible) target.SetActive(visible);
+        }
+    }
+}

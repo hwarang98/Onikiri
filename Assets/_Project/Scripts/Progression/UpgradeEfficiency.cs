@@ -30,10 +30,20 @@ namespace Onikiri.Progression
         {
             if (track == null) return 0d;
 
-            double current = track.ValueAtLevel(level).ToDouble();
+            // 상한을 걷어낸 곡선으로 잰다. 이 지표가 보는 것은 **곡선의 형태**이지
+            // 지금 실제로 낼 수 있는 값이 아니다.
+            //
+            // 상한이 걸린 값을 쓰면 상한 위에서 증가율이 0이 되고, 두 축의 비율이
+            // 무한대로 발산해 "공격속도가 죽었다"는 결론이 나온다. 그건 틀린 결론이다 -
+            // 상한 위의 레벨은 팔리지 않으므로(IsMaxed) 죽은 버튼이 아니라 아예
+            // 없는 버튼이고, 죽은 버튼은 "눌리는데 값어치가 없는 것"을 말한다.
+            //
+            // 새 축을 추가할 때 잡아야 하는 것도 형태다. 상한을 붙이면 어떤 나쁜
+            // 곡선이든 그 지점부터는 검사를 통과해버린다.
+            double current = track.UncappedValueAtLevel(level).ToDouble();
             if (current <= 0d || double.IsNaN(current) || double.IsInfinity(current)) return 0d;
 
-            double next = track.ValueAtLevel(level + 1).ToDouble();
+            double next = track.UncappedValueAtLevel(level + 1).ToDouble();
             if (double.IsNaN(next) || double.IsInfinity(next)) return 0d;
 
             return next / current - 1d;

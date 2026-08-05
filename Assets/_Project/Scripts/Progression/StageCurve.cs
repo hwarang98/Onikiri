@@ -43,6 +43,61 @@ namespace Onikiri.Progression
          */
         public const double GoldGrowth = 1.72d;
 
+        // ---------------------------------------------------------------- 보스
+
+        /**
+         * @brief 보스 체력 = 해당 스테이지 잡몹 체력 x 이 값.
+         *
+         * 8이라는 숫자의 뜻은 "잡몹 여덟 마리 분량"이 아니라 **제한 시간의 압박**이다.
+         * 잡몹은 큐로 한 마리씩 들어오므로 처치 속도가 스폰 간격에 묶여 있지만,
+         * 보스는 처음부터 전부 나와 있어서 순수하게 DPS로만 깎인다. 그래서 이 값은
+         * 곧 "30초 안에 초당 얼마를 넣어야 하는가"를 정한다.
+         *
+         * HitsToKill이 스테이지 내내 5~12대 범위를 유지하므로, 보스는 40~96대다.
+         * 지금 공격속도(1.15~3.88회/초)에서 11~35초 - 제한 시간 30초를 아슬아슬하게
+         * 걸치도록 의도한 값이다. 강화가 뒤처지면 실패하고, 따라가면 통과한다.
+         */
+        public const double BossHealthMultiplier = 8d;
+
+        /**
+         * @brief 보스 골드 = 해당 스테이지 잡몹 골드 x 이 값.
+         *
+         * 체력 배수(8)보다 크게 잡은 것은 의도적이다. 같으면 보스는 "체력만 많은 잡몹"과
+         * 골드 효율이 똑같아서, 30초 제한과 실패 위험을 감수할 이유가 사라진다.
+         * 12/8 = 1.5배의 웃돈이 도전의 대가다.
+         */
+        public const double BossGoldMultiplier = 12d;
+
+        /** 보스전 제한 시간 (초). 초과하면 스테이지 실패 - 패널티는 없다 */
+        public const float BossTimeLimitSeconds = 30f;
+
+        public static BigDouble BossHealth(BigDouble stageMobHealth)
+        {
+            return stageMobHealth * BigDouble.FromDouble(BossHealthMultiplier);
+        }
+
+        public static BigDouble BossGold(BigDouble stageMobGold)
+        {
+            return stageMobGold * BigDouble.FromDouble(BossGoldMultiplier);
+        }
+
+        /**
+         * @brief 1스테이지 기준 잡몹 평균에서 이 스테이지 보스의 체력/보상을 낸다.
+         *
+         * BossFight가 스폰할 때 부르는 함수이고, StageSimulation이 난이도를 잴 때도
+         * 같은 것을 부른다. 두 곳이 각자 곱셈을 하고 있으면 언젠가 한쪽만 고쳐지고,
+         * 그때 "계산상으로는 통과하는데 실제로는 실패하는" 상태가 만들어진다.
+         */
+        public static BigDouble BossHealthForStage(BigDouble averageMobHealth, int stage)
+        {
+            return BossHealth(averageMobHealth * HealthMultiplier(stage));
+        }
+
+        public static BigDouble BossGoldForStage(BigDouble averageMobGold, int stage)
+        {
+            return BossGold(averageMobGold * GoldMultiplier(stage));
+        }
+
         /** stage(1부터)의 체력 배수. 1스테이지는 1배 */
         public static BigDouble HealthMultiplier(int stage)
         {

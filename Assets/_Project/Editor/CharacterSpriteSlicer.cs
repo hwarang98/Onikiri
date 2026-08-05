@@ -25,6 +25,57 @@ namespace Onikiri.EditorTools
         private const string SamuraiSpriteFolder = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites";
 
         /**
+         * @brief 다크 사무라이(보스) 시트의 셀. 128x108이고 한 줄로 늘어서 있다.
+         *
+         * FULL_Samurai와 규격이 다르므로 따로 잰다. 팩이 다르면 셀 크기도 다르다는
+         * 것을 상수 이름으로 남겨둔다.
+         */
+        public const int BossCellWidth = 128;
+        public const int BossCellHeight = 108;
+
+        /**
+         * @brief 다크 사무라이 프레임에서 발밑에 있는 빈 줄 수.
+         *
+         * IDLE / HURT / DEATH 세 시트를 픽셀로 훑어 셋 다 12px로 일치하는 것을
+         * 확인했다. 자동 슬라이싱이 만든 타이트 렉트를 쓰면 프레임마다 피벗이 달라져
+         * 보스가 제자리에서 떨리는데, 격자로 자르고 피벗을 이 값에 고정하면 모든
+         * 프레임이 같은 발밑을 공유한다.
+         */
+        public const int BossFeetPadding = 12;
+
+        private const string BossSpriteFolder = "Assets/ThirdParty/Characters/Demon_Samurai/Sprites";
+
+        [MenuItem("Onikiri/Art/Slice Dark Samurai (Boss) Sheets")]
+        public static void SliceBoss()
+        {
+            var pivot = new Vector2(0.5f, BossFeetPadding / (float)BossCellHeight);
+            var paths = new List<string>();
+
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { BossSpriteFolder }))
+                paths.Add(AssetDatabase.GUIDToAssetPath(guid));
+
+            int sliced = 0, skipped = 0;
+            try
+            {
+                AssetDatabase.StartAssetEditing();
+                foreach (var path in paths)
+                {
+                    if (SliceGrid(path, BossCellWidth, BossCellHeight, pivot)) sliced++;
+                    else skipped++;
+                }
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                AssetDatabase.Refresh();
+            }
+
+            Debug.Log(string.Format(
+                "[Onikiri] Sliced {0} dark samurai sheets at {1}x{2}, pivot ({3}, {4:F5}). Skipped {5}.",
+                sliced, BossCellWidth, BossCellHeight, pivot.x, pivot.y, skipped));
+        }
+
+        /**
          * @brief 참격 시트는 64x64의 5x2 격자다.
          *
          * 128 세트가 아니라 64 세트를 쓰는 이유는, 128이 같은 아트의 단순 2배

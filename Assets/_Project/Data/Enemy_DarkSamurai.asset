@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
+  m_Name: Enemy_DarkSamurai
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
+  displayName: "\uB2E4\uD06C \uC0AC\uBB34\uB77C\uC774"
+  idleFrames:
+  - {fileID: 815424164945274260, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  - {fileID: -270785710348516584, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  - {fileID: 8443794771774750484, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  - {fileID: 1777182293076053196, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  - {fileID: 6114163804962241700, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  - {fileID: -7154528564402915179, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  hurtFrames:
+  - {fileID: 3571635775238715396, guid: e7d673badead6824cace4ff2aafba06f, type: 3}
+  - {fileID: -6552392919759675800, guid: e7d673badead6824cace4ff2aafba06f, type: 3}
+  - {fileID: -4191814458887339610, guid: e7d673badead6824cace4ff2aafba06f, type: 3}
+  - {fileID: -5703626821815436037, guid: e7d673badead6824cace4ff2aafba06f, type: 3}
+  deathFrames:
+  - {fileID: -1745646317731160461, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -1962882971833571424, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 7163519229324203079, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -2824850348822682002, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -4395442915117589123, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 7527047216810660112, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -6116082883535636463, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -5775218795824829258, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -5608201998214337042, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 6576388434661106147, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -1154471196408308341, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 2149593603886717485, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 908584393007459520, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 740597910810140825, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 4599535859148058893, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 5733224033033023741, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -4626742975923083756, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -22728116269279974, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -8574646061081483984, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 3354254753243013499, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 3603651926767336185, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 8392728427981504658, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 8484927564709351694, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 6499388409754968467, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: 1300136920628527571, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  - {fileID: -4068846982135085252, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  frameRate: 12
+  spawnWeight: 0
+  maxHealth:
+    m: 0
+    e: 0
+  goldReward:
+    m: 0
+    e: 0
+  moveSpeed: 0.85
+  queueSpacing: 2
+  hoverHeight: 0
+  artBottomOffset: 0

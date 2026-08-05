@@ -130,11 +130,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -206,6 +206,19 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
@@ -213,19 +226,19 @@ TextureImporter:
       name: SHOUT_0
       rect:
         serializedVersion: 2
-        x: 48
-        y: 11
-        width: 38
-        height: 49
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 68a92a28b29985a60800000000000000
+      spriteID: 1c7deb2a7f5cca54a86b7f459952aed8
       internalID: 7663043178125236870
       vertices: []
       indices: 
@@ -235,19 +248,19 @@ TextureImporter:
       name: SHOUT_1
       rect:
         serializedVersion: 2
-        x: 178
-        y: 9
-        width: 36
-        height: 44
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 18c1953e20af59930800000000000000
+      spriteID: a32c8590f10a0b9459a70b9ab6587d62
       internalID: 4149497522002926721
       vertices: []
       indices: 
@@ -257,19 +270,19 @@ TextureImporter:
       name: SHOUT_2
       rect:
         serializedVersion: 2
-        x: 306
-        y: 9
-        width: 36
-        height: 44
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: de0ff150873038ec0800000000000000
+      spriteID: 7fb6df58f19b05248b8c8f7de565109e
       internalID: -3566002665930362643
       vertices: []
       indices: 
@@ -279,19 +292,19 @@ TextureImporter:
       name: SHOUT_3
       rect:
         serializedVersion: 2
-        x: 434
-        y: 11
-        width: 36
-        height: 44
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f02521db7da954fc0800000000000000
+      spriteID: 7649c08803acc3246b6de9a8ec4cb1cd
       internalID: -3511230083084692977
       vertices: []
       indices: 
@@ -301,19 +314,19 @@ TextureImporter:
       name: SHOUT_4
       rect:
         serializedVersion: 2
-        x: 563
-        y: 11
-        width: 36
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 512
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: b8d85038c3dd8bf00800000000000000
+      spriteID: 79a5b81da75698c4380c5d1e2aab4189
       internalID: 1132898558249635211
       vertices: []
       indices: 
@@ -323,19 +336,19 @@ TextureImporter:
       name: SHOUT_5
       rect:
         serializedVersion: 2
-        x: 691
-        y: 11
-        width: 36
-        height: 45
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 640
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 5c38b950af16cb730800000000000000
+      spriteID: b4de8f28b9dfc024abac6f3183884251
       internalID: 4016192694171435973
       vertices: []
       indices: 
@@ -345,19 +358,19 @@ TextureImporter:
       name: SHOUT_6
       rect:
         serializedVersion: 2
-        x: 819
-        y: 11
-        width: 36
-        height: 45
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 768
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 722512da7d8abe1e0800000000000000
+      spriteID: 987b2807c7b7ae9449b49f9de14bc8f1
       internalID: -2167453151372684761
       vertices: []
       indices: 
@@ -367,19 +380,19 @@ TextureImporter:
       name: SHOUT_7
       rect:
         serializedVersion: 2
-        x: 925
-        y: 5
-        width: 68
-        height: 77
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 896
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 7c81d6c1a3c691cb0800000000000000
+      spriteID: ba9b36cb6a207a04c981072715df6521
       internalID: -4892760523320518457
       vertices: []
       indices: 
@@ -389,19 +402,19 @@ TextureImporter:
       name: SHOUT_8
       rect:
         serializedVersion: 2
-        x: 1054
-        y: 5
-        width: 57
-        height: 67
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1024
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 7300c61cc8c5ddca0800000000000000
+      spriteID: 8089d55d4749be84295d56e6af7beae0
       internalID: -5990530169722634185
       vertices: []
       indices: 
@@ -411,19 +424,19 @@ TextureImporter:
       name: SHOUT_9
       rect:
         serializedVersion: 2
-        x: 1107
-        y: 58
-        width: 9
-        height: 9
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1152
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c4c94781f87b18230800000000000000
+      spriteID: b3f8609d86885274da1307c95cd986a1
       internalID: 3639391799110573132
       vertices: []
       indices: 
@@ -433,19 +446,19 @@ TextureImporter:
       name: SHOUT_10
       rect:
         serializedVersion: 2
-        x: 1111
-        y: 38
-        width: 11
-        height: 19
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1280
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 41a1e7ae79cecc6d0800000000000000
+      spriteID: 6bc40893b3445a9469ee644d29e8890e
       internalID: -2968737917125649900
       vertices: []
       indices: 
@@ -455,19 +468,19 @@ TextureImporter:
       name: SHOUT_11
       rect:
         serializedVersion: 2
-        x: 1178
+        x: 1408
         y: 0
-        width: 66
-        height: 77
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 9d6896a59ed5983e0800000000000000
+      spriteID: 53be9046bc6a5824691d99d423cf7a22
       internalID: -2051004898464921895
       vertices: []
       indices: 
@@ -477,19 +490,19 @@ TextureImporter:
       name: SHOUT_12
       rect:
         serializedVersion: 2
-        x: 1240
-        y: 43
-        width: 15
-        height: 29
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1536
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: ef5bc881df37bb130800000000000000
+      spriteID: 6a72f10f49d5b0d4bae5368a1c911b39
       internalID: 3583585459379156478
       vertices: []
       indices: 
@@ -499,19 +512,19 @@ TextureImporter:
       name: SHOUT_13
       rect:
         serializedVersion: 2
-        x: 1301
-        y: 1
-        width: 87
-        height: 81
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1664
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 91073cdb402e29210800000000000000
+      spriteID: 8276f1efaec22094e95676609e8ca6c4
       internalID: 1338380549273907225
       vertices: []
       indices: 
@@ -521,19 +534,19 @@ TextureImporter:
       name: SHOUT_14
       rect:
         serializedVersion: 2
-        x: 1437
-        y: 11
-        width: 70
-        height: 58
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1792
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 0b268ae7c8005c2a0800000000000000
+      spriteID: ab0f7ea28c2cec04a80e472d8c20ba22
       internalID: -6717962665732840784
       vertices: []
       indices: 
@@ -543,19 +556,19 @@ TextureImporter:
       name: SHOUT_15
       rect:
         serializedVersion: 2
-        x: 1567
-        y: 11
-        width: 68
-        height: 58
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 1920
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: a7c82f703b5ee1930800000000000000
+      spriteID: d4e5174f43d48914caf0b5b5d47c5586
       internalID: 4115979666558454906
       vertices: []
       indices: 
@@ -565,284 +578,20 @@ TextureImporter:
       name: SHOUT_16
       rect:
         serializedVersion: 2
-        x: 1695
-        y: 11
-        width: 53
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 2048
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 82ede907b1b02b510800000000000000
+      spriteID: 11aabb7eac042e846968964083ee8628
       internalID: 1563324233132465704
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_17
-      rect:
-        serializedVersion: 2
-        x: 1822
-        y: 51
-        width: 9
-        height: 16
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 7e28ca44b5234b0b0800000000000000
-      internalID: -5713886659650747673
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_18
-      rect:
-        serializedVersion: 2
-        x: 1823
-        y: 11
-        width: 52
-        height: 58
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 20adaf739b424dd80800000000000000
-      internalID: -8226910241372317182
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_19
-      rect:
-        serializedVersion: 2
-        x: 1828
-        y: 53
-        width: 7
-        height: 7
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 4c7232e1b61812d80800000000000000
-      internalID: -8277192343063156796
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_20
-      rect:
-        serializedVersion: 2
-        x: 1949
-        y: 11
-        width: 55
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 253ec04c257c689a0800000000000000
-      internalID: -6231073876130077870
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_21
-      rect:
-        serializedVersion: 2
-        x: 2080
-        y: 11
-        width: 51
-        height: 58
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: b3b5b2d172a13d020800000000000000
-      internalID: 2365262984595069755
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_22
-      rect:
-        serializedVersion: 2
-        x: 1051
-        y: 20
-        width: 10
-        height: 6
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: b75ec480f201b7f50800000000000000
-      internalID: 6880110649927329147
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_23
-      rect:
-        serializedVersion: 2
-        x: 1108
-        y: 19
-        width: 10
-        height: 16
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: ae82cf133a9580460800000000000000
-      internalID: 7208109761059629290
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_24
-      rect:
-        serializedVersion: 2
-        x: 1174
-        y: 15
-        width: 10
-        height: 6
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 945d8bc2ae24600c0800000000000000
-      internalID: -4609923595027032759
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_25
-      rect:
-        serializedVersion: 2
-        x: 1241
-        y: 14
-        width: 10
-        height: 16
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: ac89f68013d494fb0800000000000000
-      internalID: -4663111066175170358
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_26
-      rect:
-        serializedVersion: 2
-        x: 1110
-        y: 11
-        width: 8
-        height: 7
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 9e2702ed13ee17190800000000000000
-      internalID: -7966324367894220055
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_27
-      rect:
-        serializedVersion: 2
-        x: 1242
-        y: 11
-        width: 6
-        height: 6
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: f5bc5dc9ec9faef30800000000000000
-      internalID: 4605768234729589599
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: SHOUT_28
-      rect:
-        serializedVersion: 2
-        x: 1297
-        y: 10
-        width: 10
-        height: 6
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 29aefaaba4fd94140800000000000000
-      internalID: 4704536797817858706
       vertices: []
       indices: 
       edges: []
@@ -870,19 +619,7 @@ TextureImporter:
       SHOUT_14: -6717962665732840784
       SHOUT_15: 4115979666558454906
       SHOUT_16: 1563324233132465704
-      SHOUT_17: -5713886659650747673
-      SHOUT_18: -8226910241372317182
-      SHOUT_19: -8277192343063156796
       SHOUT_2: -3566002665930362643
-      SHOUT_20: -6231073876130077870
-      SHOUT_21: 2365262984595069755
-      SHOUT_22: 6880110649927329147
-      SHOUT_23: 7208109761059629290
-      SHOUT_24: -4609923595027032759
-      SHOUT_25: -4663111066175170358
-      SHOUT_26: -7966324367894220055
-      SHOUT_27: 4605768234729589599
-      SHOUT_28: 4704536797817858706
       SHOUT_3: -3511230083084692977
       SHOUT_4: 1132898558249635211
       SHOUT_5: 4016192694171435973

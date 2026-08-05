@@ -37,5 +37,42 @@ namespace Onikiri.Battle
             if (baseSeconds <= 0f) return float.PositiveInfinity;
             return budgetPerSecond / baseSeconds;
         }
+
+        /**
+         * @brief 캐릭터 애니메이션을 원속도의 몇 배까지 당겨도 되는가.
+         *
+         * 히트스톱·흔들림·참격은 '초당 예산'으로 줄이면 되지만, 캐릭터 스윙은 그럴 수
+         * 없다. 스윙은 프레임 수가 정해진 손그림이고, 재생만 빨리 하면 프레임 사이
+         * 간격이 그대로 짧아진다. 7프레임 스윙을 4배로 당기면 프레임 하나가 18ms라
+         * 60fps에서 한 프레임씩만 스치고 지나간다. 그 순간 눈에 들어오는 것은 '빠른
+         * 발도'가 아니라 스프라이트가 깜빡이는 노이즈다.
+         *
+         * 2배가 한계인 이유는 픽셀 아트의 프레임 밀도에 있다. 원본이 14fps로 그려져
+         * 있으므로 2배는 28fps - 60fps 화면에서 프레임당 두 화면 프레임을 차지해
+         * 아직 각 자세가 읽힌다. 그 위로는 한 화면 프레임짜리 자세가 생긴다.
+         *
+         * 이 상수가 공격속도 강화의 상한을 결정한다. 스윙이 공격 간격 안에 들어가야
+         * 하고 스윙은 2배까지만 빨라질 수 있으므로, 낼 수 있는 최대 공격속도는
+         * 아트가 정한다. AttackSpeedCurve 참고.
+         */
+        public const float MaxAnimationSpeed = 2f;
+
+        /** 2배속까지 당겼을 때의 스윙 길이. 이보다 짧게 재생하지 않는다 */
+        public static float MinSwingDuration(float baseDuration)
+        {
+            return baseDuration / MaxAnimationSpeed;
+        }
+
+        /**
+         * @brief 스윙이 공격 간격 안에 들어가면서 낼 수 있는 최대 공격속도.
+         *
+         * 스윙 길이의 역수다. 이 값을 넘기면 이전 스윙이 아직 재생 중일 때 다음
+         * 스윙이 시작되어 동작이 뭉개진다.
+         */
+        public static float MaxAttacksPerSecond(float baseDuration)
+        {
+            if (baseDuration <= 0f) return float.PositiveInfinity;
+            return MaxAnimationSpeed / baseDuration;
+        }
     }
 }

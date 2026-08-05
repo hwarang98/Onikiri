@@ -75,7 +75,7 @@ namespace Onikiri.Progression
             var wallet = PlayerWallet.Instance;
             if (wallet != null) wallet.SetBalance(data.gold, data.lifetimeGold);
 
-            if (stage != null) stage.SetProgress(data.stage, data.killsThisStage);
+            if (stage != null) stage.SetProgress(data.stage, data.killsThisStage, data.bossKillCount);
 
             // 강화는 스테이지 다음에 적용한다. 스탯이 곧바로 전투에 반영되므로
             // 순서가 뒤바뀌면 한 프레임 동안 어긋난 값으로 싸운다
@@ -140,6 +140,7 @@ namespace Onikiri.Progression
             {
                 data.stage = stage.Stage;
                 data.killsThisStage = stage.KillsThisStage;
+                data.bossKillCount = stage.BossKillCount;
             }
 
             data.lastQuitUtcTicks = DateTime.UtcNow.Ticks;

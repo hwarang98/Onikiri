@@ -5,6 +5,7 @@ using UnityEngine;
 
 using Onikiri.Battle;
 using Onikiri.Core;
+using Onikiri.Progression;
 
 namespace Onikiri.EditorTools
 {
@@ -141,9 +142,11 @@ namespace Onikiri.EditorTools
             SfxTrimBuilder.Rebuild();
 
             foreach (var tier in Tiers) BuildEnemyDefinition(tier);
+            BossContentBuilder.BuildDefinition();
             BuildEnemyPrefab();
             BuildSlashPrefab();
             BuildDamageNumberPrefab();
+            SakuraContentBuilder.BuildArt();
 
             var scene = EditorSceneManager.OpenScene(MainSceneBuilder.ScenePath, OpenSceneMode.Single);
 
@@ -182,6 +185,10 @@ namespace Onikiri.EditorTools
 
             // 강화는 PlayerCombat이 씬에 있어야 배선할 수 있다
             UpgradePanelBuilder.Build();
+
+            // 보스전은 강화 다음이다. 실패 문구가 "어느 축을 올려라"를 고르려면
+            // UpgradeSystem이 이미 씬에 있어야 한다
+            BossContentBuilder.Wire(spawner);
 
             // 세션은 마지막이다. 강화·스테이지·전투가 전부 자리를 잡은 뒤라야
             // 세이브를 복원할 대상을 찾을 수 있다
@@ -342,6 +349,30 @@ namespace Onikiri.EditorTools
             RequireArray(combatSo, "attackFrames", problems);
             RequireArray(combatSo, "slashFrames", problems);
 
+            // 공격속도 상한이 이 두 값에서 유도된다. 아트 팩을 바꾸거나 프레임레이트를
+            // 손대면 강화 상한 레벨도 함께 움직여야 하는데, 그 사실은 코드 어디에도
+            // 드러나지 않는다. 여기서 잡지 않으면 상한만 예전 값으로 남는다
+            // 치명타가 어긋나면 화면에서는 아무 문제가 없어 보이고, 밸런스 계산만
+            // 조용히 틀린다
+            if (!Mathf.Approximately(combatSo.FindProperty("critChance").floatValue, CombatBaseline.CritChance) ||
+                !Mathf.Approximately(combatSo.FindProperty("critMultiplier").floatValue, CombatBaseline.CritMultiplier))
+            {
+                problems.Add("PlayerCombat crit values differ from CombatBaseline"
+                             + " - StageSimulation would compute the wrong DPS");
+            }
+
+            int attackFrames = combatSo.FindProperty("attackFrames").arraySize;
+            float attackFrameRate = combatSo.FindProperty("attackFrameRate").floatValue;
+            if (attackFrames != AttackSpeedCurve.AttackFrameCount ||
+                !Mathf.Approximately(attackFrameRate, AttackSpeedCurve.AttackFrameRate))
+            {
+                problems.Add(string.Format(
+                    "Attack clip is {0} frames @ {1}fps but AttackSpeedCurve assumes {2} @ {3}fps"
+                    + " - the attack-speed cap would be wrong",
+                    attackFrames, attackFrameRate,
+                    AttackSpeedCurve.AttackFrameCount, AttackSpeedCurve.AttackFrameRate));
+            }
+
             // 강화는 눌러봐야만 알 수 있는 종류의 실패를 낸다. 트랙이 비었거나 combat
             // 참조가 없으면 버튼은 정상으로 보이고 아무 일도 일어나지 않는다
             var panel = MainSceneBuilder.FindBand("GrowthPanel");
@@ -360,6 +391,49 @@ namespace Onikiri.EditorTools
 
             if (Object.FindFirstObjectByType<Onikiri.UI.SafeAreaFitter>() == null)
                 problems.Add("No SafeAreaFitter - UI will run under the notch");
+
+            // 꽃잎은 없어도 전투가 도므로 플레이 중에는 아무 문제가 없어 보인다.
+            // 배선이 빠진 것과 "아직 안 만든 것"이 화면에서 구분되지 않는다
+            var sakura = samurai.GetComponent<SakuraBurst>();
+            if (sakura == null) problems.Add("Samurai has no SakuraBurst");
+            else
+            {
+                var sakuraSo = new SerializedObject(sakura);
+                RequireReference(sakuraSo, "petalPrefab", problems);
+                RequireArray(sakuraSo, "petalSprites", problems);
+            }
+
+            // 보스전이 배선되지 않으면 10마리를 잡은 뒤에야 알게 된다. 그 시점에
+            // 도전 버튼이 없으면 진행이 영원히 멈춘다 - 스테이지가 오르는 경로가
+            // 보스뿐이기 때문이다
+            var bossFight = layoutObject != null ? layoutObject.GetComponent<BossFight>() : null;
+            if (bossFight == null) problems.Add("Battle has no BossFight - stages can never advance");
+            else
+            {
+                var bossSo = new SerializedObject(bossFight);
+                RequireReference(bossSo, "spawner", problems);
+                RequireReference(bossSo, "progress", problems);
+                RequireReference(bossSo, "bossDefinition", problems);
+                RequireReference(bossSo, "upgrades", problems);
+
+                var definition = bossSo.FindProperty("bossDefinition").objectReferenceValue as EnemyDefinition;
+                if (definition != null && (definition.idleFrames == null || definition.idleFrames.Length == 0))
+                    problems.Add("Boss definition has no idle frames - the boss would be invisible");
+            }
+
+            var bossHud = Object.FindFirstObjectByType<Onikiri.UI.BossHud>();
+            if (bossHud == null) problems.Add("No BossHud - the challenge button would never appear");
+            else
+            {
+                var hudSo = new SerializedObject(bossHud);
+                RequireReference(hudSo, "fight", problems);
+                RequireReference(hudSo, "challengeButton", problems);
+                RequireReference(hudSo, "introRoot", problems);
+                RequireReference(hudSo, "fightRoot", problems);
+                RequireReference(hudSo, "healthFill", problems);
+                RequireReference(hudSo, "resultRoot", problems);
+                RequireReference(hudSo, "resultLabel", problems);
+            }
 
             // 세이브가 배선되지 않으면 플레이 중에는 아무 문제가 없어 보이고,
             // 앱을 껐다 켠 뒤에야 진행이 사라진 것을 알게 된다
@@ -985,12 +1059,22 @@ namespace Onikiri.EditorTools
             // 이미 씬에 존재하므로 코드의 기본값을 바꿔도 전달되지 않고, 그러면 빌더가
             // 단일 출처 역할을 못 하게 된다
             so.FindProperty("attackRange").floatValue = 2.0f;
-            so.FindProperty("attacksPerSecond").floatValue = 1.15f;
+            so.FindProperty("attacksPerSecond").floatValue = (float)AttackSpeedCurve.BaseValue;
+
+            // 프레임레이트를 명시적으로 기록한다. 이 값과 프레임 수가 곧 공격속도
+            // 상한이므로(AttackSpeedCurve), 씬의 값이 코드가 가정한 값과 조용히
+            // 어긋나면 강화 상한이 근거를 잃는다
+            so.FindProperty("attackFrameRate").floatValue = AttackSpeedCurve.AttackFrameRate;
             SetBigDouble(so.FindProperty("damage"), 5d);
             // 사무라이 아트에는 7프레임 중 5~6번에 이미 흰 검격 궤적이 그려져 있다.
             // 임팩트를 그 프레임에 맞춰서 그려진 궤적, 참격 이펙트, 피격 플래시, 정지가
             // 순차가 아니라 동시에 일어나게 한다
             so.FindProperty("impactPoint").floatValue = 4f / 7f;
+            // 치명타는 강화 곡선에 속하지 않지만 DPS 계산에는 들어간다. 시뮬레이션이
+            // 쓰는 값과 씬의 값이 갈리면 밸런스 판정이 조용히 어긋난다. CombatBaseline 참고
+            so.FindProperty("critChance").floatValue = CombatBaseline.CritChance;
+            so.FindProperty("critMultiplier").floatValue = CombatBaseline.CritMultiplier;
+
             so.FindProperty("hitStopSeconds").floatValue = 0.07f;
             so.FindProperty("hitStopBudgetPerSecond").floatValue = 0.3f;
             so.FindProperty("shakeSeconds").floatValue = 0.1f;
@@ -1001,6 +1085,11 @@ namespace Onikiri.EditorTools
             // 요괴의 렌더링된 중심을 기준으로 재므로, 피벗 위치를 보정할 필요 없이
             // 호를 칼 쪽으로 조금 당기기만 하면 된다
             so.FindProperty("slashOffset").vector2Value = new Vector2(-0.3f, 0f);
+
+            // 꽃잎은 참격이 지나간 방향으로 흩어진다. 사무라이의 발도는 오른쪽 위로
+            // 향하고, 그 방향이 아트의 흰 궤적과 같아야 참격과 꽃잎이 한 동작으로 읽힌다
+            so.FindProperty("sakura").objectReferenceValue = SakuraContentBuilder.Wire(vfxRoot);
+            so.FindProperty("slashDirection").vector2Value = new Vector2(1f, 0.45f);
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

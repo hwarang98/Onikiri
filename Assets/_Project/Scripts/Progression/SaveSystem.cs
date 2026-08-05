@@ -73,12 +73,19 @@ namespace Onikiri.Progression
                     return SaveData.NewGame();
                 }
 
-                if (data.version != SaveData.CurrentVersion)
+                int loadedVersion = data.version;
+                if (!SaveData.Migrate(data))
                 {
-                    Debug.LogWarning("[Onikiri] Save version " + data.version + " is not " +
+                    // 여기 오는 경우는 사실상 하나다 - 이 빌드보다 새 버전의 세이브.
+                    // 앱을 다운그레이드했거나 파일이 손상된 경우이고, 둘 다 읽으려
+                    // 시도하면 엉뚱한 값으로 진행을 덮어쓴다
+                    Debug.LogWarning("[Onikiri] Save version " + loadedVersion + " is newer than " +
                                      SaveData.CurrentVersion + "; starting a new game.");
                     return SaveData.NewGame();
                 }
+
+                if (loadedVersion != SaveData.CurrentVersion)
+                    Debug.Log("[Onikiri] Migrated save v" + loadedVersion + " -> v" + SaveData.CurrentVersion + ".");
 
                 return data;
             }

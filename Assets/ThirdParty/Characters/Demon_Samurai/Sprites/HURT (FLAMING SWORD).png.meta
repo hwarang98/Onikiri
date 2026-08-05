@@ -55,11 +55,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -131,93 +131,106 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: HURT (FLAMING SWORD)_0
+      name: HURT_(FLAMING_SWORD)_0
       rect:
         serializedVersion: 2
-        x: 45
-        y: 11
-        width: 37
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: e145d1cd5ff116790800000000000000
-      internalID: -7538709160421141474
+      spriteID: 147cd7543f023f547a28f4933bd13db9
+      internalID: 54319951
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: HURT (FLAMING SWORD)_1
+      name: HURT_(FLAMING_SWORD)_1
       rect:
         serializedVersion: 2
-        x: 173
-        y: 11
-        width: 37
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: e502e38279d2dea30800000000000000
-      internalID: 4246100150918717534
+      spriteID: 30ecc48d41903934888a2888bf0b269d
+      internalID: 2026111302
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: HURT (FLAMING SWORD)_2
+      name: HURT_(FLAMING_SWORD)_2
       rect:
         serializedVersion: 2
-        x: 302
-        y: 11
-        width: 40
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f20426a4d718fbcf0800000000000000
-      internalID: -234326280481128401
+      spriteID: 32c7e21cdcc15204f9fdbeadfda2b74c
+      internalID: 2134291954
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: HURT (FLAMING SWORD)_3
+      name: HURT_(FLAMING_SWORD)_3
       rect:
         serializedVersion: 2
-        x: 432
-        y: 11
-        width: 39
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 354202ad8b238e1c0800000000000000
-      internalID: -4474270460277676973
+      spriteID: 92967ecd22f17ad4f8cf02a03fde5fbb
+      internalID: 1552698632
       vertices: []
       indices: 
       edges: []
@@ -236,10 +249,10 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      HURT (FLAMING SWORD)_0: -7538709160421141474
-      HURT (FLAMING SWORD)_1: 4246100150918717534
-      HURT (FLAMING SWORD)_2: -234326280481128401
-      HURT (FLAMING SWORD)_3: -4474270460277676973
+      HURT_(FLAMING_SWORD)_0: 54319951
+      HURT_(FLAMING_SWORD)_1: 2026111302
+      HURT_(FLAMING_SWORD)_2: 2134291954
+      HURT_(FLAMING_SWORD)_3: 1552698632
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

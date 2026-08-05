@@ -43,8 +43,19 @@ namespace Onikiri.Battle
         private readonly List<Enemy> active = new List<Enemy>();
         private float spawnTimer;
 
+        /**
+         * @brief 보스전 동안 잡몹 보충을 멈춘다.
+         *
+         * 보스만 남기지 않으면 세로 화면의 좁은 큐에서 보스가 잡몹 뒤에 서게 되고,
+         * 사무라이의 사거리에는 앞줄만 들어오므로 제한 시간이 흐르는 동안 정작 보스는
+         * 맞지 않는다.
+         */
+        private bool spawningSuspended;
+
         /** 살아 있는 적. 플레이어에 가까운 순 */
         public IReadOnlyList<Enemy> Active { get { return active; } }
+
+        public bool SpawningSuspended { get { return spawningSuspended; } }
 
         public int PoolGrowthCount { get { return pool != null ? pool.GrowthCount : 0; } }
 
@@ -91,12 +102,77 @@ namespace Onikiri.Battle
         {
             UpdateQueuePositions();
 
+            if (spawningSuspended) return;
+
             spawnTimer -= Time.deltaTime;
             if (spawnTimer <= 0f && CountAlive() < targetAlive)
             {
                 Spawn();
                 spawnTimer = spawnInterval;
             }
+        }
+
+        // ---------------------------------------------------------------- 보스전 제어
+
+        public void SuspendSpawning()
+        {
+            spawningSuspended = true;
+        }
+
+        /**
+         * @brief 잡몹 보충을 다시 켠다.
+         *
+         * 타이머를 0으로 두어 곧바로 한 마리가 들어오게 한다. spawnInterval을 기다리면
+         * 보스전이 끝난 직후 화면이 1초 넘게 비고, 그 정적이 실패 화면 뒤에 붙으면
+         * 게임이 멈춘 것처럼 읽힌다.
+         */
+        public void ResumeSpawning()
+        {
+            spawningSuspended = false;
+            spawnTimer = 0f;
+        }
+
+        /**
+         * @brief 필드의 잡몹을 보상 없이 치운다.
+         *
+         * 보스가 들어올 자리를 비우는 용도다. TakeDamage로 죽이지 않는 이유는 그러면
+         * 골드가 지급되고 처치 수가 오르기 때문이다. 보스에 도전할 때마다 화면의
+         * 네 마리가 공짜 골드로 바뀌면, 도전 버튼을 반복해서 누르는 것이 최적 전략이 된다.
+         */
+        public void ClearField()
+        {
+            for (int i = active.Count - 1; i >= 0; i--)
+            {
+                var enemy = active[i];
+                if (enemy == null) continue;
+
+                enemy.Killed -= OnEnemyKilled;
+                enemy.Died -= OnEnemyDied;
+                enemy.Deactivate();
+                pool.Release(enemy);
+            }
+            active.Clear();
+        }
+
+        /**
+         * @brief 보스를 필드에 세운다. 체력과 보상은 호출부가 확정해서 넘긴다.
+         *
+         * 잡몹과 같은 Enemy이고 같은 풀에서 나온다. 다른 것은 정의 에셋, 스탯,
+         * 그리고 정렬 순서뿐이다.
+         */
+        public Enemy SpawnBoss(EnemyDefinition definition, BigDouble health, BigDouble gold)
+        {
+            if (definition == null) return null;
+
+            var boss = pool.Get();
+
+            boss.Killed += OnEnemyKilled;
+            boss.Died += OnEnemyDied;
+            boss.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY,
+                       Onikiri.Core.SortingOrders.Boss, health, gold, true);
+            active.Add(boss);
+
+            return boss;
         }
 
         private int CountAlive()
@@ -128,7 +204,8 @@ namespace Onikiri.Battle
             enemy.Killed += OnEnemyKilled;
             enemy.Died += OnEnemyDied;
             enemy.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY, sorting,
-                        healthMultiplier, goldMultiplier);
+                        definition.maxHealth * healthMultiplier,
+                        definition.goldReward * goldMultiplier);
             active.Add(enemy);
         }
 
@@ -156,6 +233,9 @@ namespace Onikiri.Battle
             return definitions[definitions.Length - 1];
         }
 
+        /** 요괴 하나가 죽는 순간 발생. 보스전이 자기 보스의 죽음을 듣는다 */
+        public event System.Action<Enemy> EnemyKilled;
+
         private void OnEnemyKilled(Enemy enemy)
         {
             enemy.Killed -= OnEnemyKilled;
@@ -164,8 +244,16 @@ namespace Onikiri.Battle
             var wallet = Onikiri.Progression.PlayerWallet.Instance;
             if (wallet != null) wallet.Add(enemy.GoldReward);
 
-            var progress = Onikiri.Progression.StageProgress.Instance;
-            if (progress != null) progress.RegisterKill();
+            // 보스는 스테이지 할당량에 들어가지 않는다. 보스가 하는 일은 할당량을
+            // 채우는 것이 아니라 스테이지를 올리는 것이고, 그 판단은 BossFight가 한다
+            if (!enemy.IsBoss)
+            {
+                var progress = Onikiri.Progression.StageProgress.Instance;
+                if (progress != null) progress.RegisterKill();
+            }
+
+            var handler = EnemyKilled;
+            if (handler != null) handler(enemy);
         }
 
         private void OnEnemyDied(Enemy enemy)

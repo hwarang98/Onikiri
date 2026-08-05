@@ -35,11 +35,22 @@ namespace Onikiri.UI
         [Range(0f, 1f)]
         [SerializeField] private float holdFraction = 0.35f;
 
+        [Header("합산")]
+        [Tooltip("데미지가 합산될 때 순간적으로 커지는 배율. 숫자만 바뀌면 여덟 번 " +
+                 "때리는 동안 아무 일도 일어나지 않은 것처럼 보인다")]
+        [SerializeField] private float mergePunchScale = 1.15f;
+
+        [Tooltip("튄 스케일이 1로 돌아오는 데 걸리는 시간")]
+        [SerializeField] private float mergePunchDecay = 0.12f;
+
         private Action<DamageNumber> finished;
         private Vector2 velocity;
         private Vector2 position;
         private float elapsed;
         private Color baseColor;
+
+        /** 합산 직후 남아 있는 스케일 여분. 0이면 원래 크기 */
+        private float punchRemaining;
 
         /**
          * @brief 이 팝업이 지금까지 합산한 데미지.
@@ -91,6 +102,11 @@ namespace Onikiri.UI
             velocity = new Vector2(UnityEngine.Random.Range(-horizontalSpread, horizontalSpread), riseSpeed);
             elapsed = 0f;
 
+            // 풀에서 나온 인스턴스는 이전 생애의 스케일을 그대로 들고 온다. 합산 도중
+            // 회수되면 1.15배인 채로 반환되고, 다음 타격의 첫 숫자가 이유 없이 크게 뜬다
+            punchRemaining = 0f;
+            rect.localScale = Vector3.one;
+
             gameObject.SetActive(true);
         }
 
@@ -110,6 +126,16 @@ namespace Onikiri.UI
 
             // 합산될 때마다 살짝 위로 튄다. 숫자가 커지는 순간을 눈이 따라가게 한다
             velocity.y = Mathf.Max(velocity.y, riseSpeed * 0.45f);
+
+            // 그리고 크기가 한 번 튄다. 위치 변화만으로는 부족하다 - 초당 여덟 번
+            // 구간에서 숫자는 이미 계속 움직이고 있어서, 그 안의 작은 상승은 다른
+            // 팝업의 움직임과 구분되지 않는다. 크기는 그 화면에서 유일하게 변하지
+            // 않던 축이라 눈에 걸린다.
+            //
+            // 폰트 크기가 아니라 트랜스폼 스케일을 쓴다. 비트맵 폰트라 fontSize를
+            // 정수배 사이의 값으로 흔들면 글리프가 리샘플되어 흐려지고, 강조하려던
+            // 숫자가 오히려 읽기 어려워진다. 스케일은 메시를 그대로 두고 늘린다
+            punchRemaining = 1f;
         }
 
         private void SetText(string text, Color color, float fontSize)
@@ -142,6 +168,13 @@ namespace Onikiri.UI
             velocity.y -= gravity * Time.deltaTime;
             position += velocity * Time.deltaTime;
             rect.anchoredPosition = position;
+
+            if (punchRemaining > 0f)
+            {
+                punchRemaining = Mathf.Max(0f, punchRemaining - Time.deltaTime / Mathf.Max(0.0001f, mergePunchDecay));
+                float scale = Mathf.Lerp(1f, mergePunchScale, punchRemaining);
+                rect.localScale = new Vector3(scale, scale, 1f);
+            }
 
             float t = elapsed / lifetime;
             float fade = t <= holdFraction ? 1f : 1f - Mathf.InverseLerp(holdFraction, 1f, t);

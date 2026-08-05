@@ -40,8 +40,12 @@ namespace Onikiri.UI
         {
             if (label == null || progress == null) return;
 
-            label.text = prefix + progress.Stage +
-                         "  " + progress.KillsThisStage + "/" + progress.KillsRequired;
+            // 할당량을 채우면 "10/10" 대신 보스를 알린다. 멈춘 숫자는 진행이 끝났다는
+            // 것만 말하고 다음에 무엇을 해야 하는지는 말하지 않는데, 이 게임에서
+            // 그 다음은 화면 어딘가의 버튼을 누르는 것이라 안내가 필요하다
+            label.text = progress.IsBossReady
+                ? prefix + progress.Stage + "  보스"
+                : prefix + progress.Stage + "  " + progress.KillsThisStage + "/" + progress.KillsRequired;
         }
     }
 }

@@ -44,6 +44,7 @@ namespace Onikiri.EditorTools
         private HitAudio hitAudio;
         private StageProgress stage;
         private GameSession session;
+        private BossFight boss;
 
         /** 방치 보상 확인용. 몇 시간 전에 종료한 것으로 꾸밀지 */
         private float offlineHours = 3f;
@@ -79,7 +80,7 @@ namespace Onikiri.EditorTools
             if (!EditorApplication.isPlaying)
             {
                 combat = null; spawner = null; upgrades = null;
-                damageNumbers = null; hitAudio = null; stage = null; session = null;
+                damageNumbers = null; hitAudio = null; stage = null; session = null; boss = null;
                 measuredRate = 0f; measuredFps = 0f; audioPeak = 0f;
 
                 // 측정 창도 함께 비운다. 이 창은 도메인 리로드를 넘어 살아남는데,
@@ -99,6 +100,7 @@ namespace Onikiri.EditorTools
             if (hitAudio == null) hitAudio = Object.FindFirstObjectByType<HitAudio>();
             if (stage == null) stage = Object.FindFirstObjectByType<StageProgress>();
             if (session == null) session = Object.FindFirstObjectByType<GameSession>();
+            if (boss == null) boss = Object.FindFirstObjectByType<BossFight>();
 
             SampleAttackRate();
             SampleFps();
@@ -239,9 +241,17 @@ namespace Onikiri.EditorTools
                 {
                     // 스탯 표기와 실제가 다르면 그 자리에서 보이게 나란히 놓는다.
                     // 공격 하나가 정수 개의 프레임을 차지하므로 완전히 일치하지는 않는다
-                    Row("공격속도", string.Format("설정 {0:F2} -> 실측 {1:F2}회/초  ({2:P0})",
+                    Row("공격속도", string.Format("설정 {0:F2} -> 실측 {1:F2}회/초  ({2:P0})   상한 {3:F2}",
                         combat.AttacksPerSecond, measuredRate,
-                        combat.AttacksPerSecond > 0f ? measuredRate / combat.AttacksPerSecond : 0f));
+                        combat.AttacksPerSecond > 0f ? measuredRate / combat.AttacksPerSecond : 0f,
+                        combat.MaxAttacksPerSecond));
+
+                    // 스윙이 원속도의 몇 배로 재생되고 있는지. 2배가 한계이며 그 위는
+                    // 픽셀 애니메이션이 깜빡임으로 읽힌다. CombatFeel 참고
+                    Row("스윙 배속", string.Format("{0:F2}x  (클립 {1:F2}초)",
+                        Mathf.Min(CombatFeel.MaxAnimationSpeed,
+                                  combat.BaseAttackDuration * combat.AttacksPerSecond),
+                        combat.BaseAttackDuration));
 
                     Row("데미지", NumberFormatter.Format(combat.Damage));
                     Row("누적 공격", combat.AttackCount.ToString());
@@ -284,10 +294,11 @@ namespace Onikiri.EditorTools
 
                 // 풀 증식은 조용히 일어나고 폰에서 프레임 히칭으로만 나타난다.
                 // 0이 아니면 prewarm이 부족하다는 뜻이다
-                Row("풀 증식", string.Format("적 {0} / 참격 {1} / 데미지 {2}",
+                Row("풀 증식", string.Format("적 {0} / 참격 {1} / 데미지 {2} / 꽃잎 {3}",
                     spawner != null ? spawner.PoolGrowthCount : 0,
                     combat != null ? combat.SlashPoolGrowthCount : 0,
-                    damageNumbers != null ? damageNumbers.PoolGrowthCount : 0));
+                    damageNumbers != null ? damageNumbers.PoolGrowthCount : 0,
+                    combat != null ? combat.SakuraPoolGrowthCount : 0));
 
                 bool hasListener = Object.FindFirstObjectByType<AudioListener>() != null;
                 Row("오디오", hasListener
@@ -344,9 +355,12 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("공격속도", GUILayout.Width(64f));
-                    // 강화 상한을 넘겨 스윙 압축이 버티는지 보기 위한 직접 설정.
-                    // 강화 레벨과는 무관하며 다음 구매에서 곡선값으로 되돌아간다
-                    float value = EditorGUILayout.Slider(combat != null ? combat.AttacksPerSecond : 0f, 0.5f, 40f);
+                    // 슬라이더 상한이 곧 아트가 정한 공격속도 상한이다(AttackSpeedCurve).
+                    // 예전에는 40까지 밀 수 있었는데, 그 구간에서 스윙이 4배속을 넘어
+                    // 프레임 단위로 깜빡였고 그것을 "고속 공격"으로 착각한 채 밸런스를
+                    // 잡았다. 넘길 수 없게 만드는 편이 경고 문구보다 확실하다
+                    float max = combat != null ? combat.MaxAttacksPerSecond : 4f;
+                    float value = EditorGUILayout.Slider(combat != null ? combat.AttacksPerSecond : 0f, 0.5f, max);
                     if (combat != null && !Mathf.Approximately(value, combat.AttacksPerSecond))
                         combat.AttacksPerSecond = value;
                 }
@@ -377,15 +391,54 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("스테이지", GUILayout.Width(64f));
-                    if (GUILayout.Button("+1"))
+                    // 9단계부터 처치만으로는 스테이지가 오르지 않는다. "보스 열기"는
+                    // 할당량을 채워 도전 버튼을 띄우고, "다음 스테이지"는 보스를
+                    // 건너뛰고 직접 올린다 - 후반 밸런스를 확인할 때 필요하다
+                    if (GUILayout.Button("보스 열기"))
                         for (int n = stage.KillsThisStage; n < stage.KillsRequired; n++) stage.RegisterKill();
-                    if (GUILayout.Button("+10"))
-                        for (int n = 0; n < 10 * StageCurve.KillsPerStage; n++) stage.RegisterKill();
-                    if (GUILayout.Button("1로")) stage.SetProgress(1, 0);
+                    if (GUILayout.Button("다음 스테이지")) stage.AdvanceStage();
+                    if (GUILayout.Button("+10 스테이지"))
+                        for (int n = 0; n < 10; n++) stage.AdvanceStage();
+                    if (GUILayout.Button("1로")) stage.SetProgress(1, 0, 0);
                 }
+
+                DrawBossTools();
             }
 
             DrawSaveTools();
+        }
+
+        /**
+         * @brief 보스전.
+         *
+         * 실제로 10마리를 잡고 30초를 기다리지 않고도 등장 연출·전투·실패 세 화면을
+         * 각각 띄울 수 있어야 한다. 특히 실패는 그냥 기다려서는 재현하기 어렵다 -
+         * 강화가 앞서 있으면 보스가 먼저 죽는다. 그래서 남은 시간을 직접 태운다.
+         */
+        private void DrawBossTools()
+        {
+            if (boss == null) return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("보스", GUILayout.Width(64f));
+                EditorGUILayout.LabelField(
+                    boss.Current == BossFight.Phase.Fighting
+                        ? string.Format("전투 중  {0:F1}초  체력 {1:P0}", boss.SecondsLeft, boss.BossHealthFraction)
+                        : boss.Current.ToString(),
+                    GUILayout.Width(190f));
+
+                using (new EditorGUI.DisabledScope(!boss.CanChallenge))
+                    if (GUILayout.Button("도전")) boss.Challenge();
+
+                // 시계를 끝까지 밀어 실패 경로를 그대로 태운다. 실패 문구 계산도
+                // 실제 코드가 돌아야 하므로 상태를 직접 바꾸지 않는다
+                using (new EditorGUI.DisabledScope(boss.Current != BossFight.Phase.Fighting))
+                    if (GUILayout.Button("시간 소진")) boss.DebugExpireTimer();
+            }
+
+            if (boss.Current == BossFight.Phase.Failed && !string.IsNullOrEmpty(boss.FailureMessage))
+                EditorGUILayout.HelpBox(boss.FailureMessage, MessageType.Warning);
         }
 
         /**

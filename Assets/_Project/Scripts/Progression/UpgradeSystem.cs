@@ -118,8 +118,13 @@ namespace Onikiri.Progression
                     break;
 
                 case AttackSpeedId:
-                    // 공격속도는 BigDouble이 필요 없는 축이다. 상한이 있는 선형 곡선이라
-                    // double 범위를 벗어날 일이 없고, PlayerCombat도 float로 받는다
+                    // 공격속도는 BigDouble이 필요 없는 축이다. 아트가 정한 상한이 있어서
+                    // double 범위를 벗어날 일이 없고, PlayerCombat도 float로 받는다.
+                    //
+                    // 여기서 상한을 다시 확인하지 않는다. PlayerCombat의 세터가 자른다.
+                    // 트랙의 maxLevel과 전투의 상한은 같은 곳(AttackSpeedCurve)에서
+                    // 나오지만, 둘 중 하나를 고치고 다른 하나를 잊었을 때 스탯이
+                    // 조용히 어긋나는 것보다 잘리는 편이 낫다
                     combat.AttacksPerSecond = (float)track.Value.ToDouble();
                     break;
 

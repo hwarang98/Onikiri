@@ -67,11 +67,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -143,181 +143,194 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_0
+      name: RUN_(FLAMING_SWORD)_0
       rect:
         serializedVersion: 2
-        x: 33
-        y: 7
-        width: 55
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 26709bc8bc5c61790800000000000000
-      internalID: -7559637446464829598
+      spriteID: a9f6767bd5d97f34aac072d648aaca0f
+      internalID: 1297282945
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_1
+      name: RUN_(FLAMING_SWORD)_1
       rect:
         serializedVersion: 2
-        x: 161
-        y: 7
-        width: 56
-        height: 52
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: b70c1bcaef878cc20800000000000000
-      internalID: 3226962168225316987
+      spriteID: 22e73adecf4e8bf4595b4ec5d7055c09
+      internalID: 1690273736
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_2
+      name: RUN_(FLAMING_SWORD)_2
       rect:
         serializedVersion: 2
-        x: 289
-        y: 8
-        width: 55
-        height: 52
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 0197ac9cced0ee980800000000000000
-      internalID: -8507847335407355632
+      spriteID: e926eab58a504654aa4878417e6cf0f8
+      internalID: -1785913352
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_3
+      name: RUN_(FLAMING_SWORD)_3
       rect:
         serializedVersion: 2
-        x: 420
-        y: 7
-        width: 51
-        height: 52
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: dfda738cfb42cb7e0800000000000000
-      internalID: -1748482149210149379
+      spriteID: c21ed50cb823dfd448bc46feea7ecfcf
+      internalID: 819301529
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_4
+      name: RUN_(FLAMING_SWORD)_4
       rect:
         serializedVersion: 2
-        x: 548
-        y: 5
-        width: 52
-        height: 53
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 512
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f02c59fc8f7ec30c0800000000000000
-      internalID: -4594542464004144625
+      spriteID: 988f2365c79dc63458019b219f4449ae
+      internalID: 182086267
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_5
+      name: RUN_(FLAMING_SWORD)_5
       rect:
         serializedVersion: 2
-        x: 675
-        y: 8
-        width: 54
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 640
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: bbe06ccb93a38ad60800000000000000
-      internalID: 7901629565876178619
+      spriteID: 96dde713653f1d04da99f4d40e27f0aa
+      internalID: 1283591513
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_6
+      name: RUN_(FLAMING_SWORD)_6
       rect:
         serializedVersion: 2
-        x: 801
-        y: 8
-        width: 55
-        height: 52
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 768
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 95e35d76fb3acdf50800000000000000
-      internalID: 6907575970955607641
+      spriteID: 45fcb51beebc2d14e961fa0861f0ea8c
+      internalID: 1313571495
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: RUN (FLAMING SWORD)_7
+      name: RUN_(FLAMING_SWORD)_7
       rect:
         serializedVersion: 2
-        x: 932
-        y: 7
-        width: 51
-        height: 52
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 896
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 38a3403cc4148acf0800000000000000
-      internalID: -240870782119167357
+      spriteID: 904cf41d297c3f74cbd324bc629250af
+      internalID: 1782129443
       vertices: []
       indices: 
       edges: []
@@ -336,14 +349,14 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      RUN (FLAMING SWORD)_0: -7559637446464829598
-      RUN (FLAMING SWORD)_1: 3226962168225316987
-      RUN (FLAMING SWORD)_2: -8507847335407355632
-      RUN (FLAMING SWORD)_3: -1748482149210149379
-      RUN (FLAMING SWORD)_4: -4594542464004144625
-      RUN (FLAMING SWORD)_5: 7901629565876178619
-      RUN (FLAMING SWORD)_6: 6907575970955607641
-      RUN (FLAMING SWORD)_7: -240870782119167357
+      RUN_(FLAMING_SWORD)_0: 1297282945
+      RUN_(FLAMING_SWORD)_1: 1690273736
+      RUN_(FLAMING_SWORD)_2: -1785913352
+      RUN_(FLAMING_SWORD)_3: 819301529
+      RUN_(FLAMING_SWORD)_4: 182086267
+      RUN_(FLAMING_SWORD)_5: 1283591513
+      RUN_(FLAMING_SWORD)_6: 1313571495
+      RUN_(FLAMING_SWORD)_7: 1782129443
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

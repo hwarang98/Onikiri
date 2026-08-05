@@ -75,6 +75,12 @@ namespace Onikiri.UI
             if (nameLabel != null)
                 nameLabel.text = track.DisplayName + "  Lv." + track.Level;
 
+            // 상한에 막혀 있으면 구매도 막혀 있어야 한다. 예전 세이브가 상한 위의
+            // 레벨을 들고 올 수 있으므로(레벨은 유지하고 효과만 막는다) IsMaxed 하나로는
+            // 부족하다 - Lv.44 / 상한 Lv.32 인 트랙은 IsMaxed가 참이지만, 규칙이
+            // 바뀌어 상한만 올라간 경우에는 거짓이면서 값은 여전히 막혀 있을 수 있다
+            bool capped = track.IsMaxed || track.IsValueCapped;
+
             if (valueLabel != null)
             {
                 // Format이 아니라 FormatStat이다. Format은 1000 미만을 정수로 읽어서
@@ -83,7 +89,7 @@ namespace Onikiri.UI
                 //
                 // 소수 둘째 자리까지 두는 이유도 같다. 첫째 자리로는 공격속도의
                 // 1.15 -> 1.27이 둘 다 1.2로 뭉개진다
-                valueLabel.text = track.IsMaxed
+                valueLabel.text = capped
                     ? NumberFormatter.FormatStat(track.Value, 2)
                     : NumberFormatter.FormatStat(track.Value, 2) + " → " +
                       NumberFormatter.FormatStat(track.ValueAtLevel(track.Level + 1), 2);
@@ -93,11 +99,15 @@ namespace Onikiri.UI
 
             if (costLabel != null)
             {
-                costLabel.text = track.IsMaxed ? "최대" : NumberFormatter.Format(track.Cost);
-                costLabel.color = track.IsMaxed || affordable ? affordableColor : unaffordableColor;
+                // 상한에 닿으면 비용 대신 MAX를 세운다. 값만 멈추고 비용이 계속 보이면
+                // 골드가 모자라서 못 사는 것인지 더 살 것이 없는 것인지 구분되지 않는다.
+                // 공격속도는 아트가 정한 상한이 있어서(AttackSpeedCurve) 실제로 여기
+                // 도달한다
+                costLabel.text = capped ? "MAX" : NumberFormatter.Format(track.Cost);
+                costLabel.color = capped || affordable ? affordableColor : unaffordableColor;
             }
 
-            if (button != null) button.interactable = !track.IsMaxed && affordable;
+            if (button != null) button.interactable = !capped && affordable;
         }
     }
 }
