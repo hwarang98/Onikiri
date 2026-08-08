@@ -58,16 +58,75 @@ namespace Onikiri.Progression
         public const double BaseCost = 4d;
         public const double CostGrowth = 1.15d;
 
-        /** 초당 회복 비율 (최대 체력 대비) */
+        /**
+         * @brief 초당 회복 비율의 상한.
+         *
+         * ## 왜 상한이 필요한가
+         *
+         * 비율 곱연산에는 천장이 없다. 15단계 실측에서 Lv.54의 회복이
+         * **156.2%/s**였다 - 초당 최대 체력의 1.5배를 회복하면 어떤 피해도 다음
+         * 프레임에 지워지고, 11단계에서 만든 체력 게이트가 통째로 무력화된다.
+         *
+         * 비율로 바꾼 것 자체는 옳았다(위 주석 참고). 놓친 것은 **100%를 넘을 수
+         * 있다는 사실**이다. 절대량이던 시절에는 체력이 함께 자라서 저절로
+         * 억제됐는데, 비율이 되면서 그 억제가 사라졌다.
+         *
+         * ## 값의 근거
+         *
+         * 30%/s면 30초 보스전 동안 최대 체력의 9배를 회복한다. 커 보이지만
+         * 유효체력 기준으로는 EHP = 최대체력 x (1 + 0.3 x 30) = 10배이고,
+         * 그 정도는 보스 공격력 곡선(스테이지당 x1.12)이 몇 스테이지 만에
+         * 따라잡는다. 무적이 아니라 "한 챕터를 벌어주는" 크기다.
+         *
+         * 이보다 낮으면(20%/s = 7배) 회복 축이 상한에 너무 일찍 닿아 죽고,
+         * 높으면(40%/s = 13배) 체력 게이트가 다시 헐거워진다. 시뮬레이션에서
+         * 생존 여유가 밴드에 남는 구간으로 잡았다.
+         */
+        public const double Ceiling = 0.30d;
+
+        /**
+         * @brief 상한을 무시한 곡선값.
+         *
+         * 효율 지표(SurvivalEfficiency)가 쓴다. 그쪽이 재는 것은 곡선의 **형태**이지
+         * 지금 낼 수 있는 값이 아니다 - 상한 위에서 이득이 0이 되면 비율이 무한으로
+         * 발산해 지표가 무너진다. 9단계 공격속도에서 같은 이유로 갈라놨다.
+         */
         public static double ValueAtLevel(int level)
         {
             return BaseValue * Math.Pow(Step, Math.Max(0, level - 1));
         }
 
-        /** 이 레벨에서 최대 체력이 maxHealth일 때의 초당 절대 회복량 */
+        /** 전투가 실제로 쓰는 값. 상한에서 멈춘다 */
+        public static double CappedValueAtLevel(int level)
+        {
+            return Math.Min(Ceiling, ValueAtLevel(level));
+        }
+
+        /**
+         * @brief 상한에 처음 닿는 레벨.
+         *
+         * UpgradeTrack의 maxLevel로 쓴다. 이 위로는 팔지 않는다 - 값이 안 오르는
+         * 버튼에 골드를 받으면 그건 판매가 아니라 함정이다.
+         */
+        public static int MaxLevel
+        {
+            get
+            {
+                // BaseValue x Step^(n-1) >= Ceiling 을 만족하는 최소 n
+                int level = 1 + (int)Math.Ceiling(Math.Log(Ceiling / BaseValue) / Math.Log(Step));
+                return Math.Max(1, level);
+            }
+        }
+
+        /**
+         * @brief 이 레벨에서 최대 체력이 maxHealth일 때의 초당 절대 회복량.
+         *
+         * 상한이 적용된 값이다. 전투와 시뮬레이션이 함께 부르는 유일한 입구라
+         * 여기서 자르면 두 곳이 갈릴 수 없다.
+         */
         public static double PerSecondAt(int level, double maxHealth)
         {
-            return maxHealth * ValueAtLevel(level);
+            return maxHealth * CappedValueAtLevel(level);
         }
 
         public static double CostAtLevel(int level)

@@ -256,6 +256,64 @@ namespace Onikiri.EditorTools
         }
 
         /**
+         * @brief 시트의 모든 셀에서 아트 아래에 남는 빈 픽셀 줄 수.
+         *
+         * 보스 피벗을 여기에 고정하기 위한 값이다. 자동 슬라이싱이 만드는 타이트
+         * 렉트를 그대로 쓰면 프레임마다 피벗이 달라져 보스가 제자리에서 떨린다.
+         * 격자로 자르고 피벗을 발밑에 고정하면 모든 프레임이 같은 바닥을 공유한다.
+         *
+         * 12단계까지 이 값(다크 사무라이의 12px)은 손으로 세서 상수에 적혀 있었다.
+         * 팩마다 다른 값이라, 보스를 바꾸려면 매번 다시 세야 했다.
+         *
+         * **셀 전체가 아니라 시트 하나의 최솟값**을 낸다. 프레임마다 다르면 가장
+         * 낮은 프레임에 맞춰야 다른 프레임이 땅에 박히지 않는다.
+         *
+         * @return 아래에서부터의 빈 줄 수. 시트를 못 읽거나 전부 투명이면 -1
+         */
+        public static int MeasureFeetPadding(string assetPath, int cellWidth, int cellHeight)
+        {
+            var texture = LoadReadableCopy(assetPath);
+            if (texture == null) return -1;
+
+            try
+            {
+                if (cellWidth <= 0 || cellHeight <= 0) return -1;
+                if (texture.width % cellWidth != 0 || texture.height % cellHeight != 0) return -1;
+
+                int columns = texture.width / cellWidth;
+                int rows = texture.height / cellHeight;
+                int lowest = int.MaxValue;
+
+                for (int row = 0; row < rows; row++)
+                {
+                    for (int column = 0; column < columns; column++)
+                    {
+                        var pixels = texture.GetPixels(column * cellWidth, row * cellHeight,
+                                                       cellWidth, cellHeight);
+
+                        // 아래에서 위로 훑다가 처음 불투명한 줄에서 멈춘다.
+                        // GetPixels는 y=0이 아래쪽이다
+                        for (int y = 0; y < cellHeight && y < lowest; y++)
+                        {
+                            bool opaque = false;
+                            for (int x = 0; x < cellWidth; x++)
+                            {
+                                if (pixels[y * cellWidth + x].a > 0.03f) { opaque = true; break; }
+                            }
+                            if (opaque) { if (y < lowest) lowest = y; break; }
+                        }
+                    }
+                }
+
+                return lowest == int.MaxValue ? -1 : lowest;
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        /**
          * @brief 시트의 모든 셀을 합친 그려진 아트의 중심을 정규화 피벗으로 반환한다.
          *
          * 파일을 읽을 수 없으면 셀 중앙으로 폴백한다.

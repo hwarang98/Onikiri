@@ -136,9 +136,45 @@ namespace Onikiri.Core
         }
 
         /**
-         * @brief 오프라인 보상 팝업이 쓰는 축약 시간 표기 ("3h 12m", "45s").
+         * @brief 화면에 띄우는 한글 시간 표기 ("3시간 12분", "45초").
          *
-         * 플레이어가 보는 숫자 텍스트를 한곳에 모으기 위해 여기에 둔다.
+         * 축약형(FormatDuration)과 갈라둔 이유는 읽는 상대가 다르기 때문이다.
+         * "8h"는 콘솔 로그에서 짧아서 좋지만, 방치 보상 팝업은 **몇 시간을
+         * 비웠는지가 보상의 근거**라 한눈에 읽혀야 한다. 영문 축약은 그 한 줄에서
+         * 한 번 더 해석을 요구한다.
+         *
+         * 0초는 "0초"다. 팝업이 그 값으로 뜰 일은 없지만(경과가 0이면 보상 자체가
+         * 없다) 빈 문자열을 내면 라벨이 사라져 레이아웃이 흔들린다.
+         */
+        public static string FormatDurationKo(TimeSpan span)
+        {
+            if (span.TotalSeconds < 1d) return "0초";
+
+            if (span.TotalHours >= 1d)
+            {
+                int hours = (int)span.TotalHours;
+                int minutes = span.Minutes;
+                return minutes > 0
+                    ? hours + "시간 " + minutes + "분"
+                    : hours + "시간";
+            }
+
+            if (span.TotalMinutes >= 1d)
+            {
+                int minutes = (int)span.TotalMinutes;
+                int seconds = span.Seconds;
+                return seconds > 0
+                    ? minutes + "분 " + seconds + "초"
+                    : minutes + "분";
+            }
+
+            return (int)span.TotalSeconds + "초";
+        }
+
+        /**
+         * @brief 로그가 쓰는 축약 시간 표기 ("3h 12m", "45s").
+         *
+         * 화면에는 FormatDurationKo를 쓴다.
          */
         public static string FormatDuration(TimeSpan span)
         {

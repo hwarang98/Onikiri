@@ -132,27 +132,53 @@ namespace Onikiri.EditorTools
                 return null;
             }
 
-            int designPointSize = samplingPointSize;
             string outputPath = OutputFolder + "/" + fontName + " SDF.asset";
             // 이름에 SDF가 붙는 것은 TMP 도구가 기대하는 관례일 뿐이고,
             // 내용물은 래스터 아틀라스다
 
-            var fontAsset = TMP_FontAsset.CreateFontAsset(
-                sourceFont,
-                designPointSize,
-                AtlasPadding,
-                GlyphRenderMode.RASTER_HINTED,
-                AtlasWidth, AtlasHeight,
-                AtlasPopulationMode.Dynamic,         // dynamic while we add glyphs
-                false);
+            // 이미 있으면 **그 에셋을 그대로 쓴다.** 새로 만들어 갈아끼우지 않는다
+            var fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(outputPath);
+            bool created = false;
 
             if (fontAsset == null)
             {
-                Debug.LogError("[Onikiri] CreateFontAsset failed for " + fontName);
-                return null;
+                fontAsset = CreateEmpty(sourceFont, fontName, samplingPointSize);
+                if (fontAsset == null) return null;
+
+                AssetDatabase.CreateAsset(fontAsset, outputPath);
+                AttachSubAssets(fontAsset, fontAsset);
+                created = true;
+            }
+            else if (NeedsRecreate(fontAsset, sourceFont, samplingPointSize))
+            {
+                // 샘플링 크기나 원본 폰트가 바뀌면 아틀라스 자체를 다시 만들어야
+                // 한다. 이때는 GUID를 지킬 방법이 없으므로 경고를 남긴다 -
+                // 씬을 다시 빌드해야 한다는 신호다
+                Debug.LogWarning("[Onikiri] " + fontName + " changed sampling size or source font;"
+                                 + " recreating the asset. Re-run Build Combat Content.");
+
+                AssetDatabase.DeleteAsset(outputPath);
+                fontAsset = CreateEmpty(sourceFont, fontName, samplingPointSize);
+                if (fontAsset == null) return null;
+
+                AssetDatabase.CreateAsset(fontAsset, outputPath);
+                AttachSubAssets(fontAsset, fontAsset);
+                created = true;
             }
 
-            fontAsset.name = fontName + " SDF";
+            // 글리프를 **제자리에서** 다시 채운다.
+            //
+            // 여기가 이번 수정의 핵심이다. 예전에는 매번 CreateFontAsset으로 새
+            // 오브젝트를 만들어 파일을 갈아끼웠고, 그러면 폰트 에셋과 그 머티리얼의
+            // GUID/fileID가 전부 바뀌어 씬의 TMP 참조가 끊겼다. 11단계에서
+            // CopySerialized로 내용만 옮겨봤지만 그때는 글리프 테이블과 아틀라스가
+            // 어긋나 글자가 뒤섞였다 - 셋(테이블·아틀라스·머티리얼)이 한 벌인데
+            // 그중 일부만 옮겼기 때문이다.
+            //
+            // TMP에는 그 셋을 한꺼번에 다루는 API가 이미 있다. 지우고 다시 채우면
+            // 오브젝트 정체성은 그대로 두고 내용만 바뀐다.
+            fontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+            fontAsset.ClearFontAssetData(true);
 
             string missing;
             bool allAdded = fontAsset.TryAddCharacters(charset, out missing);
@@ -166,13 +192,24 @@ namespace Onikiri.EditorTools
             ApplyPointFiltering(fontAsset);
             ApplyBitmapShader(fontAsset);
 
-            SaveWithSubAssets(fontAsset, outputPath);
+            // 테이블을 다시 채운 뒤에는 조회용 사전을 다시 세워야 한다. 이것을
+            // 빼먹으면 에디터가 옛 매핑을 들고 있다가 다음 도메인 리로드에서야
+            // 정상으로 돌아온다
+            fontAsset.ReadFontAssetDefinition();
+
+            EditorUtility.SetDirty(fontAsset);
+            if (fontAsset.material != null) EditorUtility.SetDirty(fontAsset.material);
+            foreach (var texture in fontAsset.atlasTextures)
+                if (texture != null) EditorUtility.SetDirty(texture);
+
+            AssetDatabase.SaveAssets();
 
             int glyphs = fontAsset.glyphTable != null ? fontAsset.glyphTable.Count : 0;
             int pages = fontAsset.atlasTextures != null ? fontAsset.atlasTextures.Length : 0;
             Debug.Log(string.Format(
-                "[Onikiri] Font '{0}': {1} glyphs, {2} atlas page(s) at {3}pt, RASTER_HINTED, padding {4} -> {5}",
-                fontAsset.name, glyphs, pages, designPointSize, AtlasPadding, outputPath));
+                "[Onikiri] Font '{0}': {1} glyphs, {2} atlas page(s) at {3}pt, RASTER_HINTED, padding {4} -> {5}{6}",
+                fontAsset.name, glyphs, pages, samplingPointSize, AtlasPadding, outputPath,
+                created ? "  (new asset)" : "  (in place, GUID kept)"));
 
             // 페이지가 늘어나면 머티리얼도 늘어나고 표시 크기 규칙이 조용히 깨진다.
             // 아틀라스를 키워야 한다는 신호이므로 눈에 띄게 남긴다
@@ -181,6 +218,52 @@ namespace Onikiri.EditorTools
                                  " atlas pages - raise AtlasWidth/AtlasHeight.");
 
             return fontAsset;
+        }
+
+        /** 글리프가 비어 있는 폰트 에셋 하나. 채우는 것은 호출부가 한다 */
+        private static TMP_FontAsset CreateEmpty(Font sourceFont, string fontName, int samplingPointSize)
+        {
+            var fontAsset = TMP_FontAsset.CreateFontAsset(
+                sourceFont,
+                samplingPointSize,
+                AtlasPadding,
+                GlyphRenderMode.RASTER_HINTED,
+                AtlasWidth, AtlasHeight,
+                AtlasPopulationMode.Dynamic,
+                false);
+
+            if (fontAsset == null)
+            {
+                Debug.LogError("[Onikiri] CreateFontAsset failed for " + fontName);
+                return null;
+            }
+
+            fontAsset.name = fontName + " SDF";
+            return fontAsset;
+        }
+
+        /**
+         * @brief 제자리 갱신으로는 못 바꾸는 것이 바뀌었는가.
+         *
+         * 샘플링 크기와 원본 폰트는 아틀라스를 굽는 조건 자체라 다시 만들어야 한다.
+         * 문자셋이 바뀌는 것은 여기 해당하지 않는다 - 그것이 제자리 갱신으로
+         * 처리되어야 하는 정확히 그 경우다.
+         */
+        private static bool NeedsRecreate(TMP_FontAsset fontAsset, Font sourceFont, int samplingPointSize)
+        {
+            // sourceFontFile은 비교하지 않는다.
+            //
+            // TMP는 atlasPopulationMode를 Static으로 바꾸는 순간 이 참조를 null로
+            // 만든다 - 정적 아틀라스는 원본 TTF 없이 동작하므로 빌드에 폰트 파일을
+            // 딸려 보내지 않기 위해서다. 그래서 "원본이 달라졌는가"로 쓰면 항상
+            // 참이 되고, 매번 에셋을 다시 만들게 된다. 실제로 그렇게 동작하고 있었다.
+            //
+            // 출력 경로 하나에 원본 하나가 대응하는 구조라 원본이 바뀌는 경우는
+            // 코드를 고칠 때뿐이고, 그때는 아래 조건들이 함께 바뀐다.
+            if (Mathf.Abs(fontAsset.faceInfo.pointSize - samplingPointSize) > 0.01f) return true;
+            if (fontAsset.atlasPadding != AtlasPadding) return true;
+            if (fontAsset.atlasWidth != AtlasWidth || fontAsset.atlasHeight != AtlasHeight) return true;
+            return false;
         }
 
         private static void ApplyPointFiltering(TMP_FontAsset fontAsset)
@@ -247,35 +330,6 @@ namespace Onikiri.EditorTools
          *
          * EditorUtility.CopySerialized로 내용만 옮기면 파일도 GUID도 그대로다.
          */
-        private static void SaveWithSubAssets(TMP_FontAsset fontAsset, string path)
-        {
-            // 10단계에서 GUID를 보존하려고 기존 에셋 안에 내용만 부어 넣는 방식을
-            // 넣었다가 11단계에서 되돌렸다. **문자셋이 바뀌지 않을 때만 동작했다.**
-            //
-            // 글리프 수가 231에서 237로 늘어나자 화면의 모든 한글이 엉뚱한 글자로
-            // 바뀌었다. 폰트 에셋의 GUID는 지켰지만 씬의 TMP 컴포넌트는
-            // fontSharedMaterial 도 따로 들고 있고, 아틀라스·머티리얼·글리프 테이블
-            // 셋이 한 벌로 맞아야 하는데 그중 일부만 갈아끼우면 매핑이 어긋난다.
-            // 아틀라스 픽셀을 기존 텍스처에 복사하고 머티리얼 프로퍼티까지 옮겨봐도
-            // 마찬가지였다.
-            //
-            // 10단계의 검증이 부족했다. 그때는 문자셋이 그대로인 상태로만 다시
-            // 구웠고, 그 경우에는 테이블이 동일해서 우연히 맞았다.
-            //
-            // 지우고 다시 만드는 쪽으로 되돌린다. GUID가 바뀌므로 **폰트를 다시
-            // 구운 뒤에는 Build Combat Content 를 다시 돌려야 한다.** 규칙으로
-            // 남기는 것이 마음에 들지는 않지만, 글자가 조용히 깨지는 것보다는
-            // 한 단계를 더 밟는 편이 낫다. 제대로 고치려면 TMP가 폰트 에셋을
-            // 어떻게 캐시하는지까지 들어가야 하고, 그것은 12단계 UI 개편에서
-            // 폰트 파이프라인을 통째로 볼 때 할 일이다.
-            var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
-            if (existing != null) AssetDatabase.DeleteAsset(path);
-
-            AssetDatabase.CreateAsset(fontAsset, path);
-            AttachSubAssets(fontAsset, fontAsset);
-            Finish(fontAsset, path);
-        }
-
         /**
          * @brief 아틀라스와 머티리얼을 폰트 에셋의 자식으로 매단다.
          *
@@ -308,11 +362,5 @@ namespace Onikiri.EditorTools
             owner.material = source.material;
         }
 
-        private static void Finish(TMP_FontAsset fontAsset, string path)
-        {
-            EditorUtility.SetDirty(fontAsset);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-        }
     }
 }

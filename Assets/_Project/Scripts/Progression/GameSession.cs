@@ -19,6 +19,7 @@ namespace Onikiri.Progression
     public sealed class GameSession : MonoBehaviour
     {
         [SerializeField] private UpgradeSystem upgrades;
+        [SerializeField] private CharacterLevel character;
         [SerializeField] private StageProgress stage;
         [SerializeField] private PlayerCombat combat;
         [SerializeField] private EnemySpawner spawner;
@@ -77,6 +78,12 @@ namespace Onikiri.Progression
 
             if (stage != null) stage.SetProgress(data.stage, data.killsThisStage, data.bossKillCount);
 
+            // 레벨은 강화보다 **먼저** 복원한다. 스탯 포인트 증폭이 강화 값에
+            // 곱해지므로(UpgradeSystem.Apply), 순서가 뒤바뀌면 강화가 증폭 없는
+            // 값으로 한 번 적용되고 그 상태가 다음 구매까지 남는다
+            if (character != null)
+                character.Restore(data.characterLevel, data.exp, data.attackPoints, data.healthPoints);
+
             // 강화는 스테이지 다음에 적용한다. 스탯이 곧바로 전투에 반영되므로
             // 순서가 뒤바뀌면 한 프레임 동안 어긋난 값으로 싸운다
             if (upgrades != null) upgrades.RestoreLevels(data.upgradeIds, data.upgradeLevels);
@@ -97,16 +104,25 @@ namespace Onikiri.Progression
             // 나갈 때 적어둔 초당 수입을 쓴다. 지금 다시 계산하면 그동안 오른 것이
             // 아니라 그때 벌던 것을 줘야 한다는 원칙이 깨진다
             var reward = IdleIncome.Reward(data.goldPerSecond, accrued);
-            if (reward <= BigDouble.Zero) return;
+            var expReward = IdleIncome.Reward(data.expPerSecond, accrued);
+
+            // 경험치만 있고 골드가 없는 경우는 실제로 생긴다 - 스폰이 병목인
+            // 구간에서 반올림이 갈린다. 골드 기준으로 조기 반환하면 그 구간의
+            // 방치 경험치가 통째로 사라진다
+            if (reward <= BigDouble.Zero && expReward <= BigDouble.Zero) return;
 
             var wallet = PlayerWallet.Instance;
             if (wallet != null) wallet.Add(reward);
 
+            if (character != null) character.AddExp(expReward);
+
             if (offlinePopup != null)
                 offlinePopup.Show(reward, accrued, IdleIncome.IsCapped(lastQuit.Value, now));
 
-            Debug.Log(string.Format("[Onikiri] Offline reward: {0} for {1} away (rate {2:F2}/s).",
-                NumberFormatter.Format(reward), NumberFormatter.FormatDuration(accrued), data.goldPerSecond));
+            Debug.Log(string.Format("[Onikiri] Offline reward: {0} gold, {1} exp for {2} away "
+                + "(rates {3:F2}/s, {4:F2}/s).",
+                NumberFormatter.Format(reward), NumberFormatter.Format(expReward),
+                NumberFormatter.FormatDuration(accrued), data.goldPerSecond, data.expPerSecond));
         }
 
         // ---------------------------------------------------------------- 저장
@@ -143,8 +159,17 @@ namespace Onikiri.Progression
                 data.bossKillCount = stage.BossKillCount;
             }
 
+            if (character != null)
+            {
+                data.characterLevel = character.Level;
+                data.exp = character.Exp;
+                data.attackPoints = character.AttackPoints;
+                data.healthPoints = character.HealthPoints;
+            }
+
             data.lastQuitUtcTicks = DateTime.UtcNow.Ticks;
             data.goldPerSecond = EstimateGoldPerSecond();
+            data.expPerSecond = EstimateExpPerSecond(data.goldPerSecond);
 
             SaveSystem.Save(data);
         }
@@ -157,12 +182,55 @@ namespace Onikiri.Progression
             var multiplierHealth = stage != null ? stage.HealthMultiplier : BigDouble.One;
             var multiplierGold = stage != null ? stage.GoldMultiplier : BigDouble.One;
 
+            // 획득 축(20단계)이 방치 보상에도 들어온다. 방치는 파밍의 축소판이라
+            // (IdleIncome 주석) 파밍에 곱해지는 것이 여기에만 안 곱해지면 두 벌이
+            // 갈린다 - 그 순간부터 "켜두면 손해"가 성립한다.
+            //
+            // **곱하는 곳은 여기 하나뿐이다.** 이 값이 세이브에 적히고 복귀 시
+            // 그대로 지급되므로(GrantOfflineReward), 지급 쪽에서 또 곱하면 배수가
+            // 제곱된다
+            var goldGain = BigDouble.FromDouble(UpgradeSystem.CurrentGoldGain);
+
             return IdleIncome.GoldPerSecond(
                 combat.Damage,
                 combat.AttacksPerSecond,
                 spawner.AverageBaseHealth * multiplierHealth,
-                spawner.AverageBaseGold * multiplierGold,
+                spawner.AverageBaseGold * multiplierGold * goldGain,
                 spawner.SpawnInterval);
+        }
+
+        /**
+         * @brief 지금 스테이지에서 기대되는 초당 경험치.
+         *
+         * 처치 속도를 다시 구하지 않고 초당 골드에서 환산한다. 둘 다 "초당 처치 수 x
+         * 처치당 보상"이고 처치 속도는 같은 값이므로, 골드를 골드/처치로 나누면
+         * 초당 처치 수가 그대로 나온다.
+         *
+         * 이렇게 하는 이유는 처치 속도 계산이 IdleIncome 안에 두 상한(화력/공급)으로
+         * 들어 있기 때문이다. 여기서 다시 세우면 그 두 상한을 복제하게 되고, 한쪽만
+         * 고쳐지는 날 방치 골드와 방치 경험치가 서로 다른 처치 속도를 쓰게 된다.
+         */
+        public double EstimateExpPerSecond(double goldPerSecond)
+        {
+            if (goldPerSecond <= 0d || spawner == null) return 0d;
+
+            int stageNumber = stage != null ? stage.Stage : 1;
+            var goldMultiplier = stage != null ? stage.GoldMultiplier : BigDouble.One;
+
+            // 처치당 골드에도 획득 배수를 곱한다. **초당 골드를 이것으로 나눠
+            // 처치 속도를 되찾는 식이라 두 값의 배수가 같아야 한다.**
+            //
+            // 한쪽만 곱하면 나눗셈이 배수를 그대로 남기고, 그 결과 방치 경험치가
+            // 골드 배수만큼 부풀려진다 - 화면에서는 "자리를 비웠더니 레벨만
+            // 이상하게 올랐다"로 나타나서, 원인이 경험치 쪽이 아니라 골드 축에
+            // 있다는 것을 알아채기 어렵다
+            var goldGain = BigDouble.FromDouble(UpgradeSystem.CurrentGoldGain);
+
+            double goldPerKill = (spawner.AverageBaseGold * goldMultiplier * goldGain).ToDouble();
+            if (goldPerKill <= 0d) return 0d;
+
+            double killsPerSecond = goldPerSecond / goldPerKill;
+            return killsPerSecond * ExpCurve.MobExp(stageNumber).ToDouble();
         }
 
         /** 테스트 패널이 쓰는 초기화 */

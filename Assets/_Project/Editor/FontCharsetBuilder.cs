@@ -15,8 +15,19 @@ namespace Onikiri.EditorTools
      * 실제 사용 집합만 뽑으면 작은 한 페이지로 끝나고, UI 문구를 추가한 뒤 다시 돌리면
      * 계속 정확하게 유지된다.
      *
-     * 출처: 손으로 관리하는 UIStrings.txt, 그리고 프리팹과 메인 씬에 이미 작성된
-     * TMP 텍스트.
+     * 출처: 손으로 관리하는 UIStrings.txt, 프리팹과 메인 씬에 이미 작성된
+     * TMP 텍스트, 그리고 **화면에 이름이 뜨는 데이터 애셋**.
+     *
+     * ## 데이터 애셋을 훑는 이유
+     *
+     * 보스 이름은 씬에도 프리팹에도 없다. `BossConfig.displayName`에 적혀 있고
+     * 런타임에 등장 연출이 읽어 간다. 그래서 21단계에 처형인을 추가했을 때
+     * UIStrings.txt에 손으로 옮겨 적는 것을 잊었고, **화면에 □□□이 떴다.**
+     *
+     * 같은 실수를 9단계(보스 이름)와 11단계(사망 문구)에도 했다. 세 번 반복된
+     * 것은 "잊지 말자"로 풀 문제가 아니라는 뜻이다. 이름의 출처가 애셋이면
+     * 문자셋도 그 애셋에서 나와야 한다 - 손으로 옮겨 적는 단계가 있는 한
+     * 그 단계는 언젠가 빠진다.
      */
     public static class FontCharsetBuilder
     {
@@ -31,6 +42,7 @@ namespace Onikiri.EditorTools
             int fromFile = AddFromStringsFile(characters);
             int fromPrefabs = AddFromPrefabs(characters);
             int fromScene = AddFromOpenScene(characters);
+            int fromData = AddFromDataAssets(characters);
 
             var text = BuildCharsetString(characters);
             File.WriteAllText(CharsetPath, text, new UTF8Encoding(false));
@@ -38,9 +50,57 @@ namespace Onikiri.EditorTools
 
             Debug.Log(string.Format(
                 "[Onikiri] Charset rebuilt: {0} unique characters " +
-                "(UIStrings {1}, prefabs {2}, open scene {3}) -> {4}",
-                characters.Count, fromFile, fromPrefabs, fromScene, CharsetPath));
+                "(UIStrings {1}, prefabs {2}, open scene {3}, data {4}) -> {5}",
+                characters.Count, fromFile, fromPrefabs, fromScene, fromData, CharsetPath));
         }
+
+        /**
+         * @brief 화면에 이름이 뜨는 데이터 애셋에서 글자를 모은다.
+         *
+         * 여기 적힌 이름은 전부 실제로 화면에 선다.
+         *
+         *   BossConfig       보스 등장 연출의 이름
+         *   EnemyDefinition  일반 스테이지 보스는 "거대 " + 잡몹 이름이다
+         *   RegionConfig     상단 바의 "지역 N"
+         *
+         * 등장하지 않는 애셋(배경 세트의 표시명 등)은 일부러 넣지 않는다.
+         * 아틀라스를 작게 유지하는 것이 이 클래스의 존재 이유다.
+         */
+        public static int AddFromDataAssets(SortedSet<char> into)
+        {
+            int before = into.Count;
+
+            foreach (var name in DisplayNames()) AddAll(into, name);
+
+            return into.Count - before;
+        }
+
+        /** 화면에 서는 데이터 애셋 이름 전부. 글리프 검사도 같은 목록을 본다 */
+        public static IEnumerable<string> DisplayNames()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:BossConfig", DataFolders))
+            {
+                var config = AssetDatabase.LoadAssetAtPath<Onikiri.Battle.BossConfig>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (config != null) yield return config.displayName;
+            }
+
+            foreach (var guid in AssetDatabase.FindAssets("t:EnemyDefinition", DataFolders))
+            {
+                var definition = AssetDatabase.LoadAssetAtPath<Onikiri.Battle.EnemyDefinition>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (definition != null) yield return definition.displayName;
+            }
+
+            foreach (var guid in AssetDatabase.FindAssets("t:RegionConfig", DataFolders))
+            {
+                var region = AssetDatabase.LoadAssetAtPath<Onikiri.Battle.RegionConfig>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (region != null) yield return region.displayName;
+            }
+        }
+
+        private static readonly string[] DataFolders = { "Assets/_Project" };
 
         /** 구워야 할 글자들을 하나의 문자열로. 폰트 빌더가 쓴다 */
         public static string LoadCharset()

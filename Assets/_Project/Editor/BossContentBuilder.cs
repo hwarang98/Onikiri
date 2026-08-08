@@ -21,6 +21,10 @@ namespace Onikiri.EditorTools
     {
         private const string BossSpriteFolder = "Assets/ThirdParty/Characters/Demon_Samurai/Sprites";
         private const string BossIdleSheet = BossSpriteFolder + "/IDLE.png";
+
+        /** 이 팩은 걷기가 아니라 달리기다. 걸어 들어오는 자리에 그대로 쓴다 */
+        private const string BossWalkSheet = BossSpriteFolder + "/RUN.png";
+
         private const string BossHurtSheet = BossSpriteFolder + "/HURT.png";
         private const string BossDeathSheet = BossSpriteFolder + "/DEATH.png";
 
@@ -99,6 +103,70 @@ namespace Onikiri.EditorTools
          * 곱한 값이라 스테이지마다 다르고, BossFight가 스폰 시점에 계산해서 넘긴다.
          * 에셋에 그럴듯한 숫자를 적어두면 언젠가 그 값이 실제 밸런스라고 오해받는다.
          */
+        /**
+         * @brief 배치 애셋을 깔고, 그 안의 시트형 보스를 전부 빌드한다.
+         *
+         * 13단계 이전에는 이 자리에서 다크 사무라이 하나를 하드코딩된 경로로
+         * 만들었다. 이제 만들 대상은 로스터가 정한다 - 보스를 추가하려면
+         * BossConfig 애셋을 하나 더 만들어 지역에 꽂으면 되고 여기는 그대로다.
+         */
+        public static BossRoster BuildBosses()
+        {
+            var roster = BossConfigBuilder.EnsureDefaultAssets();
+            if (roster == null) return null;
+
+            int built = 0;
+            foreach (var config in ConfigsIn(roster))
+            {
+                if (config.kind != BossConfig.ArtKind.Sheets) continue;
+
+                // 발밑 여백을 매번 다시 잰다. 시트를 갈아 끼웠는데 옛 값이 남아
+                // 있으면 보스가 공중에 뜨거나 땅에 박히고, 그것은 플레이해 봐야
+                // 안다. 재는 비용이 그것보다 훨씬 싸다
+                string report;
+                int measured = BossConfigBuilder.MeasureFeetPadding(config, out report);
+                if (measured >= 0 && measured != config.feetPadding)
+                {
+                    Debug.Log(string.Format("[Onikiri] {0} feet padding {1}px -> {2}px  [{3}]",
+                        config.name, config.feetPadding, measured, report));
+                    config.feetPadding = measured;
+                    EditorUtility.SetDirty(config);
+                }
+
+                if (BossConfigBuilder.Build(config) != null) built++;
+            }
+
+            Debug.Log("[Onikiri] Boss roster built: " + built + " sheet boss(es).");
+            return roster;
+        }
+
+        /** 로스터가 참조하는 모든 BossConfig. 중복 없이 */
+        public static List<BossConfig> ConfigsIn(BossRoster roster)
+        {
+            var configs = new List<BossConfig>();
+            if (roster == null || roster.regions == null) return configs;
+
+            foreach (var region in roster.regions)
+            {
+                if (region == null) continue;
+                AddUnique(configs, region.chapterBoss);
+                AddUnique(configs, region.finaleBoss);
+                AddUnique(configs, region.normalBossOverride);
+            }
+            return configs;
+        }
+
+        private static void AddUnique(List<BossConfig> into, BossConfig config)
+        {
+            if (config != null && !into.Contains(config)) into.Add(config);
+        }
+
+        /**
+         * @brief 12단계까지 쓰던 하드코딩 경로. 폴백으로만 남는다.
+         *
+         * BossFight가 로스터 없이 돌 때를 위한 것이고, 새 보스를 추가할 때
+         * 여기를 고칠 일은 없다.
+         */
         public static EnemyDefinition BuildDefinition()
         {
             // 자동 슬라이싱이 만든 타이트 렉트를 그대로 두면 프레임마다 피벗이 달라
@@ -114,6 +182,7 @@ namespace Onikiri.EditorTools
 
             definition.displayName = BossDisplayName;
             definition.idleFrames = OrderedSprites(BossIdleSheet).ToArray();
+            definition.walkFrames = OrderedSprites(BossWalkSheet).ToArray();
             definition.hurtFrames = OrderedSprites(BossHurtSheet).ToArray();
             definition.deathFrames = OrderedSprites(BossDeathSheet).ToArray();
             definition.attackFrames = OrderedSprites(BossAttackSheet).ToArray();
@@ -188,6 +257,16 @@ namespace Onikiri.EditorTools
             fightSo.FindProperty("playerHealth").objectReferenceValue =
                 samurai != null ? samurai.GetComponent<PlayerHealth>() : null;
             fightSo.FindProperty("bossDefinition").objectReferenceValue = definition;
+
+            // 배치 애셋. 있으면 BossFight가 이쪽 말만 듣는다
+            fightSo.FindProperty("roster").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<BossRoster>(BossConfigBuilder.RosterPath);
+
+            // 토리이 관문. BattleStageBuilder가 지면 앵커 아래에 만들어두고
+            // 숨겨둔 것을 찾아 연결한다
+            fightSo.FindProperty("gate").objectReferenceValue =
+                Object.FindFirstObjectByType<BossGate>(FindObjectsInactive.Include);
+            fightSo.FindProperty("advance").objectReferenceValue = battle.GetComponent<StageAdvance>();
 
             // 일반 스테이지 보스로 쓸 잡몹들. 스테이지로 하나를 고른다
             var stageBosses = LoadMobDefinitions();
@@ -282,8 +361,9 @@ namespace Onikiri.EditorTools
             challengeRect.anchoredPosition = new Vector2(0f, -24f);
 
             var challengeImage = challenge.AddComponent<Image>();
-            challengeImage.color = ButtonColor;
+            UiSkin.ApplyPanel(challengeImage, UiSkin.Panel, UiSkin.Danger);
             var challengeButton = challenge.AddComponent<Button>();
+            UiSkin.ApplyButton(challengeButton, challengeImage);
             challengeButton.targetGraphic = challengeImage;
 
             var challengeLabel = CreateLabel(challenge.transform, font, "Label",
@@ -304,7 +384,7 @@ namespace Onikiri.EditorTools
             backRect.pivot = new Vector2(0.5f, 1f);
             backRect.offsetMin = new Vector2(60f, -66f);
             backRect.offsetMax = new Vector2(-60f, -24f);
-            healthBack.AddComponent<Image>().color = HealthBackColor;
+            UiSkin.ApplyPanel(healthBack.AddComponent<Image>(), UiSkin.Inlay, UiSkin.InlayTint);
 
             var healthFill = new GameObject("HealthFill", typeof(RectTransform));
             healthFill.transform.SetParent(healthBack.transform, false);
@@ -337,7 +417,7 @@ namespace Onikiri.EditorTools
             playerBackRect.pivot = new Vector2(0.5f, 1f);
             playerBackRect.offsetMin = new Vector2(60f, -196f);
             playerBackRect.offsetMax = new Vector2(-60f, -162f);
-            playerBack.AddComponent<Image>().color = HealthBackColor;
+            UiSkin.ApplyPanel(playerBack.AddComponent<Image>(), UiSkin.Inlay, UiSkin.InlayTint);
 
             var playerFillGo = new GameObject("PlayerHealthFill", typeof(RectTransform));
             playerFillGo.transform.SetParent(playerBack.transform, false);
@@ -380,7 +460,7 @@ namespace Onikiri.EditorTools
             resultRect.anchoredPosition = Vector2.zero;
 
             var resultImage = result.AddComponent<Image>();
-            resultImage.color = PanelColor;
+            UiSkin.ApplyPanel(resultImage, UiSkin.Row);
             resultImage.raycastTarget = false;
 
             var resultLabel = CreateLabel(result.transform, font, "Message",
@@ -390,6 +470,51 @@ namespace Onikiri.EditorTools
             // 되는가"로 나뉘고, 한 줄로 붙이면 둘 다 흘려 읽힌다
             resultLabel.textWrappingMode = TextWrappingModes.Normal;
             resultLabel.text = "화력이 1.4배 모자란다.\n공격력 강화를 올리고 다시 도전하라";
+
+            // --- 클리어 배너: 결과 문구와 같은 자리, 두 줄
+            var banner = new GameObject("ClearBanner", typeof(RectTransform));
+            banner.transform.SetParent(band, false);
+            var bannerRect = (RectTransform)banner.transform;
+            bannerRect.anchorMin = bannerRect.anchorMax = new Vector2(0.5f, 0.5f);
+            bannerRect.pivot = new Vector2(0.5f, 0.5f);
+            bannerRect.sizeDelta = new Vector2(960f, 300f);
+            bannerRect.anchoredPosition = Vector2.zero;
+
+            var bannerImage = banner.AddComponent<Image>();
+            UiSkin.ApplyPanel(bannerImage, UiSkin.Row);
+            bannerImage.raycastTarget = false;
+
+            var bannerTitle = CreateLabel(banner.transform, font, "Title",
+                                          PixelFontSizesLarge, TextAlignmentOptions.Center);
+            var titleRect = (RectTransform)bannerTitle.transform;
+            titleRect.anchorMin = new Vector2(0f, 0.5f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.offsetMin = new Vector2(20f, 0f);
+            titleRect.offsetMax = new Vector2(-20f, -20f);
+            bannerTitle.text = "클리어";
+
+            var bannerDetail = CreateLabel(banner.transform, font, "Detail",
+                                           PixelFontSizesSmall, TextAlignmentOptions.Center);
+            var detailRect = (RectTransform)bannerDetail.transform;
+            detailRect.anchorMin = new Vector2(0f, 0f);
+            detailRect.anchorMax = new Vector2(1f, 0.5f);
+            detailRect.offsetMin = new Vector2(20f, 20f);
+            detailRect.offsetMax = new Vector2(-20f, 0f);
+            bannerDetail.color = TextColor;
+            bannerDetail.text = "지역 1 · 1/10   +0";
+
+            var bannerComponent = band.GetComponent<Onikiri.UI.ClearBanner>();
+            if (bannerComponent == null)
+                bannerComponent = band.gameObject.AddComponent<Onikiri.UI.ClearBanner>();
+
+            var bannerSo = new SerializedObject(bannerComponent);
+            bannerSo.FindProperty("fight").objectReferenceValue = fight;
+            bannerSo.FindProperty("root").objectReferenceValue = banner;
+            bannerSo.FindProperty("titleLabel").objectReferenceValue = bannerTitle;
+            bannerSo.FindProperty("detailLabel").objectReferenceValue = bannerDetail;
+            bannerSo.ApplyModifiedPropertiesWithoutUndo();
+
+            banner.SetActive(false);
 
             var hud = band.GetComponent<Onikiri.UI.BossHud>();
             if (hud == null) hud = band.gameObject.AddComponent<Onikiri.UI.BossHud>();

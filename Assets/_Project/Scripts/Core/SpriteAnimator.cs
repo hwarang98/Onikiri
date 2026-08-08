@@ -29,6 +29,31 @@ namespace Onikiri.Core
 
         public bool IsPlaying { get; private set; }
 
+        /**
+         * @brief 지금 재생 중인 것이 **한 번 재생 클립**인가.
+         *
+         * "동작 도중이라 끊으면 안 되는 상태"의 정확한 정의다. 루프 클립(idle,
+         * 달리기)은 언제 갈아끼워도 되지만 한 번 재생 클립(공격, 피격)은 끝까지
+         * 가야 한다.
+         *
+         * `IsPlaying`만으로는 그 구분이 안 된다 - 루프 클립도 계속 true이기
+         * 때문이다. 그것을 "동작 중"으로 오해한 자리가 실제로 있었다:
+         * PlayerCombat이 `IsPlaying && swingStarted`로 스윙 여부를 판정했는데,
+         * idle이 재생 중이고 swingStarted가 낡은 값으로 남아 있으면 둘 다 참이라
+         * **영원히 달리기로 전환되지 않았다.**
+         */
+        public bool IsOneShot { get { return IsPlaying && !loop; } }
+
+        /**
+         * @brief 지금 돌고 있는 클립. 재생 중이 아니면 null.
+         *
+         * "무엇이 도는가"를 부르는 쪽이 물어볼 수 있게 한다. 예전에는 그것을
+         * 각자 bool로 기억했는데, 그 값은 반드시 어딘가에서 낡는다 - 사무라이가
+         * idle로 달려간 버그가 정확히 그것이었다. 배열 참조 비교라 재생을 시작한
+         * 쪽이 자기 클립인지 확인하는 데 추가 상태가 필요 없다.
+         */
+        public Sprite[] CurrentClip { get { return IsPlaying ? frames : null; } }
+
         /** 현재 화면에 떠 있는 프레임의 0-기반 인덱스 */
         public int FrameIndex { get { return frameIndex; } }
 
@@ -74,6 +99,19 @@ namespace Onikiri.Core
         {
             IsPlaying = false;
             onComplete = null;
+        }
+
+        /**
+         * @brief 재생 중인 클립의 속도만 바꾼다. 프레임 위치는 그대로 둔다.
+         *
+         * Play를 다시 부르면 frameIndex가 0으로 돌아가는데, 인스펙터에서 값을
+         * 끌면 매 키 입력마다 동작이 첫 프레임으로 튄다 - 그 상태로는 빠른지
+         * 느린지를 볼 수가 없다. 조율은 눈으로 하는 일이라 튀지 않는 것이 조건이다.
+         */
+        public void SetFrameRate(float framesPerSecond)
+        {
+            if (!IsPlaying) return;
+            secondsPerFrame = framesPerSecond > 0f ? 1f / framesPerSecond : 0.1f;
         }
 
         private void Update()

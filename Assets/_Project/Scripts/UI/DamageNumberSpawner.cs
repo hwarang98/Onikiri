@@ -124,6 +124,50 @@ namespace Onikiri.UI
             }
         }
 
+        [Header("경험치 흡수")]
+        [Tooltip("경험치가 빨려 들어갈 목표. 보통 상단 바의 경험치 바다. " +
+                 "비어 있으면 흡수 연출을 생략한다 - 목표 없이 날리면 화면 " +
+                 "왼쪽 아래 구석으로 사라진다")]
+        [SerializeField] private RectTransform expTarget;
+
+        [Tooltip("경험치 색. 경험치 바의 채움색과 같아야 어디로 가는지가 읽힌다")]
+        [SerializeField] private Color expColor = new Color32(0x7C, 0xC5, 0x9A, 0xFF);
+
+        /**
+         * @brief 처치 지점에서 경험치 바로 날아가는 "+N".
+         *
+         * 데미지 팝업과 같은 풀을 쓴다. 초당 처치 수는 스폰 간격 하한(0.4초)이
+         * 막고 있어서, 이 연출이 풀을 놓고 데미지 팝업과 다투는 구간은 없다.
+         */
+        public void ShowExp(BigDouble amount, Vector3 worldPosition)
+        {
+            if (pool == null || canvas == null || expTarget == null) return;
+            if (amount <= BigDouble.Zero) return;
+
+            var screenPoint = worldCamera.WorldToScreenPoint(
+                worldPosition + new Vector3(worldOffset.x, worldOffset.y, 0f));
+
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+
+            Vector2 from;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    container, screenPoint, uiCamera, out from))
+                return;
+
+            // 목표는 다른 계층에 있다(상단 바). 월드를 거쳐 컨테이너 좌표로 옮긴다 -
+            // 두 rect의 앵커가 달라서 anchoredPosition을 그대로 쓸 수 없다
+            var targetScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, expTarget.position);
+
+            Vector2 to;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    container, targetScreen, uiCamera, out to))
+                return;
+
+            var popup = pool.Get();
+            popup.PlayAbsorb("+" + NumberFormatter.Format(amount), from, to,
+                             expColor, PixelFontSizes.ThaleahDamage, Release);
+        }
+
         /** 대상별로 지금까지 올라간 강조 단계 */
         private readonly System.Collections.Generic.Dictionary<object, DamageStyle> lastStyle =
             new System.Collections.Generic.Dictionary<object, DamageStyle>();

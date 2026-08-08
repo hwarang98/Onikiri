@@ -24,6 +24,15 @@ namespace Onikiri.Progression
         public const string HealthId = "health";
         public const string HealthRegenId = "health_regen";
 
+        /**
+         * @brief 획득 축. 골드를 골드로 바꾸는 유일한 축이다.
+         *
+         * 전투 스탯이 아니라 **보상 배수**라, 다른 여섯처럼 combat/health로 흘러
+         * 가지 않는다. 대신 GoldGainMultiplier로 노출하고 골드를 지급하는 쪽이
+         * 읽어 간다. 효율 자도 다르다(GoldGainEfficiency).
+         */
+        public const string GoldGainId = "gold_gain";
+
         [SerializeField] private PlayerCombat combat;
         [SerializeField] private PlayerHealth health;
         [SerializeField] private UpgradeTrack[] tracks;
@@ -32,6 +41,64 @@ namespace Onikiri.Progression
         public event Action Changed;
 
         public int TrackCount { get { return tracks != null ? tracks.Length : 0; } }
+
+        /**
+         * @brief 지금 골드 보상에 곱해지는 배수. 축이 없으면 1.
+         *
+         * ## 왜 여기서 노출하고 지급 쪽이 읽는가
+         *
+         * PlayerWallet.Add에서 곱하는 방법이 더 짧지만 그러면 **방치 보상이 두 번
+         * 곱해진다.** 방치 보상은 나갈 때 적어둔 초당 골드에서 나오는데(SaveData),
+         * 그 값 자체가 이미 이 배수를 포함하고 있고, 지급 경로는 wallet.Add다.
+         *
+         * 그래서 규칙을 반대로 세운다 - **지갑은 받은 것을 그대로 넣고, 골드를
+         * 만드는 쪽이 곱한다.** 만드는 곳은 셋뿐이다:
+         *
+         *   처치/보스 골드   EnemySpawner
+         *   클리어 보너스    BossFight
+         *   방치 보상        GameSession.EstimateGoldPerSecond
+         *
+         * 정적 접근자(Current)를 두는 이유는 그 셋 중 둘이 UpgradeSystem 참조를
+         * 들고 있지 않기 때문이다. CharacterLevel.Instance가 스탯 증폭에 쓰는
+         * 방식과 같다.
+         */
+        public double GoldGainMultiplier
+        {
+            get
+            {
+                var track = GetTrack(GoldGainId);
+                return track != null ? track.Value.ToDouble() : 1d;
+            }
+        }
+
+        /**
+         * @brief 씬에 있는 UpgradeSystem의 골드 배수. 없으면 1.
+         *
+         * 1로 떨어지는 것이 중요하다. 전투 전용 테스트 씬은 UpgradeSystem 없이
+         * 스포너만 세우는데, 거기서 0이 되면 골드가 통째로 사라진다.
+         */
+        public static double CurrentGoldGain
+        {
+            get { return Instance != null ? Instance.GoldGainMultiplier : 1d; }
+        }
+
+        /** 씬에 하나뿐이다. 골드를 만드는 쪽이 참조 없이 배수를 읽어 간다 */
+        public static UpgradeSystem Instance { get; private set; }
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning("[Onikiri] A second UpgradeSystem appeared; keeping the first.");
+                return;
+            }
+            Instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
 
         public UpgradeTrack GetTrack(int index)
         {
@@ -124,17 +191,34 @@ namespace Onikiri.Progression
             {
                 if (health == null) return;
 
-                if (track.Id == HealthId) health.MaxHealthStat = track.Value.ToDouble();
-                else health.RegenStat = track.Value.ToDouble();
+                if (track.Id == HealthId)
+                    health.MaxHealthStat = track.Value.ToDouble() * StatAmp(CharacterLevel.HealthAmpId);
+                else
+                    // 회복은 증폭하지 않는다. 최대 체력의 비율이라(HealthRegenCurve)
+                    // 체력 증폭이 오르면 초당 회복량도 같이 오른다. 여기서 또 곱하면
+                    // 체력 포인트 하나가 유효체력을 두 번 밀어올린다
+                    health.RegenStat = track.Value.ToDouble();
                 return;
             }
+
+            // 획득 축은 전투 스탯이 아니다. 값을 어디로도 밀어 넣지 않고,
+            // 골드를 지급하는 쪽이 GoldGainMultiplier로 읽어 간다.
+            //
+            // 여기서 조용히 빠져나가는 것이 중요하다. 아래 switch의 default가
+            // "스탯이 배선되지 않았다"고 경고하는데, 이 축은 배선되지 않은 것이
+            // 아니라 배선할 스탯이 없는 것이다
+            if (track.Id == GoldGainId) return;
 
             if (combat == null) return;
 
             switch (track.Id)
             {
                 case AttackPowerId:
-                    combat.Damage = track.Value;
+                    // 스탯 포인트 증폭은 여기서만 곱한다. 공격속도·치명타에는
+                    // 붙지 않는다 - 증폭 축이 둘(공격력/체력)뿐이라는 것이
+                    // 12단계의 설계이고, 네 화력 축에 고루 뿌리면 골드 축들의
+                    // 상대 효율(UpgradeEfficiency가 재는 값)이 레벨에 따라 흔들린다
+                    combat.Damage = track.Value * BigDouble.FromDouble(StatAmp(CharacterLevel.AttackAmpId));
                     break;
 
                 case AttackSpeedId:
@@ -162,6 +246,19 @@ namespace Onikiri.Progression
                     Debug.LogWarning("[Onikiri] Upgrade track '" + track.Id + "' has no stat wired.");
                     break;
             }
+        }
+
+        /**
+         * @brief 스탯 포인트 증폭 배수. 캐릭터 레벨이 없으면 1.
+         *
+         * 없을 때 1로 떨어지는 것이 중요하다. 강화 테스트와 전투 전용 테스트 씬은
+         * CharacterLevel 없이 UpgradeSystem만 세우는데, 거기서 스탯이 0이 되면
+         * 12단계 이전에 쓰던 테스트가 전부 이유 없이 깨진다.
+         */
+        private static double StatAmp(string axisId)
+        {
+            var character = CharacterLevel.Instance;
+            return character != null ? StatPointCurve.Multiplier(character.PointsIn(axisId)) : 1d;
         }
 
         /** 강화 버튼이 "5 -> 5.6" 을 표시할 때 쓴다 */

@@ -63,12 +63,18 @@ namespace Onikiri.Progression
             return elapsed > MaxAccrual ? MaxAccrual : elapsed;
         }
 
-        /** 지급할 골드. 경과 시간 x 초당 골드 x 효율 */
-        public static BigDouble Reward(double goldPerSecond, TimeSpan accrued)
+        /**
+         * @brief 지급할 양. 경과 시간 x 초당 획득 x 효율.
+         *
+         * 골드와 경험치가 같은 함수를 쓴다. 둘의 계산이 갈리면 방치 효율이 재화마다
+         * 달라지고, 그때부터 "자리를 비우면 레벨만 앞선다" 같은 상태가 생긴다.
+         * 두 재화가 같은 비율로 깎여야 방치가 플레이의 축소판으로 남는다.
+         */
+        public static BigDouble Reward(double perSecond, TimeSpan accrued)
         {
-            if (goldPerSecond <= 0d || accrued <= TimeSpan.Zero) return BigDouble.Zero;
+            if (perSecond <= 0d || accrued <= TimeSpan.Zero) return BigDouble.Zero;
 
-            double amount = goldPerSecond * accrued.TotalSeconds * Efficiency;
+            double amount = perSecond * accrued.TotalSeconds * Efficiency;
             if (double.IsInfinity(amount) || double.IsNaN(amount)) return BigDouble.Zero;
 
             return BigDouble.FromDouble(Math.Floor(amount));

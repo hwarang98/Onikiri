@@ -24,10 +24,12 @@ namespace Onikiri.Progression
          *   2  9단계. 보스가 스테이지 게이트가 됐고 bossKillCount가 생겼다
          *   3  10단계. 치명타 확률·피해 축이 생겼다
          *   4  11단계. 체력·체력회복 축이 생겼다
+         *   5  12단계. 경험치/레벨/스탯 포인트가 생겼다
+         *   6  20단계. 골드 획득량 축이 생겼다
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 4;
+        public const int CurrentVersion = 6;
 
         public int version = CurrentVersion;
 
@@ -51,6 +53,24 @@ namespace Onikiri.Progression
         /** 지금까지 잡은 보스 수 */
         public int bossKillCount;
 
+        // ---------------------------------------------------------------- 12단계
+
+        /** 캐릭터 레벨. 1부터 */
+        public int characterLevel = 1;
+
+        /** 현재 레벨에서 모은 경험치. 초과분은 레벨업할 때 다음 레벨로 넘어간다 */
+        public BigDouble exp;
+
+        /**
+         * @brief 각 증폭 축에 찍은 스탯 포인트.
+         *
+         * 남은 포인트는 저장하지 않는다. 레벨에서 총 지급량이 나오고 여기서 쓴 양이
+         * 나오므로, 남은 양을 따로 적으면 셋이 어긋났을 때 무엇이 맞는지 알 수 없다.
+         * CharacterLevel.UnspentPoints 참고.
+         */
+        public int attackPoints;
+        public int healthPoints;
+
         /**
          * @brief 마지막으로 저장한 시각 (UTC ticks).
          *
@@ -68,6 +88,9 @@ namespace Onikiri.Progression
          */
         public double goldPerSecond;
 
+        /** 같은 이유로 함께 적는 초당 경험치. 방치 보상이 골드와 나란히 계산된다 */
+        public double expPerSecond;
+
         public static SaveData NewGame()
         {
             return new SaveData
@@ -78,6 +101,10 @@ namespace Onikiri.Progression
                 stage = 1,
                 killsThisStage = 0,
                 bossKillCount = 0,
+                characterLevel = 1,
+                exp = BigDouble.Zero,
+                attackPoints = 0,
+                healthPoints = 0,
                 lastQuitUtcTicks = 0L,
                 goldPerSecond = 0d
             };
@@ -133,6 +160,38 @@ namespace Onikiri.Progression
                 EnsureTrack(data, UpgradeSystem.HealthId);
                 EnsureTrack(data, UpgradeSystem.HealthRegenId);
                 data.version = 4;
+            }
+
+            if (data.version == 4)
+            {
+                // v4에는 레벨이 없었다. 지나온 진행만큼 레벨을 소급해줄 수도 있지만
+                // 그러지 않는다. 소급하면 그만큼의 스탯 포인트가 함께 들어오고,
+                // 그것은 v4 플레이어가 12단계 밸런스로 계산되지 않은 증폭을 얹은 채
+                // 다음 보스를 만난다는 뜻이다. 레벨 1에서 시작하되 경험치는 지금
+                // 스테이지에서 벌리므로 몇 분이면 따라잡는다
+                //
+                // 필드가 JsonUtility 기본값(0)으로 들어오는 경우가 있어 명시적으로
+                // 1을 넣는다. 0이면 ExpCurve.RequiredForLevel이 Lv.1과 같은 값을
+                // 내주긴 하지만, 레벨 표시가 "Lv.0"이 된다
+                if (data.characterLevel < 1) data.characterLevel = 1;
+                data.exp = BigDouble.Zero;
+                data.attackPoints = 0;
+                data.healthPoints = 0;
+                data.version = 5;
+            }
+
+            if (data.version == 5)
+            {
+                // v5에는 골드 획득 축이 없었다. 앞의 축들과 같은 이유로 레벨 1을
+                // 명시적으로 적어 넣는다 - 그래야 "레벨 1이라서 없는 것"과 "저장된
+                // 적이 없어서 없는 것"이 구분된다.
+                //
+                // 레벨 1의 배수가 1배이므로(GoldGainCurve.BaseValue) 이 마이그레이션은
+                // **예전 플레이어의 골드 수입을 바꾸지 않는다.** 새 축이 생겼다고
+                // 기존 진행의 벌이가 달라지면 그것은 마이그레이션이 아니라 밸런스
+                // 변경이다
+                EnsureTrack(data, UpgradeSystem.GoldGainId);
+                data.version = 6;
             }
 
             data.version = CurrentVersion;

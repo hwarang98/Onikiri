@@ -74,6 +74,43 @@ namespace Onikiri.Progression
 
             /** 이 스테이지가 챕터 보스인가 */
             public bool IsChapterBoss;
+
+            // ------------------------------------------------------------ 12단계
+
+            /** 이 스테이지를 끝냈을 때의 캐릭터 레벨 */
+            public int CharacterLevel;
+
+            /** 이 스테이지에서 오른 레벨 수 */
+            public int LevelsGained;
+
+            public int AttackPoints;
+            public int HealthPoints;
+
+            /**
+             * @brief 이 스테이지에서 한 레벨을 올리는 데 걸린 평균 시간.
+             *
+             * 목표 리듬을 재는 값이다. 초반 30초 안팎에서 시작해 후반으로 갈수록
+             * 늘어나야 한다 - 레벨이 골드보다 느리게 자라야 하기 때문이다.
+             * 이 스테이지에서 한 번도 안 올랐으면 무한대다.
+             */
+            public double SecondsPerLevel;
+
+            /** 스탯 포인트가 곱하고 있는 배수. 골드 축과 얼마나 벌어졌는지 보는 값 */
+            public double AttackAmp;
+            public double HealthAmp;
+
+            // ------------------------------------------------------------ 20단계
+
+            public int GoldGainLevel;
+
+            /** 골드 보상에 곱해지고 있는 배수 */
+            public double GoldGain;
+
+            /** 이 스테이지의 파밍 속도. 회수 시간의 분모다 */
+            public double GoldPerSecond;
+
+            /** 지금 레벨에서 한 칸 더 살 때의 회수 시간 (초). 밴드를 재는 값 */
+            public double GoldGainPaybackSeconds;
         }
 
         public struct Field
@@ -123,19 +160,24 @@ namespace Onikiri.Progression
         }
 
         /**
-         * @brief 제한 시간 중 실제로 때릴 수 있는 시간.
+         * @brief 제한 시간 중 실제로 때릴 수 있는 시간. **제한 시간 전부다.**
          *
-         * 시계는 보스가 스폰되는 순간 시작하지만 보스는 화면 밖에서 걸어 들어온다.
-         * 그 5.3초 동안 사무라이의 사거리에는 아무도 없다. 제한 시간 30초를 그대로
-         * 쓰면 실제보다 후한 판정이 나온다.
+         * 16단계까지는 여기서 워크인 5.3초를 뺐다. 시계가 보스 스폰과 함께
+         * 돌기 시작하는데 보스는 화면 밖에서 걸어 들어와서, 그 5.3초 동안
+         * 사거리에 아무도 없었기 때문이다 - 제한 시간의 18%가 기다림이었다.
          *
-         * 이것을 시계 쪽에서 고치지 않고 계산 쪽에서 반영하는 이유는, 걸어 들어오는
-         * 장면이 연출이기도 하기 때문이다. 시계가 보스 도착 후에 시작하면 등장이
-         * 공짜가 되어 플레이어가 그 시간을 기다림으로만 느낀다.
+         * 17단계에서 그것을 **시계 쪽에서** 고쳤다. 이제 플레이어가 보스에게
+         * 달려가고(연출), 도달한 순간부터 30초가 시작한다. 달려가는 구간은
+         * 타이머 밖이므로 뺄 것이 없다.
+         *
+         * 16단계 주석은 "시계가 보스 도착 후에 시작하면 등장이 공짜가 되어
+         * 플레이어가 그 시간을 기다림으로만 느낀다"고 적었는데, 그 전제가
+         * 바뀌었다. 기다리는 것이 아니라 **달려가는 것**이면 그 시간은 대기가
+         * 아니라 전진이다.
          */
         public static double BossDamageWindowSeconds
         {
-            get { return StageCurve.BossTimeLimitSeconds - BossWalkInSeconds; }
+            get { return StageCurve.BossTimeLimitSeconds; }
         }
 
         public static bool BossClears(double averageMobHealth, int stage, CombatStats stats)
@@ -215,11 +257,14 @@ namespace Onikiri.Progression
             for (int stage = 1; stage <= throughStage; stage++)
             {
                 double mobHealth = field.AverageMobHealth * StageCurve.HealthMultiplier(stage).ToDouble();
-                double goldPerMob = field.AverageMobGold * StageCurve.GoldMultiplier(stage).ToDouble();
+                double rawGoldPerMob = field.AverageMobGold * StageCurve.GoldMultiplier(stage).ToDouble();
+                double expPerMob = ExpCurve.MobExp(stage).ToDouble();
 
                 double mobSeconds = 0d;
                 double lastKill = 0d;
                 double lastInterval = 0d;
+                double lastGoldPerSecond = 0d;
+                int levelsGained = 0;
 
                 for (int k = 0; k < StageCurve.KillsPerStage; k++)
                 {
@@ -229,13 +274,26 @@ namespace Onikiri.Progression
                     // 빨라지면 파밍 시간도 함께 줄어든다 - 9단계에서 11.0초에
                     // 고정되던 지점이 여기다. 하한 0.4초. SpawnPacing 참고
                     double interval = SpawnPacing.SettledInterval(kill);
-                    mobSeconds += Math.Max(kill, interval);
+                    double seconds = Math.Max(kill, interval);
+                    mobSeconds += seconds;
 
                     lastKill = kill;
                     lastInterval = interval;
 
+                    // 획득 축이 곱해진 실제 수령액. 루프 안에서 매번 다시 읽는
+                    // 이유는 바로 아래 Buy가 이 축의 레벨을 올릴 수 있기 때문이다
+                    double goldPerMob = rawGoldPerMob * levels.GoldGain;
                     purse += goldPerMob;
-                    Buy(ref levels, ref purse, stage);
+
+                    // 회수 시간의 분모. 파밍 한 마리에 걸린 시간으로 나눈 것이
+                    // 이 시점의 초당 골드다 - 게임 쪽 IdleIncome.GoldPerSecond가
+                    // 처치 속도와 공급 하한 중 낮은 쪽을 쓰는 것과 같은 값이다
+                    lastGoldPerSecond = seconds > 0d ? goldPerMob / seconds : 0d;
+
+                    // 경험치는 골드와 같은 자리에서 들어온다. 게임에서도 처치
+                    // 하나가 둘 다 준다(EnemySpawner.OnEnemyKilled)
+                    levelsGained += levels.GainExp(expPerMob);
+                    Buy(ref levels, ref purse, stage, lastGoldPerSecond, stage);
                 }
 
                 var stats = levels.Stats;
@@ -250,9 +308,19 @@ namespace Onikiri.Progression
                 // 여기서 stage를 넘기면 이미 지나간 보스를 대비하게 된다
                 // 챕터 배수는 BossGoldForStage 안에 들어 있다. 여기서 또 곱하면
                 // 두 번 적용된다 - 시뮬레이션만 후하게 계산하는 상태가 된다
+                // 보스 골드와 클리어 보너스에도 획득 배수가 곱해진다. 게임 쪽
+                // 두 지점(EnemySpawner, BossFight)과 같아야 하고, 여기만 빠지면
+                // 시뮬레이션이 실제보다 가난한 플레이어를 재게 된다
                 purse += StageCurve.BossGoldForStage(
-                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble();
-                Buy(ref levels, ref purse, stage + 1);
+                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble() * levels.GoldGain;
+
+                // 17단계의 클리어 보너스. 화면에는 축하 숫자로 뜨지만 밸런스에는
+                // 그대로 들어온다 - 16단계에서 피날레 골드가 다음 스테이지를
+                // 망가뜨린 것과 같은 경로다
+                purse += StageCurve.ClearGoldForStage(
+                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble() * levels.GoldGain;
+                levelsGained += levels.GainExp(ExpCurve.BossExp(stage).ToDouble());
+                Buy(ref levels, ref purse, stage + 1, lastGoldPerSecond, stage);
 
                 results.Add(new StageResult
                 {
@@ -279,7 +347,27 @@ namespace Onikiri.Progression
                     RegenPerSecond = levels.RegenPerSecond,
                     SurvivalMargin = incoming > 0d ? levels.EffectiveHealth / incoming : double.PositiveInfinity,
                     Survived = levels.EffectiveHealth >= incoming,
-                    IsChapterBoss = BossCurve.IsChapterBoss(stage)
+                    IsChapterBoss = BossCurve.IsChapterBoss(stage),
+
+                    CharacterLevel = levels.L,
+                    LevelsGained = levelsGained,
+                    AttackPoints = levels.AttackPoints,
+                    HealthPoints = levels.HealthPoints,
+                    AttackAmp = levels.AttackAmp,
+                    HealthAmp = levels.HealthAmp,
+
+                    GoldGainLevel = levels.Gd,
+                    GoldGain = levels.GoldGain,
+                    GoldPerSecond = lastGoldPerSecond,
+                    GoldGainPaybackSeconds =
+                        GoldGainEfficiency.PaybackSeconds(levels.Gd, lastGoldPerSecond),
+
+                    // 이 스테이지에 든 시간을 오른 레벨 수로 나눈다. 보스 연출과
+                    // 처치 시간까지 포함하는 이유는 그것도 플레이어가 앉아 있는
+                    // 시간이기 때문이다 - 리듬은 체감이고 체감은 벽시계다
+                    SecondsPerLevel = levelsGained > 0
+                        ? (mobSeconds + BossIntroSeconds + BossWalkInSeconds + bossKill) / levelsGained
+                        : double.PositiveInfinity
                 });
             }
 
@@ -296,13 +384,100 @@ namespace Onikiri.Progression
             public int Health;
             public int Regen;
 
+            /** 20단계의 획득 축 */
+            public int Gold;
+
+            // ------------------------------------------------------------ 12단계
+
+            /** 캐릭터 레벨. 1부터 */
+            public int Character;
+
+            /** 현재 레벨에서 모은 경험치 */
+            public double Exp;
+
+            public int AttackPoints;
+            public int HealthPoints;
+
+            public int L { get { return Character < 1 ? 1 : Character; } }
+
+            public double AttackAmp { get { return StatPointCurve.Multiplier(AttackPoints); } }
+            public double HealthAmp { get { return StatPointCurve.Multiplier(HealthPoints); } }
+
+            /**
+             * @brief 경험치를 받고 올릴 수 있는 만큼 올린다.
+             *
+             * 자동으로 올린다. 게임에서는 버튼을 눌러야 하지만(CharacterLevel),
+             * 시뮬레이션이 재는 것은 "이 시점에 올릴 수 있는가"이고 플레이어가
+             * 누르기를 미루는 시간까지 모델링하면 진행 속도가 임의의 가정에
+             * 좌우된다. 실제로도 레벨업 버튼은 떠 있으면 누르는 버튼이다.
+             */
+            public int GainExp(double amount)
+            {
+                Exp += amount;
+
+                int gained = 0;
+                for (int guard = 0; guard < 100000; guard++)
+                {
+                    double need = ExpCurve.RequiredForLevel(L + gained).ToDouble();
+                    if (Exp < need) break;
+
+                    Exp -= need;
+                    gained++;
+                }
+
+                Character = L + gained;
+                return gained;
+            }
+
+            /**
+             * @brief 스탯 포인트를 찍는다. 배분 규칙은 다음 하나다.
+             *
+             *   **다음 보스에게 죽지 않을 만큼까지는 체력 증폭, 그 뒤는 전부
+             *   공격력 증폭.**
+             *
+             * 골드 축의 정책("생존 먼저, 그 다음 화력")과 같은 규칙이고, 같아야
+             * 한다 - 두 재화가 서로 다른 우선순위를 쓰면 시뮬레이션이 재는 것이
+             * 어느 쪽 플레이어인지 알 수 없게 된다.
+             *
+             * 축이 둘뿐이고 포인트당 효과가 같아서 골드 축처럼 효율을 비교할
+             * 것이 없다. 남는 판단 기준은 "지금 무엇이 모자란가" 하나다.
+             *
+             * 상한(StatPointCurve.MaxPoints)에 닿은 축은 건너뛴다. 실제로
+             * 도달할 일은 없지만, 도달했는데 계속 찍으면 포인트가 조용히
+             * 사라진다.
+             */
+            public void SpendPoints(double neededEffectiveHealth)
+            {
+                int unspent = StatPointCurve.TotalPointsAtLevel(L) - AttackPoints - HealthPoints;
+
+                for (int i = 0; i < unspent; i++)
+                {
+                    bool wantHealth = EffectiveHealth < neededEffectiveHealth;
+
+                    if (wantHealth && HealthPoints < StatPointCurve.MaxPoints) HealthPoints++;
+                    else if (AttackPoints < StatPointCurve.MaxPoints) AttackPoints++;
+                    else if (HealthPoints < StatPointCurve.MaxPoints) HealthPoints++;
+                    else break;
+                }
+            }
+
             public int H { get { return Health < 1 ? 1 : Health; } }
             public int G { get { return Regen < 1 ? 1 : Regen; } }
 
-            public double MaxHealth { get { return HealthCurve.ValueAtLevel(H); } }
+            /** 획득 축의 레벨과 지금 곱하고 있는 배수 */
+            public int Gd { get { return Gold < 1 ? 1 : Gold; } }
+            public double GoldGain { get { return GoldGainCurve.CappedValueAtLevel(Gd); } }
 
-            /** 초당 회복 비율 (최대 체력 대비) */
-            public double RegenFraction { get { return HealthRegenCurve.ValueAtLevel(G); } }
+            /** 스탯 포인트 증폭이 곱해진 값. UpgradeSystem.Apply와 같은 순서다 */
+            public double MaxHealth { get { return HealthCurve.ValueAtLevel(H) * HealthAmp; } }
+
+            /**
+             * @brief 초당 회복 비율 (최대 체력 대비). **상한이 적용된 값이다.**
+             *
+             * 16단계에서 상한이 생겼다. 여기서 무상한 값을 쓰면 시뮬레이션은
+             * 무적 플레이어를 기준으로 밸런스를 재고, 화면과 갈린다.
+             */
+            public double RegenFraction { get { return HealthRegenCurve.CappedValueAtLevel(G); } }
 
             /** 초당 절대 회복량. 표에 찍을 때만 쓴다 */
             public double RegenPerSecond { get { return MaxHealth * RegenFraction; } }
@@ -324,7 +499,9 @@ namespace Onikiri.Progression
                 {
                     return new CombatStats
                     {
-                        Damage = AttackPowerCurve.ValueAtLevel(P),
+                        // 증폭은 공격력에만 붙는다. UpgradeSystem.Apply와 같다 -
+                        // 두 곳이 갈리면 시뮬레이션이 게임과 다른 밸런스를 잰다
+                        Damage = AttackPowerCurve.ValueAtLevel(P) * AttackAmp,
                         AttacksPerSecond = AttackSpeedCurve.CappedValueAtLevel(S),
                         CritRate = CritRateCurve.CappedValueAtLevel(R),
                         CritMultiplier = CritDamageCurve.ValueAtLevel(D)
@@ -342,8 +519,21 @@ namespace Onikiri.Progression
          */
         public const double BossIntroSeconds = 1d;
 
-        /** 화면 밖에서 큐 앞줄까지 걸어오는 시간. 이동 속도 0.85로 약 4.5 units */
-        public const double BossWalkInSeconds = 5.3d;
+        /**
+         * @brief 보스에게 달려가는 시간.
+         *
+         * 16단계까지 이 값은 "보스가 화면 밖에서 걸어 들어오는 시간"이었고
+         * **제한 시간 안에** 있었다. 17단계에서 방향이 뒤집혔다 - 이제
+         * 플레이어가 달려가고, 이 구간은 타이머 밖이다.
+         *
+         * 총 소요 시간에는 여전히 들어간다. 타이머가 안 돌 뿐 플레이어가
+         * 화면 앞에 앉아 있는 시간은 맞고, 스테이지마다 반드시 드는 고정
+         * 비용이라 진행 속도 계산에서 빼면 안 된다.
+         */
+        public const double BossRunUpSeconds = 5.3d;
+
+        /** 예전 이름. 뜻이 바뀌었으므로 새 이름을 쓴다 */
+        public const double BossWalkInSeconds = BossRunUpSeconds;
 
         public static double TotalSeconds(List<StageResult> results)
         {
@@ -382,11 +572,22 @@ namespace Onikiri.Progression
          */
         private const double SurvivalSafetyMargin = 1.15d;
 
-        private static void Buy(ref Levels levels, ref double purse, int nextStage)
+        private static void Buy(ref Levels levels, ref double purse, int nextStage, double goldPerSecond,
+                                int currentStage)
         {
             // 생존 먼저. 다음 보스가 낼 총 피해를 여유를 두고 넘길 때까지 산다
             double needed = BossCurve.TotalDamageOverFight(nextStage, StageCurve.BossTimeLimitSeconds)
                             * SurvivalSafetyMargin;
+
+            // 스탯 포인트가 먼저다. 골드가 들지 않으므로 미룰 이유가 없고,
+            // 미루면 골드 축이 그만큼을 대신 메우게 되어 두 축의 기여가 섞인다
+            levels.SpendPoints(needed);
+
+            // 해금 전에는 목록에 없다(GoldGainCurve.UnlockStage). 게이트를 시뮬레이션
+            // 쪽에도 넣지 않으면 계산만 온보딩에서 이 축을 사고, 그 차이가 그대로
+            // "보고서의 소요 시간과 실제 플레이가 다르다"가 된다
+            if (GoldGainCurve.IsUnlockedAt(currentStage))
+                BuyGoldGain(ref levels, ref purse, goldPerSecond);
 
             for (int guard = 0; guard < 100000; guard++)
             {
@@ -396,13 +597,28 @@ namespace Onikiri.Progression
                 double regenCost = HealthRegenCurve.CostAtLevel(levels.G);
 
                 // 골드당 %EHP가 큰 쪽. UpgradeEfficiency가 아니라
-                // SurvivalEfficiency와 같은 자다
+                // SurvivalEfficiency와 같은 자다.
+                //
+                // 회복은 상한이 적용된 값으로 잰다. 상한 위에서는 이득이 0이라
+                // 자연히 안 사게 되고, 그것이 실제 플레이어가 하는 판단이다 -
+                // 값이 안 오르는 버튼에 골드를 쓰지 않는다
+                // **증폭을 곱해서 비교한다.** levels.MaxHealth에는 스탯 포인트
+                // 증폭이 이미 곱해져 있는데(12단계), 여기만 곡선값을 그대로 쓰면
+                // 증폭이 커질수록 "다음 레벨"이 현재보다 작아져 이득이 음수가 된다.
+                //
+                // 증폭이 x1.005일 때는 묻혀 있다가 16단계에서 x1.56이 되자
+                // 드러났다 - 비교가 뒤집혀 체력을 한 번도 안 사고 회복만
+                // Lv.129까지 사들였다. 같은 것끼리 비교해야 한다
                 double healthGain = (SurvivalEfficiency.EffectiveHealth(
-                        HealthCurve.ValueAtLevel(levels.H + 1), levels.RegenFraction)
+                        HealthCurve.ValueAtLevel(levels.H + 1) * levels.HealthAmp,
+                        levels.RegenFraction)
                     / levels.EffectiveHealth - 1d) / healthCost;
-                double regenGain = (SurvivalEfficiency.EffectiveHealth(
-                        levels.MaxHealth, HealthRegenCurve.ValueAtLevel(levels.G + 1))
-                    / levels.EffectiveHealth - 1d) / regenCost;
+
+                double regenGain = levels.G >= HealthRegenCurve.MaxLevel
+                    ? 0d
+                    : (SurvivalEfficiency.EffectiveHealth(
+                            levels.MaxHealth, HealthRegenCurve.CappedValueAtLevel(levels.G + 1))
+                        / levels.EffectiveHealth - 1d) / regenCost;
 
                 bool buyHealth = healthGain >= regenGain;
                 double cost = buyHealth ? healthCost : regenCost;
@@ -443,6 +659,51 @@ namespace Onikiri.Progression
                     case 2: levels.CritRate = levels.R + 1; break;
                     case 3: levels.CritDamage = levels.D + 1; break;
                 }
+            }
+        }
+
+        /**
+         * @brief 획득 축을 회수 시간이 밴드 안일 때만 산다.
+         *
+         * ## 왜 생존 다음, 화력 앞인가
+         *
+         * 생존보다 뒤인 이유는 생존이 절대 조건이기 때문이다 - 죽으면 그 스테이지에
+         * 아예 들어갈 수 없고, 그때 골드 수입이 몇 배든 의미가 없다.
+         *
+         * 화력보다 앞인 이유는 이 축이 **화력을 사는 속도 자체를 올리기** 때문이다.
+         * 회수 시간이 5분이라는 것은 5분 뒤부터 같은 골드로 화력을 더 산다는 뜻이라,
+         * 화력을 먼저 사면 그 5분만큼 손해다. 실제 플레이어도 "골드 벌이부터 올리고
+         * 나머지"를 한다.
+         *
+         * 다만 그 순서가 성립하려면 **회수가 밴드 안**이어야 한다. 무조건 이 축부터
+         * 사면 골드가 있는 한 계속 사게 되고, 그것이 스노볼이다. 임계값이 그 선을
+         * 긋는다(GoldGainEfficiency.BuyThresholdSeconds).
+         *
+         * 회수 시간은 살 때마다 나빠지므로(비용 x1.15 대 수입 x1.04) 이 루프는
+         * 자연히 멈춘다. 그것이 이 축의 자기 제한이고, 별도의 개수 제한이 필요 없는
+         * 이유다.
+         */
+        private static void BuyGoldGain(ref Levels levels, ref double purse, double goldPerSecond)
+        {
+            // 파밍 속도를 아직 모르는 시점(첫 처치 전)에는 사지 않는다. 0으로
+            // 재면 회수 시간이 무한대라 어차피 안 사지만, 명시적으로 둔다
+            if (goldPerSecond <= 0d) return;
+
+            for (int guard = 0; guard < 100000; guard++)
+            {
+                if (levels.Gd >= GoldGainCurve.MaxLevel) break;
+                if (!GoldGainEfficiency.WorthBuying(levels.Gd, goldPerSecond)) break;
+
+                double cost = GoldGainCurve.CostAtLevel(levels.Gd);
+                if (cost > purse) break;
+
+                purse -= cost;
+                levels.Gold = levels.Gd + 1;
+
+                // 사고 나면 수입이 늘어난다. 그 늘어난 값으로 다음 칸의 회수
+                // 시간을 재야 한다 - 안 그러면 자기 제한이 한 박자 늦게 걸린다
+                goldPerSecond *= GoldGainCurve.CappedValueAtLevel(levels.Gd)
+                                 / GoldGainCurve.CappedValueAtLevel(levels.Gd - 1);
             }
         }
 

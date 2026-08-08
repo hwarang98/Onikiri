@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb1b43b0a40a30f4bb1e4f4f68ea3b2c, type: 3}
+  m_Name: Background_Region2
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.RegionBackgroundSet
+  displayName: "\uC9C0\uC5ED 2 \xB7 \uAC00\uC744\uC232"
+  layers:
+  - name: Mist_Far
+    sprite: {fileID: 21300000, guid: a6dcab1800c5a6b4c9ee6ba48d4e84e6, type: 3}
+    scrollSpeed: 0
+    tint: {r: 0.36862746, g: 0.3882353, b: 0.54901963, a: 1}
+    isSkyFill: 1
+    isGroundCover: 0
+    sitsOnGround: 0
+    landmarkRepeatSeconds: 0
+  - name: Mist_Far_Scroll
+    sprite: {fileID: 21300000, guid: a6dcab1800c5a6b4c9ee6ba48d4e84e6, type: 3}
+    scrollSpeed: 0.18
+    tint: {r: 0.78431374, g: 0.80784315, b: 0.9098039, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    landmarkRepeatSeconds: 0
+  - name: Mist_Mid
+    sprite: {fileID: 21300000, guid: cad4320e4c137f34298b2672864cd299, type: 3}
+    scrollSpeed: 0.4
+    tint: {r: 0.84705883, g: 0.8627451, b: 0.9411765, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    landmarkRepeatSeconds: 0
+  - name: Silhouette
+    sprite: {fileID: 21300000, guid: 064f2f65392267b41a6e9baaf1cbe531, type: 3}
+    scrollSpeed: 0.66
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    landmarkRepeatSeconds: 0
+  - name: Maples
+    sprite: {fileID: 21300000, guid: 56a9b4b0ed574ab479cd668f82b11c09, type: 3}
+    scrollSpeed: 0.88
+    tint: {r: 0.8, g: 0.6666667, b: 0.7058824, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 1
+    landmarkRepeatSeconds: 0
+  - name: Ground
+    sprite: {fileID: 21300000, guid: ef0a55f00432b6a4da2a16ffb103e7cf, type: 3}
+    scrollSpeed: 1
+    tint: {r: 0.8, g: 0.6666667, b: 0.7058824, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    landmarkRepeatSeconds: 0
+  clearColor: {r: 0.16470589, g: 0.17254902, b: 0.28235295, a: 1}
+  groundSurfacePixels: 48
+  backgroundPixelHeight: 180

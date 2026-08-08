@@ -61,11 +61,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -137,6 +137,19 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
@@ -144,12 +157,12 @@ TextureImporter:
       name: HURT_0
       rect:
         serializedVersion: 2
-        x: 37
-        y: 15
-        width: 61
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 130
+        height: 92
+      alignment: 9
+      pivot: {x: 0.5, y: 0.17391305}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -166,12 +179,12 @@ TextureImporter:
       name: HURT_1
       rect:
         serializedVersion: 2
-        x: 169
-        y: 15
-        width: 61
-        height: 59
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 130
+        y: 0
+        width: 130
+        height: 92
+      alignment: 9
+      pivot: {x: 0.5, y: 0.17391305}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -188,12 +201,12 @@ TextureImporter:
       name: HURT_2
       rect:
         serializedVersion: 2
-        x: 300
-        y: 15
-        width: 61
-        height: 59
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 260
+        y: 0
+        width: 130
+        height: 92
+      alignment: 9
+      pivot: {x: 0.5, y: 0.17391305}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -210,12 +223,12 @@ TextureImporter:
       name: HURT_3
       rect:
         serializedVersion: 2
-        x: 427
-        y: 15
-        width: 61
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 390
+        y: 0
+        width: 130
+        height: 92
+      alignment: 9
+      pivot: {x: 0.5, y: 0.17391305}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -232,12 +245,12 @@ TextureImporter:
       name: HURT_4
       rect:
         serializedVersion: 2
-        x: 556
-        y: 15
-        width: 61
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 520
+        y: 0
+        width: 130
+        height: 92
+      alignment: 9
+      pivot: {x: 0.5, y: 0.17391305}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -254,12 +267,12 @@ TextureImporter:
       name: HURT_5
       rect:
         serializedVersion: 2
-        x: 687
-        y: 15
-        width: 61
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 650
+        y: 0
+        width: 130
+        height: 92
+      alignment: 9
+      pivot: {x: 0.5, y: 0.17391305}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []

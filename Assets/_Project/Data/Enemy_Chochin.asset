@@ -30,6 +30,7 @@ MonoBehaviour:
   - {fileID: 1679679292852648574, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   - {fileID: -5775657986390419533, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   - {fileID: -2546484541383549571, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  walkFrames: []
   hurtFrames: []
   deathFrames:
   - {fileID: 5851640218161731370, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
@@ -53,3 +54,4 @@ MonoBehaviour:
   attackImpactPoint: 0.5
   hoverHeight: 0.1
   artBottomOffset: 0.65625
+  artFacesLeft: 0

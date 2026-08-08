@@ -51,6 +51,23 @@ namespace Onikiri.Battle
         /** 캐릭터가 서는 지면의 월드 Y */
         public float GroundY { get; private set; }
 
+        /**
+         * @brief 배경이 바뀔 때 지면선 기준을 갈아끼운다.
+         *
+         * 팩마다 지면 그림의 두께가 다르다 - 지역 1은 밑단에서 표면까지 24px,
+         * 가을숲은 타일에서 구운 스트립이라 64px다. 배경만 갈고 이 값을 두면
+         * **캐릭터가 흙 속에 서거나 공중에 뜬다.**
+         *
+         * 인스펙터 값이 아니라 배경 세트가 출처가 된다는 뜻이고, 그래야 지역이
+         * 늘어날 때마다 씬을 손보지 않아도 된다.
+         */
+        public void SetBackgroundMetrics(float surfacePixels, float pixelHeight)
+        {
+            groundSurfacePixels = surfacePixels;
+            backgroundPixelHeight = pixelHeight;
+            Apply();
+        }
+
         /** 월드 단위로 표현한 전투 밴드 */
         public BattleLayout.Band Band { get; private set; }
 

@@ -56,7 +56,16 @@ namespace Onikiri.Progression
          * 8은 무강화 플레이어가 1스테이지 보스를 아슬아슬하게 잡는 값이다
          * (17.7초 / 때릴 수 있는 24.7초). 첫 보스는 벽이 아니라 튜토리얼이어야 한다.
          */
-        public const double BossHealthMultiplierBase = 8d;
+        /**
+         * 8에서 9.72로 올렸다 (17단계). 보스 타이머가 스폰이 아니라 **도달**
+         * 시점부터 돌기 시작하면서 때릴 수 있는 시간이 24.7초에서 30초로
+         * 늘었기 때문이다 - 30/24.7 = 1.2146 배만큼 여유가 통째로 위로 떴고,
+         * 같은 비율을 체력에 곱해 상쇄한다.
+         *
+         * 램프가 아니라 기본 배수를 쓴 이유는 타이머 변경이 **전 구간에 균일하게**
+         * 작용하기 때문이다. 램프는 스테이지마다 곱해져 후반에 치우친다.
+         */
+        public const double BossHealthMultiplierBase = 10.8d;
 
         /**
          * @brief 스테이지마다 체력 배수에 추가로 곱하는 값.
@@ -85,7 +94,7 @@ namespace Onikiri.Progression
          * 지점이며(1.22배), 동시에 50스테이지까지 여유가 1 아래로 내려가지 않는다.
          */
         public const double BossHealthRampStart = 1.34d;
-        public const double BossHealthRampFinal = 1.065d;
+        public const double BossHealthRampFinal = 1.110d;
 
         /** 램프가 Start에서 Final로 내려오는 속도. 1에 가까울수록 천천히 */
         public const double BossHealthRampDecay = 0.93d;
@@ -140,28 +149,124 @@ namespace Onikiri.Progression
          * 같은 것을 부른다. 두 곳이 각자 곱셈을 하고 있으면 언젠가 한쪽만 고쳐지고,
          * 그때 "계산상으로는 통과하는데 실제로는 실패하는" 상태가 만들어진다.
          */
+        /**
+         * @brief 골드 획득 축(20단계)이 만든 여유를 보스가 따라가는 보정 배수.
+         *
+         * ## 왜 필요한가
+         *
+         * 골드가 늘면 강화를 더 사고, 그만큼 보스 여유가 오른다. 실측 지수는
+         * **여유 = 골드배수^0.81**이다(시뮬레이션에서 골드 x1.25가 여유 x1.197).
+         *
+         * 이 보정이 없으면 축 하나가 전 등급의 밴드를 1.2배씩 밀어 올린다.
+         * 그런데 17단계 시점에 일반 밴드 상단이 이미 2.98/3.00까지 차 있어서
+         * (그것이 보고서가 적어둔 "얇은 경계"다), 어떤 크기의 골드 축도 천장을
+         * 뚫는다. 밴드를 지키면서 넣을 수 있는 최대 축이 x1.10인데, 그 크기는
+         * 화면에서 존재감이 없다.
+         *
+         * ## 왜 램프가 아니라 보정항인가
+         *
+         * 램프(BossHealthRamp*)는 스테이지마다 **누적**된다. 골드 축은 상한이
+         * 있어서 이득이 어느 지점에서 멈추는데, 누적되는 손잡이로 상쇄하면
+         * 축이 멈춘 뒤에도 보스만 계속 무거워진다.
+         *
+         * 이 보정은 축과 같은 모양으로 자라고 **같은 곳에서 멈춘다.** 상쇄해야
+         * 할 것과 같은 곡선을 쓰는 것이 요점이다.
+         *
+         * ## 왜 완전히 상쇄하지 않는가 (0.81이 아니라 0.60)
+         *
+         * 실측 지수 0.81을 그대로 쓰면 이득이 **정확히 0이 된다.** 축에 쓴 골드가
+         * 화력으로 바뀌는 만큼 보스도 무거워지므로, 남는 것은 그 골드를 다른 축에
+         * 썼다면 얻었을 몫뿐이다 - 즉 순손실이다. 시뮬레이션에서 30스테이지까지
+         * 총 시간이 기준선보다 **길게** 나왔다(12.79분 대 12.83분, 초반은 +5%).
+         *
+         * 회수 시간 자로는 "회수된다"고 나오는데 실제로는 손해인 상태이고, 그것은
+         * 8단계 공격속도보다 나쁘다 - 그때는 안 사면 그만이었지만 여기서는 지표가
+         * 사라고 말한다.
+         *
+         * 0.60은 상쇄를 3/4쯤만 한다. 남는 여유 상승분은 g^(0.81-0.60) = x1.05로,
+         * 일반 밴드 상단이 2.98에서 3.12가 된다. **st11 하나가 4% 넘친다.**
+         * 그 스테이지는 17단계 보고서가 "얇은 경계"로 적어둔 부채(피날레 직후
+         * 골드 스파이크)이고, 이번 지시가 손대지 말라고 명시한 자리다.
+         *
+         * ## 그래서 이 축의 이득은 무엇이 되는가
+         *
+         * 절반은 **"같은 지점에 더 빨리 도달한다"**이고 절반은 **방치 보상**이다.
+         * 방치는 보스 체력과 무관하므로 이 보정의 영향을 받지 않는다 - 골드
+         * 배수가 그대로 방치 수령액에 곱해진다. 액티브만 하는 플레이어에게는
+         * 작은 축이고, 자리를 비우는 플레이어에게는 큰 축이다.
+         */
+        public const double GoldAxisMarginExponent = 0.81d;
+
+        public static double GoldAxisCompensation(int stage)
+        {
+            return Math.Pow(GoldGainCurve.ExpectedAtStage(stage), GoldAxisMarginExponent);
+        }
+
         public static BigDouble BossHealthForStage(BigDouble averageMobHealth, int stage)
         {
             var health = BossHealth(averageMobHealth * HealthMultiplier(stage), stage);
 
-            // 챕터 보스는 더 무겁다. **이 한 줄이 빠져 있었다.**
+            // 골드 축이 만든 여유를 보스가 따라간다. 곱하는 자리가 여기인 이유는
+            // 시뮬레이션과 BossFight가 둘 다 이 함수를 지나기 때문이다 - 한쪽에만
+            // 넣으면 "계산상으로는 통과하는데 실제로는 실패하는" 상태가 만들어진다
+            health *= BigDouble.FromDouble(GoldAxisCompensation(stage));
+
+            // 등급별 추가 배수. **이 한 줄이 빠져 있었다.**
             //
             // BossCurve에 상수를 선언하고 "1보다 큰가"만 검사하는 테스트를 뒀는데,
             // 그 값이 실제로 쓰이는지는 아무도 확인하지 않았다. 치명타 축에서
             // 같은 함정을 막으려고 CritAxes_FeedTheDpsFormula 를 만들어 놓고
-            // 여기서는 그러지 않았다. 상수의 존재는 연결의 증거가 아니다
-            return BossCurve.IsChapterBoss(stage)
-                ? health * BigDouble.FromDouble(BossCurve.ChapterHealthMultiplier)
-                : health;
+            // 여기서는 그러지 않았다. 상수의 존재는 연결의 증거가 아니다.
+            //
+            // 13단계에서 등급이 셋(일반/챕터/피날레)이 되면서 분기가 아니라
+            // 조회로 바뀌었다. 등급이 하나 더 늘어도 이쪽은 고칠 것이 없다
+            return health * BigDouble.FromDouble(BossCurve.HealthMultiplierFor(stage));
         }
 
         public static BigDouble BossGoldForStage(BigDouble averageMobGold, int stage)
         {
             var gold = BossGold(averageMobGold * GoldMultiplier(stage));
+            return gold * BigDouble.FromDouble(BossCurve.GoldMultiplierFor(stage));
+        }
 
-            return BossCurve.IsChapterBoss(stage)
-                ? gold * BigDouble.FromDouble(BossCurve.ChapterGoldMultiplier)
-                : gold;
+        /**
+         * @brief 스테이지 클리어 보너스 골드. 그 스테이지 잡몹 골드의 배수.
+         *
+         * ## 왜 작게 잡는가
+         *
+         * 16단계에서 정확히 이 종류의 사고가 있었다. 피날레 골드를 x3으로 두자
+         * 그 골드가 즉시 화력으로 바뀌어 **다음 스테이지 보스 여유가 천장을
+         * 뚫었다**(st11이 3.48까지). 결국 골드를 낮추고 그만큼을 경험치로 옮겼다.
+         *
+         * 클리어 보너스도 같은 위험이다. 그래서 "축하 숫자"로 보이되 밸런스는
+         * 흔들지 않는 크기로 잡는다 - 보스 처치 골드(잡몹 골드 x12)의
+         * 4분의 1과 2분의 1이다. 화면에는 큰 숫자가 뜨지만 실제로는 반 스테이지
+         * 분량의 파밍에 해당한다.
+         *
+         * 축하의 크기가 더 필요하면 골드가 아니라 경험치나 보석으로 얹는 것이
+         * 맞다. 골드만이 즉시 DPS로 환산된다.
+         */
+        public const double ClearGoldMultiplier = 2d;
+
+        /**
+         * 지역 피날레.
+         *
+         * 처음에 x6으로 잡았다가 x3으로 내렸다. 시뮬레이션에서 **피날레 직후
+         * 스테이지(st11)의 여유가 3.39까지** 올라갔기 때문이다 - 16단계에서
+         * 피날레 골드로 겪은 것과 정확히 같은 사고를 클리어 보너스로 한 번 더
+         * 낸 셈이다.
+         *
+         * 축하의 크기가 더 필요하면 골드가 아니라 경험치나 보석으로 얹는다.
+         */
+        public const double FinaleClearGoldMultiplier = 3d;
+
+        public static BigDouble ClearGoldForStage(BigDouble averageMobGold, int stage)
+        {
+            double multiplier = BossCurve.TierOf(stage) == BossCurve.Tier.Finale
+                ? FinaleClearGoldMultiplier
+                : ClearGoldMultiplier;
+
+            return averageMobGold * GoldMultiplier(stage) * BigDouble.FromDouble(multiplier);
         }
 
         /** stage(1부터)의 체력 배수. 1스테이지는 1배 */

@@ -126,6 +126,11 @@ namespace Onikiri.UI
             punchRemaining = 0f;
             rect.localScale = Vector3.one;
 
+            // 이전 생애가 흡수였으면 그 모드가 그대로 남는다. 풀에서 나온 인스턴스가
+            // 스케일을 들고 오는 것과 같은 종류의 문제이고, 여기서는 데미지 숫자가
+            // 경험치 바로 날아가는 모습으로 나타난다
+            absorbing = false;
+
             // 첫 숫자가 치명타면 등장부터 튀긴다. 합산이 아니라 새로 뜨는 경우라
             // 등장 자체가 이미 신호이긴 하지만, 평타 사이에서 한 번 더 도드라져야
             // 초당 네 번 구간에서 눈에 걸린다
@@ -191,9 +196,91 @@ namespace Onikiri.UI
             }
         }
 
+        // ---------------------------------------------------------------- 경험치 흡수
+
+        [Header("경험치 흡수")]
+        [Tooltip("처치 지점에서 경험치 바까지 날아가는 데 걸리는 시간")]
+        [SerializeField] private float absorbSeconds = 0.55f;
+
+        private bool absorbing;
+        private Vector2 absorbFrom;
+        private Vector2 absorbTo;
+
+        /**
+         * @brief 처치 지점에서 경험치 바로 날아가는 팝업.
+         *
+         * 데미지 팝업과 같은 풀에서 나온다. 별도 풀을 두지 않는 이유는 두 연출이
+         * **서로 배타적으로 많아지기** 때문이다 - 타격이 잦은 구간은 처치가 잦은
+         * 구간이기도 해서, 풀을 나누면 양쪽 모두 최대치를 잡아둬야 한다.
+         *
+         * 호를 그리며 사라지는 대신 목표 지점으로 빨려 들어간다. 위로 떠서 사라지는
+         * 것은 "여기서 무슨 일이 있었다"이고, 어딘가로 날아가는 것은 "그것이 저기로
+         * 갔다"이다. 경험치는 후자다 - 상단 바의 숫자가 왜 늘었는지가 연결된다.
+         */
+        public void PlayAbsorb(string text, Vector2 from, Vector2 to, Color color, float fontSize,
+                               Action<DamageNumber> onFinished)
+        {
+            finished = onFinished;
+            Accumulated = BigDouble.Zero;
+
+            // 합산 대상이 되어서는 안 된다. 열쇠를 남기면 다음 타격이 날아가는
+            // 중인 이 팝업에 데미지를 더하려 든다
+            TargetKey = null;
+
+            SetText(text, color, fontSize);
+
+            absorbing = true;
+            absorbFrom = from;
+            absorbTo = to;
+            position = from;
+            rect.anchoredPosition = position;
+
+            elapsed = 0f;
+            punchRemaining = 0f;
+            rect.localScale = Vector3.one;
+
+            gameObject.SetActive(true);
+        }
+
+        private void UpdateAbsorb()
+        {
+            float duration = Mathf.Max(0.01f, absorbSeconds);
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            // 처음엔 느리고 끝에서 빨라진다. 등속으로 움직이면 UI 요소가 이동하는
+            // 것처럼 보이고, 가속이 붙어야 '빨려 들어간다'로 읽힌다
+            float eased = t * t;
+
+            position = Vector2.Lerp(absorbFrom, absorbTo, eased);
+            rect.anchoredPosition = position;
+
+            // 도착하면서 작아진다. 목표 지점에서 그대로 사라지면 마지막 프레임이
+            // 툭 끊기는데, 줄어들면 흡수가 끝난 것으로 보인다
+            float scale = Mathf.Lerp(1f, 0.4f, eased);
+            rect.localScale = new Vector3(scale, scale, 1f);
+
+            var color = baseColor;
+            color.a = 1f - eased * eased;
+            label.color = color;
+            if (shadow != null) shadow.color = new Color(0f, 0f, 0f, 0.75f * color.a);
+
+            if (t < 1f) return;
+
+            absorbing = false;
+            var callback = finished;
+            finished = null;
+            if (callback != null) callback(this);
+        }
+
         private void Update()
         {
             elapsed += Time.deltaTime;
+
+            if (absorbing)
+            {
+                UpdateAbsorb();
+                return;
+            }
 
             if (elapsed >= lifetime)
             {

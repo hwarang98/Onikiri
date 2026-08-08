@@ -197,23 +197,29 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 보스가 걸어 들어오는 동안 제한 시간이 흐른다.
+         * @brief 제한 시간 전부가 때릴 수 있는 시간이다.
          *
-         * 이것을 빼먹으면 판정이 실제보다 후해진다. 9단계 초안의 계산이 그랬고,
-         * 마침 치명타를 함께 빼먹어서 두 오차가 상쇄되는 바람에 드러나지 않았다.
+         * 16단계까지는 반대였다. 시계가 보스 스폰과 함께 돌기 시작하는데 보스는
+         * 화면 밖에서 걸어 들어와서, 그 5.3초 동안 사거리가 비어 있었다 -
+         * 제한 시간의 18%가 기다림이었고, 계산은 그것을 빼야 했다.
+         *
+         * 17단계에서 시계 쪽을 고쳤다. 플레이어가 보스에게 달려가고, **도달한
+         * 순간부터** 30초가 시작한다. 달려가는 구간은 타이머 밖이므로 뺄 것이 없다.
+         *
+         * 이 테스트가 지키는 것은 "빼는가"가 아니라 **시뮬레이션과 전투가 같은
+         * 시계를 보는가**이다. 한쪽만 고치면 계산은 통과하는데 화면은 실패하는
+         * 상태가 만들어진다 - 9단계에서 실제로 겪었다.
          */
         [Test]
-        public void BossDamageWindow_IsShorterThanTheClock()
+        public void BossDamageWindow_IsTheWholeClock()
         {
-            Assert.Less(StageSimulation.BossDamageWindowSeconds, StageCurve.BossTimeLimitSeconds,
-                "걸어 들어오는 시간이 제한 시간에서 빠지지 않았다");
+            Assert.AreEqual(StageCurve.BossTimeLimitSeconds, StageSimulation.BossDamageWindowSeconds, 1e-9d,
+                "때릴 수 있는 시간이 제한 시간과 다르다 - 달려가는 구간이 타이머에 섞였다");
 
-            Assert.AreEqual(StageCurve.BossTimeLimitSeconds - StageSimulation.BossWalkInSeconds,
-                            StageSimulation.BossDamageWindowSeconds, 1e-9d);
-
-            // 창이 절반 아래로 내려가면 전투보다 기다림이 길어진다
-            Assert.Greater(StageSimulation.BossDamageWindowSeconds, StageCurve.BossTimeLimitSeconds * 0.5d,
-                "제한 시간의 절반 이상이 걸어 들어오는 데 쓰인다");
+            // 달려가는 시간은 여전히 **총 소요 시간**에는 들어간다. 타이머 밖일 뿐
+            // 플레이어가 앉아 있는 시간은 맞다
+            Assert.Greater(StageSimulation.BossRunUpSeconds, 0d,
+                "보스에게 달려가는 시간이 0이면 등장 연출이 없다는 뜻이다");
         }
 
         [Test]
@@ -290,6 +296,19 @@ namespace Onikiri.Tests
         const double ChapterMarginCeiling = 2.0d;
 
         /**
+         * @brief 지역 피날레의 밴드. 챕터보다 **아래**에 있어야 한다.
+         *
+         * 13단계에서 등급이 셋이 됐다. 5스테이지 관문과 10스테이지 피날레가 같은
+         * 밴드를 쓰면 피날레는 그냥 또 하나의 챕터 보스이고, 다크 사무라이를
+         * 거기에만 세운 이유가 수치에서는 사라진다.
+         *
+         * "지역의 마지막이 가장 빡빡하다"가 성립하려면 세 밴드가 겹치지 않고
+         * 피날레 < 챕터 < 일반 순으로 놓여야 한다.
+         */
+        const double FinaleMarginFloor = 1.15d;
+        const double FinaleMarginCeiling = 1.7d;
+
+        /**
          * @brief 곡선을 따라가는 플레이어의 보스 여유가 밴드 안에 머무는지.
          *
          * 9단계에서는 2.1배 -> 5.6배로 발산했고, 10단계에서 치명타 두 축이 들어오자
@@ -306,9 +325,16 @@ namespace Onikiri.Tests
 
             foreach (var row in results)
             {
-                double floor = row.IsChapterBoss ? ChapterMarginFloor : MarginFloor;
-                double ceiling = row.IsChapterBoss ? ChapterMarginCeiling : MarginCeiling;
-                string kind = row.IsChapterBoss ? "챕터" : "일반";
+                var tier = BossCurve.TierOf(row.Stage);
+
+                double floor = tier == BossCurve.Tier.Finale ? FinaleMarginFloor
+                             : tier == BossCurve.Tier.Chapter ? ChapterMarginFloor
+                             : MarginFloor;
+                double ceiling = tier == BossCurve.Tier.Finale ? FinaleMarginCeiling
+                               : tier == BossCurve.Tier.Chapter ? ChapterMarginCeiling
+                               : MarginCeiling;
+                string kind = tier == BossCurve.Tier.Finale ? "피날레"
+                            : tier == BossCurve.Tier.Chapter ? "챕터" : "일반";
 
                 Assert.GreaterOrEqual(row.BossMargin, floor, string.Format(
                     "stage {0}({1}): 여유 {2:F2}배 - 곡선을 따라왔는데도 보스가 벽이다 " +
@@ -455,35 +481,59 @@ namespace Onikiri.Tests
         {
             var results = StageSimulation.Run(20, FieldFromAssets());
 
+            // 13단계에서 등급이 셋이 됐다. 챕터와 피날레를 한 덩어리로 재면
+            // 피날레의 더 낮은 여유가 챕터 바닥을 뚫는 것으로 보인다 - 실제로는
+            // 그것이 의도된 차등이다
             double chapterWorst = double.MaxValue, chapterBest = 0d;
+            double finaleWorst = double.MaxValue, finaleBest = 0d;
             double stageWorst = double.MaxValue;
-            int chapterCount = 0;
+            int chapterCount = 0, finaleCount = 0;
 
             foreach (var row in results)
             {
-                if (row.IsChapterBoss)
+                switch (BossCurve.TierOf(row.Stage))
                 {
-                    chapterCount++;
-                    if (row.BossMargin < chapterWorst) chapterWorst = row.BossMargin;
-                    if (row.BossMargin > chapterBest) chapterBest = row.BossMargin;
+                    case BossCurve.Tier.Finale:
+                        finaleCount++;
+                        if (row.BossMargin < finaleWorst) finaleWorst = row.BossMargin;
+                        if (row.BossMargin > finaleBest) finaleBest = row.BossMargin;
+                        break;
+
+                    case BossCurve.Tier.Chapter:
+                        chapterCount++;
+                        if (row.BossMargin < chapterWorst) chapterWorst = row.BossMargin;
+                        if (row.BossMargin > chapterBest) chapterBest = row.BossMargin;
+                        break;
+
+                    default:
+                        if (row.BossMargin < stageWorst) stageWorst = row.BossMargin;
+                        break;
                 }
-                else if (row.BossMargin < stageWorst) stageWorst = row.BossMargin;
             }
 
-            Assert.AreEqual(4, chapterCount, "20스테이지에 챕터 보스가 넷이어야 한다 (5, 10, 15, 20)");
-            Assert.IsTrue(BossCurve.IsChapterBoss(5) && BossCurve.IsChapterBoss(20));
+            Assert.AreEqual(2, chapterCount, "20스테이지에 챕터 관문이 둘이어야 한다 (5, 15)");
+            Assert.AreEqual(2, finaleCount, "20스테이지에 지역 피날레가 둘이어야 한다 (10, 20)");
             Assert.IsFalse(BossCurve.IsChapterBoss(6));
 
-            // 챕터 보스 밴드는 일반보다 아래쪽이다
             Assert.LessOrEqual(chapterBest, ChapterMarginCeiling, string.Format(
                 "챕터 보스 여유가 {0:F2}까지 올라간다 - 일반 스테이지와 구분되지 않는다", chapterBest));
             Assert.GreaterOrEqual(chapterWorst, ChapterMarginFloor, string.Format(
                 "챕터 보스 여유가 {0:F2}로 내려간다 - 벽이다", chapterWorst));
 
-            // 챕터가 실제로 더 빡빡한지. 밴드가 겹치기만 해서는 차등이 아니다
+            Assert.LessOrEqual(finaleBest, FinaleMarginCeiling, string.Format(
+                "피날레 여유가 {0:F2}까지 올라간다 - 챕터 관문과 구분되지 않는다", finaleBest));
+            Assert.GreaterOrEqual(finaleWorst, FinaleMarginFloor, string.Format(
+                "피날레 여유가 {0:F2}로 내려간다 - 벽이다", finaleWorst));
+
+            // **세 등급이 실제로 계단을 이루는지.** 밴드가 겹치기만 해서는 차등이
+            // 아니다. 피날레 < 챕터 < 일반 순으로 빡빡해야 "지역의 마지막이 가장
+            // 어렵다"가 수치에서도 성립한다
             Assert.Less(chapterWorst, stageWorst, string.Format(
                 "챕터 최악 여유 {0:F2}가 일반 최악 {1:F2}보다 크다 - 차등이 없다",
                 chapterWorst, stageWorst));
+            Assert.Less(finaleWorst, chapterWorst, string.Format(
+                "피날레 최악 여유 {0:F2}가 챕터 최악 {1:F2}보다 크다 - 피날레가 관문보다 쉽다",
+                finaleWorst, chapterWorst));
         }
 
         /**
@@ -511,11 +561,15 @@ namespace Onikiri.Tests
             var mobHealth = BigDouble.FromDouble(field.AverageMobHealth);
             var mobGold = BigDouble.FromDouble(field.AverageMobGold);
 
-            // 체력: 챕터 5 / 일반 4 에서 곡선 성장분을 걷어내면 챕터 배수만 남는다
+            // 체력: 챕터 5 / 일반 4 에서 곡선 성장분을 걷어내면 챕터 배수만 남는다.
+            //
+            // 20단계의 골드축 보정도 걷어낸다. 그것은 스테이지마다 다른 값이라
+            // 두 스테이지의 비에 그대로 남고, 등급 배수와 섞여 보고된다
             double chapterHealth = StageCurve.BossHealthForStage(mobHealth, 5).ToDouble();
             double plainHealth = StageCurve.BossHealthForStage(mobHealth, 4).ToDouble();
             double curveGrowth = StageCurve.HealthMultiplier(5).ToDouble() / StageCurve.HealthMultiplier(4).ToDouble()
-                               * StageCurve.BossHealthMultiplier(5) / StageCurve.BossHealthMultiplier(4);
+                               * StageCurve.BossHealthMultiplier(5) / StageCurve.BossHealthMultiplier(4)
+                               * StageCurve.GoldAxisCompensation(5) / StageCurve.GoldAxisCompensation(4);
 
             Assert.AreEqual(BossCurve.ChapterHealthMultiplier,
                             chapterHealth / plainHealth / curveGrowth, 1e-6d,
@@ -632,6 +686,18 @@ namespace Onikiri.Tests
          *
          * 곡선 어느 하나를 손대면 이 값이 움직인다. 움직이는 것 자체는 정상이고,
          * 보고서를 함께 고치라는 신호로 쓴다.
+         *
+         * 20단계에서 158초 -> 179초가 됐다(+13%). 골드 획득 축이 생기면서 초반에
+         * 살 것이 하나 늘었고, 그 축은 회수에 2분이 걸려 온보딩 구간에서는 아직
+         * 손해였기 때문이다.
+         *
+         * 21단계에 그 축을 6스테이지 해금으로 밀어내면서 **168초로 돌아왔다.**
+         * 축을 완전히 무력화해도 같은 값이 나오므로, 이 구간에 남은 골드 축의
+         * 기여는 0이다(`GoldAxis_ContributesNothingBeforeUnlock`).
+         *
+         * 158초에서 남은 10초는 골드 축이 아니라 그 사이의 다른 곡선 변경에서
+         * 왔다. 어느 것인지는 아직 못 짚었고, 온보딩 목표(3분 안쪽)에는 여유가
+         * 있어 이번에는 쫓지 않았다.
          */
         [Test]
         public void StageOneToFive_TakesTheDocumentedTime()
@@ -639,8 +705,8 @@ namespace Onikiri.Tests
             var results = StageSimulation.Run(5, FieldFromAssets());
             double total = StageSimulation.TotalSeconds(results);
 
-            Assert.AreEqual(158d, total, 12d,
-                "1~5 스테이지 소요 시간이 " + total.ToString("F0") + "초로 바뀌었다 (보고서 기준 158초)");
+            Assert.AreEqual(168d, total, 12d,
+                "1~5 스테이지 소요 시간이 " + total.ToString("F0") + "초로 바뀌었다 (보고서 기준 168초)");
         }
 
         // ------------------------------------------------------------ 꽃잎 예산
@@ -692,6 +758,308 @@ namespace Onikiri.Tests
                 "예산이 지켜지지 않는다", concurrentLow, concurrentCap));
 
             UnityEngine.Object.DestroyImmediate(go);
+        }
+
+        // ------------------------------------------------------------ 12단계: 경험치
+
+        /**
+         * @brief 경험치가 시뮬레이션에 실제로 들어와 있는지.
+         *
+         * 이것을 먼저 확인하는 이유는 11단계의 ChapterHealthMultiplier와 같은
+         * 일을 막기 위해서다. 그 상수는 선언되고 테스트까지 있었지만 값 흐름
+         * 어디에도 연결되지 않아서, 바꿔도 게임이 달라지지 않았다.
+         *
+         * 여기서 재는 것은 "레벨이 오른다"가 아니라 **레벨이 스탯에 도달한다**다.
+         */
+        [Test]
+        public void Simulation_ModelsExperience()
+        {
+            var results = StageSimulation.Run(20, FieldFromAssets());
+
+            Assert.Greater(results[19].CharacterLevel, 1,
+                "20스테이지를 지나도 Lv.1이면 경험치가 시뮬레이션에 들어오지 않은 것이다");
+
+            Assert.Greater(results[19].AttackPoints + results[19].HealthPoints, 0,
+                "레벨은 올랐는데 스탯 포인트가 하나도 안 찍혔다");
+
+            // 증폭이 스탯에 도달했는가. 배수가 1이면 포인트가 장부에만 있는 것이다
+            Assert.Greater(results[19].AttackAmp, 1d,
+                "스탯 포인트가 공격력에 곱해지지 않는다");
+
+            // 레벨은 단조 증가해야 한다. 스테이지가 오를 때 초기화되는 경로가
+            // 생기면 여기서 걸린다
+            for (int i = 1; i < results.Count; i++)
+                Assert.GreaterOrEqual(results[i].CharacterLevel, results[i - 1].CharacterLevel,
+                    "stage " + results[i].Stage + "에서 레벨이 내려갔다");
+        }
+
+        /**
+         * @brief 레벨 성장이 골드 성장을 앞지르지 않는가.
+         *
+         * 12단계 밸런스의 뼈대다. 스탯 포인트는 골드 강화에 **곱해지는** 보조
+         * 축이어서, 레벨이 골드보다 빨리 자라면 어느 지점부터 "레벨만 올리면
+         * 되는 게임"이 된다.
+         *
+         * 두 축이 DPS에 기여하는 배수로 잰다. 레벨 쪽은 스탯 포인트 증폭,
+         * 골드 쪽은 공격력 강화 곡선이다 - 둘 다 공격력에 곱해지는 값이라
+         * 같은 단위로 비교할 수 있다.
+         */
+        [Test]
+        public void LevelGrowth_DoesNotOutpaceGoldGrowth()
+        {
+            var results = StageSimulation.Run(40, FieldFromAssets());
+
+            foreach (var row in results)
+            {
+                double fromGold = AttackPowerCurve.ValueAtLevel(row.AttackPowerLevel)
+                                  / AttackPowerCurve.ValueAtLevel(1);
+                double fromLevel = row.AttackAmp;
+
+                Assert.Less(fromLevel, fromGold, string.Format(
+                    "stage {0}: 레벨 증폭 x{1:F2}이 골드 강화 x{2:F2}를 앞질렀다 " +
+                    "(Lv.{3}, 공격력 Lv.{4})",
+                    row.Stage, fromLevel, fromGold, row.CharacterLevel, row.AttackPowerLevel));
+            }
+
+            // 격차가 벌어지는 방향이어야 한다. 같은 비율로 자라면 앞지르지는
+            // 않아도 레벨이 골드를 그대로 따라 그리는 값이 된다
+            double earlyRatio = results[4].AttackAmp
+                / (AttackPowerCurve.ValueAtLevel(results[4].AttackPowerLevel) / AttackPowerCurve.ValueAtLevel(1));
+            double lateRatio = results[39].AttackAmp
+                / (AttackPowerCurve.ValueAtLevel(results[39].AttackPowerLevel) / AttackPowerCurve.ValueAtLevel(1));
+
+            Assert.Less(lateRatio, earlyRatio, string.Format(
+                "레벨의 상대 비중이 줄지 않는다 (5스테이지 {0:F4} -> 40스테이지 {1:F4})",
+                earlyRatio, lateRatio));
+        }
+
+        /**
+         * @brief 레벨업 리듬.
+         *
+         * 초반은 30초 안팎, 후반으로 갈수록 완만해야 한다. 초반이 너무 느리면
+         * 레벨업 버튼과 스탯 포인트가 무엇인지 배울 자리가 없고, 후반에도
+         * 같은 속도로 오르면 스탯 포인트가 골드 강화를 밀어낸다.
+         *
+         * **스테이지당 레벨 수**로 잰다. 벽시계 초/레벨로 재면 후반에 스테이지
+         * 자체가 짧아지는 것(잡몹 구간이 스폰 하한 4초로 수렴한다)이 섞여
+         * 들어와, 리듬이 느려졌는데 숫자는 빨라진 것으로 나온다.
+         */
+        [Test]
+        public void LevelUpRhythm_SlowsDown()
+        {
+            var results = StageSimulation.Run(40, FieldFromAssets());
+
+            double early = LevelsPerStage(results, 0, 10);
+            double late = LevelsPerStage(results, 30, 40);
+
+            Assert.Less(late, early, string.Format(
+                "레벨업이 완만해지지 않는다 (1~10스테이지 {0:F2}렙/스테이지, " +
+                "31~40스테이지 {1:F2}렙/스테이지)", early, late));
+
+            // 멈춰서도 안 된다. 레벨이 사실상 정지하면 스탯 포인트 축 둘이
+            // 화면만 차지한다
+            Assert.Greater(late, 0.3d, string.Format(
+                "31~40스테이지에서 레벨이 {0:F2}렙/스테이지로 사실상 멈췄다", late));
+
+            // 첫 스테이지에서는 반드시 한 번 오른다. 첫 보스를 만나기 전에
+            // 레벨업 버튼을 한 번 보는 것이 온보딩이다
+            Assert.GreaterOrEqual(results[0].LevelsGained, 1,
+                "1스테이지에서 한 번도 레벨업하지 못한다");
+        }
+
+        static double LevelsPerStage(System.Collections.Generic.List<StageSimulation.StageResult> rows,
+                                     int from, int to)
+        {
+            int levels = 0;
+            for (int i = from; i < to && i < rows.Count; i++) levels += rows[i].LevelsGained;
+            return levels / (double)(to - from);
+        }
+
+        // ------------------------------------------------------------ 16단계: 죽은 축 차단
+
+        /**
+         * @brief 스탯 포인트 한 개를 **찍는 그 순간** 체감되는가.
+         *
+         * 기존 생존성 검사(EveryAxis...)는 스탯 포인트 축을 잡지 못한다. 포인트는
+         * 골드가 들지 않아서 구매 정책이 무조건 찍기 때문이다 - 장부에는 "샀다"고
+         * 남지만 화면에서는 죽어 있다. 회복 축(11단계)과 스탯 포인트 축(14~15단계)이
+         * 같은 함정에 두 번 빠졌다.
+         *
+         * 그래서 "샀는가"가 아니라 **"사면 움직이는가"**를 잰다. 방금 레벨업으로
+         * 얻은 포인트 하나를 그 자리에서 투자했을 때 DPS(또는 EHP)가 1% 이상
+         * 움직여야 한다. 1%는 "눌렀더니 숫자가 바뀌었다"가 성립하는 최소선이다.
+         *
+         * **끝단에서 잰다.** 상수가 아니라 시뮬레이션이 실제로 굴린 스탯에서
+         * 다시 계산한다 - 11단계 ChapterHealthMultiplier가 선언만 되고 연결되지
+         * 않았던 것과 같은 사고를 막는다.
+         */
+        const double MinimumFeltGain = 0.01d;
+
+        [Test]
+        public void StatPoint_IsFeltTheMomentItIsSpent()
+        {
+            var results = StageSimulation.Run(20, FieldFromAssets());
+
+            // 초반·중반·후반 세 지점에서 본다. 한 지점만 보면 그 레벨에서만
+            // 통과하는 계수가 빠져나간다
+            foreach (int stage in new[] { 5, 12, 20 })
+            {
+                var row = results[stage - 1];
+
+                // 공격력 증폭: 지금 DPS에서 증폭만 한 칸 올린다
+                double ampNow = StatPointCurve.Multiplier(row.AttackPoints);
+                double ampNext = StatPointCurve.Multiplier(row.AttackPoints + 1);
+                double dpsGain = ampNext / ampNow - 1d;
+
+                Assert.GreaterOrEqual(dpsGain, MinimumFeltGain, string.Format(
+                    "stage {0}: 공격력 증폭 한 칸이 DPS를 {1:P2}밖에 못 올린다 " +
+                    "(포인트 {2}개, 공격력 강화 Lv.{3}). 눌러도 숫자가 안 움직이면 " +
+                    "그 버튼은 죽은 것이다",
+                    stage, dpsGain, row.AttackPoints, row.AttackPowerLevel));
+
+                // 체력 증폭: 유효체력 기준
+                double hpAmpNow = StatPointCurve.Multiplier(row.HealthPoints);
+                double hpAmpNext = StatPointCurve.Multiplier(row.HealthPoints + 1);
+                double regenFraction = row.MaxHealth > 0d ? row.RegenPerSecond / row.MaxHealth : 0d;
+
+                double ehpNow = SurvivalEfficiency.EffectiveHealth(row.MaxHealth, regenFraction);
+                double ehpNext = SurvivalEfficiency.EffectiveHealth(
+                    row.MaxHealth / hpAmpNow * hpAmpNext, regenFraction);
+                double ehpGain = ehpNext / ehpNow - 1d;
+
+                Assert.GreaterOrEqual(ehpGain, MinimumFeltGain, string.Format(
+                    "stage {0}: 체력 증폭 한 칸이 유효체력을 {1:P2}밖에 못 올린다 " +
+                    "(포인트 {2}개)", stage, ehpGain, row.HealthPoints));
+            }
+        }
+
+        /**
+         * @brief 스탯 포인트 축도 20스테이지까지 실제로 찍힌다.
+         *
+         * 골드 축의 생존성 검사와 짝이다. 이쪽이 0이면 구매 정책이 포인트를
+         * 아예 배분하지 않는다는 뜻이고, 그러면 위의 체감 검사도 의미가 없다.
+         */
+        [Test]
+        public void StatPointAxes_AreInvestedThrough20()
+        {
+            var final = StageSimulation.Run(20, FieldFromAssets())[19];
+
+            Assert.Greater(final.AttackPoints, 0, "공격력 증폭에 포인트가 한 번도 안 들어갔다");
+            Assert.Greater(final.HealthPoints, 0, "체력 증폭에 포인트가 한 번도 안 들어갔다");
+        }
+
+        // ------------------------------------------------------------ 16단계: 회복 상한
+
+        /**
+         * @brief 초당 회복이 최대 체력을 넘지 않는다.
+         *
+         * 15단계 실측에서 Lv.54의 회복이 **156.2%/s**였다. 초당 최대 체력의
+         * 1.5배를 회복하면 어떤 피해도 다음 프레임에 지워지고, 11단계에서 만든
+         * 체력 게이트가 통째로 무력화된다.
+         *
+         * 원인은 회복이 최대 체력 **비율**의 곱연산이면서 상한이 없다는 것이다.
+         * 비율로 바꾼 것 자체는 옳았지만(11단계) 100%를 넘을 수 있다는 것을
+         * 그때 보지 못했다.
+         */
+        [Test]
+        public void RegenRatio_IsCapped()
+        {
+            // 곡선 자체에 상한이 있는가. 레벨을 충분히 올려도 캡을 넘지 않아야 한다
+            for (int level = 1; level <= 300; level++)
+            {
+                double ratio = HealthRegenCurve.CappedValueAtLevel(level);
+                Assert.LessOrEqual(ratio, HealthRegenCurve.Ceiling + 1e-9, string.Format(
+                    "Lv.{0}에서 회복이 {1:P1}/s로 상한 {2:P1}/s를 넘는다",
+                    level, ratio, HealthRegenCurve.Ceiling));
+            }
+
+            // 상한이 무적을 만들지 않는 크기인가. 30초 전투에서 회복만으로
+            // 최대 체력의 몇 배를 벌어주는지 본다
+            double healedOverFight = HealthRegenCurve.Ceiling * StageCurve.BossTimeLimitSeconds;
+            Assert.Less(healedOverFight, 15d, string.Format(
+                "상한 {0:P0}/s면 30초 동안 최대 체력의 {1:F1}배를 회복한다 - 무적이다",
+                HealthRegenCurve.Ceiling, healedOverFight));
+            Assert.Greater(healedOverFight, 2d, string.Format(
+                "상한 {0:P0}/s면 30초 회복량이 최대 체력의 {1:F1}배뿐이라 회복 축을 살 이유가 없다",
+                HealthRegenCurve.Ceiling, healedOverFight));
+        }
+
+        /**
+         * @brief 시뮬레이션이 상한을 실제로 반영하는가.
+         *
+         * 곡선에 상한을 넣어도 시뮬레이션이 무상한 값을 쓰면, 밸런스는 여전히
+         * 무적 플레이어 기준으로 계산된다.
+         */
+        [Test]
+        public void Simulation_UsesTheCappedRegen()
+        {
+            var results = StageSimulation.Run(30, FieldFromAssets());
+
+            foreach (var row in results)
+            {
+                double fraction = row.MaxHealth > 0d ? row.RegenPerSecond / row.MaxHealth : 0d;
+                Assert.LessOrEqual(fraction, HealthRegenCurve.Ceiling + 1e-9, string.Format(
+                    "stage {0}: 시뮬레이션의 회복이 {1:P1}/s로 상한을 넘는다 (회복 Lv.{2})",
+                    row.Stage, fraction, row.RegenLevel));
+            }
+        }
+
+        // ------------------------------------------------------------ 16단계: EXP 리듬
+
+        /**
+         * @brief 곡선을 따라가는 플레이어에게 레벨이 무더기로 쌓이지 않는다.
+         *
+         * 15단계 화면에서 레벨 2인데 **레벨업 16개가 밀려 있었다.** 레벨업이
+         * 보상이 아니라 "여러 번 눌러야 하는 잡일"이 된다.
+         *
+         * 스테이지 하나에서 오르는 레벨 수로 잰다. 플레이어가 스테이지마다 한 번
+         * 누른다고 보면 그것이 곧 밀리는 양이다.
+         */
+        [Test]
+        public void LevelUps_DoNotPileUp()
+        {
+            var results = StageSimulation.Run(40, FieldFromAssets());
+
+            foreach (var row in results)
+            {
+                Assert.LessOrEqual(row.LevelsGained, 2, string.Format(
+                    "stage {0}에서 한 번에 {1}레벨이 오른다 - 레벨업이 잡일이 된다 " +
+                    "(Lv.{2})", row.Stage, row.LevelsGained, row.CharacterLevel));
+            }
+        }
+
+        /**
+         * @brief 시뮬레이션과 실전이 같은 경험치 값을 쓰는가.
+         *
+         * 9단계에서 계산 헬퍼와 실전이 어긋나 "계산상 통과, 화면은 실패"가 났다.
+         * 경험치는 12단계에 들어온 가장 새로운 축이라 같은 위험이 가장 크다.
+         *
+         * 시뮬레이션이 쓰는 함수와 스포너/보스전이 쓰는 함수가 같은지 못 박는다.
+         */
+        [Test]
+        public void SimulationExp_MatchesTheLiveCurve()
+        {
+            for (int stage = 1; stage <= 30; stage++)
+            {
+                // 잡몹: EnemySpawner.Spawn 이 부르는 것과 같은 함수
+                double mob = ExpCurve.MobExp(stage).ToDouble();
+                Assert.Greater(mob, 0d, "stage " + stage + " 잡몹 경험치가 0이다");
+
+                // 보스: BossFight.BossExpReward 가 부르는 것과 같은 함수
+                double boss = ExpCurve.BossExp(stage).ToDouble();
+                double expected = mob * ExpCurve.BossExpMultiplier * ExpCurve.MultiplierFor(stage);
+                Assert.AreEqual(expected, boss, expected * 1e-9,
+                    "stage " + stage + ": 보스 경험치가 곡선과 어긋난다");
+            }
+
+            // 시뮬레이션이 한 스테이지에서 넣는 총량이 위 두 함수의 합과 같은가.
+            // 여기가 어긋나면 밸런스는 맞는데 화면은 다른 속도로 오른다
+            var results = StageSimulation.Run(3, FieldFromAssets());
+            double perStage1 = ExpCurve.MobExp(1).ToDouble() * StageCurve.KillsPerStage
+                               + ExpCurve.BossExp(1).ToDouble();
+            Assert.Greater(perStage1, 0d);
+            Assert.GreaterOrEqual(results[0].LevelsGained, 1,
+                "1스테이지에서 한 번도 레벨업하지 못한다 - 온보딩이 끊긴다");
         }
     }
 }

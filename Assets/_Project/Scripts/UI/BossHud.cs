@@ -1,4 +1,5 @@
 using Onikiri.Battle;
+using Onikiri.Progression;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -96,9 +97,13 @@ namespace Onikiri.UI
 
             var phase = fight.Current;
 
+            // 접근 중에도 전투 화면을 띄운다. 보스 체력 바가 이때 이미 보여야
+            // "저놈을 상대한다"가 전달되고, 시계는 아직 안 돌므로 제한 시간이
+            // 가득 찬 채로 멈춰 있는다 - 달려가는 동안 시간이 안 깎인다는 것이
+            // 화면에서도 읽힌다
             Show(challengeRoot, phase == BossFight.Phase.Farming && fight.CanChallenge);
             Show(introRoot, phase == BossFight.Phase.Intro);
-            Show(fightRoot, phase == BossFight.Phase.Fighting);
+            Show(fightRoot, phase == BossFight.Phase.Approaching || phase == BossFight.Phase.Fighting);
             Show(resultRoot, phase == BossFight.Phase.Failed);
 
             if (phase == BossFight.Phase.Intro && introLabel != null)
@@ -117,6 +122,11 @@ namespace Onikiri.UI
                 shownSeconds = -1;
                 shownPlayerHealth = -1;
             }
+
+            // 달려가는 동안은 제한 시간이 가득 찬 채로 서 있는다. 0으로 두면
+            // 도착하는 순간 0에서 30으로 튀어 시계가 고장 난 것처럼 보인다
+            if (phase == BossFight.Phase.Approaching && timerLabel != null)
+                timerLabel.text = Mathf.CeilToInt(StageCurve.BossTimeLimitSeconds) + "초";
         }
 
         private void Update()

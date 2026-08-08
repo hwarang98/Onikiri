@@ -33,6 +33,17 @@ namespace Onikiri.Battle
         [SerializeField] private Sprite[] attackFrames;
         [SerializeField] private Sprite[] slashFrames;
         [SerializeField] private float idleFrameRate = 10f;
+
+        [Tooltip("사거리가 비었을 때 도는 달리기 클립. 사무라이의 X는 고정이고 " +
+                 "배경이 흘러 전진을 만든다")]
+        [SerializeField] private Sprite[] runFrames;
+
+        [Tooltip("달리기 클립 재생 속도. 16프레임 = 두 걸음이므로 걸음당 = 8/이 값. " +
+                 "24fps면 0.333초로 사람 달리기 주기다. 12fps는 정확히 절반이라 " +
+                 "슬로모션으로 읽혔다 - 배경 속도가 아니라 이것이 '느리다'의 주범이었다. " +
+                 "플레이 중에 끌면 바로 반영된다. 확정된 값은 빌더가 쓴다")]
+        [Range(6f, 36f)]
+        [SerializeField] private float runFrameRate = 32f;
         [SerializeField] private float attackFrameRate = 14f;
         [SerializeField] private float slashFrameRate = 24f;
 
@@ -257,8 +268,22 @@ namespace Onikiri.Battle
                 ? spawner.FindNearestAlive(transform.position.x, attackRange)
                 : null;
 
+            HasTargetInRange = target != null;
+
             if (target == null)
             {
+                // 벨 것이 사라지면 스윙 상태도 함께 끝난다.
+                //
+                // 이 줄이 없으면 플래그가 참인 채로 남는다 - 아래 리셋은 타격이
+                // 들어가는 순간에만 도는데, 대상이 없으면 거기까지 가지 못하기
+                // 때문이다. 보스전에 들어가면서 큐가 비는 순간이 정확히 그렇다.
+                //
+                // 낡은 플래그는 두 가지를 망가뜨린다. 새 요괴가 들어와도 예비
+                // 동작 없이 타격만 나가고(아래 !swingStarted 조건), 달리기 전환이
+                // 거절당한다(RefreshRestingClip). 후자가 "보스에게 idle로
+                // 달려가는" 버그였다
+                swingStarted = false;
+
                 // 대상이 없으면 타격 직전에서 타이머를 멈춰 세운다. 요괴가 들어오면
                 // lead 시간만큼 예비 동작을 하고 곧바로 벤다. 자유롭게 쌓이게 두면
                 // 비어 있던 시간만큼 첫 등장에 타격이 몰아친다
@@ -375,10 +400,88 @@ namespace Onikiri.Battle
             slashPool.Release(slash);
         }
 
+        /**
+         * @brief 벨 것이 없을 때의 동작. 달리는 중이면 달리기, 아니면 idle.
+         *
+         * 17단계에서 갈렸다. 그전에는 언제나 idle이었고, 화면은 사무라이가
+         * 제자리에 선 채 요괴가 걸어오기를 기다리는 그림이었다 - "나아가는
+         * 느낌이 없다"는 소감의 원인이 정확히 이것이다.
+         *
+         * 이제 사거리가 비면 달린다. 사무라이의 X는 그대로고 배경이 흐르므로,
+         * 달리기 클립과 배경 스크롤이 같은 사실의 앞뒤다.
+         *
+         * 스크롤 여부를 {@link ParallaxScroller}에서 읽는 이유는 그것이 이미
+         * 모든 레이어가 공유하는 단일 상태이기 때문이다. 여기서 따로 판단하면
+         * "배경은 흐르는데 사무라이는 서 있는" 조합이 생긴다.
+         */
         private void PlayIdle()
         {
+            bool advancing = ParallaxScroller.IsScrolling;
+
+            if (advancing && runFrames != null && runFrames.Length > 0)
+            {
+                animator.Play(runFrames, runFrameRate, true);
+                return;
+            }
+
             if (idleFrames != null && idleFrames.Length > 0)
                 animator.Play(idleFrames, idleFrameRate, true);
+        }
+
+        /**
+         * @brief 사거리에 벨 것이 있는가.
+         *
+         * 전진 판단이 이 값 하나에 달려 있다. 여기서 내보내는 이유는 대상을
+         * 찾는 코드가 이미 여기 있기 때문이다 - 밖에서 다시 찾으면 사거리가
+         * 두 곳에 적히고, 한쪽만 고쳐지는 날 "때리는데 안 멈추는" 상태가 된다.
+         */
+        public bool HasTargetInRange { get; private set; }
+
+        /**
+         * @brief 쉬는 동작을 다시 고른다.
+         *
+         * 달리기와 idle이 바뀌는 순간에 불린다. 스윙 도중이면 건드리지 않는다 -
+         * 동작 중에 클립을 갈면 벤 자세가 끊긴다.
+         *
+         * ## 왜 성공 여부를 돌려주는가
+         *
+         * 거절할 수 있는 호출이기 때문이다. 부르는 쪽(StageAdvance)은 스크롤
+         * 상태가 **바뀌는 순간에만** 부르는데, 그 순간에 거절당하면 다시 부를
+         * 기회가 영영 오지 않는다 - 상태는 이미 바뀌었으므로 다음 프레임에는
+         * 전환이 감지되지 않는다.
+         *
+         * "보스 도전을 눌렀는데 사무라이가 idle 자세로 달려가는" 버그가 이것이었다.
+         * 도전 순간에 마침 스윙 중이면 달리기 전환이 통째로 유실됐고, 스윙이
+         * 걸리는 타이밍이라 **간헐적으로만** 나타났다.
+         *
+         * @return 클립을 실제로 다시 골랐으면 true. false면 부른 쪽이 다시 시도해야 한다
+         */
+        public bool RefreshRestingClip()
+        {
+            // 한 번 재생 클립(스윙)이 도는 중에만 거절한다. 예전에는
+            // `IsPlaying && swingStarted`로 판정했는데, idle도 IsPlaying이 true라
+            // swingStarted가 낡은 값으로 남으면 영원히 거절하는 상태가 됐다
+            if (animator != null && animator.IsOneShot) return false;
+
+            PlayIdle();
+            return true;
+        }
+
+        /**
+         * @brief 인스펙터에서 값을 끄는 동안 달리기 속도를 즉시 반영한다.
+         *
+         * 속도감은 숫자로 판정할 수 있는 것이 아니라 눈으로 봐야 하는 것이고,
+         * 눈으로 보려면 끄는 즉시 화면이 따라와야 한다. 클립을 다시 걸지 않고
+         * 속도만 갈아끼우므로 동작이 첫 프레임으로 튀지 않는다.
+         *
+         * 여기서 정한 값은 **플레이를 나가면 사라진다.** 확정되면 빌더에
+         * 적어야 씬에 남는다(BattleContentBuilder) - 직렬화 값이 코드 기본값을
+         * 이기는 자리라 코드만 고치면 조용히 무시된다.
+         */
+        private void OnValidate()
+        {
+            if (!Application.isPlaying || animator == null) return;
+            if (ParallaxScroller.IsScrolling) animator.SetFrameRate(runFrameRate);
         }
 
 #if UNITY_EDITOR

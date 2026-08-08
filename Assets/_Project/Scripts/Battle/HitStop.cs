@@ -55,6 +55,30 @@ namespace Onikiri.Battle
             }
             Instance = this;
             restoreTimeScale = normalTimeScale;
+
+            // **플레이를 시작할 때 배속을 정상으로 되돌린다.**
+            //
+            // Time.timeScale은 에디터에서 플레이 모드를 나갔다 들어와도 리셋되지
+            // 않는다. 테스트 패널로 0.25x를 걸어두고 잊으면 그 뒤의 모든 플레이가
+            // 조용히 느려지고, 화면에는 "게임이 느리다"로만 보인다.
+            //
+            // 17단계에서 실제로 걸렸다. 배속이 0.3에 걸린 줄 모르고 전진 속도를
+            // 3.2 -> 8 -> 16으로 세 번 올렸는데, 매번 0.3이 곱해져 체감이 거의
+            // 안 바뀌었다. 다리 애니메이션도 32fps가 실효 9.6fps로 돌아 "다리가
+            // 안 움직인다"가 됐다. 세 번의 수정이 전부 헛돌았고, 원인은 게임이
+            // 아니라 에디터에 남은 값이었다.
+            //
+            // 빌드에서는 항상 1로 시작하므로 이것은 에디터 전용 함정이다.
+            // 그래서 조용히 고치지 않고 경고를 남긴다 - 배속을 일부러 걸어둔
+            // 사람에게는 "꺼졌다"가 보여야 하고, 잊은 사람에게는 원인이 보여야 한다
+            if (!Mathf.Approximately(Time.timeScale, normalTimeScale))
+            {
+                Debug.LogWarning("[Onikiri] Time.timeScale was " + Time.timeScale
+                                 + " at startup - reset to " + normalTimeScale
+                                 + ". (Editor keeps timeScale across play sessions;"
+                                 + " use the test panel to set it again if intended.)");
+                Time.timeScale = normalTimeScale;
+            }
         }
 
         private void OnDestroy()

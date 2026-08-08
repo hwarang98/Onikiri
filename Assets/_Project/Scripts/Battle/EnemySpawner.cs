@@ -22,6 +22,10 @@ namespace Onikiri.Battle
         [SerializeField] private EnemyDefinition[] definitions;
         [SerializeField] private Transform enemyParent;
 
+        [Tooltip("경험치 흡수 연출. 처치 지점이 여기에서만 알 수 있으므로 " +
+                 "타격 팝업(PlayerCombat)과 달리 스포너가 들고 있다")]
+        [SerializeField] private Onikiri.UI.DamageNumberSpawner damageNumbers;
+
         [Header("필드")]
         [Tooltip("동시에 살아 있어야 할 요괴 수. 사양서는 화면에 3~5마리를 요구한다")]
         [SerializeField] private int targetAlive = 4;
@@ -198,7 +202,8 @@ namespace Onikiri.Battle
          * 그리고 정렬 순서뿐이다.
          */
         public Enemy SpawnBoss(EnemyDefinition definition, BigDouble health, BigDouble gold,
-                               float scale, Color tint, double attackDamage, bool walkIn)
+                               BigDouble exp, float scale, Color tint, double attackDamage, bool walkIn,
+                               float approachDistance = 0f)
         {
             if (definition == null) return null;
 
@@ -207,12 +212,19 @@ namespace Onikiri.Battle
             // 챕터 보스만 화면 밖에서 걸어 들어온다. 일반 스테이지 보스는 큐 앞줄에
             // 바로 선다 - 워크인 5.3초가 매 스테이지 반복되면 제한 시간의 18%가
             // 기다림으로 사라진다. BossCurve 참고
-            float spawnX = walkIn ? RightEdgeX() + offscreenMargin : frontLineX;
+            // 달려가기 거리를 호출부가 정한다. 17단계에서 플레이어가 보스에게
+            // 달려가게 되면서 접근 속도가 (보스 걸음 + 스크롤)로 올라갔고,
+            // 화면 밖 여백만큼만 띄우면 1초 만에 도착해 관문을 지날 틈이 없다
+            float spawnX = walkIn
+                ? (approachDistance > 0f
+                    ? frontLineX + approachDistance
+                    : RightEdgeX() + offscreenMargin)
+                : frontLineX;
 
             boss.Killed += OnEnemyKilled;
             boss.Died += OnEnemyDied;
             boss.Spawn(definition, spawnX, stage.GroundY,
-                       Onikiri.Core.SortingOrders.Boss, health, gold, true,
+                       Onikiri.Core.SortingOrders.Boss, health, gold, exp, true,
                        scale, tint, attackDamage);
             active.Add(boss);
 
@@ -245,11 +257,17 @@ namespace Onikiri.Battle
             var healthMultiplier = progress != null ? progress.HealthMultiplier : BigDouble.One;
             var goldMultiplier = progress != null ? progress.GoldMultiplier : BigDouble.One;
 
+            // 경험치는 정의 에셋이 아니라 스테이지에서만 나온다. 요괴 종류마다
+            // 다른 경험치를 주면 가중치 추첨이 진행 속도에 섞여 들어가고,
+            // ExpCurve가 재는 "스테이지당 경험치"가 추첨 결과에 따라 흔들린다
+            int stageNumber = progress != null ? progress.Stage : 1;
+
             enemy.Killed += OnEnemyKilled;
             enemy.Died += OnEnemyDied;
             enemy.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY, sorting,
                         definition.maxHealth * healthMultiplier,
-                        definition.goldReward * goldMultiplier);
+                        definition.goldReward * goldMultiplier,
+                        Onikiri.Progression.ExpCurve.MobExp(stageNumber));
             active.Add(enemy);
         }
 
@@ -284,9 +302,27 @@ namespace Onikiri.Battle
         {
             enemy.Killed -= OnEnemyKilled;
 
-            // 정의 에셋의 값이 아니라 이 개체가 스폰될 때 확정된 보상을 준다
+            // 정의 에셋의 값이 아니라 이 개체가 스폰될 때 확정된 보상을 준다.
+            //
+            // 획득 축(20단계)은 **여기서** 곱한다. 지갑 쪽에서 곱하면 방치 보상이
+            // 두 번 곱해진다 - 그쪽은 이미 배수가 반영된 초당 골드에서 나오고
+            // 지급 경로는 같은 wallet.Add다. UpgradeSystem.GoldGainMultiplier 참고
             var wallet = Onikiri.Progression.PlayerWallet.Instance;
-            if (wallet != null) wallet.Add(enemy.GoldReward);
+            if (wallet != null)
+                wallet.Add(enemy.GoldReward
+                    * Onikiri.Core.BigDouble.FromDouble(
+                        Onikiri.Progression.UpgradeSystem.CurrentGoldGain));
+
+            // 경험치도 같은 자리에서. 골드와 경험치가 서로 다른 경로로 지급되면
+            // 언젠가 한쪽만 도는 상태가 생긴다 - BossFight가 골드를 여기 맡긴
+            // 이유와 같다
+            var character = Onikiri.Progression.CharacterLevel.Instance;
+            if (character != null)
+            {
+                character.AddExp(enemy.ExpReward);
+                if (damageNumbers != null)
+                    damageNumbers.ShowExp(enemy.ExpReward, enemy.transform.position);
+            }
 
             // 보스는 스테이지 할당량에 들어가지 않는다. 보스가 하는 일은 할당량을
             // 채우는 것이 아니라 스테이지를 올리는 것이고, 그 판단은 BossFight가 한다

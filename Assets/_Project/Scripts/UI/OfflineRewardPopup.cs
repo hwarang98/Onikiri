@@ -21,6 +21,23 @@ namespace Onikiri.UI
         [SerializeField] private TMP_Text amountLabel;
         [SerializeField] private Button claimButton;
 
+        /**
+         * @brief 광고 리워드 자리(20-3). **자리만이고 눌리지 않는다.**
+         *
+         * 여기 두는 이유는 방치 보상이 광고 리워드의 표준 자리이기 때문이다 -
+         * 이미 "공짜로 받은 것"이 화면에 떠 있는 순간이 배로 늘릴 제안을 받아
+         * 들이기 가장 쉬운 지점이고, 그래서 이 장르가 거의 예외 없이 여기에 둔다.
+         *
+         * 실제 광고 SDK 연동은 수익화 단계다(이번 범위 밖). 그때까지 **거짓말은
+         * 하지 않는다** - 눌리는데 아무 일도 없는 버튼이 아니라 "준비 중"이라고
+         * 적힌 잠긴 버튼으로 선다. LockedTab이 스킬·전직에서 지키는 규칙과 같다.
+         */
+        [SerializeField] private Button doubleButton;
+        [SerializeField] private TMP_Text doubleLabel;
+
+        [Tooltip("광고 연동 전까지 버튼에 적을 문구. 비우면 잠금 표시를 하지 않는다")]
+        [SerializeField] private string doublePendingLabel = "골드 2배 준비 중";
+
         /** Show가 Awake보다 먼저 올 수 있어서 배선을 두 진입점에서 공유한다 */
         private bool wired;
 
@@ -54,6 +71,12 @@ namespace Onikiri.UI
 
             if (root == null) root = gameObject;
             if (claimButton != null) claimButton.onClick.AddListener(Hide);
+
+            // 리스너를 달지 않는다. 다는 순간 "언젠가 동작하는 버튼"이 되고,
+            // 광고를 붙이는 사람이 여기 이미 뭔가 연결돼 있다고 믿게 된다
+            if (doubleButton != null) doubleButton.interactable = false;
+            if (doubleLabel != null && !string.IsNullOrEmpty(doublePendingLabel))
+                doubleLabel.text = doublePendingLabel;
         }
 
         private void OnDestroy()
@@ -77,12 +100,17 @@ namespace Onikiri.UI
 
             if (titleLabel != null) titleLabel.text = "오프라인 보상";
 
+            // 시간을 앞에 세운다. 이 줄이 하는 일은 금액의 **근거**를 대는 것이라
+            // ("8시간 방치했으니 이만큼"), 시간이 먼저 읽혀야 순서가 맞는다
             if (durationLabel != null)
-                durationLabel.text = "자리를 비운 동안  " + NumberFormatter.FormatDuration(awayFor)
+                durationLabel.text = NumberFormatter.FormatDurationKo(awayFor) + " 방치"
                                      + (capped ? "  (상한 도달)" : string.Empty);
 
+            // 부호를 붙인다. 이 팝업의 숫자는 잔액이 아니라 **증가분**인데,
+            // 상단 바에 같은 서체로 총 골드가 떠 있어서 부호가 없으면 둘이
+            // 같은 종류의 숫자로 읽힌다
             if (amountLabel != null)
-                amountLabel.text = NumberFormatter.Format(amount) + " 획득했습니다";
+                amountLabel.text = "+" + NumberFormatter.Format(amount) + " 골드";
 
             root.SetActive(true);
         }

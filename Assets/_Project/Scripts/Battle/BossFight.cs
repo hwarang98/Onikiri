@@ -33,7 +33,17 @@ namespace Onikiri.Battle
      */
     public sealed class BossFight : MonoBehaviour
     {
-        public enum Phase { Farming, Intro, Fighting, Failed }
+        /**
+         * @brief 보스전의 다섯 상태.
+         *
+         * 17단계에서 `Approaching`이 생겼다. 그전에는 보스가 스폰되자마자
+         * 30초 시계가 돌기 시작했는데, 보스는 화면 밖에서 걸어 들어오고 있어서
+         * **제한 시간의 18%가 사거리에 아무도 없는 상태로 흘렀다.**
+         *
+         * 이제 그 구간이 별도 상태다. 플레이어가 보스에게 달려가고(배경 스크롤),
+         * 도달한 순간부터 시계가 시작한다. 달려가는 시간은 타이머 밖이다.
+         */
+        public enum Phase { Farming, Intro, Approaching, Fighting, Cleared, Failed }
 
         /** 실패한 이유. 문구가 갈린다 */
         public enum FailureReason { TimeOut, Death }
@@ -43,7 +53,17 @@ namespace Onikiri.Battle
         [SerializeField] private StageProgress progress;
         [SerializeField] private PlayerHealth playerHealth;
 
-        [Tooltip("챕터 보스(5의 배수 스테이지). 다크 사무라이")]
+        /**
+         * @brief 스테이지 -> 보스 매핑. 13단계에서 코드 분기를 대체했다.
+         *
+         * 비어 있으면 아래의 옛 경로(bossDefinition + 5의 배수)로 떨어진다.
+         * 폴백을 남겨두는 이유는 로스터가 없는 테스트 씬에서 보스전이 아예
+         * 돌지 않으면 원인이 "로스터가 없다"인지 "보스전이 깨졌다"인지
+         * 구분되지 않기 때문이다.
+         */
+        [SerializeField] private BossRoster roster;
+
+        [Tooltip("로스터가 없을 때만 쓰는 폴백 정의")]
         [SerializeField] private EnemyDefinition bossDefinition;
 
         [Tooltip("일반 스테이지 보스로 쓸 잡몹 정의들. 스테이지로 하나를 고른다")]
@@ -59,6 +79,13 @@ namespace Onikiri.Battle
         [Tooltip("실패 문구가 어느 축을 올리라고 안내할지 판단하는 데 쓴다")]
         [SerializeField] private UpgradeSystem upgrades;
 
+        [Tooltip("보스에게 달려가는 동안 한 번 지나가는 토리이 관문. " +
+                 "파밍 중에는 화면에 없다")]
+        [SerializeField] private BossGate gate;
+
+        [Tooltip("전진 속도를 읽어 달려가기 거리를 유도한다")]
+        [SerializeField] private StageAdvance advance;
+
         [Header("연출")]
         [Tooltip("챕터 보스의 등장 연출 시간. 화면이 어두워지고 이름이 뜬다")]
         [SerializeField] private float introSeconds = 1f;
@@ -68,6 +95,19 @@ namespace Onikiri.Battle
 
         [Tooltip("실패 문구를 붙들고 있는 시간. 그 뒤 잡몹 파밍으로 돌아간다")]
         [SerializeField] private float failSeconds = 3f;
+
+        [Tooltip("보스에게 달려가는 데 허용하는 최대 시간. 제한 시간이 아니라 " +
+                 "안전장치다 - 보스가 영영 도달하지 못하면 접근 상태에 갇히므로 " +
+                 "그때는 그냥 전투를 시작해 정상 경로로 흘려보낸다")]
+        [SerializeField] private float approachTimeoutSeconds = 15f;
+
+        [Tooltip("클리어 배너를 붙들고 있는 시간. 곧바로 잡몹이 나오면 방금 " +
+                 "무엇을 해냈는지가 화면에서 지워진다")]
+        [SerializeField] private float clearBannerSeconds = 2f;
+
+        [Tooltip("지역 피날레는 더 길게 붙든다. 지역을 넘는 것은 스테이지를 " +
+                 "넘는 것과 다른 사건이다")]
+        [SerializeField] private float regionClearBannerSeconds = 3.5f;
 
         [Tooltip("보스 이름. 화면에 그대로 뜬다")]
         [SerializeField] private string bossName = "다크 사무라이";
@@ -84,10 +124,35 @@ namespace Onikiri.Battle
 
         public Phase Current { get { return phase; } }
 
-        /** 지금(또는 다음) 보스가 챕터 보스인가. 연출과 배수가 갈린다 */
+        /** 지금(또는 다음) 스테이지 번호. progress가 없으면 1 */
+        private int CurrentStage { get { return progress != null ? progress.Stage : 1; } }
+
+        /** 이 스테이지에 배치된 보스. null이면 잡몹 확대판 */
+        public BossConfig CurrentBossConfig
+        {
+            get { return roster != null ? roster.BossForStage(CurrentStage) : null; }
+        }
+
+        /** 지금(또는 다음) 보스가 확대판이 아닌 보스인가. 배수가 갈린다 */
         public bool IsChapterBoss
         {
             get { return progress != null && BossCurve.IsChapterBoss(progress.Stage); }
+        }
+
+        /**
+         * @brief 전체 등장 연출을 쓰는가.
+         *
+         * 배치 애셋이 있으면 그쪽 말을 듣는다. 연출의 크기는 밸런스가 아니라
+         * 그 보스가 어떤 자리인가의 문제이고, 그 자리를 정하는 것은 로스터다.
+         */
+        public bool UsesFullIntro
+        {
+            get
+            {
+                var config = CurrentBossConfig;
+                if (config != null) return config.fullIntro;
+                return BossCurve.UsesFullIntro(CurrentStage);
+            }
         }
 
         /**
@@ -100,10 +165,28 @@ namespace Onikiri.Battle
         {
             get
             {
+                var config = CurrentBossConfig;
+                if (config != null)
+                {
+                    // 확대형은 이름 앞에 우두머리 표시를 붙인다. 원본 잡몹을
+                    // 방금까지 베고 있었으므로 "저놈의 우두머리"로 읽혀야 한다.
+                    // 시트형은 전용 아트라 그럴 필요가 없다
+                    if (config.kind == BossConfig.ArtKind.Sheets) return config.displayName;
+                    return string.IsNullOrEmpty(config.displayName)
+                        ? "거대 " + SafeMobName()
+                        : config.displayName;
+                }
+
                 if (IsChapterBoss) return bossName;
                 var definition = StageBossDefinition();
                 return definition != null ? "거대 " + definition.displayName : bossName;
             }
+        }
+
+        private string SafeMobName()
+        {
+            var definition = StageBossDefinition();
+            return definition != null ? definition.displayName : bossName;
         }
         public Enemy Boss { get { return boss; } }
         public string FailureMessage { get { return failureMessage; } }
@@ -147,6 +230,12 @@ namespace Onikiri.Battle
                 if (spawner == null || progress == null) return BigDouble.Zero;
                 return StageCurve.BossGoldForStage(spawner.AverageBaseGold, progress.Stage);
             }
+        }
+
+        /** 챕터 배수는 ExpCurve.BossExp 안에 들어 있다. 여기서 또 곱하면 두 번 적용된다 */
+        public BigDouble BossExpReward
+        {
+            get { return progress != null ? ExpCurve.BossExp(progress.Stage) : BigDouble.Zero; }
         }
 
         /**
@@ -230,7 +319,9 @@ namespace Onikiri.Battle
             // 전체 연출(화면 어둡게 + 이름 + 워크인)은 챕터 보스 전용이다.
             // 일반 스테이지 보스는 짧은 이름만 띄우고 곧바로 싸운다 - 매 스테이지
             // 6초씩 반복되면 연출은 무게가 아니라 대기 시간이 된다. BossCurve 참고
-            timer = IsChapterBoss ? introSeconds : stageBossIntroSeconds;
+            // 암전 시간도 전체 연출을 쓰는 보스만 길다. 챕터 관문(엘리트 확대판)은
+            // 짧게 스치는 쪽이고, 그것이 피날레와 챕터를 화면에서 가르는 신호다
+            timer = UsesFullIntro ? introSeconds : stageBossIntroSeconds;
             SetPhase(Phase.Intro);
         }
 
@@ -245,7 +336,16 @@ namespace Onikiri.Battle
             switch (phase)
             {
                 case Phase.Intro:
-                    if (timer <= 0f) BeginFight();
+                    if (timer <= 0f) BeginApproach();
+                    break;
+
+                case Phase.Approaching:
+                    // 보스가 사거리에 들어오면 시계가 시작한다. 여기 timer는
+                    // 제한 시간이 아니라 **안전장치**다 - 어떤 이유로 보스가
+                    // 영영 도달하지 못하면(스폰 실패, 이동 속도 0) 접근 상태에
+                    // 갇히므로, 그때는 그냥 전투를 시작해 정상 경로로 흘려보낸다
+                    if (boss == null || !boss.IsAlive) { ReturnToFarming(); break; }
+                    if (boss.CurrentState == Enemy.State.Engaged || timer <= 0f) BeginFight();
                     break;
 
                 case Phase.Fighting:
@@ -253,6 +353,10 @@ namespace Onikiri.Battle
                     // 시계만 도는 상태로 30초를 버리지 않고 즉시 정리한다
                     if (boss == null || !boss.IsAlive) { Fail(FailureReason.TimeOut); break; }
                     if (timer <= 0f) Fail(FailureReason.TimeOut);
+                    break;
+
+                case Phase.Cleared:
+                    if (timer <= 0f) ReturnToFarming();
                     break;
 
                 case Phase.Failed:
@@ -266,30 +370,99 @@ namespace Onikiri.Battle
             // 시계와 체력 바는 BossHud가 직접 읽어 간다
         }
 
-        private void BeginFight()
+        /**
+         * @brief 보스를 세우고 **달려가기 시작한다.** 시계는 아직 안 돈다.
+         *
+         * 17단계 이전에는 이 함수가 스폰과 시계 시작을 함께 했다. 그래서 보스가
+         * 걸어 들어오는 5.3초가 제한 시간 안에 있었고, 그동안 사거리는 비어
+         * 있었다 - 제한 시간의 18%가 아무 일도 일어나지 않는 구간이었다.
+         *
+         * 이제 둘이 나뉜다. 여기서는 보스를 화면 밖에 세우고 접근 상태로 들어가며,
+         * 시계는 보스가 사거리에 닿을 때 {@link BeginFight}가 시작한다.
+         *
+         * **모든 보스가 달려가기를 거친다.** 13단계에서는 피날레만 워크인을
+         * 썼는데, 그때는 워크인이 제한 시간을 갉아먹었기 때문에 아껴 쓴 것이다.
+         * 이제 타이머 밖이므로 아낄 이유가 없고, 오히려 매 스테이지 "달려가서
+         * 벤다"는 리듬이 생긴다.
+         */
+        private void BeginApproach()
         {
-            if (spawner == null || bossDefinition == null)
+            if (spawner == null)
             {
-                Debug.LogError("[Onikiri] BossFight is missing its spawner or boss definition.");
+                Debug.LogError("[Onikiri] BossFight has no spawner.");
                 ReturnToFarming();
                 return;
             }
 
-            bool chapter = IsChapterBoss;
+            var config = CurrentBossConfig;
 
-            // 챕터 보스는 화면 밖에서 걸어 들어온다. 일반 보스는 큐 앞줄에 바로
-            // 선다 - 워크인 5.3초가 매 스테이지 반복되면 제한 시간의 18%가
-            // 기다림으로 사라진다
+            // 배치 애셋이 있으면 그쪽이 정의·확대·틴트를 전부 정한다.
+            // 없으면 12단계까지의 경로로 떨어진다
+            EnemyDefinition definition;
+            float scale;
+            Color tint;
+            BigDouble health = BossMaxHealth;
+            BigDouble gold = BossGoldReward;
+            double attack = BossAttackDamage;
+
+            if (config != null)
+            {
+                // 확대형인데 baseMob이 비어 있으면 그 스테이지의 잡몹을 쓴다.
+                // "이 스테이지의 우두머리"라는 인상은 방금까지 베던 놈이라야 생긴다
+                definition = config.Definition != null ? config.Definition : StageBossDefinition();
+                scale = config.SpawnScale;
+                tint = config.SpawnTint;
+
+                // 애셋의 추가 배수. 기본 1이라 대개 아무 일도 하지 않는다
+                health = config.ApplyHealth(health);
+                gold = config.ApplyGold(gold);
+                attack = config.ApplyAttack(attack);
+            }
+            else
+            {
+                bool chapter = IsChapterBoss;
+                definition = chapter ? bossDefinition : StageBossDefinition();
+                scale = chapter ? 1f : stageBossScale;
+                tint = chapter ? Color.white : stageBossTint;
+            }
+
+            if (definition == null)
+            {
+                Debug.LogError("[Onikiri] BossFight found no definition for stage " + CurrentStage + ".");
+                ReturnToFarming();
+                return;
+            }
+
+            // 모든 보스가 화면 밖에서 시작한다. 그 구간이 타이머 밖이 되면서
+            // 아낄 이유가 없어졌다
+            // 달려가기 거리를 **시간에서 유도한다.** 시뮬레이션이 5.3초를
+            // 가정하므로(StageSimulation.BossRunUpSeconds) 거리가 아니라 그
+            // 시간이 기준이고, 전진 속도를 바꿔도 달려가기 길이는 안 변한다
+            float closing = definition.moveSpeed + (advance != null ? advance.ScrollSpeed : 0f);
+            float approachDistance = closing * (float)StageSimulation.BossRunUpSeconds;
+
             boss = spawner.SpawnBoss(
-                chapter ? bossDefinition : StageBossDefinition(),
-                BossMaxHealth, BossGoldReward,
-                chapter ? 1f : stageBossScale,
-                chapter ? Color.white : stageBossTint,
-                BossAttackDamage,
-                chapter);
+                definition, health, gold, BossExpReward,
+                scale, tint, attack,
+                true, approachDistance);
 
             if (boss != null) boss.Attacked += OnBossAttacked;
 
+            // 관문을 세운다. 달려가기 구간의 중간쯤에 서므로 플레이어가 먼저
+            // 지나고, 그 너머가 보스의 영역이 된다
+            if (gate != null)
+                gate.Show(UsesFullIntro, (float)StageSimulation.BossRunUpSeconds,
+                          advance != null ? advance.ScrollSpeed : 0f);
+
+            // 안전장치용 시계. 제한 시간이 아니라 "이만큼 지나도 도달 못 하면
+            // 그냥 시작한다"는 상한이다. 접근에 걸리는 시간의 세 배쯤 잡는다
+            timer = approachTimeoutSeconds;
+            SetPhase(Phase.Approaching);
+        }
+
+        /** 보스가 사거리에 닿았다. **여기서부터 30초가 돈다** */
+        private void BeginFight()
+        {
             if (playerHealth != null) playerHealth.BeginFight();
 
             timer = StageCurve.BossTimeLimitSeconds;
@@ -299,17 +472,62 @@ namespace Onikiri.Battle
         /**
          * @brief 보스가 죽었다. 스테이지가 오르는 유일한 지점.
          *
-         * 골드는 여기서 주지 않는다. 스포너가 다른 요괴와 똑같이 처치 시점에 이미
-         * 지급했다. 보상 경로를 둘로 나누면 언젠가 한쪽만 도는 상태가 생긴다.
+         * **처치 골드**는 여기서 주지 않는다. 스포너가 다른 요괴와 똑같이 처치
+         * 시점에 이미 지급했다. 보상 경로를 둘로 나누면 언젠가 한쪽만 도는
+         * 상태가 생긴다.
+         *
+         * **클리어 보너스**는 여기서 준다(17단계). 그것은 요괴를 벤 대가가 아니라
+         * 스테이지를 넘은 대가라 스포너가 알 수 없는 사건이다.
          */
         private void OnEnemyKilled(Enemy enemy)
         {
             if (phase != Phase.Fighting || enemy == null || !enemy.IsBoss || enemy != boss) return;
 
+            int clearedStage = CurrentStage;
+            ClearedStage = clearedStage;
+            ClearBonus = GrantClearBonus(clearedStage);
+            ClearedRegion = roster != null && roster.IsFinale(clearedStage);
+
             if (progress != null) progress.AdvanceStage();
 
             boss = null;
-            ReturnToFarming();
+
+            // 클리어 배너를 띄우고 그동안은 파밍으로 돌아가지 않는다. 곧바로
+            // 잡몹이 나오면 방금 무엇을 해냈는지가 화면에서 지워진다
+            timer = ClearedRegion ? regionClearBannerSeconds : clearBannerSeconds;
+            SetPhase(Phase.Cleared);
+        }
+
+        /** 마지막으로 클리어한 스테이지. 배너가 "지역 1 · 10/10"을 만들 때 쓴다 */
+        public int ClearedStage { get; private set; }
+
+        /** 그 클리어로 받은 보너스 골드. 배너가 숫자로 보여준다 */
+        public BigDouble ClearBonus { get; private set; }
+
+        /** 지역 피날레를 넘었는가. 배너 문구와 크기가 갈린다 */
+        public bool ClearedRegion { get; private set; }
+
+        /**
+         * @brief 클리어 보너스 골드를 지급한다.
+         *
+         * 크기는 StageCurve가 정한다. 16단계에서 피날레 골드가 다음 스테이지
+         * 보스를 무의미하게 만든 적이 있어서, 이 값은 시뮬레이션에 반영된
+         * 상태로만 움직여야 한다.
+         */
+        private BigDouble GrantClearBonus(int stage)
+        {
+            if (spawner == null) return BigDouble.Zero;
+
+            // 획득 축(20단계)이 여기에도 곱해진다. 처치 골드에만 붙이면 후반에
+            // 클리어 보너스의 비중이 상대적으로 줄어들어, 같은 "번 골드"인데
+            // 한쪽만 성장에서 빠지는 상태가 된다
+            var bonus = StageCurve.ClearGoldForStage(spawner.AverageBaseGold, stage)
+                        * BigDouble.FromDouble(UpgradeSystem.CurrentGoldGain);
+            if (bonus <= BigDouble.Zero) return BigDouble.Zero;
+
+            var wallet = PlayerWallet.Instance;
+            if (wallet != null) wallet.Add(bonus);
+            return bonus;
         }
 
         private void Fail(FailureReason reason)
@@ -369,6 +587,10 @@ namespace Onikiri.Battle
          */
         private void ReturnToFarming()
         {
+            // 관문은 보스전에만 존재한다. 파밍으로 돌아가면 화면에서 사라져야
+            // 하고, 그래야 다음 보스에서 다시 "한 번 나타나는 것"이 된다
+            if (gate != null) gate.Hide();
+
             if (spawner != null) spawner.ResumeSpawning();
             // 체력은 파밍으로 돌아가며 가득 찬다. 회복에 시간을 들이지 않는
             // 이유는 PlayerHealth.EndFight 참고

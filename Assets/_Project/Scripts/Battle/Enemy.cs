@@ -34,6 +34,7 @@ namespace Onikiri.Battle
         private BigDouble health;
         private BigDouble maxHealth;
         private BigDouble goldReward;
+        private BigDouble expReward;
         private float groundY;
         private float targetX;
         private float hurtFlashRemaining;
@@ -45,6 +46,27 @@ namespace Onikiri.Battle
         /** 공격 주기. 0이면 공격하지 않는다 (잡몹) */
         private float attackTimer;
         private bool swingStarted;
+
+        /**
+         * @brief 지금 공격 동작이 화면에 떠 있는가.
+         *
+         * `swingStarted`로는 알 수 없다. 그쪽은 "이번 주기의 스윙을 시작했는가"라서
+         * **타격이 들어가는 순간 꺼진다** - 공격 동작의 뒤쪽 45%가 아직 남아
+         * 있는데도 꺼져 있다.
+         *
+         * 별도 bool을 두지 않고 애니메이터에게 묻는다. 기억해둔 플래그는 반드시
+         * 어딘가에서 낡고(사무라이가 idle로 달려간 버그가 그것이었다), 여기서
+         * 낡으면 보스가 영원히 피격 자세로 굳는다.
+         */
+        private bool IsSwinging
+        {
+            get
+            {
+                return definition != null
+                    && animator.IsOneShot
+                    && animator.CurrentClip == definition.attackFrames;
+            }
+        }
 
         /**
          * @brief 한 번 때릴 때의 피해량. 0이면 공격하지 않는다.
@@ -71,6 +93,16 @@ namespace Onikiri.Battle
          */
         public BigDouble MaxHealth { get { return maxHealth; } }
         public BigDouble GoldReward { get { return goldReward; } }
+
+        /**
+         * @brief 처치 시 주는 경험치.
+         *
+         * 골드와 나란히 스폰 시점에 확정한다. 값 자체는 스테이지만의 함수라
+         * (ExpCurve.MobExp) 죽는 순간 계산해도 대개 같은 답이 나오지만, 보스를
+         * 잡아 스테이지가 오르는 그 프레임에 아직 걸어오던 잡몹이 죽으면 답이
+         * 갈린다. 골드가 절대값인 이유와 같은 이유로 여기서도 절대값이다.
+         */
+        public BigDouble ExpReward { get { return expReward; } }
 
         /**
          * @brief 보스인가.
@@ -124,12 +156,14 @@ namespace Onikiri.Battle
          * 남아 있으면 스포너와 여기 양쪽에 밸런스 계산이 흩어진다.
          */
         public void Spawn(EnemyDefinition def, float spawnX, float ground, int sortingOrder,
-                          BigDouble totalHealth, BigDouble goldOnKill, bool isBoss = false,
+                          BigDouble totalHealth, BigDouble goldOnKill, BigDouble expOnKill,
+                          bool isBoss = false,
                           float scale = 1f, Color tint = default(Color), double attackDamage = 0d)
         {
             definition = def;
             maxHealth = totalHealth;
             goldReward = goldOnKill;
+            expReward = expOnKill;
             IsBoss = isBoss;
             health = maxHealth;
 
@@ -151,11 +185,14 @@ namespace Onikiri.Battle
             // 기본값(투명 검정)이면 손대지 않는다
             baseTint = tint.a > 0f ? tint : Color.white;
             spriteRenderer.color = baseTint;
-            // 적은 오른쪽에서 와서 플레이어를 바라본다. 원본 아트가 그려진 방향의 반대다
-            spriteRenderer.flipX = true;
+            // 적은 오른쪽에서 와서 **왼쪽의 플레이어를 바라본다.** 대부분의 팩이
+            // 오른쪽을 보고 그려져 있어 뒤집어야 하지만, 그것은 팩의 성질이지
+            // 규칙이 아니다 - 처형인 팩은 왼쪽을 보고 그려져 있어서 뒤집으면
+            // 플레이어에게 등을 돌린다
+            spriteRenderer.flipX = def == null || !def.artFacesLeft;
 
             transform.position = new Vector3(spawnX, RestingY(), 0f);
-            PlayIdle();
+            PlayResting();
         }
 
         /** 이 적이 걸어가야 할 목표 지점. 스포너가 매 프레임 지정한다 */
@@ -195,8 +232,14 @@ namespace Onikiri.Battle
             hurtFlashRemaining = 0.08f;
             spriteRenderer.color = Color.white;
 
+            // 공격 동작은 끊지 않는다. 플레이어가 초당 네 번 때리는데 0.92초짜리
+            // 공격 클립을 매번 덮어쓰면 보스는 **한 번도 도끼를 끝까지 들지
+            // 못한다** - 처형인이 계속 얻어맞기만 하는 것으로 보였던 이유다.
+            // 흰 플래시는 위에서 이미 켰으므로 "맞았다"는 신호는 남는다
+            if (IsSwinging) return;
+
             if (definition.hurtFrames != null && definition.hurtFrames.Length > 0)
-                animator.Play(definition.hurtFrames, definition.frameRate, false, PlayIdle);
+                animator.Play(definition.hurtFrames, definition.frameRate, false, PlayResting);
         }
 
         private void Die()
@@ -224,10 +267,28 @@ namespace Onikiri.Battle
             if (handler != null) handler(this);
         }
 
-        private void PlayIdle()
+        /**
+         * @brief 지금 상태에 맞는 **반복 클립**을 건다.
+         *
+         * 걸어오는 중이면 걷기, 서 있으면 idle이다. 걷기 프레임이 없는 요괴는
+         * 지금까지와 똑같이 idle로 걷는다 - 도깨비불처럼 떠다니는 팩에는 걷기가
+         * 아예 없고, 있어야 할 이유도 없다.
+         *
+         * 한 번 재생 클립(공격·피격·사망)이 도는 중이면 손대지 않는다. 그쪽은
+         * 끝날 때 이 함수를 콜백으로 부르므로, 끝나는 시점의 상태에 맞는 클립이
+         * 자동으로 걸린다.
+         */
+        private void PlayResting()
         {
             if (definition == null) return;
-            animator.Play(definition.idleFrames, definition.frameRate, true);
+            if (animator.IsOneShot) return;
+
+            var clip = CurrentState == State.Approaching
+                       && definition.walkFrames != null && definition.walkFrames.Length > 0
+                ? definition.walkFrames
+                : definition.idleFrames;
+
+            animator.Play(clip, definition.frameRate, true);
         }
 
         private void Update()
@@ -247,7 +308,26 @@ namespace Onikiri.Battle
             UpdateAttack();
 
             var position = transform.position;
-            float step = definition.moveSpeed * Time.deltaTime;
+
+            /*
+             * 자기 걸음 + **세계가 실어 나르는 몫**.
+             *
+             * 17단계에서 배경이 흐르기 시작하면서 필요해졌다. 플레이어가 앞으로
+             * 달리면 지면이 왼쪽으로 흐르는데, 요괴가 자기 걸음(1.0)으로만
+             * 움직이면 지면(3.2)에 대해 오른쪽으로 2.2씩 미끄러진다 - 발이 땅에
+             * 안 붙고 뒤로 밀리는 것처럼 보인다.
+             *
+             * 요괴도 세계의 일부다. 지면과 같은 속도로 실려 오고, 그 위에서
+             * 자기 걸음을 더 걷는다. 그래야 발과 땅이 맞물린다.
+             *
+             * 접근이 빨라지는 것은 부작용이 아니라 의도다 - 플레이어가 달려가
+             * 만나는 것이므로 거리가 빨리 좁혀지는 것이 맞다. 공급 속도는
+             * 스폰 간격(SpawnPacing)이 정하지 이동 시간이 정하지 않으므로
+             * 밸런스 모델은 그대로다.
+             */
+            float step = (definition.moveSpeed + ParallaxScroller.BaseSpeed) * Time.deltaTime;
+
+            var wasState = CurrentState;
 
             if (position.x > targetX + 0.001f)
             {
@@ -258,6 +338,11 @@ namespace Onikiri.Battle
             {
                 CurrentState = State.Engaged;
             }
+
+            // 걷기와 서기의 전환은 **여기 한 곳**에서만 일어난다. 이동 판정이
+            // 곧 걷는지 여부이므로, 그 판정을 내린 자리에서 클립을 바꾸는 것이
+            // 두 값이 어긋날 수 없는 유일한 배치다
+            if (CurrentState != wasState) PlayResting();
 
             position.y = RestingY();
             transform.position = position;
@@ -293,7 +378,7 @@ namespace Onikiri.Battle
                 if (swingDuration > 0f)
                 {
                     float rate = definition.attackFrames.Length / Mathf.Max(0.0001f, swingDuration);
-                    animator.Play(definition.attackFrames, rate, false, PlayIdle);
+                    animator.Play(definition.attackFrames, rate, false, PlayResting);
                 }
                 swingStarted = true;
             }
@@ -335,6 +420,7 @@ namespace Onikiri.Battle
             bodyScale = 1f;
             baseTint = Color.white;
             AttackDamage = 0d;
+            swingStarted = false;
             transform.localScale = Vector3.one;
             if (spriteRenderer != null) spriteRenderer.color = Color.white;
         }

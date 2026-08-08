@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb1b43b0a40a30f4bb1e4f4f68ea3b2c, type: 3}
+  m_Name: Background_Region1
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.RegionBackgroundSet
+  displayName: "\uC9C0\uC5ED 1 \xB7 \uC0AC\uCFE0\uB77C \uBC24"
+  layers:
+  - name: Sky
+    sprite: {fileID: 21300000, guid: 7b41099fa2366154eb5b3057ebb38c64, type: 3}
+    scrollSpeed: 0
+    tint: {r: 0.43137255, g: 0.40784314, b: 0.627451, a: 1}
+    isSkyFill: 1
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Clouds
+    sprite: {fileID: 21300000, guid: f962749fedd898b49a30c307259f4301, type: 3}
+    scrollSpeed: 0.15
+    tint: {r: 0.43137255, g: 0.40784314, b: 0.627451, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Fuji
+    sprite: {fileID: 21300000, guid: e0c2fa1ff02396e4582dd83a53e0ae1e, type: 3}
+    scrollSpeed: 0.2
+    tint: {r: 0.43137255, g: 0.40784314, b: 0.627451, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Mountain_Back
+    sprite: {fileID: 21300000, guid: dfcbe22b3c7c59b4c9eeb1d75ff68f55, type: 3}
+    scrollSpeed: 0.34
+    tint: {r: 0.54509807, g: 0.50980395, b: 0.70980394, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Mountain_Middle
+    sprite: {fileID: 21300000, guid: 7b40868529f6413419929a92ea34cf5d, type: 3}
+    scrollSpeed: 0.48
+    tint: {r: 0.54509807, g: 0.50980395, b: 0.70980394, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Mountain_Front
+    sprite: {fileID: 21300000, guid: 75aad30b96c8669469b79db52d0dc54d, type: 3}
+    scrollSpeed: 0.62
+    tint: {r: 0.54509807, g: 0.50980395, b: 0.70980394, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: BackgroundTrees
+    sprite: {fileID: 21300000, guid: 8077ce0677e09ea4e9c731e457509f77, type: 3}
+    scrollSpeed: 0.76
+    tint: {r: 0.54509807, g: 0.50980395, b: 0.70980394, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Trees
+    sprite: {fileID: 21300000, guid: e7bf96bd3c417a84f990cfee69f24d3a, type: 3}
+    scrollSpeed: 0.88
+    tint: {r: 0.54509807, g: 0.50980395, b: 0.70980394, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Shrine_Single
+    sprite: {fileID: 21300000, guid: 371017af66ffe2b488f7684728072108, type: 3}
+    scrollSpeed: 0.22
+    tint: {r: 0.78431374, g: 0.6431373, b: 0.72156864, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 125
+  - name: Ground
+    sprite: {fileID: 21300000, guid: b205b25a3a5729047a8bb53092850f63, type: 3}
+    scrollSpeed: 1
+    tint: {r: 0.78431374, g: 0.6431373, b: 0.72156864, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    landmarkRepeatSeconds: 0
+  - name: Gras
+    sprite: {fileID: 21300000, guid: ff0b0b6e7f5461044b4d0abdf67e9235, type: 3}
+    scrollSpeed: 1
+    tint: {r: 0.78431374, g: 0.6431373, b: 0.72156864, a: 1}
+    isSkyFill: 0
+    isGroundCover: 1
+    landmarkRepeatSeconds: 0
+  clearColor: {r: 0.16470589, g: 0.15294118, b: 0.2509804, a: 1}
+  groundSurfacePixels: 24
+  backgroundPixelHeight: 180
