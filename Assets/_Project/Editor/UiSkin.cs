@@ -124,6 +124,25 @@ namespace Onikiri.EditorTools
         /** 바의 빈 부분. 채움색이 무엇이든 그 아래는 같은 어둠이다 */
         public static readonly Color BarTrack = new Color32(0x18, 0x14, 0x24, 0xFF);
 
+        /**
+         * @brief 하단 UI 바탕의 먹빛. **지역과 무관하게 고정이다.**
+         *
+         * 화지 시트(흰색, 값 0.90~1.00)에 곱해진다. 시트가 흰색에 가까우므로 화면에
+         * 나오는 색은 거의 이 값이고, 종이 결은 10% 안쪽의 요철로만 남는다.
+         *
+         * `BarTrack`(#181424)보다 살짝 밝다. 바의 빈 칸이 바탕에 묻히면 안 되기
+         * 때문이다 - 둘이 같으면 체력·경험치 바의 테두리가 사라진다.
+         */
+        public static readonly Color PanelInk = new Color32(0x22, 0x1D, 0x30, 0xFF);
+
+        /**
+         * @brief 씬과 UI를 가르는 경계선.
+         *
+         * 바탕이 아무리 어두워도 선이 없으면 두 영역이 그라디언트처럼 이어져서, 화면이
+         * "위는 게임 아래는 메뉴"로 갈리지 않는다. 먹으로 그은 한 획이다.
+         */
+        public static readonly Color PanelEdge = new Color32(0x4A, 0x3E, 0x5C, 0xFF);
+
         // ---------------------------------------------------------------- 배율
 
         /**

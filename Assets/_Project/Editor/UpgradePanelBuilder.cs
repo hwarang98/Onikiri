@@ -406,10 +406,79 @@ namespace Onikiri.EditorTools
             return safeArea;
         }
 
+        /** 하단 UI 전용 바탕. 지역이 바뀌어도 그대로다 */
+        private const string BackdropName = "PanelBackdrop";
+
+        /**
+         * @brief 하단 UI(성장 패널 + 탭 바) 뒤에 깔리는 **고정 먹빛 바탕**.
+         *
+         * ## 왜 필요한가
+         *
+         * 24단계까지 이 자리는 비어 있었고, 뒤로 라이브 씬의 하늘 채움이 그대로 비쳤다.
+         * 그동안 문제가 없어 보였던 것은 지역 1·3이 자줏빛 밤이라 뒤가 어두웠기 때문이다 -
+         * 패널이 불투명해 보였을 뿐 실은 씬을 비추고 있었다. 봄숲이 들어오자 하단 절반이
+         * 하늘색으로 물들고 글자가 떠 보였다.
+         *
+         * 두 가지가 걸린다.
+         *
+         *   가독성   목록 글씨 뒤가 지역마다 다른 색이면 대비를 보장할 수 없다
+         *   정체성   "위=씬(지역별로 변한다) / 아래=고정 먹빛 UI"가 무너진다
+         *
+         * 그래서 지역과 무관한 한 장을 깐다. 이 위에서 행 카드·헤더 색·MASTER 표기는
+         * 예전 그대로다 - 바뀌는 것은 밑바탕뿐이다.
+         *
+         * ## 안전 영역 아래까지 내린다
+         *
+         * 밴드는 안전 영역 안에 있지만 바탕은 그 아래(제스처 바 구간)까지 덮어야 한다.
+         * 안 그러면 화면 맨 밑에 씬이 한 줄 비친다.
+         */
+        private static void EnsurePanelBackdrop(Transform safeArea)
+        {
+            if (safeArea == null) return;
+
+            var existing = safeArea.Find(BackdropName);
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+
+            var go = new GameObject(BackdropName, typeof(RectTransform));
+            go.transform.SetParent(safeArea, false);
+
+            // 밴드들보다 먼저 그려져야 한다. 뒤에 두면 목록을 덮는다
+            go.transform.SetAsFirstSibling();
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, Onikiri.Core.DisplayConfig.GrowthPanelTop);
+            rect.offsetMin = new Vector2(0f, -400f);   // 안전 영역 아래로 흘려보낸다
+            rect.offsetMax = Vector2.zero;
+
+            var image = go.AddComponent<Image>();
+            image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(BackdropTextureBuilder.WashiPath);
+            image.type = Image.Type.Tiled;
+            image.color = UiSkin.PanelInk;
+            image.raycastTarget = false;
+
+            // 씬과 UI의 경계. 탭 바 위에 얇은 먹선 하나를 그어 "여기부터 UI"를 말한다.
+            // 이것이 없으면 배경이 아무리 어두워도 두 영역이 그라디언트처럼 이어진다
+            var edge = new GameObject("TopEdge", typeof(RectTransform));
+            edge.transform.SetParent(go.transform, false);
+
+            var edgeRect = (RectTransform)edge.transform;
+            edgeRect.anchorMin = new Vector2(0f, 1f);
+            edgeRect.anchorMax = new Vector2(1f, 1f);
+            edgeRect.pivot = new Vector2(0.5f, 1f);
+            edgeRect.sizeDelta = new Vector2(0f, 6f);
+            edgeRect.anchoredPosition = Vector2.zero;
+
+            var edgeImage = edge.AddComponent<Image>();
+            edgeImage.color = UiSkin.PanelEdge;
+            edgeImage.raycastTarget = false;
+        }
+
         /** 성장 패널을 채우고 UpgradeSystem을 배선한다 */
         public static UpgradeSystem Build()
         {
-            EnsureSafeArea();
+            var safeArea = EnsureSafeArea();
+            EnsurePanelBackdrop(safeArea);
 
             var panel = MainSceneBuilder.FindBand("GrowthPanel");
             if (panel == null)

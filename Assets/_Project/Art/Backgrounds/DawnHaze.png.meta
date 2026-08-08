@@ -1,16 +1,10 @@
 fileFormatVersion: 2
-guid: edd435283951cdd4087d8774368451d7
+guid: 69d064aa5d497754bac72eba1c9ebf78
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8684344836396243426
-    second: Color 1_0
-  - first:
-      213: -5270482655067243664
-    second: Color 1_1
-  - first:
-      213: 1860123145628462079
-    second: Color 1_2
+      213: 8129388970070896165
+    second: DawnHaze_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -116,6 +110,19 @@ TextureImporter:
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
     buildTarget: iOS
     maxTextureSize: 4096
     resizeAlgorithm: 0
@@ -128,30 +135,17 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 4096
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 0
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Color 1_0
+      name: DawnHaze_0
       rect:
         serializedVersion: 2
-        x: 9
-        y: 15
-        width: 152
-        height: 132
+        x: 0
+        y: 0
+        width: 384
+        height: 212
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -160,52 +154,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 2e95568fd9df48870800000000000000
-      internalID: 8684344836396243426
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Color 1_1
-      rect:
-        serializedVersion: 2
-        x: 176
-        y: 15
-        width: 115
-        height: 139
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 07bfbdd03fb7bd6b0800000000000000
-      internalID: -5270482655067243664
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Color 1_2
-      rect:
-        serializedVersion: 2
-        x: 304
-        y: 15
-        width: 134
-        height: 141
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: ffbaaa5452c70d910800000000000000
-      internalID: 1860123145628462079
+      spriteID: 52eed0a623461d070800000000000000
+      internalID: 8129388970070896165
       vertices: []
       indices: 
       edges: []
@@ -224,9 +174,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Color 1_0: 8684344836396243426
-      Color 1_1: -5270482655067243664
-      Color 1_2: 1860123145628462079
+      DawnHaze_0: 8129388970070896165
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

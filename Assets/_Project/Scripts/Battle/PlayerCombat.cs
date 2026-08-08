@@ -24,14 +24,14 @@ namespace Onikiri.Battle
         [Header("참조")]
         [SerializeField] private EnemySpawner spawner;
         [SerializeField] private SpriteAnimator animator;
-        [SerializeField] private SlashVfx slashPrefab;
         [SerializeField] private Transform vfxParent;
         [SerializeField] private Onikiri.UI.DamageNumberSpawner damageNumbers;
 
         [Header("애니메이션")]
         [SerializeField] private Sprite[] idleFrames;
+        [Tooltip("발도 클립. **참격 궤적이 이 시트에 이미 그려져 있다** - 5번째 " +
+                 "프레임의 흰 아크가 그것이고, 별도 참격 이펙트를 두지 않는 이유다")]
         [SerializeField] private Sprite[] attackFrames;
-        [SerializeField] private Sprite[] slashFrames;
         [SerializeField] private float idleFrameRate = 10f;
 
         [Tooltip("사거리가 비었을 때 도는 달리기 클립. 사무라이의 X는 고정이고 " +
@@ -45,7 +45,6 @@ namespace Onikiri.Battle
         [Range(6f, 36f)]
         [SerializeField] private float runFrameRate = 32f;
         [SerializeField] private float attackFrameRate = 14f;
-        [SerializeField] private float slashFrameRate = 24f;
 
         [Header("전투")]
         [Tooltip("사무라이의 사거리 (world units)")]
@@ -88,24 +87,48 @@ namespace Onikiri.Battle
         [Tooltip("흔들림 세기 (원본 픽셀)")]
         [SerializeField] private float shakePixels = 3f;
 
-        [Tooltip("플레이 1초당 허용되는 참격 이펙트 표시 시간. 이것이 없으면 공격속도가 " +
-                 "오를 때 참격이 서로 겹쳐 화면이 흰 덩어리가 된다")]
-        [SerializeField] private float slashBudgetPerSecond = 0.45f;
+        // ---------------------------------------------------------------- 타격 불꽃
 
-        [Tooltip("참격이 나타나는 위치. 대상에서 사무라이 쪽으로의 오프셋")]
-        [SerializeField] private Vector2 slashOffset = new Vector2(-0.15f, 0.55f);
+        /**
+         * @brief 칼이 닿은 자리에서 터지는 작은 불꽃.
+         *
+         * 22단계까지 여기에는 별도 참격 아크가 있었고, 그것이 "이펙트가 칼 궤적과 어긋난다"의
+         * 원인이었다. **참격이 두 번 그려지고 있었다** - 사무라이 시트의 5번째 프레임에는
+         * 원화가가 칼에 맞춰 그린 흰 아크가 이미 들어 있는데, 그 위에 팩 아크를 한 장 더
+         * 얹고 있었다. 두 호는 모양도 방향도 달라서(팩은 아래로 긋는 세로 베기, 발도는
+         * 오른쪽 위) 배치를 어떻게 바꿔도 맞출 수 없었다.
+         *
+         * 아크는 스프라이트 하나로 줄였다. 남은 것은 스프라이트가 말해주지 못하는 것 -
+         * 참격은 사무라이 쪽에 그려져 있으므로 **요괴 쪽에는 아무 일도 일어나지 않는다.**
+         * 불꽃이 그 자리를 찍는다. ImpactSpark 참고.
+         */
+        [SerializeField] private ImpactSpark sparkPrefab;
+
+        [Tooltip("불꽃 프레임. 12px 네 장이다(ImpactSparkBuilder가 굽는다)")]
+        [SerializeField] private Sprite[] sparkFrames;
+
+        [SerializeField] private float sparkFrameRate = 30f;
+
+        [Tooltip("플레이 1초당 허용되는 불꽃 표시 시간. 공격속도가 오르면 짧아진다. " +
+                 "걷어낸 아크만큼 절박하지는 않다 - 12px라 겹쳐도 화면을 덮지 않는다. " +
+                 "그래도 같은 규칙을 따르게 둔다. CombatFeel 참고")]
+        [SerializeField] private float sparkBudgetPerSecond = 0.45f;
+
+        [Tooltip("요괴 중심에서 불꽃까지의 보정. x는 요괴가 바라보는 쪽으로 적용된다 " +
+                 "(Enemy.FacingDirection) - 칼은 앞면으로 들어온다")]
+        [SerializeField] private Vector2 sparkOffset = new Vector2(0.22f, 0f);
 
         [Tooltip("타격마다 터지는 벚꽃잎. 비어 있어도 전투는 그대로 돈다")]
         [SerializeField] private SakuraBurst sakura;
 
-        [Tooltip("참격이 지나가는 기준 방향. 사무라이는 오른쪽 위로 벤다. " +
-                 "꽃잎은 이 방향을 중심으로 부채꼴로 흩어진다")]
+        [Tooltip("베는 기준 방향. 사무라이는 오른쪽 위로 벤다. 꽃잎이 흩어지는 " +
+                 "부채꼴의 중심이다")]
         [SerializeField] private Vector2 slashDirection = new Vector2(1f, 0.45f);
 
         [Header("풀")]
-        [SerializeField] private int slashPrewarm = 6;
+        [SerializeField] private int sparkPrewarm = 6;
 
-        private ObjectPool<SlashVfx> slashPool;
+        private ObjectPool<ImpactSpark> sparkPool;
 
         /**
          * @brief 다음 타격까지 쌓인 시간.
@@ -130,7 +153,7 @@ namespace Onikiri.Battle
          */
         private const int MaxHitsPerFrame = 3;
 
-        public int SlashPoolGrowthCount { get { return slashPool != null ? slashPool.GrowthCount : 0; } }
+        public int SparkPoolGrowthCount { get { return sparkPool != null ? sparkPool.GrowthCount : 0; } }
 
         public int SakuraPoolGrowthCount { get { return sakura != null ? sakura.PoolGrowthCount : 0; } }
 
@@ -234,7 +257,7 @@ namespace Onikiri.Battle
         private void Awake()
         {
             if (vfxParent == null) vfxParent = transform;
-            if (slashPrefab != null) slashPool = new ObjectPool<SlashVfx>(slashPrefab, vfxParent, slashPrewarm);
+            if (sparkPrefab != null) sparkPool = new ObjectPool<ImpactSpark>(sparkPrefab, vfxParent, sparkPrewarm);
 
             // 인스펙터에 상한을 넘는 값이 남아 있을 수 있다. 프로퍼티를 거쳐 한 번
             // 통과시켜 씬의 값과 코드가 정한 상한을 처음부터 맞춰둔다
@@ -315,7 +338,15 @@ namespace Onikiri.Battle
             }
         }
 
-        /** 데미지가 들어가는 순간. 참격·숫자·소리·정지가 전부 여기서 함께 난다 */
+        /**
+         * @brief 데미지가 들어가는 순간. 불꽃·꽃잎·숫자·소리·정지가 전부 여기서 함께 난다.
+         *
+         * **"같은 프레임에 터진다"가 이 함수의 존재 이유다.** 애님 이벤트를 쓰지 않는
+         * 것도 같은 이유다 - 이벤트로 흩으면 다섯 연출이 각자의 조건으로 나게 되고,
+         * 하나가 한 프레임 밀리면 타격이 두 번 일어난 것처럼 보인다. 여기서는 밀릴
+         * 방법이 없다. 애니메이션 쪽은 반대로 맞춘다: 스윙을 lead 시간만큼 먼저
+         * 시작시켜서, 참격이 그려진 5번째 프레임이 이 함수가 도는 순간에 화면에 있다.
+         */
         private void DeliverHit(Enemy target)
         {
             if (target == null || !target.IsTargetable) return;
@@ -329,11 +360,13 @@ namespace Onikiri.Battle
 
             // transform이 아니라 그려진 스프라이트의 중심을 겨냥한다. Enemy.HitPoint 참고
             var hitPoint = target.HitPoint;
-            SpawnSlash(hitPoint + new Vector3(slashOffset.x, slashOffset.y, 0f));
 
-            // 꽃잎은 참격 오프셋을 쓰지 않는다. 참격은 이펙트 아트의 중심을 맞추려고
-            // 칼 쪽으로 당겨져 있지만, 꽃잎은 베인 대상에서 떨어져 나가는 것이므로
-            // 요괴가 그려진 자리에서 나와야 한다
+            // 참격 아크는 여기서 내지 않는다. **사무라이 스프라이트에 이미 그려져 있다.**
+            // 이 자리에서 나는 것은 맞은 지점의 작은 불꽃뿐이다
+            SpawnSpark(target, hitPoint);
+
+            // 꽃잎은 베인 대상에서 떨어져 나가는 것이므로 앞면 보정 없이 요괴가 그려진
+            // 자리 한가운데에서 나온다
             if (sakura != null) sakura.Play(hitPoint, slashDirection, attacksPerSecond);
 
             target.TakeDamage(dealt);
@@ -375,29 +408,56 @@ namespace Onikiri.Battle
             animator.Play(attackFrames, rate, false, PlayIdle);
         }
 
-        private void SpawnSlash(Vector3 position)
+        /**
+         * @brief 참격이 지나가는 방향 (도).
+         *
+         * slashDirection 하나에서 나온다. 꽃잎이 흩어지는 방향과 이펙트가 눕는 방향이
+         * 같은 값에서 나와야 한 번의 베기로 읽힌다 - 예전에는 꽃잎만 이 방향을 쓰고
+         * 이펙트는 0도 부근의 무작위였다.
+         *
+         * 사무라이 아트에서 잰 값과도 맞는다. ATTACK 1의 5번째 프레임(임팩트)에서
+         * 흰 궤적이 피벗 기준 오른쪽 1.375u, 위로 0.969u까지 뻗어 있어 약 24도다.
+         */
+        /**
+         * @brief 요괴가 맞은 자리에 불꽃을 터뜨린다.
+         *
+         * 위치는 요괴의 그려진 중심에서 **바라보는 쪽으로** 조금 나간 지점이다. 칼은
+         * 앞면으로 들어오므로 불꽃도 앞면에 찍혀야 한다. 방향은 하드코딩하지 않고
+         * {@link Enemy.FacingDirection}이 `artFacesLeft`에서 끌어온다.
+         *
+         * 요괴 스프라이트의 가장자리(bounds.min.x)를 안 쓴다. 그 값은 그려진 몸이 아니라
+         * **투명 여백까지 포함한 프레임 경계**이고, Aseprite 임포터가 프레임마다 다르게
+         * 잘라내서 같은 팩 안에서도 반너비가 0.27u에서 1.22u까지 흔들린다. 넓게 잘린
+         * 프레임에서는 '가장자리'가 사무라이 발밑까지 왔다 - 실제로 그렇게 나왔고,
+         * 이펙트가 요괴가 아니라 사무라이를 덮었다. 중심 + 고정 보정이 흔들리지 않는다.
+         */
+        private void SpawnSpark(Enemy target, Vector3 hitPoint)
         {
-            if (slashPool == null || slashFrames == null || slashFrames.Length == 0) return;
+            if (sparkPool == null || sparkFrames == null || sparkFrames.Length == 0) return;
 
-            // 참격도 히트스톱·흔들림과 같은 예산 규칙을 따른다. 여기가 상한이 없던
-            // 마지막 효과였다. 스윙 압축으로 공격속도가 실제로 두 자릿수까지 올라가므로,
-            // 고정 22fps(4프레임 = 0.18초)를 유지하면 초당 열 번 공격할 때 참격 두세
-            // 개가 항상 겹쳐 있게 된다. 흰 호가 서로 포개지면 개별 타격이 보이지 않고
-            // 화면 가운데가 흰 얼룩으로 뭉개진다.
+            int facing = target.FacingDirection;
+
+            var at = new Vector3(hitPoint.x + sparkOffset.x * facing,
+                                 hitPoint.y + sparkOffset.y,
+                                 0f);
+
+            // 불꽃도 히트스톱·흔들림과 같은 예산 규칙을 따른다. 스윙 압축으로 공격속도가
+            // 두 자릿수까지 올라가므로, 고정 재생 속도를 유지하면 초당 열 번 구간에서
+            // 불꽃이 끊이지 않고 켜져 있어 '터진다'가 아니라 '켜져 있다'로 읽힌다.
             //
-            // 프레임 수를 줄이지 않고 재생 속도만 올린다. 이펙트의 형태는 그대로 두고
-            // 화면에 머무는 시간만 줄이는 쪽이 픽셀 아트에서는 훨씬 덜 티가 난다.
-            float baseDuration = slashFrames.Length / Mathf.Max(0.0001f, slashFrameRate);
-            float duration = CombatFeel.ScaledDuration(baseDuration, slashBudgetPerSecond, attacksPerSecond);
-            float rate = slashFrames.Length / Mathf.Max(0.0001f, duration);
+            // 프레임 수를 줄이지 않고 재생 속도만 올린다. 형태는 그대로 두고 화면에
+            // 머무는 시간만 줄이는 쪽이 픽셀 아트에서 훨씬 덜 티가 난다.
+            float baseDuration = sparkFrames.Length / Mathf.Max(0.0001f, sparkFrameRate);
+            float duration = CombatFeel.ScaledDuration(baseDuration, sparkBudgetPerSecond, attacksPerSecond);
+            float rate = sparkFrames.Length / Mathf.Max(0.0001f, duration);
 
-            var slash = slashPool.Get();
-            slash.Play(slashFrames, rate, position, false, ReleaseSlash);
+            var spark = sparkPool.Get();
+            spark.Play(sparkFrames, rate, at, facing < 0, ReleaseSpark);
         }
 
-        private void ReleaseSlash(SlashVfx slash)
+        private void ReleaseSpark(ImpactSpark spark)
         {
-            slashPool.Release(slash);
+            sparkPool.Release(spark);
         }
 
         /**

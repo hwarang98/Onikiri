@@ -138,6 +138,53 @@ namespace Onikiri.Tests
             Assert.IsTrue(formatted.Contains("e5000"), "Expected scientific fallback, got " + formatted);
         }
 
+        // ------------------------------------------------------------ 전체 자릿수 표기
+
+        [Test]
+        public void FormatFull_ShowsEveryDigitWithSeparators()
+        {
+            Assert.AreEqual("1,234", NumberFormatter.FormatFull(BigDouble.FromDouble(1234d)));
+            Assert.AreEqual("291,512,345", NumberFormatter.FormatFull(BigDouble.FromDouble(291512345d)));
+        }
+
+        [Test]
+        public void FormatFull_BelowThousand_HasNoSeparator()
+        {
+            Assert.AreEqual("0", NumberFormatter.FormatFull(BigDouble.Zero));
+            Assert.AreEqual("5", NumberFormatter.FormatFull(BigDouble.FromDouble(5d)));
+            Assert.AreEqual("999", NumberFormatter.FormatFull(BigDouble.FromDouble(999d)));
+        }
+
+        /**
+         * 축약과 갈라지는 지점. 같은 값이 재화 표기로는 "1.2K", 데미지 팝업으로는
+         * "1,234"로 나와야 한다 - 이것이 이번 변경의 전부다
+         */
+        [Test]
+        public void FormatFull_DivergesFromAbbreviated()
+        {
+            var value = BigDouble.FromDouble(1234d);
+            Assert.AreEqual("1.2K", NumberFormatter.Format(value));
+            Assert.AreEqual("1,234", NumberFormatter.FormatFull(value));
+        }
+
+        [Test]
+        public void FormatFull_AboveDigitLimit_FallsBackToAbbreviated()
+        {
+            // 12자리까지가 상한이다. 999,999,999,999는 아직 전체 표기
+            Assert.AreEqual("999,999,999,999",
+                            NumberFormatter.FormatFull(BigDouble.FromDouble(999999999999d)));
+
+            // 13자리부터는 축약으로 돌아간다
+            Assert.AreEqual("1.0T", NumberFormatter.FormatFull(BigDouble.Create(1d, 12L)));
+            Assert.AreEqual("1.2aa", NumberFormatter.FormatFull(BigDouble.Create(1.2d, 15L)));
+        }
+
+        [Test]
+        public void FormatFull_NegativeKeepsSign()
+        {
+            Assert.AreEqual("-1,234", NumberFormatter.FormatFull(BigDouble.FromDouble(-1234d)));
+        }
+
         [Test]
         public void Duration_FormatsCompactly()
         {

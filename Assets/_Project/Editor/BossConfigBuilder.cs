@@ -33,6 +33,7 @@ namespace Onikiri.EditorTools
         public const string ExecutionerPath = ConfigFolder + "/Boss_Executioner.asset";
         public const string Region1Path = ConfigFolder + "/Region_1.asset";
         public const string Region2Path = ConfigFolder + "/Region_2.asset";
+        public const string Region3Path = ConfigFolder + "/Region_3.asset";
         public const string RosterPath = ConfigFolder + "/BossRoster.asset";
 
         private const string DemonSpriteFolder = "Assets/ThirdParty/Characters/Demon_Samurai/Sprites";
@@ -187,10 +188,54 @@ namespace Onikiri.EditorTools
                 config.normalBossOverride = null;
             });
 
+            /**
+             * @brief 지역 3. 24단계에 톤 아크(봄 여명 -> 가을 -> 자줏빛 밤)를 확정하며 생겼다.
+             *
+             * 자줏빛 밤 배경이 지역 3으로 내려왔는데, 그 배경이 화면에 뜨려면 지역이
+             * 로스터에 있어야 한다 - `RegionForStage`는 마지막 지역을 반복하므로,
+             * 지역 3이 없으면 21스테이지 이후로도 가을숲이 계속된다.
+             *
+             * ## 피날레를 비워두려다 채웠다
+             *
+             * 배경만 확정하고 보스는 다음 스텝으로 미룰 생각이었다. `BossRosterTests`가
+             * 막았다 - **마지막 지역의 배치가 무한히 반복되므로**, 여기가 비면 30스테이지
+             * 이후 전체에서 피날레가 사라진다. 후반이 정예 관문만 도는 화면이 된다.
+             *
+             * 그래서 라인업이 이미 정해둔 자리를 채운다(랜턴 -> 처형인 -> **다크 사무라이**
+             * -> 요괴). 이 config는 12단계부터 있었고 21단계에 챕터에서 내려온 뒤로 아무도
+             * 쓰지 않고 있었다 - 원래 여기 설 놈이다.
+             *
+             * 배치 값(체력 배수·등장 연출 다듬기·전용 배경 정합)은 지역 3 콘텐츠 스텝의
+             * 몫으로 남는다. 여기서 하는 것은 **자리를 비워두지 않는 것**뿐이다.
+             */
+            var region3 = LoadOrCreate<RegionConfig>(Region3Path, config =>
+            {
+                config.displayName = "지역 3";
+                config.stageCount = BossCurve.RegionLength;
+                config.chapterEvery = BossCurve.ChapterEvery;
+                config.chapterBoss = elite;
+                config.finaleBoss = darkSamurai;
+                config.normalBossOverride = null;
+            });
+
+            // 위의 씨앗은 애셋을 처음 만들 때만 돈다. 피날레를 비운 채로 만들어진
+            // 애셋이 이미 있으면 그 칸만 채운다(BackfillWalkSheet와 같은 규칙)
+            if (region3 != null && region3.finaleBoss == null)
+            {
+                region3.finaleBoss = darkSamurai;
+                EditorUtility.SetDirty(region3);
+                Debug.Log("[Onikiri] Region_3 피날레 채움 -> " + darkSamurai.displayName);
+            }
+
             var roster = LoadOrCreate<BossRoster>(RosterPath, config =>
             {
-                config.regions = new[] { region, region2 };
+                config.regions = new[] { region, region2, region3 };
             });
+
+            // 로스터는 이미 있으면 건드리지 않는 애셋이라, 지역이 늘어도 씨앗이
+            // 반영되지 않는다. 뒤에 붙는 것만 채운다 - 순서를 바꾸거나 지우지는
+            // 않으므로 손으로 배치한 것을 덮어쓰지 않는다
+            if (AppendRegion(roster, region3)) AssetDatabase.SaveAssets();
 
             int backfilled = 0;
             if (BackfillWalkSheet(darkSamurai, DemonSpriteFolder + "/RUN.png")) backfilled++;
@@ -202,6 +247,29 @@ namespace Onikiri.EditorTools
             if (backfilled > 0) AssetDatabase.SaveAssets();
 
             return roster;
+        }
+
+        /**
+         * @brief 로스터 끝에 지역을 덧붙인다. 이미 있으면 아무 일도 하지 않는다.
+         *
+         * @return 실제로 붙였으면 true
+         */
+        private static bool AppendRegion(BossRoster roster, RegionConfig region)
+        {
+            if (roster == null || region == null) return false;
+
+            var regions = roster.regions ?? new RegionConfig[0];
+            foreach (var existing in regions)
+                if (existing == region) return false;
+
+            var grown = new RegionConfig[regions.Length + 1];
+            System.Array.Copy(regions, grown, regions.Length);
+            grown[regions.Length] = region;
+            roster.regions = grown;
+
+            EditorUtility.SetDirty(roster);
+            Debug.Log("[Onikiri] 로스터에 " + region.name + " 추가 (지역 " + grown.Length + "개)");
+            return true;
         }
 
         /**

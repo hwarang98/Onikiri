@@ -472,6 +472,13 @@ namespace Onikiri.EditorTools
             resultLabel.text = "화력이 1.4배 모자란다.\n공격력 강화를 올리고 다시 도전하라";
 
             // --- 클리어 배너: 결과 문구와 같은 자리, 두 줄
+            //
+            // 위의 넷과 달리 이것만 Replace를 빼먹고 있었다. 빌더를 돌릴 때마다
+            // 배너가 하나씩 더 쌓여 27개가 됐고, 컴포넌트는 마지막 것만 참조하므로
+            // **화면상으로는 아무 이상이 없었다.** 이번 폰트 축소에서 드러났다 -
+            // 새로 만든 것만 44/88이고 나머지 26개는 55/110에 멈춰 있었다
+            Replace(band, "ClearBanner");
+
             var banner = new GameObject("ClearBanner", typeof(RectTransform));
             banner.transform.SetParent(band, false);
             var bannerRect = (RectTransform)banner.transform;
@@ -553,10 +560,20 @@ namespace Onikiri.EditorTools
         private const float PixelFontSizesSmall = Onikiri.UI.PixelFontSizes.GalmuriSmall;
         private const float PixelFontSizesLarge = Onikiri.UI.PixelFontSizes.GalmuriLarge;
 
+        /**
+         * @brief 같은 이름의 자식을 **전부** 지운다.
+         *
+         * Find는 하나만 찾는다. 그래서 이미 중복이 쌓인 씬에서는 빌더를 돌려도 하나씩만
+         * 줄어들고, 27개가 쌓여 있으면 27번 돌려야 깨끗해진다. 빌더는 몇 번을 돌리든
+         * 같은 결과가 나와야 하므로 여기서 다 치운다.
+         */
         private static void Replace(Transform parent, string name)
         {
-            var existing = parent.Find(name);
-            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                var child = parent.GetChild(i);
+                if (child.name == name) Object.DestroyImmediate(child.gameObject);
+            }
         }
 
         private static TextMeshProUGUI CreateLabel(Transform parent, TMP_FontAsset font, string name,

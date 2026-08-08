@@ -15,12 +15,13 @@ MonoBehaviour:
   displayName: "\uC9C0\uC5ED 2 \xB7 \uAC00\uC744\uC232"
   layers:
   - name: Mist_Far
-    sprite: {fileID: 21300000, guid: a6dcab1800c5a6b4c9ee6ba48d4e84e6, type: 3}
+    sprite: {fileID: 21300000, guid: 2ded06b632477c3478980b0b51a64b15, type: 3}
     scrollSpeed: 0
-    tint: {r: 0.36862746, g: 0.3882353, b: 0.54901963, a: 1}
+    tint: {r: 0.17254902, g: 0.19215687, b: 0.31764707, a: 1}
     isSkyFill: 1
     isGroundCover: 0
     sitsOnGround: 0
+    artBottomPixels: 0
     landmarkRepeatSeconds: 0
   - name: Mist_Far_Scroll
     sprite: {fileID: 21300000, guid: a6dcab1800c5a6b4c9ee6ba48d4e84e6, type: 3}
@@ -29,6 +30,7 @@ MonoBehaviour:
     isSkyFill: 0
     isGroundCover: 0
     sitsOnGround: 0
+    artBottomPixels: 0
     landmarkRepeatSeconds: 0
   - name: Mist_Mid
     sprite: {fileID: 21300000, guid: cad4320e4c137f34298b2672864cd299, type: 3}
@@ -37,6 +39,7 @@ MonoBehaviour:
     isSkyFill: 0
     isGroundCover: 0
     sitsOnGround: 0
+    artBottomPixels: 0
     landmarkRepeatSeconds: 0
   - name: Silhouette
     sprite: {fileID: 21300000, guid: 064f2f65392267b41a6e9baaf1cbe531, type: 3}
@@ -45,6 +48,7 @@ MonoBehaviour:
     isSkyFill: 0
     isGroundCover: 0
     sitsOnGround: 0
+    artBottomPixels: 0
     landmarkRepeatSeconds: 0
   - name: Maples
     sprite: {fileID: 21300000, guid: 56a9b4b0ed574ab479cd668f82b11c09, type: 3}
@@ -53,6 +57,7 @@ MonoBehaviour:
     isSkyFill: 0
     isGroundCover: 0
     sitsOnGround: 1
+    artBottomPixels: 0
     landmarkRepeatSeconds: 0
   - name: Ground
     sprite: {fileID: 21300000, guid: ef0a55f00432b6a4da2a16ffb103e7cf, type: 3}
@@ -61,6 +66,7 @@ MonoBehaviour:
     isSkyFill: 0
     isGroundCover: 0
     sitsOnGround: 0
+    artBottomPixels: 0
     landmarkRepeatSeconds: 0
   clearColor: {r: 0.16470589, g: 0.17254902, b: 0.28235295, a: 1}
   groundSurfacePixels: 48

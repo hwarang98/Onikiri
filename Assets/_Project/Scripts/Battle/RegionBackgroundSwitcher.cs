@@ -82,10 +82,17 @@ namespace Onikiri.Battle
             {
                 backgroundStage.Apply(set);
 
-                // 지면선도 함께 옮긴다. 팩마다 지면 두께가 다르므로 배경만 갈면
-                // 캐릭터가 흙 속에 서거나 공중에 뜬다
                 if (layout != null)
+                {
+                    // 하늘 채움은 배경마다 새로 만들어진다. 갈아끼우지 않으면 레이아웃이
+                    // 파괴된 것을 들고 있어 카메라 크기로 늘리는 일을 멈춘다.
+                    // BattleStageLayout.SetSkyFill 참고
+                    layout.SetSkyFill(backgroundStage.SkyFill);
+
+                    // 지면선도 함께 옮긴다. 팩마다 지면 두께가 다르므로 배경만 갈면
+                    // 캐릭터가 흙 속에 서거나 공중에 뜬다
                     layout.SetBackgroundMetrics(set.groundSurfacePixels, set.backgroundPixelHeight);
+                }
             };
 
             // 첫 적용(세이브 복원)에는 연출이 없다. 바뀐 것이 없기 때문이다

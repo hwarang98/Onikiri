@@ -135,9 +135,14 @@ namespace Onikiri.Battle
                 // 밑단이 루트 원점(밴드 바닥)에 온다.
                 //
                 // 땅에 서는 레이어는 지면 두께만큼 더 올린다 - 안 그러면 나무
-                // 줄기가 지면에 잘려 잎만 공중에 뜬다
+                // 줄기가 지면에 잘려 잎만 공중에 뜬다.
+                //
+                // 다만 올리는 것은 **캔버스가 아니라 그려진 밑동**이다. 캔버스 바닥을
+                // 지면선에 맞추면, 아트 아래에 투명 여백이 있는 팩에서 그만큼 뜬다 -
+                // 봄 벚꽃(여백 16px)이 정확히 0.5u 떠 있었다. 여백을 빼면 밑동이
+                // 지면선에 온다. Layer.artBottomPixels 참고
                 float lift = layer.sitsOnGround
-                    ? set.groundSurfacePixels / DisplayConfig.PixelsPerUnit
+                    ? (set.groundSurfacePixels - layer.artBottomPixels) / DisplayConfig.PixelsPerUnit
                     : 0f;
 
                 pieceObject.transform.localPosition =

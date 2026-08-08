@@ -68,10 +68,8 @@ namespace Onikiri.EditorTools
         };
 
         private const string EnemyFolder = "Assets/ThirdParty/Enemies/FeudalJapan/";
-        // 흰 참격. 팩의 적색 시트를 max 채널로 무채화해 생성했다. 무기 등급을
-        // 흰색 -> 적색 -> 금색으로 설계했으므로 기본 칼날은 흰색이어야 하고,
-        // 유채색 시트는 업그레이드용으로 남겨둔다.
-        private const string SlashSheet = "Assets/_Project/Art/VFX/Slash_White.png";
+        // 참격 시트 상수는 없다. **참격은 아래 ATTACK 시트 안에 그려져 있다** -
+        // 별도 아크를 얹지 않는 이유는 PlayerCombat.SpawnSpark에 적어뒀다.
         private const string SamuraiIdle = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/IDLE.png";
         private const string SamuraiAttack = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/ATTACK 1.png";
 
@@ -81,7 +79,6 @@ namespace Onikiri.EditorTools
         private const string DataFolder = "Assets/_Project/Data";
         private const string PrefabFolder = "Assets/_Project/Prefabs";
         private const string EnemyPrefabPath = PrefabFolder + "/Enemy.prefab";
-        private const string SlashPrefabPath = PrefabFolder + "/SlashVfx.prefab";
 
         /**
          * @brief 손으로 넣은 추가 사운드를 이 폴더들에서 주워온다.
@@ -127,13 +124,6 @@ namespace Onikiri.EditorTools
         private const string ThaleahFontPath = "Assets/_Project/Art/Fonts/ThaleahFat SDF.asset";
         private const string DamagePrefabPath = PrefabFolder + "/DamageNumber.prefab";
 
-        /**
-         * @brief 임팩트 이펙트로 쓰는 참격 시트의 첫 프레임 (0-기반).
-         *
-         * 시트의 아홉 프레임은 예비 동작(0~4)과 굵은 호(5~8)로 나뉜다.
-         */
-        private const int SlashImpactFirstFrame = 5;
-
         [MenuItem("Onikiri/Scene/Build Combat Content")]
         public static void Build()
         {
@@ -148,9 +138,9 @@ namespace Onikiri.EditorTools
             BossContentBuilder.BuildDefinition();
             BossContentBuilder.BuildBosses();
             BuildEnemyPrefab();
-            BuildSlashPrefab();
             BuildDamageNumberPrefab();
             SakuraContentBuilder.BuildArt();
+            ImpactSparkBuilder.BuildArt();
 
             var scene = EditorSceneManager.OpenScene(MainSceneBuilder.ScenePath, OpenSceneMode.Single);
 
@@ -165,12 +155,12 @@ namespace Onikiri.EditorTools
                 if (loaded != null) definitions.Add(loaded);
             }
             var enemyPrefab = LoadPrefabComponent<Enemy>(EnemyPrefabPath);
-            var slashPrefab = LoadPrefabComponent<SlashVfx>(SlashPrefabPath);
+            var sparkPrefab = ImpactSparkBuilder.BuildPrefab();
 
-            if (definitions.Count == 0 || enemyPrefab == null || slashPrefab == null)
+            if (definitions.Count == 0 || enemyPrefab == null || sparkPrefab == null)
             {
                 Debug.LogError("[Onikiri] Combat assets missing after build: definitions=" + definitions.Count
-                               + " enemy=" + (enemyPrefab != null) + " slash=" + (slashPrefab != null));
+                               + " enemy=" + (enemyPrefab != null) + " spark=" + (sparkPrefab != null));
                 return;
             }
 
@@ -185,7 +175,7 @@ namespace Onikiri.EditorTools
             var damageNumbers = WireDamageNumbers();
 
             var spawner = WireSpawner(definitions, enemyPrefab);
-            WirePlayerCombat(spawner, slashPrefab, shake, hitAudio, damageNumbers);
+            WirePlayerCombat(spawner, sparkPrefab, shake, hitAudio, damageNumbers);
 
             // 강화는 PlayerCombat이 씬에 있어야 배선할 수 있다.
             // 성장 패널이 증폭 행을 만들려면 CharacterLevel과 LevelHud가 이미
@@ -366,12 +356,12 @@ namespace Onikiri.EditorTools
             var combatSo = new SerializedObject(samurai.GetComponent<PlayerCombat>());
             RequireReference(combatSo, "spawner", problems);
             RequireReference(combatSo, "animator", problems);
-            RequireReference(combatSo, "slashPrefab", problems);
+            RequireReference(combatSo, "sparkPrefab", problems);
             RequireReference(combatSo, "cameraShake", problems);
             RequireReference(combatSo, "hitAudio", problems);
             RequireArray(combatSo, "idleFrames", problems);
             RequireArray(combatSo, "attackFrames", problems);
-            RequireArray(combatSo, "slashFrames", problems);
+            RequireArray(combatSo, "sparkFrames", problems);
 
             // 공격속도 상한이 이 두 값에서 유도된다. 아트 팩을 바꾸거나 프레임레이트를
             // 손대면 강화 상한 레벨도 함께 움직여야 하는데, 그 사실은 코드 어디에도
@@ -751,6 +741,19 @@ namespace Onikiri.EditorTools
             {
                 if (region == null) { problems.Add("BossRoster has an empty region slot"); continue; }
 
+                /**
+                 * @brief 피날레는 **어느 지역도** 비울 수 없다. 특히 마지막 지역이 그렇다.
+                 *
+                 * 24단계에 한 번 봐주려다 되돌렸다. 지역 3을 배경만 확정하고 피날레를
+                 * 비워둔 채 로스터에 넣었는데, `BossRosterTests`가 잡았다 - 정의된 지역을
+                 * 다 지나면 **마지막 지역의 배치가 무한히 반복되므로**, 마지막 지역에
+                 * 피날레가 없으면 후반 전체에서 피날레가 사라진다. 10스테이지마다 정예
+                 * 관문만 도는 화면이 된다.
+                 *
+                 * "만들다 만 지역은 봐준다"는 규칙이 하필 가장 봐주면 안 되는 자리를
+                 * 봐주고 있었다.
+                 */
+
                 if (region.stageCount <= 0)
                     problems.Add(region.name + ": stageCount must be positive");
 
@@ -1085,9 +1088,12 @@ namespace Onikiri.EditorTools
             // 비트맵 폰트는 SDF 아웃라인을 쓸 수 없고, 그림자가 없으면 흰 참격 위에
             // 올라가는 순간 숫자를 읽을 수 없다.
             //
-            // 오프셋 5는 아트 픽셀 하나다(Pixel Perfect 배율과 같은 값). 그보다 작으면
-            // 그림자가 픽셀 격자 사이에 놓여 글자 가장자리가 지저분해진다
-            var shadow = CreateDamageLabel(root.transform, font, "Shadow", new Vector2(5f, -5f));
+            // 오프셋은 **글자의 픽셀 하나**다. 아트 픽셀(5)이 아니라 Thaleah 아틀라스의
+            // 배율을 쓴다 - 그림자는 글자를 따라가는 것이므로 글자의 격자 위에 놓여야
+            // 하고, 다른 격자를 쓰면 그림자 가장자리가 글자 가장자리와 어긋나 지저분해진다
+            const float shadowStep = Onikiri.UI.PixelFontSizes.ThaleahScale;
+            var shadow = CreateDamageLabel(root.transform, font, "Shadow",
+                                           new Vector2(shadowStep, -shadowStep));
             var label = CreateDamageLabel(root.transform, font, "Label", Vector2.zero);
 
             var popup = root.AddComponent<Onikiri.UI.DamageNumber>();
@@ -1126,19 +1132,6 @@ namespace Onikiri.EditorTools
             rect.offsetMin = new Vector2(offset.x, offset.y);
             rect.offsetMax = new Vector2(offset.x, offset.y);
             return label;
-        }
-
-        private static SlashVfx BuildSlashPrefab()
-        {
-            var root = new GameObject("SlashVfx");
-            var renderer = root.AddComponent<SpriteRenderer>();
-            renderer.sortingOrder = SortingOrders.Vfx;
-            root.AddComponent<SpriteAnimator>();
-            root.AddComponent<SlashVfx>();
-
-            var prefab = PrefabUtility.SaveAsPrefabAsset(root, SlashPrefabPath);
-            Object.DestroyImmediate(root);
-            return prefab.GetComponent<SlashVfx>();
         }
 
         // ---------------------------------------------------------------- 씬 배선
@@ -2091,7 +2084,7 @@ namespace Onikiri.EditorTools
             return spawner;
         }
 
-        private static void WirePlayerCombat(EnemySpawner spawner, SlashVfx slashPrefab,
+        private static void WirePlayerCombat(EnemySpawner spawner, ImpactSpark sparkPrefab,
                                              ScreenShake shake, HitAudio hitAudio,
                                              Onikiri.UI.DamageNumberSpawner damageNumbers)
         {
@@ -2117,7 +2110,7 @@ namespace Onikiri.EditorTools
             var so = new SerializedObject(combat);
             so.FindProperty("spawner").objectReferenceValue = spawner;
             so.FindProperty("animator").objectReferenceValue = animator;
-            so.FindProperty("slashPrefab").objectReferenceValue = slashPrefab;
+            so.FindProperty("sparkPrefab").objectReferenceValue = sparkPrefab;
             so.FindProperty("vfxParent").objectReferenceValue = vfxRoot;
             so.FindProperty("cameraShake").objectReferenceValue = shake;
             so.FindProperty("hitAudio").objectReferenceValue = hitAudio;
@@ -2148,14 +2141,13 @@ namespace Onikiri.EditorTools
             // 상한이고 미끄러짐도 2.6배로 좁는다. 16프레임 클립으로 갈 수 있는 끝이다
             so.FindProperty("runFrameRate").floatValue = 32f;
 
-            // 참격 시트의 뒤쪽 절반만 쓴다. 앞 다섯 프레임은 타격으로 이어지는 가느다란
-            // 예비 동작이고 6~9번이 굵은 호다. 히트스톱은 임팩트 순간 표시 중인 프레임에서
-            // 멈추므로, 이펙트는 가장 강한 프레임에서 시작해야 한다. 아니면 정지 화면이
-            // 흐릿한 얼룩이 된다
-            var slash = OrderedSprites(SlashSheet);
-            AssignSprites(so.FindProperty("slashFrames"), slash.GetRange(
-                Mathf.Min(SlashImpactFirstFrame, slash.Count - 1),
-                Mathf.Max(1, slash.Count - SlashImpactFirstFrame)));
+            // **참격 프레임은 배선하지 않는다.** 참격은 위의 attackFrames 안에 이미 있다 -
+            // 원화가가 5번째 프레임에 칼 궤적을 그려 넣었고, 그것이 스프라이트의 일부라
+            // 칼과 어긋날 수가 없다. 22단계까지 그 위에 별도 팩 아크를 한 장 더 얹고
+            // 있었던 것이 "이펙트가 붕 뜬다"의 원인이었다.
+            //
+            // 이 자리에 남는 것은 맞은 지점의 작은 불꽃뿐이다
+            AssignSprites(so.FindProperty("sparkFrames"), ImpactSparkBuilder.OrderedSprites());
 
             // 튜닝 값을 스크립트 기본값에 맡기지 않고 명시적으로 기록한다. 컴포넌트가
             // 이미 씬에 존재하므로 코드의 기본값을 바꿔도 전달되지 않고, 그러면 빌더가
@@ -2182,14 +2174,19 @@ namespace Onikiri.EditorTools
             so.FindProperty("shakeSeconds").floatValue = 0.1f;
             so.FindProperty("shakeBudgetPerSecond").floatValue = 0.4f;
             so.FindProperty("shakePixels").floatValue = 3f;
-            so.FindProperty("slashFrameRate").floatValue = 22f;
-            so.FindProperty("slashBudgetPerSecond").floatValue = 0.45f;
-            // 요괴의 렌더링된 중심을 기준으로 재므로, 피벗 위치를 보정할 필요 없이
-            // 호를 칼 쪽으로 조금 당기기만 하면 된다
-            so.FindProperty("slashOffset").vector2Value = new Vector2(-0.3f, 0f);
+            // 불꽃은 네 프레임짜리라 30fps면 0.133초다. 걷어낸 아크(4프레임 22fps =
+            // 0.18초)보다 짧다 - 아크는 '베였다'를 보여주는 것이라 눈이 따라갈 시간이
+            // 필요했지만, 불꽃은 '여기 맞았다'를 찍는 것이라 짧을수록 날카롭다
+            so.FindProperty("sparkFrameRate").floatValue = 30f;
+            so.FindProperty("sparkBudgetPerSecond").floatValue = 0.45f;
 
-            // 꽃잎은 참격이 지나간 방향으로 흩어진다. 사무라이의 발도는 오른쪽 위로
-            // 향하고, 그 방향이 아트의 흰 궤적과 같아야 참격과 꽃잎이 한 동작으로 읽힌다
+            // 요괴 중심에서 앞면 쪽으로 0.22u. 잡몹의 그려진 반너비가 0.27~0.5u쯤이라
+            // 몸 안쪽 가장자리에 얹힌다 - 칼이 몸에 박히는 자리다. 부호는 여기서 정하지
+            // 않는다. Enemy.FacingDirection이 artFacesLeft에서 끌어온다
+            so.FindProperty("sparkOffset").vector2Value = new Vector2(0.22f, 0f);
+
+            // 꽃잎은 베는 방향으로 흩어진다. 사무라이의 발도는 오른쪽 위로 향하고,
+            // 그 방향이 스프라이트에 그려진 흰 궤적과 같아야 한 동작으로 읽힌다
             var sakura = SakuraContentBuilder.Wire(vfxRoot);
             so.FindProperty("sakura").objectReferenceValue = sakura;
             so.FindProperty("slashDirection").vector2Value = new Vector2(1f, 0.45f);
@@ -2198,10 +2195,11 @@ namespace Onikiri.EditorTools
 
             WirePlayerHealth(samurai, animator, sakura);
 
-            Debug.Log(string.Format("[Onikiri] Player combat: idle={0} attack={1} slash={2} frames.",
+            Debug.Log(string.Format(
+                "[Onikiri] Player combat: idle={0} attack={1} (참격 내장) spark={2} frames.",
                 OrderedSprites(SamuraiIdle).Count,
                 OrderedSprites(SamuraiAttack).Count,
-                OrderedSprites(SlashSheet).Count));
+                ImpactSparkBuilder.OrderedSprites().Count));
         }
 
         private const string SamuraiHurt = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites/HURT.png";

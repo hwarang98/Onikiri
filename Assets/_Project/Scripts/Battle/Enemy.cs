@@ -215,6 +215,31 @@ namespace Onikiri.Battle
             get { return spriteRenderer != null ? spriteRenderer.bounds.center : transform.position; }
         }
 
+        /**
+         * @brief 이 요괴가 바라보는 방향. -1이면 왼쪽, +1이면 오른쪽.
+         *
+         * 그려진 방향(`artFacesLeft`)과 Spawn이 건 뒤집기를 함께 읽는다. 둘 중 하나만
+         * 보면 틀린다 - 팩마다 그려진 방향이 다르고(처형인은 왼쪽, 나머지는 오른쪽),
+         * 그 차이를 없애려고 뒤집는 것이 바로 `artFacesLeft`의 일이기 때문이다.
+         *
+         * 타격 불꽃이 이 값으로 선다. 요괴가 바라보는 쪽이 칼이 들어오는 앞면이므로,
+         * 불꽃은 그쪽에 찍혀야 하고 가시도 그쪽으로 길어야 한다.
+         *
+         * 지금은 모든 요괴가 오른쪽에서 와서 왼쪽의 플레이어를 보므로 결과가 늘 -1이다.
+         * 그래도 상수 -1을 쓰지 않는 이유는, 그 -1이 **여기서 한 번 계산되는 결론**이지
+         * 부르는 쪽이 알아야 할 사실이 아니기 때문이다. 왼쪽에서 오는 적이 생기면
+         * Spawn의 뒤집기 규칙만 바뀌고 불꽃은 따라온다.
+         */
+        public int FacingDirection
+        {
+            get
+            {
+                bool drawnFacingLeft = definition != null && definition.artFacesLeft;
+                bool flipped = spriteRenderer != null && spriteRenderer.flipX;
+                return drawnFacingLeft != flipped ? -1 : 1;
+            }
+        }
+
         public void TakeDamage(BigDouble amount)
         {
             if (!IsAlive) return;

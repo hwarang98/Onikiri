@@ -44,23 +44,21 @@ namespace Onikiri.EditorTools
          */
         private const int AtlasPadding = 1;
 
-        /** Galmuri11 폰트가 그려진 크기 */
-        public const int GalmuriDesignSize = 11;
-
         /**
-         * @brief 아틀라스를 래스터하는 정수 배수.
+         * @brief 굽는 크기는 표시 크기에서 온다. 여기에 배수를 따로 적지 않는다.
          *
-         * 5인 것은 임의의 선택이 아니라 화면의 픽셀 크기와 맞추기 위함이다. 게임 아트는
-         * PPU 32에 기준 해상도 216x384로 그려지고, 1080 폭 기기에서 Pixel Perfect Camera가
-         * 정확히 5배로 확대한다. 즉 아트의 픽셀 하나가 화면 픽셀 5x5다.
+         * 예전에는 설계 크기와 배수를 이 파일에도 복사해 두었다. 굽는 쪽과 그리는 쪽에
+         * 같은 숫자가 두 벌 있으면 언젠가 한쪽만 바뀌고, 그 결과는 컴파일 에러가 아니라
+         * **80pt로 구운 아틀라스를 48pt로 다운스케일해 그리는 흐릿한 글자**다. 화면을
+         * 들여다보기 전까지 아무 신호도 없다.
          *
-         * 폰트를 3배로 구우면 글자의 픽셀은 3x3이 되어, 같은 화면 안에 크기가 다른 픽셀이
-         * 두 종류 존재하게 된다. 픽셀 아트에서 이것은 해상도가 섞인 것처럼 보이는 가장
-         * 흔한 원인이다. 5배로 맞추면 글자 계단과 아트 계단이 같은 크기가 된다.
-         *
-         * 표시 크기는 이 값(55)이거나 그 정수배여야 한다.
+         * 이제 크기의 단일 출처는 {@link Onikiri.UI.PixelFontSizes} 하나다. 아래 두 값은
+         * 정확히 표시 크기와 같고, 그래서 다운스케일이 구조적으로 불가능하다.
          */
-        public const int GalmuriSampleMultiple = 5;
+        private static int GalmuriSamplingSize
+        {
+            get { return Onikiri.UI.PixelFontSizes.GalmuriAtlasSize; }
+        }
 
         /**
          * @brief Thaleah 폰트가 그려진 크기.
@@ -68,10 +66,10 @@ namespace Onikiri.EditorTools
          * 함께 배포되는 레거시 비트맵 폰트에서 확인했다 (ThaleahFat.fontsettings 의
          * m_FontSize: 16).
          */
-        public const int ThaleahDesignSize = 16;
-
-        /** Galmuri와 같은 이유로 5배. 화면 픽셀 배율과 일치시킨다 */
-        public const int ThaleahSampleMultiple = 5;
+        private static int ThaleahSamplingSize
+        {
+            get { return Onikiri.UI.PixelFontSizes.ThaleahAtlasSize; }
+        }
 
         /**
          * @brief Thaleah는 데미지 팝업에만 쓰는 라틴 디스플레이 서체다.
@@ -90,7 +88,7 @@ namespace Onikiri.EditorTools
             FontCharsetBuilder.Rebuild();
             var charset = FontCharsetBuilder.LoadCharset();
 
-            // 설계 크기가 아니라 그 5배로 샘플링한다.
+            // 설계 크기가 아니라 그 정수배로 샘플링한다.
             //
             // 외곽선을 정확히 11로 래스터하면 TMP가 쿼드를 만드는 메트릭보다 1픽셀 작은
             // 글리프 비트맵이 나온다. 그러면 모든 글리프가 11/10으로 늘어나고 Point
@@ -98,13 +96,11 @@ namespace Onikiri.EditorTools
             // 축 정렬 사각형이므로 정수배로 래스터하면 정확히 NxN 블록이 나오고 반올림
             // 오차가 무시할 수준이 된다. 표시 크기는 샘플링 크기와 1:1로 맞춘다.
             //
-            // 배수가 5인 이유는 GalmuriSampleMultiple 주석 참고. 화면에 존재하는 픽셀
-            // 크기를 한 종류로 유지하기 위해 카메라 배율과 같은 값을 쓴다.
-            Build(GalmuriSourcePath, "Galmuri11",
-                  GalmuriDesignSize * GalmuriSampleMultiple, charset);
+            // 배수를 얼마로 잡을지는 PixelFontSizes가 정한다. 여기서는 그 값을 그대로
+            // 받아쓸 뿐이라, 구운 크기와 그리는 크기가 어긋날 여지가 없다.
+            Build(GalmuriSourcePath, "Galmuri11", GalmuriSamplingSize, charset);
 
-            Build(ThaleahSourcePath, "ThaleahFat",
-                  ThaleahDesignSize * ThaleahSampleMultiple, NumberCharset);
+            Build(ThaleahSourcePath, "ThaleahFat", ThaleahSamplingSize, NumberCharset);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();

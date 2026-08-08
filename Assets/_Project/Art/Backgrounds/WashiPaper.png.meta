@@ -1,16 +1,10 @@
 fileFormatVersion: 2
-guid: edd435283951cdd4087d8774368451d7
+guid: a5b1ecbab0758634c9693beff2977d6b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8684344836396243426
-    second: Color 1_0
-  - first:
-      213: -5270482655067243664
-    second: Color 1_1
-  - first:
-      213: 1860123145628462079
-    second: Color 1_2
+      213: -1645446382580170603
+    second: WashiPaper_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,9 +40,9 @@ TextureImporter:
     filterMode: 0
     aniso: 1
     mipBias: 0
-    wrapU: 1
-    wrapV: 1
-    wrapW: 1
+    wrapU: 0
+    wrapV: 0
+    wrapW: 0
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
@@ -116,6 +110,19 @@ TextureImporter:
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
     buildTarget: iOS
     maxTextureSize: 4096
     resizeAlgorithm: 0
@@ -128,30 +135,17 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 4096
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 0
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Color 1_0
+      name: WashiPaper_0
       rect:
         serializedVersion: 2
-        x: 9
-        y: 15
-        width: 152
-        height: 132
+        x: 0
+        y: 0
+        width: 64
+        height: 64
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -160,52 +154,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 2e95568fd9df48870800000000000000
-      internalID: 8684344836396243426
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Color 1_1
-      rect:
-        serializedVersion: 2
-        x: 176
-        y: 15
-        width: 115
-        height: 139
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 07bfbdd03fb7bd6b0800000000000000
-      internalID: -5270482655067243664
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Color 1_2
-      rect:
-        serializedVersion: 2
-        x: 304
-        y: 15
-        width: 134
-        height: 141
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: ffbaaa5452c70d910800000000000000
-      internalID: 1860123145628462079
+      spriteID: 5908b55ab333a29e0800000000000000
+      internalID: -1645446382580170603
       vertices: []
       indices: 
       edges: []
@@ -224,9 +174,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Color 1_0: 8684344836396243426
-      Color 1_1: -5270482655067243664
-      Color 1_2: 1860123145628462079
+      WashiPaper_0: -1645446382580170603
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -294,9 +294,9 @@ namespace Onikiri.EditorTools
 
                 // 풀 증식은 조용히 일어나고 폰에서 프레임 히칭으로만 나타난다.
                 // 0이 아니면 prewarm이 부족하다는 뜻이다
-                Row("풀 증식", string.Format("적 {0} / 참격 {1} / 데미지 {2} / 꽃잎 {3}",
+                Row("풀 증식", string.Format("적 {0} / 불꽃 {1} / 데미지 {2} / 꽃잎 {3}",
                     spawner != null ? spawner.PoolGrowthCount : 0,
-                    combat != null ? combat.SlashPoolGrowthCount : 0,
+                    combat != null ? combat.SparkPoolGrowthCount : 0,
                     damageNumbers != null ? damageNumbers.PoolGrowthCount : 0,
                     combat != null ? combat.SakuraPoolGrowthCount : 0));
 

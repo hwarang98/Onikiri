@@ -9,8 +9,13 @@ namespace Onikiri.UI
      * 게임에서 가장 빈도가 높은 UI다. 타격마다 하나씩 생기는데 공격속도가 성장 축이므로,
      * 전투의 다른 요소와 마찬가지로 풀링하며 타격마다 Instantiate하지 않는다.
      *
-     * 값은 NumberFormatter를 통해 찍는다. HUD가 쓰는 "1.5K / 3.2M / 1.2aa" 표기가
-     * 별도 포맷 경로 없이 그대로 적용된다.
+     * 데미지 값은 **축약하지 않고 전체 자릿수로** 찍는다(NumberFormatter.FormatFull).
+     * HUD의 재화 표기와 갈라지는 유일한 자리이고, 이유는 그쪽 주석에 적어뒀다 -
+     * 잔고는 크기만 알면 되지만 타격은 크기의 변화가 곧 정보다.
+     *
+     * 경험치 흡수(ShowExp)만 예외로 축약을 쓴다. 그것이 향하는 경험치 바가 축약
+     * 표기라, 날아가는 숫자와 도착지의 숫자가 같은 표기여야 "저것이 여기로 들어갔다"가
+     * 읽힌다.
      */
     public sealed class DamageNumberSpawner : MonoBehaviour
     {
@@ -92,7 +97,7 @@ namespace Onikiri.UI
                     // 아니라 style을 보는 이유는, 이미 치명타로 올라간 숫자에 평타가
                     // 더해질 때마다 매번 크게 튀면 강조가 평범해지기 때문이다.
                     // 튀김은 '지금 무슨 일이 있었나'를 말한다
-                    existing.Merge(amount, NumberFormatter.Format(total),
+                    existing.Merge(amount, NumberFormatter.FormatFull(total),
                                    ColorFor(mergedStyle), FontSizeFor(mergedStyle),
                                    style != DamageStyle.Normal);
                     return;
@@ -113,7 +118,7 @@ namespace Onikiri.UI
                 return;
 
             var popup = pool.Get();
-            popup.Play(NumberFormatter.Format(amount), anchored,
+            popup.Play(NumberFormatter.FormatFull(amount), anchored,
                        ColorFor(style), FontSizeFor(style), amount, targetKey,
                        style != DamageStyle.Normal, Release);
 
