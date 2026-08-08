@@ -216,6 +216,9 @@ namespace Onikiri.Tests
          * 체력 배수는 10단계부터 스테이지에 따라 함께 오른다(BossHealthGrowth).
          * 골드 배수는 고정이다 - 보상까지 함께 부풀리면 보스 한 번이 그 스테이지의
          * 파밍 전체보다 커져서, 잡몹을 잡을 이유가 사라진다.
+         *
+         * 26단계에 골드 배수가 12 -> 10.8(=체력 배수)이 됐다. 자세한 이유는
+         * StageCurve.BossGoldMultiplier 주석과 아래 단언 참고.
          */
         [Test]
         public void BossRewards_ScaleWithTheStage()
@@ -228,10 +231,25 @@ namespace Onikiri.Tests
             Assert.AreEqual(AverageGold * StageCurve.BossGoldMultiplier,
                             StageCurve.BossGold(mobGold).ToDouble(), 1e-6d);
 
-            // 골드 배수가 1스테이지 체력 배수보다 커야 도전할 이유가 생긴다.
-            // 같거나 작으면 보스는 "위험하기만 한 잡몹"이 된다
-            Assert.Greater(StageCurve.BossGoldMultiplier, StageCurve.BossHealthMultiplierBase,
-                "the boss pays no premium for the 30s risk");
+            // 26단계에 **웃돈이 사라졌다.** 이 자리는 9단계에 "골드 배수가 체력
+            // 배수보다 커야 도전할 이유가 생긴다"였고, 그때는 보스가 선택이었다.
+            // 지금 보스는 스테이지 관문이라(BossGate) 안 싸우면 다음 스테이지가
+            // 없고, 도전할 이유를 골드로 살 필요가 없다.
+            //
+            // 남아 있던 12(체력 10.8 대비 x1.11)는 17단계에 체력 배수만 올리면서
+            // 남은 잔여값이었고, 그 잔여 웃돈이 st11 여유 스파이크의 마지막
+            // 조각이었다 - 보스 골드는 스테이지 경계를 넘어 곧바로 화력이 된다.
+            //
+            // 이제 둘이 같다. 검사는 "웃돈이 있는가"에서 **"둘이 한 값에서
+            // 나오는가"**로 바뀐다 - 한쪽만 고쳐지면 그 순간 뜻 없는 잔여값이
+            // 다시 생긴다.
+            Assert.AreEqual(StageCurve.BossHealthMultiplierBase, StageCurve.BossGoldMultiplier, 1e-9d,
+                "보스 골드와 체력 배수가 갈렸다 - 웃돈을 되살릴 생각이면 st11 여유부터 다시 재라");
+
+            // 등급 차등은 그대로다. "일반보다 챕터가 후하다"는 살아 있는 설계이고,
+            // 지운 것은 **모든 보스에 균일하게 붙던** 웃돈뿐이다
+            Assert.Greater(BossCurve.ChapterGoldMultiplier, 1d,
+                "챕터 보스의 보상 차등까지 사라졌다");
 
             // 체력 배수는 스테이지를 따라 오른다. 9단계에서는 고정이었고 그 때문에
             // 제한 시간이 5스테이지부터 무의미해졌다

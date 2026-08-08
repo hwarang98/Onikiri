@@ -155,6 +155,37 @@ namespace Onikiri.Battle
 
         public int SparkPoolGrowthCount { get { return sparkPool != null ? sparkPool.GrowthCount : 0; } }
 
+        /**
+         * @brief 요괴 목록. 관통·광역이 대상을 훑는다.
+         *
+         * 스포너를 직접 내보내지 않고 목록만 내보낸다 - 오의가 스폰을 건드릴
+         * 이유가 없고, 참조를 넘기면 언젠가 건드린다.
+         */
+        public System.Collections.Generic.IReadOnlyList<Enemy> ActiveEnemies
+        {
+            get
+            {
+                return spawner != null
+                    ? spawner.Active
+                    : (System.Collections.Generic.IReadOnlyList<Enemy>)new Enemy[0];
+            }
+        }
+
+        /**
+         * @brief 사거리 안의 가장 가까운 요괴. **평타와 같은 사거리를 쓴다.**
+         *
+         * 오의가 스스로 찾지 않고 여기를 지나는 이유는 사거리가 두 곳에 적히면
+         * 안 되기 때문이다 - 한쪽만 고쳐지는 날 "평타는 때리는데 오의는 안
+         * 나가는" 상태가 되고, 그 원인은 화면에서 읽히지 않는다.
+         */
+        public Enemy FindTarget()
+        {
+            return spawner != null ? spawner.FindNearestAlive(transform.position.x, attackRange) : null;
+        }
+
+        /** 오의가 겨냥할 때 쓰는 사거리. 진단용으로 내보낸다 */
+        public float AttackRange { get { return attackRange; } }
+
         public int SakuraPoolGrowthCount { get { return sakura != null ? sakura.PoolGrowthCount : 0; } }
 
         /**
@@ -235,13 +266,30 @@ namespace Onikiri.Battle
             set { critMultiplier = Mathf.Max(1f, value); }
         }
 
+        /**
+         * @brief 자동 공격 + 오의를 합친 **초당 환산 공격 횟수**.
+         *
+         * 오의 한 번은 공격력 x 배율이고 평타 한 대는 공격력 x1이므로, 배율을
+         * 쿨다운으로 나누면 같은 단위가 되어 더할 수 있다. 시뮬레이션의
+         * CombatStats가 쓰는 것과 **같은 정의**여야 밸런스 판정이 화면과 갈리지
+         * 않는다.
+         *
+         * SkillSystem이 없으면 0이 더해진다. 전투 전용 테스트 씬은 스킬 없이
+         * 스포너만 세우는데, 거기서 값이 사라지면 26단계 이전 검사가 이유 없이
+         * 깨진다 - UpgradeSystem.CurrentGoldGain이 1로 떨어지는 것과 같은 규칙이다.
+         */
+        public float EffectiveAttacksPerSecond
+        {
+            get { return attacksPerSecond + (float)Onikiri.Progression.SkillSystem.CurrentCastRate; }
+        }
+
         /** 치명타 기대값을 포함한 초당 피해. 테스트 패널과 방치 보상이 쓴다 */
         public BigDouble ExpectedDps
         {
             get
             {
                 float factor = 1f + critChance * (critMultiplier - 1f);
-                return damage * BigDouble.FromDouble(attacksPerSecond * factor);
+                return damage * BigDouble.FromDouble(EffectiveAttacksPerSecond * factor);
             }
         }
 
@@ -258,6 +306,12 @@ namespace Onikiri.Battle
         {
             if (vfxParent == null) vfxParent = transform;
             if (sparkPrefab != null) sparkPool = new ObjectPool<ImpactSpark>(sparkPrefab, vfxParent, sparkPrewarm);
+
+            // 런지의 기준점. 사무라이의 X는 고정이 규칙이고(17단계 - 배경이 흘러
+            // 전진을 만든다), 일섬의 돌진은 그 규칙을 깨는 것이 아니라 **잠깐
+            // 튀어나갔다 돌아오는 것**이다. 기준을 여기서 한 번 기억해두면
+            // 시전이 중간에 끊겨도 오프셋을 0으로 되돌리는 것만으로 복구된다
+            baseLocalX = transform.localPosition.x;
 
             // 인스펙터에 상한을 넘는 값이 남아 있을 수 있다. 프로퍼티를 거쳐 한 번
             // 통과시켜 씬의 값과 코드가 정한 상한을 처음부터 맞춰둔다
@@ -331,11 +385,32 @@ namespace Onikiri.Battle
             // 상한에 걸려 남은 몫은 이월하지 않고 버린다
             if (attackTimer > interval) attackTimer = interval;
 
-            if (!swingStarted && target != null && attackTimer >= interval - lead)
+            // 오의 클립이 도는 동안에는 평타 스윙을 걸지 않는다. 걸면 오의 동작이
+            // 첫 프레임으로 잘리고, 그 사고는 오의와 평타의 주기가 맞물릴 때만
+            // 나타나서 간헐적으로 보인다(26단계 메모). 데미지는 그대로 들어간다 -
+            // 12단계 규칙대로 타이머가 결정하고 애니메이션은 장식이다
+            if (!swingStarted && target != null && attackTimer >= interval - lead && !IsPlayingOneShot)
             {
                 PlaySwing(swingDuration);
                 swingStarted = true;
             }
+        }
+
+        /**
+         * @brief 런지 오프셋을 적용한다. **LateUpdate다.**
+         *
+         * BattleStageLayout이 LateUpdate에서 지면 앵커의 Y를 다시 놓는데, 그것은
+         * 부모라서 이쪽의 로컬 X와 다투지 않는다. 그래도 같은 단계에 두는 이유는
+         * 순서를 한 곳에서 읽을 수 있게 하기 위함이다.
+         */
+        private void LateUpdate()
+        {
+            var local = transform.localPosition;
+            float wanted = baseLocalX + lungeOffsetX;
+            if (Mathf.Approximately(local.x, wanted)) return;
+
+            local.x = wanted;
+            transform.localPosition = local;
         }
 
         /**
@@ -397,6 +472,139 @@ namespace Onikiri.Battle
             ScreenShake.Request(cameraShake,
                 CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond),
                 shakePixels);
+        }
+
+        // ---------------------------------------------------------------- 오의
+
+        /**
+         * @brief 오의 **한 대**. 시전 한 번이 아니라 타격 한 번이다.
+         *
+         * 27단계에 갈라졌다. 26단계에는 `CastSkill` 하나가 "겨냥 + 한 방 + 정지 +
+         * 흔들림"을 전부 했는데, 오의마다 타격을 시간(다타)과 공간(관통·광역)에
+         * 펴게 되면서 그 셋의 주기가 서로 달라졌다 - 연참은 타격이 셋인데 정지는
+         * 마지막에 한 번이고, 귀참은 타격이 여럿인데 화면 정지는 한 번이다.
+         *
+         * 그래서 경계를 다시 그었다:
+         *
+         *   PlayerCombat    **한 대가 무엇을 하는가** (피해·불꽃·꽃잎·숫자·소리)
+         *   SkillPerformer  **한 시전이 그 대를 어떻게 뿌리는가** (안무·정지·흔들림)
+         *
+         * 12단계의 "한 함수 안에서 전부 난다"는 규칙은 그대로다 - 한 대의 다섯
+         * 연출은 여기서 같은 프레임에 나고, 애님 이벤트로 흩지 않는다.
+         *
+         * @param multiplier        이 **한 대**의 배율. 다타면 이미 나눠진 값이다
+         * @param numberSizeMultiple 데미지 숫자의 크기 배수. 정수만 (래스터 폰트)
+         * @return 실제로 벤 것이 있으면 true
+         */
+        public bool DeliverSkillHit(Enemy target, BigDouble multiplier, Color tint,
+                                    int numberSizeMultiple)
+        {
+            if (target == null || !target.IsTargetable) return false;
+
+            bool crit = critChance > 0f && Random.value < critChance;
+
+            // 치명타와 스탯 포인트 증폭이 둘 다 상속된다. 증폭은 damage에 이미
+            // 들어 있고(UpgradeSystem.Apply), 치명타는 여기서 같은 규칙으로
+            // 굴린다 - 오의만 다른 확률을 쓰면 시뮬레이션의 기대값과 갈린다
+            BigDouble dealt = damage * multiplier;
+            if (crit) dealt = dealt * BigDouble.FromDouble(critMultiplier);
+
+            var hitPoint = target.HitPoint;
+
+            // 불꽃은 평타와 같은 것을 쓴다. 오의 전용 불꽃을 만들지 않는 이유는
+            // 불꽃이 말하는 것이 "여기 맞았다" 하나이고, 그것은 평타든 오의든
+            // 같은 사실이기 때문이다. 오의라는 사실은 아크·이름·정지가 말한다
+            SpawnSpark(target, hitPoint);
+            if (sakura != null) sakura.Play(hitPoint, slashDirection, attacksPerSecond);
+
+            target.TakeDamage(dealt);
+            bool killed = !target.IsAlive;
+
+            // 오의 숫자는 **오의 색**으로 뜬다. 치명타(금색)와 같은 단계를 쓰면
+            // 치명타율 60% 구간에서 화면의 큰 숫자 대부분이 이미 금색이라
+            // "무엇이 나갔는지"가 색으로 읽히지 않는다 - 26단계 소감의 절반이
+            // 이것이었다
+            if (damageNumbers != null)
+                damageNumbers.ShowSkill(dealt, hitPoint, tint, numberSizeMultiple);
+
+            if (hitAudio != null)
+            {
+                if (killed) hitAudio.PlayKill();
+                else hitAudio.PlayHit();
+            }
+
+            return true;
+        }
+
+        /**
+         * @brief 오의의 무게. 정지와 흔들림을 **시전당 한 번** 낸다.
+         *
+         * 평타의 예산 계산 결과에 배수를 곱한다. 예산 규칙(CombatFeel)을 깨지
+         * 않는 이유는 시전 빈도다 - 7~22초에 한 번 0.15초를 멈춰도 초당 0.02초로,
+         * 평타 예산 0.3초/초의 7%다. 같은 잣대로 재면 오의는 애초에 예산을 다
+         * 쓰지 않는다.
+         *
+         * 고정 길이로 두지 않는 이유는 비율이다. 공격속도가 오를수록 평타 정지는
+         * 짧아지는데 오의만 그대로면, 후반에 오의 하나가 화면을 통째로 세우는
+         * 것처럼 보인다.
+         */
+        public void SkillFeedback(float hitStopMultiplier, float shakeMultiplier)
+        {
+            if (hitStopMultiplier > 0f)
+                HitStop.Request(CombatFeel.ScaledDuration(
+                    hitStopSeconds, hitStopBudgetPerSecond, attacksPerSecond) * hitStopMultiplier);
+
+            if (shakeMultiplier > 0f)
+                ScreenShake.Request(cameraShake,
+                    CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond)
+                        * shakeMultiplier,
+                    shakePixels * shakeMultiplier);
+        }
+
+        // ---------------------------------------------------------------- 오의 클립 / 런지
+
+        /**
+         * @brief 오의 전용 클립을 재생한다. 끝나면 스스로 쉬는 동작으로 돌아간다.
+         *
+         * 애니메이터를 밖으로 내보내지 않고 이 함수를 지나게 하는 이유는 26단계
+         * 메모다 - **진행 중인 클립을 다시 재생하면 첫 프레임으로 튄다.** 재생
+         * 주체가 둘이면 그 사고가 간헐적으로만 나타나고, 그때는 원인을 찾을 수
+         * 없다. 여기 하나만 애니메이터를 만진다.
+         *
+         * 스윙 타이머는 건드리지 않는다. 평타는 계속 자기 주기로 데미지를 넣고
+         * 있고(12단계: 데미지는 타이머가 결정하고 애니메이션은 장식이다), 오의
+         * 클립은 그 장식을 잠깐 다른 것으로 바꿀 뿐이다.
+         */
+        public void PlaySkillClip(Sprite[] frames, float framesPerSecond)
+        {
+            if (animator == null || frames == null || frames.Length == 0) return;
+            animator.Play(frames, framesPerSecond, false, PlayIdle);
+        }
+
+        /** 오의 클립이 도는 동안 평타 스윙이 끼어들지 않게 막는다 */
+        public bool IsPlayingOneShot { get { return animator != null && animator.IsOneShot; } }
+
+        /** 사무라이의 기준 X. Awake에서 한 번 기억한다 */
+        private float baseLocalX;
+
+        private float lungeOffsetX;
+
+        /**
+         * @brief 기준 X에서 앞으로 밀려난 거리. 일섬의 돌진이 쓴다.
+         *
+         * **매 프레임 기준점에서 다시 놓는다.** 누적으로 움직이면 시전이 중간에
+         * 끊길 때(요괴가 사라짐, 씬 리로드, 사망) 사무라이가 밀려난 자리에 남고,
+         * 그 상태는 "사무라이 위치가 이상하다"로만 나타나서 원인이 안 읽힌다.
+         * 0으로 되돌리는 것만으로 복구되는 편이 낫다.
+         *
+         * 17단계의 "사무라이 X는 고정"이라는 규칙을 깨는 것이 아니다. 고정은
+         * **전진을 배경이 만든다**는 뜻이고, 돌진은 잠깐 튀어나갔다 돌아오는
+         * 것이라 평상 상태의 X가 그대로 남는다.
+         */
+        public float LungeOffsetX
+        {
+            get { return lungeOffsetX; }
+            set { lungeOffsetX = value; }
         }
 
         /** 장식용 스윙. 끝나면 스스로 idle로 돌아간다 */

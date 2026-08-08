@@ -137,6 +137,47 @@ namespace Onikiri.Progression
             Raise();
         }
 
+        /**
+         * @brief 모든 강화 축을 레벨 1로 되돌린다. **테스트 패널 전용.**
+         *
+         * `Debug` 접두사는 BossFight.DebugExpireTimer와 같은 규칙이다 - 게임 진행
+         * 경로에서 부르면 안 되는 것을 이름으로 말한다.
+         *
+         * ## 왜 "세이브 삭제"로는 부족한가
+         *
+         * 패널에 이미 그 버튼이 있지만 전부를 지운다 - 스테이지·레벨·골드까지.
+         * 곡선 하나를 다시 보려면 그 전부를 다시 만들어야 하고, 스테이지가 1로
+         * 돌아가면 잠긴 축(골드 획득량은 6스테이지 해금)은 살 수조차 없다.
+         *
+         * 여기서 되돌리는 것은 강화 축뿐이다. 스테이지 33·레벨 74를 그대로 둔 채
+         * "Lv.1부터 다시 사는 과정"을 몇 번이고 볼 수 있다.
+         *
+         * ## 0이 아니라 1이다
+         *
+         * 이 프로젝트의 모든 축은 **레벨 1이 시작 스탯**이다(AttackPowerCurve 등).
+         * 0으로 두면 곡선이 레벨 1과 같은 값을 내주긴 하지만 화면에 "Lv.0"이
+         * 뜨고, 그것은 어느 화면에서도 뜻이 없는 상태다.
+         *
+         * ## 골드는 돌려주지 않는다
+         *
+         * 환불은 초기화가 아니라 별개의 치트이고, 골드는 패널 위쪽에 이미 자기
+         * 버튼이 있다. SkillSystem.DebugResetLevels와 같은 규칙이다.
+         *
+         * **ApplyAll을 반드시 부른다.** 레벨만 되돌리고 적용을 잊으면 표시된
+         * 레벨과 실제 전투 스탯이 어긋난 채로 남는다 - RestoreLevels가 같은
+         * 이유로 적어둔 함정이다.
+         */
+        public void DebugResetLevels()
+        {
+            if (tracks == null) return;
+
+            foreach (var track in tracks)
+                if (track != null) track.SetLevel(1);
+
+            ApplyAll();
+            Raise();
+        }
+
         public string[] CollectIds()
         {
             if (tracks == null) return new string[0];
@@ -172,7 +213,33 @@ namespace Onikiri.Progression
 
             Apply(track);
             Raise();
+
+            // 퀘스트 카운터. **성사된 구매만 센다** - 위에서 이미 실패 경로가
+            // 걸러졌으므로 여기 오면 골드가 실제로 나갔다. 버튼 쪽에 훅을 걸면
+            // 잔액이 모자라 눌리기만 한 것도 세어진다
+            var quests = QuestSystem.Instance;
+            if (quests != null) quests.ReportUpgradePurchase();
+
             return true;
+        }
+
+        /**
+         * @brief 일곱 축의 레벨 총합. 업적이 읽는다.
+         *
+         * 축이 일곱이고 전부 레벨 1에서 시작하므로 새 게임의 총합은 7이다.
+         * 업적 목표(50/150)가 그 기준이다.
+         */
+        public int TotalLevels
+        {
+            get
+            {
+                if (tracks == null) return 0;
+
+                int total = 0;
+                foreach (var track in tracks)
+                    if (track != null) total += track.Level;
+                return total;
+            }
         }
 
         public void ApplyAll()
@@ -192,7 +259,13 @@ namespace Onikiri.Progression
                 if (health == null) return;
 
                 if (track.Id == HealthId)
-                    health.MaxHealthStat = track.Value.ToDouble() * StatAmp(CharacterLevel.HealthAmpId);
+                    // 방어구 배수가 여기서 곱해진다. 스탯 포인트 증폭과 **같은
+                    // 자리**이고 같은 이유다 - 곱해지는 값은 자기 자리에 저장되지
+                    // 않고 강화 값 위에 얹히므로, 반영 경로가 이 함수 하나여야
+                    // "레벨은 올랐는데 스탯은 안 올랐다"가 성립하지 않는다
+                    health.MaxHealthStat = track.Value.ToDouble()
+                        * StatAmp(CharacterLevel.HealthAmpId)
+                        * EquipmentSystem.CurrentMultiplierFor(EquipmentStat.MaxHealth);
                 else
                     // 회복은 증폭하지 않는다. 최대 체력의 비율이라(HealthRegenCurve)
                     // 체력 증폭이 오르면 초당 회복량도 같이 오른다. 여기서 또 곱하면
@@ -218,7 +291,15 @@ namespace Onikiri.Progression
                     // 붙지 않는다 - 증폭 축이 둘(공격력/체력)뿐이라는 것이
                     // 12단계의 설계이고, 네 화력 축에 고루 뿌리면 골드 축들의
                     // 상대 효율(UpgradeEfficiency가 재는 값)이 레벨에 따라 흔들린다
-                    combat.Damage = track.Value * BigDouble.FromDouble(StatAmp(CharacterLevel.AttackAmpId));
+                    //
+                    // 32단계의 무기 배수도 여기서 곱한다. 장비를 **곱연산**으로
+                    // 둔 이유는 EquipmentCurve 머리 주석에 있다 - 가산이면 강화
+                    // 곡선이 지수로 자라는 동안 장비의 몫이 스테이지마다 절반씩
+                    // 줄어 반드시 죽는 축이 된다
+                    combat.Damage = track.Value
+                        * BigDouble.FromDouble(StatAmp(CharacterLevel.AttackAmpId))
+                        * BigDouble.FromDouble(
+                            EquipmentSystem.CurrentMultiplierFor(EquipmentStat.AttackPower));
                     break;
 
                 case AttackSpeedId:

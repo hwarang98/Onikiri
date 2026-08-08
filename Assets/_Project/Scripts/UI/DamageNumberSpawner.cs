@@ -129,6 +129,52 @@ namespace Onikiri.UI
             }
         }
 
+        /**
+         * @brief 오의 피해. **색을 부르는 쪽이 정하고, 합산하지 않는다.**
+         *
+         * ## 왜 DamageStyle을 하나 더 만들지 않았는가
+         *
+         * DamageStyle은 **강조의 단계**이고 셋뿐인 것이 설계다(그쪽 주석 참고).
+         * 넷째를 만들면 평타/치명/처치의 대비가 흐려진다. 게다가 오의는 색이
+         * 셋이므로(흰/적/금) 단계 하나로는 표현되지 않는다 - 단계는 서열이고
+         * 오의 색은 서열이 아니다.
+         *
+         * ## 왜 합산하지 않는가
+         *
+         * 합산은 초당 여덟 번 때리는 평타가 서로를 덮는 것을 막는 장치다. 오의는
+         * 반대다 - **연참의 세 대는 각자 떠야 "다다닥"이 된다.** 합산하면 숫자
+         * 하나가 세 번 커지는 것으로 보이고, 그것은 평타 연타와 구분되지 않는다.
+         *
+         * 그래서 targetKey를 남기지 않는다. 같은 요괴를 세 번 때려도 세 숫자가
+         * 각자 뜨고, 서로 겹치지 않게 DamageNumber의 가로 분산이 흩는다.
+         *
+         * @param sizeMultiple 아틀라스 크기의 **정수** 배수. 래스터 폰트는 정수배가
+         *                     아니면 리샘플되어 흐려진다(PixelFontSizes)
+         */
+        public void ShowSkill(BigDouble amount, Vector3 worldPosition, Color tint, int sizeMultiple)
+        {
+            if (pool == null || canvas == null) return;
+
+            var screenPoint = worldCamera.WorldToScreenPoint(
+                worldPosition + new Vector3(worldOffset.x, worldOffset.y, 0f));
+
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+
+            Vector2 anchored;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    container, screenPoint, uiCamera, out anchored))
+                return;
+
+            int multiple = sizeMultiple < 1 ? 1 : sizeMultiple;
+
+            var popup = pool.Get();
+            // 등장부터 튀긴다. 오의는 드물게 나오므로 등장 자체가 사건이고,
+            // 평타 숫자가 계속 흐르는 화면에서 그 튀김이 눈에 걸리는 유일한 축이다
+            popup.Play(NumberFormatter.FormatFull(amount), anchored,
+                       tint, PixelFontSizes.ThaleahDamage * multiple, amount,
+                       null, true, Release);
+        }
+
         [Header("경험치 흡수")]
         [Tooltip("경험치가 빨려 들어갈 목표. 보통 상단 바의 경험치 바다. " +
                  "비어 있으면 흡수 연출을 생략한다 - 목표 없이 날리면 화면 " +

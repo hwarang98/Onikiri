@@ -185,6 +185,21 @@ namespace Onikiri.EditorTools
             // 반대 방향 참조는 여기서 잇는다. CharacterLevel이 포인트가 바뀔 때마다
             // 강화 적용을 다시 돌려야 증폭이 스탯에 들어간다
             WireCharacterToUpgrades(upgrades);
+
+            // 스킬 화면은 잠긴 탭보다 먼저다. 탭이 켤 대상을 참조로 들고 있어야
+            // 하는데(LockedTab.screen), 없으면 조용히 예전처럼 안 눌리는 탭이 된다
+            var skills = SkillPanelBuilder.Build();
+
+            // 퀘스트 화면도 잠긴 탭보다 먼저다. 스킬과 같은 이유 - 탭이 켤 대상을
+            // 참조로 들고 있어야 한다. 스킬 다음인 것은 업적이 오의 총 레벨을
+            // 읽으므로 SkillSystem이 이미 씬에 있어야 하기 때문이다
+            var quests = QuestPanelBuilder.Build();
+
+            // 장비 화면은 퀘스트 다음이다. 두 가지가 이미 씬에 있어야 한다 -
+            // GemWallet(퀘스트가 세운다)과 UpgradeSystem(장비 배수가 그쪽을
+            // 통해 스탯에 도달한다). 잠긴 탭보다 먼저인 것은 앞의 둘과 같은 이유다
+            var equipment = EquipmentPanelBuilder.Build();
+
             WireLockedTabs();
             WireStageAdvance();
 
@@ -196,7 +211,7 @@ namespace Onikiri.EditorTools
             // 세이브를 복원할 대상을 찾을 수 있다
             var offlinePopup = WireOfflinePopup();
             WireRegionTransition();
-            WireSession(spawner, offlinePopup);
+            WireSession(spawner, offlinePopup, skills, quests, equipment);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -535,8 +550,10 @@ namespace Onikiri.EditorTools
                 RequireReference(sessionSo, "combat", problems);
                 RequireReference(sessionSo, "spawner", problems);
                 RequireReference(sessionSo, "offlinePopup", problems);
+                RequireReference(sessionSo, "quests", problems);
             }
 
+            VerifySkillChoreography(samurai, problems);
             VerifyGlyphCoverage(problems);
             VerifyExpRowFits(problems);
             VerifyNoMecanimAnimators(problems);
@@ -567,6 +584,132 @@ namespace Onikiri.EditorTools
          * 양쪽 다 지우는 쪽으로 맞췄지만, 방향이 같아졌다는 사실 자체를 빌드가
          * 확인해야 다음에 누가 한쪽만 되돌려도 조용히 지나가지 않는다.
          */
+        /**
+         * @brief 오의 안무가 배선됐고 카탈로그와 어긋나지 않는지.
+         *
+         * 27단계에 생겼다. 안무가 없으면 `SkillPerformer.Cast`가 거절하므로 화면에는
+         * "오의가 안 나간다"로만 나타나고, 그것은 26단계의 "나가는지 모르겠다"와
+         * 구분되지 않는다 - 그때 실제로는 나가고 있었기 때문이다. 같은 증상에 원인이
+         * 둘이면 빌드가 하나를 걷어내야 한다.
+         *
+         * 타격 프레임 수를 카탈로그와 대조하는 것이 핵심이다. 다타의 총 데미지가
+         * 그 수로 나뉘므로(SkillCatalog.HitDamageShare), 둘이 어긋나면 **총 데미지가
+         * 조용히 바뀐다** - 셋으로 나눈 것을 두 번만 때리면 3분의 1이 사라진다.
+         */
+        private static void VerifySkillChoreography(GameObject samurai, List<string> problems)
+        {
+            var performer = samurai.GetComponent<Onikiri.Battle.SkillPerformer>();
+            if (performer == null)
+            {
+                problems.Add("Samurai has no SkillPerformer - 오의가 하나도 나가지 않는다");
+                return;
+            }
+
+            var so = new SerializedObject(performer);
+            RequireReference(so, "combat", problems);
+            RequireReference(so, "slashPrefab", problems);
+            RequireReference(so, "streakPrefab", problems);
+            RequireReference(so, "afterimagePrefab", problems);
+            RequireReference(so, "nameFlash", problems);
+            RequireReference(so, "screenFlash", problems);
+
+            var list = so.FindProperty("choreographies");
+            if (list.arraySize != Onikiri.Progression.SkillCatalog.Count)
+            {
+                problems.Add(string.Format(
+                    "SkillPerformer has {0} choreographies but the catalog has {1} skills",
+                    list.arraySize, Onikiri.Progression.SkillCatalog.Count));
+                return;
+            }
+
+            for (int i = 0; i < Onikiri.Progression.SkillCatalog.Count; i++)
+            {
+                var spec = Onikiri.Progression.SkillCatalog.Skills[i];
+                var element = list.GetArrayElementAtIndex(i);
+
+                string id = element.FindPropertyRelative("id").stringValue;
+                if (id != spec.Id)
+                {
+                    problems.Add(string.Format(
+                        "Choreography {0} is '{1}' but the catalog says '{2}' - 배율과 안무가 " +
+                        "다른 오의를 가리킨다", i, id, spec.Id));
+                    continue;
+                }
+
+                if (element.FindPropertyRelative("clip").arraySize == 0)
+                    problems.Add("'" + spec.DisplayName + "'의 클립이 비었다 - 모션 없이 데미지만 들어간다");
+
+                int hitFrames = element.FindPropertyRelative("hitFrames").arraySize;
+                int expected = Onikiri.Progression.SkillCatalog.HitsPerCast(i);
+                if (hitFrames != expected)
+                    problems.Add(string.Format(
+                        "'{0}'의 타격 프레임이 {1}개인데 카탈로그는 {2}회를 가정한다 - " +
+                        "총 데미지가 {3:P0}만 들어간다",
+                        spec.DisplayName, hitFrames, expected,
+                        expected > 0 ? hitFrames / (float)expected : 0f));
+
+                // 연참은 참격을 얹지 않는 것이 설계다. 켜지면 23단계가 걷어낸
+                // 이중 참격이 그대로 재발한다 - 클립에 궤적이 이미 세 번 있다
+                bool usesSlash = element.FindPropertyRelative("usesSlash").boolValue;
+                if (spec.Shape == Onikiri.Progression.SkillShape.MultiHit && usesSlash)
+                    problems.Add("'" + spec.DisplayName + "'이 팩 참격을 쓴다 - 클립의 "
+                                 + "그려진 참격과 겹쳐 23단계의 이중 참격이 된다");
+
+                bool usesStreak = element.FindPropertyRelative("usesStreak").boolValue;
+
+                // 관통(일섬)은 눈에 보이는 것이 있어야 한다. 팩 참격이든 돌진
+                // 섬광이든 둘 중 하나는 켜져 있어야, 데미지만 들어가고 화면에는
+                // 아무것도 안 나오는 상태를 빌드가 잡는다
+                if (spec.Shape == Onikiri.Progression.SkillShape.Pierce && !usesSlash && !usesStreak)
+                    problems.Add("'" + spec.DisplayName + "'에 참격도 섬광도 없다 - "
+                                 + "데미지는 들어가는데 화면에는 아무것도 안 나온다");
+
+                // 섬광은 돌진이 지나간 자리다. 돌진이 0이면 길이도 0이라 안 보인다
+                if (usesStreak)
+                {
+                    if (element.FindPropertyRelative("lungeDistance").floatValue <= 0f)
+                        problems.Add("'" + spec.DisplayName + "'이 돌진 섬광을 쓰는데 "
+                                     + "돌진 거리가 0이다 - 길이가 0인 선이 된다");
+
+                    if (element.FindPropertyRelative("streakThickness").floatValue <= 0f)
+                        problems.Add("'" + spec.DisplayName + "'의 섬광 두께가 0이다");
+
+                    // 섬광은 돌진과 함께 자란다. 다 자라는 시간이 돌진이 나가는
+                    // 시간과 다르면 머리가 칼끝에서 떨어진다
+                    float reveal = element.FindPropertyRelative("streakRevealSeconds").floatValue;
+                    float lungeOut = element.FindPropertyRelative("lungeOutSeconds").floatValue;
+                    if (Mathf.Abs(reveal - lungeOut) > 0.001f)
+                        problems.Add(string.Format(
+                            "'{0}'의 섬광 성장 시간({1:0.###}초)이 돌진 시간({2:0.###}초)과 다르다 - "
+                            + "섬광의 머리가 칼끝에서 떨어진다",
+                            spec.DisplayName, reveal, lungeOut));
+                }
+
+                if (!usesSlash) continue;
+
+                // 참격을 쓰는데 프레임이 비었으면 화면에 아무것도 안 나온다.
+                // 데미지는 그대로 들어가므로 "이펙트만 사라진" 상태가 되고,
+                // 그 증상은 로그에도 콘솔에도 남지 않는다
+                if (element.FindPropertyRelative("slashFrames").arraySize == 0)
+                    problems.Add("'" + spec.DisplayName + "'의 참격 프레임이 비었다 - "
+                                 + "데미지는 들어가는데 화면에는 아무것도 안 나온다");
+
+                // 한 장짜리면 자르기가 실패한 것이다. 정적인 한 장을 키워 쓰던
+                // 27단계로 조용히 되돌아가는 경로가 정확히 이것이다
+                if (element.FindPropertyRelative("slashFrames").arraySize == 1)
+                    problems.Add("'" + spec.DisplayName + "'의 참격이 한 장뿐이다 - "
+                                 + "시트 자르기가 실패했다. 정적인 그림이 뜬다");
+
+                // 배율 상한. 원본 픽셀의 2.5배를 넘기면 아트 픽셀 하나가 화면에서
+                // 10px 넘는 네모가 되고, 그것이 27단계의 덩어리다
+                float scale = element.FindPropertyRelative("slashScale").floatValue;
+                if (scale > 2.5f)
+                    problems.Add(string.Format(
+                        "'{0}'의 참격 배율이 {1:0.##}배다 - 2.5배를 넘으면 소스 픽셀이 "
+                        + "화면에서 네모로 보인다", spec.DisplayName, scale));
+            }
+        }
+
         private static void VerifyNoMecanimAnimators(List<string> problems)
         {
             foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsSortMode.None))
@@ -1368,6 +1511,33 @@ namespace Onikiri.EditorTools
             currencySo.FindProperty("prefix").stringValue = string.Empty;
             currencySo.ApplyModifiedPropertiesWithoutUndo();
 
+            // 보석. **골드 오른쪽에 붙인다.**
+            //
+            // 상단 바는 세로 192px에 좌우로 골드와 스테이지가 이미 있다. 보석을
+            // 오른쪽 줄에 두면 스테이지 표시("지역 4 · 7/10  처치 3/10", 최악 627px)와
+            // 자리를 다투므로, 왼쪽 골드 옆에 이어 붙인다 - 둘 다 재화라 한 묶음으로
+            // 읽히는 것이 오히려 맞다.
+            //
+            // 골드 라벨의 폭을 잡아 그 오른쪽에 놓는다. 골드는 자릿수가 늘어나므로
+            // 고정 폭을 주고 그만큼 띄운다
+            ((RectTransform)goldLabel.transform).sizeDelta = new Vector2(GoldLabelWidth, 72f);
+
+            EnsureBarIcon(topBar, "GemIcon", UiIcons.LoadItem(UiIcons.GemSprite),
+                          new Vector2(48f + BarIconSize + 12f + GoldLabelWidth + 16f, -40f));
+
+            var gemLabel = EnsureHudLabel(topBar, "GemLabel", TMPro.TextAlignmentOptions.Left,
+                new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(48f + BarIconSize + 12f + GoldLabelWidth + 16f + BarIconSize + 10f, -46f));
+            ((RectTransform)gemLabel.transform).sizeDelta = new Vector2(180f, 72f);
+            gemLabel.text = "0";
+
+            var gemHud = topBar.GetComponent<Onikiri.UI.HUDGems>();
+            if (gemHud == null) gemHud = topBar.gameObject.AddComponent<Onikiri.UI.HUDGems>();
+
+            var gemSo = new SerializedObject(gemHud);
+            gemSo.FindProperty("label").objectReferenceValue = gemLabel;
+            gemSo.ApplyModifiedPropertiesWithoutUndo();
+
             var stageHud = topBar.GetComponent<Onikiri.UI.HUDStage>();
             if (stageHud == null) stageHud = topBar.gameObject.AddComponent<Onikiri.UI.HUDStage>();
 
@@ -1386,6 +1556,36 @@ namespace Onikiri.EditorTools
          * "같은 심볼의 작은 판"으로 읽힌다.
          */
         private const float BarIconSize = 48f;
+
+        /**
+         * @brief 골드 라벨에 잡아두는 폭.
+         *
+         * 31단계에 보석이 그 오른쪽에 붙으면서 필요해졌다. 그전에는 라벨이
+         * 내용에 맞춰 늘어나도 오른쪽이 비어 있어 상관없었지만, 이제 그쪽에
+         * 아이콘이 서므로 **자리를 확정해야** 골드가 길어질 때 겹치지 않는다.
+         *
+         * ## 260 -> 200. 32단계에 실측으로 줄였다
+         *
+         * 260은 "999.9M까지 들어가는 폭"이라고 적혀 있었는데 **어림이었다.**
+         * TMP 실측:
+         *
+         *   "999.9M"    168px
+         *   "999.9aa"   183px   <- 축약 단위가 두 글자가 되는 최악
+         *   "100.2M"    161px
+         *
+         * 92px이 놀고 있었고, 그 뒤에 선 보석 라벨이 그만큼 오른쪽으로 밀려
+         * **스테이지 문구와 5px까지 붙어 있었다.** 보석 세 자리("860" 87px)에서
+         * 이미 그 상태이고, 네 자리("9999" 116px)면 24px 겹친다.
+         *
+         * 31단계에는 보석이 두 자리였고(퀘스트 몇 개분) 소비처가 없어 자릿수가
+         * 늘 이유도 없었다. 32단계가 그 이유를 만들었다 - 등급업 하나가 40~260개라
+         * 네 자리가 정상 구간이 된다. **재화에 소비처가 생기면 그 재화의 자릿수
+         * 가정도 다시 재야 한다.**
+         *
+         * 200 = 183 + 17. 이 값도 어림이 아니라 위 실측에서 나온 것이고, 넘치면
+         * 축약 단위가 하나 올라가 자릿수가 다시 줄어든다(NumberFormatter).
+         */
+        private const float GoldLabelWidth = 200f;
 
         /** 상단 바 아이콘 하나. 위 기준 앵커라 바 높이가 바뀌어도 위치가 유지된다 */
         private static UnityEngine.UI.Image EnsureBarIcon(
@@ -1624,6 +1824,12 @@ namespace Onikiri.EditorTools
         {
             public string Name;
             public int RequiredLevel;
+
+            /** 스테이지 조건. 0이면 레벨만 쓴다 (32단계의 장비가 이쪽) */
+            public int RequiredStage;
+
+            /** 열렸을 때 켤 화면. 비어 있으면 예전처럼 눌리지 않는다 */
+            public string ScreenName;
         }
 
         /**
@@ -1636,10 +1842,46 @@ namespace Onikiri.EditorTools
          * 스킬은 남는다. 성장 패널의 탭이 아니라 **별개 시스템**이라서다. 전직은
          * 캐릭터 성장의 한 축(포인트/골드와 같은 층위)이지만 스킬은 그렇지 않고,
          * 성장 패널 탭 줄에 올리면 "이 줄은 캐릭터 성장"이라는 규칙이 깨진다.
+         *
+         * 26단계에 이 탭이 **실제로 눌리게 됐다.** 화면이 생겼기 때문이다
+         * (SkillPanelBuilder). 잠금 조건은 코드에서 끌어온다 - 여기 10을 손으로
+         * 적어두면 SkillCatalog의 해금 레벨과 갈릴 수 있고, 그러면 탭은 밝은데
+         * 목록의 세 줄이 전부 잠긴 화면이 나온다.
          */
         private static readonly LockedTabSpec[] LockedTabs =
         {
-            new LockedTabSpec { Name = "스킬", RequiredLevel = 10 }
+            new LockedTabSpec {
+                Name = "스킬",
+                RequiredLevel = Onikiri.Progression.SkillCatalog.PanelUnlockLevel,
+                ScreenName = SkillPanelBuilder.PanelName
+            },
+
+            // 31단계의 퀘스트. **해금 레벨이 1이다** - 잠그지 않는다.
+            //
+            // 다른 탭은 "앞으로 무엇이 열리는가"를 보여주려고 잠가 뒀지만
+            // 퀘스트는 반대다. 신규 플레이어에게 **다음에 무엇을 할지 알려주는
+            // 것**이 이 화면의 목적이고, 그것이 필요한 시점은 레벨 10이 아니라
+            // 첫 화면이다.
+            new LockedTabSpec {
+                Name = "퀘스트",
+                RequiredLevel = 1,
+                ScreenName = QuestPanelBuilder.PanelName
+            },
+
+            // 32단계의 장비(대장간). **조건이 스테이지다** - 이 탭만 그렇다.
+            // 대장간은 지역 1의 랜드마크이고, 화면에 서 있는 건물이 열리는
+            // 조건은 "그 지역을 지나왔는가"여야 말이 된다
+            // (EquipmentCurve.UnlockStage).
+            //
+            // 값은 코드에서 끌어온다. 여기 11을 손으로 적어두면 곡선의 해금
+            // 스테이지와 갈릴 수 있고, 그러면 탭은 밝은데 두 줄이 전부 잠긴
+            // 화면이 나온다 - 스킬 탭에서 같은 이유로 같은 처리를 했다
+            new LockedTabSpec {
+                Name = "장비",
+                RequiredLevel = 1,
+                RequiredStage = Onikiri.Progression.EquipmentCurve.UnlockStage,
+                ScreenName = EquipmentPanelBuilder.PanelName
+            }
         };
 
         /**
@@ -1715,7 +1957,9 @@ namespace Onikiri.EditorTools
                 labelRect.anchorMax = Vector2.one;
                 labelRect.offsetMin = Vector2.zero;
                 labelRect.offsetMax = Vector2.zero;
-                label.text = spec.Name + " Lv." + spec.RequiredLevel;
+                label.text = spec.RequiredStage > 0
+                    ? spec.Name + " " + spec.RequiredStage + "스테이지"
+                    : spec.Name + " Lv." + spec.RequiredLevel;
 
                 var tab = background.GetComponent<Onikiri.UI.LockedTab>();
                 if (tab == null) tab = background.gameObject.AddComponent<Onikiri.UI.LockedTab>();
@@ -1723,15 +1967,60 @@ namespace Onikiri.EditorTools
                 var so = new SerializedObject(tab);
                 so.FindProperty("displayName").stringValue = spec.Name;
                 so.FindProperty("requiredLevel").intValue = spec.RequiredLevel;
+                so.FindProperty("requiredStage").intValue = spec.RequiredStage;
                 so.FindProperty("button").objectReferenceValue = button;
                 so.FindProperty("label").objectReferenceValue = label;
                 so.FindProperty("background").objectReferenceValue = background;
+
+                // 켤 화면. 없으면 null이 들어가고 탭은 예전처럼 잠긴 표시만 한다 -
+                // 화면을 안 만들고 잠금만 푸는 실수가 성립하지 않는 것이 요점이다
+                var screen = string.IsNullOrEmpty(spec.ScreenName)
+                    ? null
+                    : MainSceneBuilder.FindBand(spec.ScreenName);
+                so.FindProperty("screen").objectReferenceValue =
+                    screen != null ? screen.gameObject : null;
+
+                if (!string.IsNullOrEmpty(spec.ScreenName) && screen == null)
+                    Debug.LogWarning("[Onikiri] Locked tab '" + spec.Name + "' wants screen '"
+                                     + spec.ScreenName + "' but it is not in the scene.");
 
                 // 이 둘은 최종 색이 아니라 판에 곱해지는 틴트다. 빌더가 스킨에서
                 // 가져와 적어야 팔레트를 바꿀 때 한 곳만 고치면 된다
                 so.FindProperty("lockedBackground").colorValue = UiSkin.InlayTint * 0.7f;
                 so.FindProperty("unlockedBackground").colorValue = UiSkin.InlayTint;
                 so.ApplyModifiedPropertiesWithoutUndo();
+
+                // 배지는 **퀘스트와 장비** 둘에 붙는다. 세는 것이 다르다 -
+                // 퀘스트는 "받을 것", 장비는 "살 수 있는 것"이다. 규칙은 같다:
+                // 탭 버튼의 자식이라 판을 열지 않아도 보이고, 개수를 숫자로 적는다
+                if (spec.ScreenName == QuestPanelBuilder.PanelName)
+                {
+                    var badge = QuestPanelBuilder.BuildBadge(background.transform, font);
+
+                    var badgeComponent = background.GetComponent<Onikiri.UI.QuestTabBadge>();
+                    if (badgeComponent == null)
+                        badgeComponent = background.gameObject.AddComponent<Onikiri.UI.QuestTabBadge>();
+
+                    var badgeSo = new SerializedObject(badgeComponent);
+                    badgeSo.FindProperty("badge").objectReferenceValue = badge.gameObject;
+                    badgeSo.FindProperty("label").objectReferenceValue =
+                        badge.GetComponentInChildren<TMPro.TMP_Text>(true);
+                    badgeSo.ApplyModifiedPropertiesWithoutUndo();
+                }
+                else if (spec.ScreenName == EquipmentPanelBuilder.PanelName)
+                {
+                    var badge = QuestPanelBuilder.BuildBadge(background.transform, font);
+
+                    var badgeComponent = background.GetComponent<Onikiri.UI.EquipmentTabBadge>();
+                    if (badgeComponent == null)
+                        badgeComponent = background.gameObject.AddComponent<Onikiri.UI.EquipmentTabBadge>();
+
+                    var badgeSo = new SerializedObject(badgeComponent);
+                    badgeSo.FindProperty("badge").objectReferenceValue = badge.gameObject;
+                    badgeSo.FindProperty("label").objectReferenceValue =
+                        badge.GetComponentInChildren<TMPro.TMP_Text>(true);
+                    badgeSo.ApplyModifiedPropertiesWithoutUndo();
+                }
             }
         }
 
@@ -2019,7 +2308,10 @@ namespace Onikiri.EditorTools
         }
 
         /** 세이브/로드와 방치 보상을 담당하는 세션 */
-        private static void WireSession(EnemySpawner spawner, Onikiri.UI.OfflineRewardPopup popup)
+        private static void WireSession(EnemySpawner spawner, Onikiri.UI.OfflineRewardPopup popup,
+                                        Onikiri.Progression.SkillSystem skills,
+                                        Onikiri.Progression.QuestSystem quests,
+                                        Onikiri.Progression.EquipmentSystem equipment)
         {
             var battle = GameObject.Find("Battle");
             var session = battle.GetComponent<Onikiri.Progression.GameSession>();
@@ -2039,6 +2331,21 @@ namespace Onikiri.EditorTools
                 Object.FindFirstObjectByType<Onikiri.Progression.CharacterLevel>();
             so.FindProperty("spawner").objectReferenceValue = spawner;
             so.FindProperty("offlinePopup").objectReferenceValue = popup;
+
+            // 오의 레벨과 자동 시전 토글이 세이브에 들어간다(v7). 이 줄이 빠지면
+            // 세이브 형식은 v7인데 스킬 칸이 매번 비어 있는 상태가 되고, 화면에서는
+            // "껐다 켜면 오의 레벨이 1로 돌아간다"로만 나타난다
+            so.FindProperty("skills").objectReferenceValue = skills;
+
+            // 퀘스트 진행·수령·보석이 세이브에 들어간다(v8). 빠지면 형식은 v8인데
+            // 퀘스트 칸이 매번 비어 있고, 화면에서는 "받았는데 껐다 켜면 다시
+            // 받을 수 있다"로 나타난다 - 오의 줄과 같은 종류의 사고다
+            so.FindProperty("quests").objectReferenceValue = quests;
+
+            // 장비 등급·단련 레벨이 세이브에 들어간다(v9). 빠지면 등급업에 쓴
+            // **보석이 사라진다** - 골드는 다시 벌지만 보석은 퀘스트를 다시
+            // 해야 하므로 앞의 두 줄보다 손해가 크다
+            so.FindProperty("equipment").objectReferenceValue = equipment;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

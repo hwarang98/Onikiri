@@ -52,6 +52,18 @@ namespace Onikiri.Progression
             gold += amount;
             LifetimeGold += amount;
             Raise();
+
+            // 퀘스트의 "골드 획득"은 **여기 하나에서** 센다.
+            //
+            // 골드가 들어오는 길은 여럿이다 - 처치(EnemySpawner), 보스 보상과
+            // 클리어 보너스(BossFight), 방치 보상(GameSession), 업적 수령
+            // (QuestSystem). 그 넷에 각각 훅을 걸면 하나를 빠뜨리거나 두 번 세는
+            // 날이 오고, 증상은 "퀘스트 진행이 조금 안 맞는다"라 원인을 찾기 어렵다.
+            //
+            // Add는 그 전부가 지나는 유일한 문이다. 잔액 복원(SetBalance)은 여기를
+            // 지나지 않으므로 세이브를 불러올 때 카운터가 부풀지도 않는다
+            var quests = QuestSystem.Instance;
+            if (quests != null) quests.ReportGoldEarned(amount);
         }
 
         public bool CanAfford(BigDouble cost)

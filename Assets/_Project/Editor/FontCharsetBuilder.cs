@@ -78,6 +78,32 @@ namespace Onikiri.EditorTools
         /** 화면에 서는 데이터 애셋 이름 전부. 글리프 검사도 같은 목록을 본다 */
         public static IEnumerable<string> DisplayNames()
         {
+            // 오의 이름은 애셋이 아니라 코드(SkillCatalog)에 있다. 그래도 여기
+            // 넣는 이유는 위 주석이 적은 것과 같다 - **이름의 출처가 어디든
+            // 문자셋은 그 출처에서 나와야 한다.** UIStrings.txt에 손으로 옮겨
+            // 적으면 스킬을 추가하는 날 그 단계가 빠지고, 화면에 □□이 뜬다.
+            // 보스 이름으로 세 번 겪은 실수다
+            foreach (var skill in Onikiri.Progression.SkillCatalog.Skills)
+                yield return skill.DisplayName;
+
+            // 퀘스트 제목도 코드(QuestCatalog)에 있다. 오의와 같은 이유로 여기서
+            // 끌어온다 - 열여덟 줄을 손으로 옮겨 적으면 하나를 고치는 날 그 글자가
+            // 빠지고, 화면에 □이 뜬다
+            foreach (var kind in new[] { Onikiri.Progression.QuestKind.Daily,
+                                         Onikiri.Progression.QuestKind.Repeat,
+                                         Onikiri.Progression.QuestKind.Achievement })
+                foreach (var quest in Onikiri.Progression.QuestCatalog.Of(kind))
+                    yield return quest.Title;
+
+            // 장비 이름도 코드(EquipmentCatalog)에 있다. 슬롯 이름 둘과 등급
+            // 이름 열이고, **등급 이름은 화면의 제목 자리에 뜬다** - 빠지면
+            // "오니키리"가 ㅁㅁㅁㅁ이 된다. 오의·퀘스트와 같은 규칙이다
+            foreach (var slot in Onikiri.Progression.EquipmentCatalog.Slots)
+            {
+                yield return slot.SlotName;
+                foreach (var grade in slot.GradeNames) yield return grade;
+            }
+
             foreach (var guid in AssetDatabase.FindAssets("t:BossConfig", DataFolders))
             {
                 var config = AssetDatabase.LoadAssetAtPath<Onikiri.Battle.BossConfig>(

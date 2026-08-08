@@ -1,0 +1,639 @@
+using System;
+using System.Collections.Generic;
+using Onikiri.Core;
+using Onikiri.Progression;
+using UnityEngine;
+
+namespace Onikiri.Battle
+{
+    /**
+     * @brief 오의 한 번이 타격을 **시간과 공간에 어떻게 뿌리는가**.
+     *
+     * ## 왜 PlayerCombat에서 갈라졌는가
+     *
+     * 26단계에는 `PlayerCombat.CastSkill` 하나가 겨냥·한 방·정지·흔들림을 전부
+     * 했다. 셋 다 단일 대상 한 방이라 그것으로 충분했고, 그 결과가 "색만 다른
+     * 같은 아크"였다.
+     *
+     * 오의마다 타격이 시간(연참 세 대)과 공간(일섬 관통, 귀참 광역)에 펴지면서
+     * 세 연출의 주기가 서로 갈라졌다 - 연참은 타격이 셋인데 정지는 마지막 한 번,
+     * 귀참은 타격이 여럿인데 화면 정지는 한 번이다. 한 함수에 두면 "한 대"와
+     * "한 시전"이 섞인다.
+     *
+     *   PlayerCombat    한 대가 무엇을 하는가 (피해·불꽃·꽃잎·숫자·소리)
+     *   SkillPerformer  한 시전이 그 대를 어떻게 뿌리는가 (안무·정지·흔들림·화면)
+     *
+     * ## 밸런스 가드
+     *
+     * **총 데미지는 바뀌지 않는다.** 배율·쿨다운·상한은 26단계 값 그대로다.
+     *
+     *   연참  배율을 셋으로 나눈다. 마지막이 나머지를 받아 합이 **정확히** 같다
+     *   일섬  경로의 각 대상이 총 배율. 보스는 단일 대상이라 한 번
+     *   귀참  화면의 각 대상이 총 배율. 보스는 단일 대상이라 한 번
+     *
+     * 보스전은 언제나 대상이 하나이므로 **어느 거동이든 보스에게 들어가는 총량이
+     * 같다.** 그래서 보스 여유 밴드가 불변이고, StageSimulation을 고칠 필요가 없다.
+     *
+     * 잡몹 쪽은 관통·광역이 여럿을 때리므로 파밍이 빨라질 수 있다. 잡몹은 이미
+     * 거의 즉사라 실제 영향은 미미해야 하고, 그것을 시뮬레이션이 아니라
+     * **처치 속도의 상한**이 보증한다 - 파밍 속도는 요괴 공급(SpawnPacing 하한
+     * 0.4초)에 묶여 있어서 DPS가 아무리 높아도 그 아래로 내려가지 않는다.
+     *
+     * ## 히트스톱 중에는 안무도 멈춘다
+     *
+     * 경과 시간을 스케일 타임으로 잰다. 애니메이션·불꽃·숫자가 모두 스케일
+     * 타임이므로(23단계), 안무만 unscaled로 돌면 정지 중에 타격이 들어가고
+     * 화면에는 아무 일도 일어나지 않는다.
+     */
+    public sealed class SkillPerformer : MonoBehaviour
+    {
+        /**
+         * @brief 오의 하나의 안무. 빌더가 SkillCatalog와 클립 실측에서 적는다.
+         *
+         * 타격 프레임을 초가 아니라 **클립 프레임 번호**로 두는 것이 요점이다.
+         * 원화가가 그린 참격이 몇 번째 프레임에 있는지가 정답이고(23단계), 초로
+         * 적어두면 재생 속도를 바꾸는 순간 타격이 그림에서 떨어진다.
+         */
+        [Serializable]
+        public sealed class Choreography
+        {
+            [Tooltip("어느 오의인지. SkillCatalog의 id와 같아야 한다")]
+            public string id;
+
+            [Tooltip("이 오의가 재생할 클립. 연참은 ATTACK 1/2/3을 이어 붙인 20프레임")]
+            public Sprite[] clip;
+
+            public float clipFrameRate = 24f;
+
+            [Tooltip("타격이 나는 클립 프레임 번호. 그려진 참격 프레임과 같아야 한다")]
+            public int[] hitFrames;
+
+            [Header("참격 (팩 애니)")]
+            [Tooltip("팩 참격을 재생하는가. **연참은 쓰지 않는다** - 클립에 이미 " +
+                     "궤적이 세 번 그려져 있고, 그 위에 얹으면 23단계의 이중 참격이다")]
+            public bool usesSlash;
+
+            [Tooltip("팩 시트에서 잘라낸 프레임들. 128x128 열 장")]
+            public Sprite[] slashFrames;
+
+            [Tooltip("참격 재생 속도. 클립 길이 안에서 끝나야 한다")]
+            public float slashFrameRate = 30f;
+
+            [Tooltip("원본 픽셀 대비 배수. **정수만** - 소수 배율은 점 필터링에서 " +
+                     "픽셀 크기가 들쭉날쭉해진다. 2.5를 넘기면 27단계의 네모가 돌아온다")]
+            public float slashScale = 2f;
+
+            [Tooltip("회전각 (도). 팩 원본 방향을 화면 방향으로 돌린다")]
+            public float slashAngle;
+
+            [Tooltip("사무라이 기준 참격 중심의 전방 거리 (월드 단위)")]
+            public float slashForwardOffset = 1.6f;
+
+            [Tooltip("참격 중심의 높이 보정. 사무라이 그려진 중심에서 위로")]
+            public float slashHeightOffset;
+
+            [Header("돌진 섬광 (일섬)")]
+            [Tooltip("얇은 수평 섬광을 그리는가. 돌진과 함께 자란다")]
+            public bool usesStreak;
+
+            [Tooltip("두께. **얇게** - 굵으면 다시 덩어리다")]
+            public float streakThickness = 0.12f;
+
+            [Tooltip("섬광의 높이. 사무라이 그려진 중심에서. 요괴 몸통을 지나야 한다")]
+            public float streakHeightOffset;
+
+            [Tooltip("섬광 색. 흰빛에 붉은 기가 도는 쪽")]
+            public Color streakColor = Color.white;
+
+            [Tooltip("다 자라는 시간. **돌진이 나가는 시간과 같아야** 머리가 칼끝에 붙는다")]
+            public float streakRevealSeconds = 0.09f;
+
+            public float streakHoldSeconds = 0.05f;
+            public float streakFadeSeconds = 0.12f;
+
+            [Tooltip("돌진 중 남길 잔상 수. 0이면 안 남긴다")]
+            public int afterimageCount;
+
+            [Header("거동")]
+            [Tooltip("관통 사거리 (월드 단위). Pierce만 쓴다")]
+            public float pierceRange = 4.6f;
+
+            [Tooltip("관통이 훑는 세로 폭. 떠 있는 도깨비불까지 닿아야 한다")]
+            public float pierceHeight = 2.4f;
+
+            [Tooltip("돌진 거리. Pierce만 쓴다. 앵커로 돌아온다")]
+            public float lungeDistance;
+
+            [Tooltip("돌진해 나가는 시간")]
+            public float lungeOutSeconds = 0.10f;
+
+            [Tooltip("앵커로 돌아오는 시간. 나가는 것보다 길어야 '돌아왔다'로 읽힌다")]
+            public float lungeBackSeconds = 0.16f;
+
+            [Header("무게")]
+            [Tooltip("마지막 타격의 히트스톱 배수")]
+            public float hitStopMultiplier = 1.6f;
+
+            public float shakeMultiplier = 1.6f;
+
+            [Tooltip("마지막이 아닌 타격의 흔들림 배수. 다타가 끊겨 보이지 않게 " +
+                     "히트스톱은 주지 않고 흔들림만 짧게 준다")]
+            public float perHitShakeMultiplier = 0.5f;
+
+            [Tooltip("데미지 숫자의 크기 배수. 정수만 (래스터 폰트)")]
+            public int numberSizeMultiple = 2;
+
+            [Tooltip("풀스크린 번쩍을 내는가. 귀참만")]
+            public bool screenFlash;
+
+            /** 클립 전체 길이 (초) */
+            public float ClipSeconds
+            {
+                get
+                {
+                    if (clip == null || clip.Length == 0 || clipFrameRate <= 0f) return 0f;
+                    return clip.Length / clipFrameRate;
+                }
+            }
+
+            /** index번째 타격이 나는 시각 (초) */
+            public float HitTime(int index)
+            {
+                if (hitFrames == null || hitFrames.Length == 0 || clipFrameRate <= 0f) return 0f;
+                int clamped = Mathf.Clamp(index, 0, hitFrames.Length - 1);
+                return hitFrames[clamped] / clipFrameRate;
+            }
+
+            public int HitCount { get { return hitFrames != null ? hitFrames.Length : 0; } }
+        }
+
+        [SerializeField] private PlayerCombat combat;
+        [SerializeField] private SpriteRenderer samuraiRenderer;
+        [SerializeField] private Transform vfxParent;
+
+        [SerializeField] private PackSlash slashPrefab;
+        [SerializeField] private int slashPrewarm = 3;
+
+        [SerializeField] private DashStreak streakPrefab;
+        [SerializeField] private int streakPrewarm = 2;
+
+        [SerializeField] private Afterimage afterimagePrefab;
+        [SerializeField] private int afterimagePrewarm = 4;
+
+        [Tooltip("잔상의 색. 알파가 가장 진한 한 장의 진하기다")]
+        [SerializeField] private Color afterimageTint = new Color(0.75f, 0.85f, 1f, 0.5f);
+
+        [SerializeField] private Onikiri.UI.SkillNameFlash nameFlash;
+        [SerializeField] private Onikiri.UI.ScreenFlash screenFlash;
+
+        [SerializeField] private Choreography[] choreographies;
+
+        private ObjectPool<PackSlash> slashPool;
+        private ObjectPool<DashStreak> streakPool;
+        private ObjectPool<Afterimage> afterimagePool;
+
+        /** 진행 중인 시전. 오의당 하나뿐이다 - 쿨다운이 클립보다 길다 */
+        private readonly List<ActiveCast> active = new List<ActiveCast>();
+
+        private sealed class ActiveCast
+        {
+            public int skillIndex;
+            public Choreography choreography;
+            public double totalMultiplier;
+            public Color tint;
+            public float elapsed;
+            public int nextHit;
+
+            /** 다음에 흩뿌릴 잔상 번호. 타격과 같은 방식으로 시각에 걸어 둔다 */
+            public int nextGhost;
+
+            /** 시전 순간의 사무라이 X. 돌진 오프셋이 얹히기 전 값이라 경로의 기준이다 */
+            public float baseX;
+        }
+
+        public int SlashPoolGrowthCount
+        {
+            get
+            {
+                return (slashPool != null ? slashPool.GrowthCount : 0)
+                     + (streakPool != null ? streakPool.GrowthCount : 0)
+                     + (afterimagePool != null ? afterimagePool.GrowthCount : 0);
+            }
+        }
+
+        /** 지금 안무가 돌고 있는 시전 수. 테스트 패널이 읽는다 */
+        public int ActiveCastCount { get { return active.Count; } }
+
+        private void Awake()
+        {
+            if (combat == null) combat = GetComponent<PlayerCombat>();
+            if (samuraiRenderer == null) samuraiRenderer = GetComponent<SpriteRenderer>();
+            if (vfxParent == null) vfxParent = transform;
+
+            if (slashPrefab != null)
+                slashPool = new ObjectPool<PackSlash>(slashPrefab, vfxParent, slashPrewarm);
+
+            if (streakPrefab != null)
+                streakPool = new ObjectPool<DashStreak>(streakPrefab, vfxParent, streakPrewarm);
+
+            if (afterimagePrefab != null)
+                afterimagePool = new ObjectPool<Afterimage>(afterimagePrefab, vfxParent, afterimagePrewarm);
+        }
+
+        private Choreography Find(string id)
+        {
+            if (choreographies == null) return null;
+            foreach (var c in choreographies)
+                if (c != null && c.id == id) return c;
+            return null;
+        }
+
+        // ---------------------------------------------------------------- 시전
+
+        /**
+         * @brief 오의 하나를 시전한다.
+         *
+         * 첫 타격은 **클립의 타격 프레임에서** 나므로 이 함수는 즉시 피해를 주지
+         * 않는다. 그래도 사거리 확인은 지금 한다 - 허공에 클립만 재생하고 쿨다운을
+         * 돌리는 것이 이 게임에서 가장 나쁜 손해다(26단계 주석).
+         *
+         * @return 시전이 시작됐으면 true. 사거리가 비어 있으면 false이고, 부르는
+         *         쪽(SkillSystem)은 쿨다운을 되돌린다
+         */
+        public bool Cast(int skillIndex, double totalMultiplier, Color tint, string displayName)
+        {
+            if (combat == null) return false;
+            if (skillIndex < 0 || skillIndex >= SkillCatalog.Count) return false;
+
+            var spec = SkillCatalog.Skills[skillIndex];
+            var choreography = Find(spec.Id);
+
+            // 안무가 없으면 시전하지 않는다. 조용히 단일 대상 한 방으로 떨어뜨리는
+            // 대신 거절하는 이유는, 그 폴백이 있으면 배선이 빠진 것을 화면에서
+            // 알아챌 수 없기 때문이다 - 26단계와 똑같이 보인다
+            if (choreography == null || choreography.HitCount == 0)
+            {
+                Debug.LogWarning("[Onikiri] '" + spec.DisplayName + "'의 안무가 배선되지 않았다. "
+                                 + "Build Combat Content 를 실행하라.");
+                return false;
+            }
+
+            if (combat.FindTarget() == null) return false;
+
+            // 같은 오의가 아직 돌고 있으면 새로 시작하지 않는다. 쿨다운이 클립보다
+            // 길므로 정상 경로에서는 일어나지 않고, 테스트 패널의 "지금 시전"을
+            // 연달아 누를 때만 온다
+            for (int i = 0; i < active.Count; i++)
+                if (active[i].skillIndex == skillIndex) return false;
+
+            active.Add(new ActiveCast
+            {
+                skillIndex = skillIndex,
+                choreography = choreography,
+                totalMultiplier = totalMultiplier,
+                tint = tint,
+                elapsed = 0f,
+                nextHit = 0,
+                nextGhost = 0,
+                baseX = combat.transform.position.x
+            });
+
+            combat.PlaySkillClip(choreography.clip, choreography.clipFrameRate);
+
+            // **섬광은 타격이 아니라 시전 순간에 나간다.** 거합은 지나가는 것이
+            // 먼저고 베이는 것이 나중이다 - 타격 프레임에 맞춰 띄우면 이미
+            // 지나간 자리에 뒤늦게 선이 그어진다
+            if (choreography.usesStreak) SpawnStreak(active[active.Count - 1], choreography);
+
+            if (nameFlash != null) nameFlash.Play(displayName, tint);
+
+            return true;
+        }
+
+        // ---------------------------------------------------------------- 안무 진행
+
+        private void Update()
+        {
+            if (active.Count == 0) return;
+
+            float lunge = 0f;
+
+            for (int i = active.Count - 1; i >= 0; i--)
+            {
+                var cast = active[i];
+                var c = cast.choreography;
+
+                // 스케일 타임이다. 히트스톱 중에는 안무도 멈춘다 - 애니메이션과
+                // 이펙트가 전부 스케일 타임이므로(23단계), 여기만 unscaled로 돌면
+                // 정지 중에 타격이 들어가고 화면에는 아무 일도 일어나지 않는다
+                cast.elapsed += Time.deltaTime;
+
+                while (cast.nextHit < c.HitCount && cast.elapsed >= c.HitTime(cast.nextHit))
+                {
+                    Deliver(cast, cast.nextHit);
+                    cast.nextHit++;
+                }
+
+                // 잔상도 타격과 같은 방식으로 시각에 걸려 있다. 걸린 시각을
+                // 지날 때마다 하나씩 나가므로, 프레임이 몇 장이 뜨든 개수가 같다
+                while (cast.nextGhost < c.afterimageCount
+                       && cast.elapsed >= GhostTime(c, cast.nextGhost))
+                {
+                    SpawnAfterimage(cast, c, cast.nextGhost);
+                    cast.nextGhost++;
+                }
+
+                // 돌진은 타격과 별개로 클립 길이에 걸쳐 흐른다
+                if (c.lungeDistance > 0f)
+                    lunge = Mathf.Max(lunge, LungeAt(c, cast.elapsed));
+
+                // 클립이 끝나면 놓아준다. 마지막 타격이 아니라 클립 끝을 기준으로
+                // 하는 이유는 돌진 복귀가 타격보다 뒤에 있기 때문이다
+                if (cast.nextHit >= c.HitCount && cast.elapsed >= c.ClipSeconds)
+                    active.RemoveAt(i);
+            }
+
+            // 돌진 오프셋은 매 프레임 다시 쓴다. 시전이 끝나면 0이 들어가 앵커로
+            // 돌아간다 - PlayerCombat이 기준 X에서 다시 놓으므로 누적되지 않는다
+            combat.LungeOffsetX = lunge;
+        }
+
+        /**
+         * @brief 돌진 곡선. 나갈 때 빠르고 돌아올 때 느리다.
+         *
+         * 등속으로 왕복하면 "미끄러진다"로 읽힌다. 나가는 쪽에 가속을 몰아주면
+         * 순간 이동에 가까워지고, 그것이 거합의 성질이다.
+         */
+        private static float LungeAt(Choreography c, float elapsed)
+        {
+            float out_ = Mathf.Max(0.0001f, c.lungeOutSeconds);
+            float back = Mathf.Max(0.0001f, c.lungeBackSeconds);
+
+            if (elapsed <= out_)
+            {
+                // ease-out: 처음이 가장 빠르다
+                float t = elapsed / out_;
+                return c.lungeDistance * (1f - (1f - t) * (1f - t));
+            }
+
+            float bt = (elapsed - out_) / back;
+            if (bt >= 1f) return 0f;
+
+            // ease-in-out: 천천히 떼고 천천히 붙는다
+            return c.lungeDistance * (1f - bt * bt * (3f - 2f * bt));
+        }
+
+        // ---------------------------------------------------------------- 타격 분배
+
+        private void Deliver(ActiveCast cast, int hitIndex)
+        {
+            var c = cast.choreography;
+            var spec = SkillCatalog.Skills[cast.skillIndex];
+            bool last = hitIndex == c.HitCount - 1;
+
+            double share = SkillCatalog.HitDamageShare(cast.skillIndex, hitIndex, cast.totalMultiplier);
+            var damage = BigDouble.FromDouble(share);
+
+            int hits;
+            switch (spec.Shape)
+            {
+                case SkillShape.Pierce:
+                    hits = DeliverLane(cast, damage, c.pierceRange, c.pierceHeight);
+                    break;
+
+                case SkillShape.Screen:
+                    // 화면 전체다. 관통과 같은 코드를 아주 큰 사거리로 쓰지 않는
+                    // 이유는 뜻이 다르기 때문이다 - 관통은 '경로'이고 광역은
+                    // '살아 있는 전부'다. 사거리로 흉내내면 화면 밖의 요괴가
+                    // 사거리에 들어오는 날 조용히 뜻이 달라진다
+                    hits = DeliverAll(cast, damage);
+                    break;
+
+                default:
+                    hits = combat.DeliverSkillHit(combat.FindTarget(), damage, cast.tint,
+                                                  c.numberSizeMultiple) ? 1 : 0;
+                    break;
+            }
+
+            if (c.usesSlash) SpawnSlash(cast, c);
+
+            if (c.screenFlash && screenFlash != null) screenFlash.Play();
+
+            // 무게는 마지막 타격에만. 다타의 중간 타격에 정지를 주면 0.5초 동안
+            // 화면이 세 번 끊기고, 그것은 '연속 베기'가 아니라 '느려짐'이다
+            if (last)
+                combat.SkillFeedback(c.hitStopMultiplier, c.shakeMultiplier);
+            else
+                combat.SkillFeedback(0f, c.perHitShakeMultiplier);
+
+            // 벨 것이 사라져도 안무는 끝까지 간다. 클립을 중간에 끊으면 사무라이가
+            // 칼을 뻗은 자세로 얼어붙고, 그것이 화면에서 가장 어색한 상태다.
+            // 데미지만 0으로 지나간다
+            if (hits == 0 && hitIndex == 0)
+                lastCastMissed = true;
+        }
+
+        /** 마지막 시전이 허공을 갈랐는지. 테스트 패널의 진단용 */
+        private bool lastCastMissed;
+        public bool LastCastMissed { get { return lastCastMissed; } }
+
+        /**
+         * @brief 전방 일렬. 사무라이 앞 range 안의 살아 있는 요괴 전부.
+         *
+         * 세로 폭을 함께 보는 이유는 떠 있는 도깨비불이다. 그려진 중심이 지면보다
+         * 1u 위에 있어서, 세로를 안 보면 관통이 지면의 요괴만 베고 도깨비불은
+         * 지나친다 - 화면에서는 "가끔 안 맞는다"로만 보인다.
+         */
+        private int DeliverLane(ActiveCast cast, BigDouble damage, float range, float height)
+        {
+            float originX = combat.transform.position.x;
+            float originY = samuraiRenderer != null ? samuraiRenderer.bounds.center.y : combat.transform.position.y;
+
+            int hits = 0;
+            var enemies = combat.ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var enemy = enemies[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                var point = enemy.HitPoint;
+                float dx = point.x - originX;
+                if (dx < -0.3f || dx > range) continue;
+                if (Mathf.Abs(point.y - originY) > height * 0.5f) continue;
+
+                if (combat.DeliverSkillHit(enemy, damage, cast.tint,
+                                           cast.choreography.numberSizeMultiple)) hits++;
+            }
+            return hits;
+        }
+
+        /** 화면 광역. 살아 있는 요괴 전부 */
+        private int DeliverAll(ActiveCast cast, BigDouble damage)
+        {
+            int hits = 0;
+            var enemies = combat.ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var enemy = enemies[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                if (combat.DeliverSkillHit(enemy, damage, cast.tint,
+                                           cast.choreography.numberSizeMultiple)) hits++;
+            }
+            return hits;
+        }
+
+        // ---------------------------------------------------------------- 참격
+
+        /**
+         * @brief 팩 참격을 사무라이 앞에 놓는다. **요괴가 아니라 사무라이 기준이다.**
+         *
+         * 26단계에는 요괴의 피격점에 놓았고, 그래서 요괴가 여럿일 때 어느 하나에
+         * 붙은 것으로 보였다. 관통과 광역은 **여럿을 한 번에 베는 것**이므로
+         * 참격도 그 범위 한가운데에 있어야 한다 - 한 요괴에 붙으면 "여럿을 벴다"가
+         * 아니라 "저 하나를 벴다"로 읽힌다.
+         *
+         * **참격의 크기와 타격 범위는 별개다.** 귀참은 화면의 모든 요괴를 때리지만
+         * (`DeliverAll`) 그림은 사무라이 앞을 가르는 한 번뿐이다 - 이펙트가 맞는
+         * 것들을 물리적으로 덮을 필요가 없다. 덮으려다 화면을 가린 것이 28단계다.
+         *
+         * 반전은 여전히 요괴에서 끌어온다(23단계 규칙). 대상이 없으면 오른쪽을
+         * 기본으로 둔다 - 지금 요괴는 전부 오른쪽에서 온다.
+         */
+        private void SpawnSlash(ActiveCast cast, Choreography c)
+        {
+            if (slashPool == null || c.slashFrames == null || c.slashFrames.Length == 0) return;
+
+            float originY = samuraiRenderer != null
+                ? samuraiRenderer.bounds.center.y
+                : combat.transform.position.y;
+
+            var target = combat.FindTarget();
+            bool mirror = target != null && target.FacingDirection > 0;
+
+            // 전방 오프셋은 바라보는 쪽으로 간다. 부호를 안 뒤집으면 왼쪽을 벨 때
+            // 참격이 등 뒤에 뜬다
+            float forward = mirror ? -c.slashForwardOffset : c.slashForwardOffset;
+
+            var anchor = new Vector3(
+                combat.transform.position.x + forward,
+                originY + c.slashHeightOffset,
+                0f);
+
+            var slash = slashPool.Get();
+            slash.Play(c.slashFrames, c.slashFrameRate, anchor,
+                       c.slashAngle, c.slashScale, mirror, ReleaseSlash);
+        }
+
+        private void ReleaseSlash(PackSlash slash)
+        {
+            slashPool.Release(slash);
+        }
+
+        /**
+         * @brief 돌진 경로에 얇은 섬광을 눕힌다.
+         *
+         * 길이가 **돌진 거리와 같다.** 사거리(pierceRange)가 아니다 - 섬광은
+         * 사무라이가 실제로 지나간 자리이고, 그보다 길면 다시 "저 앞에 뜬 이펙트"가
+         * 된다. 타격이 닿는 범위는 히트박스가 따로 말한다.
+         */
+        private void SpawnStreak(ActiveCast cast, Choreography c)
+        {
+            if (streakPool == null) return;
+
+            float originY = samuraiRenderer != null
+                ? samuraiRenderer.bounds.center.y
+                : combat.transform.position.y;
+
+            var target = combat.FindTarget();
+            bool mirror = target != null && target.FacingDirection > 0;
+
+            var origin = new Vector3(cast.baseX, originY + c.streakHeightOffset, 0f);
+
+            var streak = streakPool.Get();
+            streak.Play(origin, mirror ? -1f : 1f, c.lungeDistance, c.streakThickness,
+                        c.streakColor, c.streakRevealSeconds, c.streakHoldSeconds,
+                        c.streakFadeSeconds, ReleaseStreak);
+        }
+
+        private void ReleaseStreak(DashStreak streak)
+        {
+            streakPool.Release(streak);
+        }
+
+        /**
+         * @brief 잔상 하나가 놓일 자리 (돌진 거리 대비 비율).
+         *
+         * **시간이 아니라 거리를 균등하게 나눈다.** 시간을 나누면 돌진 곡선이
+         * ease-out(처음이 가장 빠르다)이라 잔상이 도착 지점 쪽에 뭉친다 -
+         * 실측으로 세 장이 0.83 / 1.43 / 1.78u에 놓여 뒤 두 장이 0.36u 안에
+         * 붙었다. 거리를 나누면 0.475 / 0.95 / 1.425로 고르게 선다.
+         */
+        private static float GhostFraction(Choreography c, int index)
+        {
+            return (index + 1) / (c.afterimageCount + 1f);
+        }
+
+        /**
+         * @brief 그 자리를 본체가 실제로 지나는 시각.
+         *
+         * 돌진 곡선 `1-(1-x)^2 = f`를 x에 대해 푼 것이다. 거리에서 시각을
+         * 역산해야 **잔상이 본체보다 앞서 나타나지 않는다** - 자리만 고르게
+         * 잡고 시각을 그대로 두면 아직 가지 않은 곳에 잔상이 먼저 뜬다.
+         */
+        private static float GhostTime(Choreography c, int index)
+        {
+            float f = Mathf.Clamp01(GhostFraction(c, index));
+            return c.lungeOutSeconds * (1f - Mathf.Sqrt(1f - f));
+        }
+
+        /**
+         * @brief 돌진이 지나간 자리에 사무라이 잔상을 하나 남긴다.
+         *
+         * ## 시전 순간에 한꺼번에 뿌리지 않는다
+         *
+         * 처음에는 Cast에서 세 장을 한 번에 만들었다. 개수가 프레임률에
+         * 좌우되지 않는다는 점은 좋았지만 **그리는 것이 틀렸다** - 그 시점의
+         * `samuraiRenderer.sprite`는 아직 DASH 클립이 아니라 직전 평타 프레임이라,
+         * 화면에는 돌진하는 사무라이가 아니라 **평타의 흰 칼궤적이 허공에
+         * 한 장 떠 있는 그림**이 나왔다. 28단계 스크린샷에서 실제로 그렇게 보였다.
+         *
+         * 그래서 타격과 같은 방식으로 바꿨다. 잔상마다 시각이 걸려 있고
+         * (GhostTime), 그 시각을 지날 때 하나가 나간다. 시각이 고정이므로 개수는
+         * 여전히 프레임률과 무관하고, 그리는 그림은 그 순간의 DASH 프레임이 된다.
+         *
+         * 위치는 실제 위치가 아니라 **걸린 시각의 돌진 곡선 값**을 쓴다. 프레임이
+         * 늦게 떠서 조금 지나친 자리에 남기면 잔상이 본체보다 앞에 놓인다.
+         */
+        private void SpawnAfterimage(ActiveCast cast, Choreography c, int index)
+        {
+            if (afterimagePool == null) return;
+            if (samuraiRenderer == null || samuraiRenderer.sprite == null) return;
+
+            float offset = c.lungeDistance * GhostFraction(c, index);
+
+            var tint = afterimageTint;
+            // 뒤쪽(먼저 지나간 자리)일수록 옅다. 같은 진하기로 두면 잔상이
+            // 아니라 여러 명이 서 있는 그림이 된다.
+            //
+            // 다만 0에서 시작하지 않는다. 1/N로 나눴더니 첫 장이 알파 0.17로
+            // 떠서 수명 감쇠까지 겹치면 화면에 아무것도 안 보였다 - 가장 옅은
+            // 장도 0.45는 남겨야 "지나간 자리"로 읽힌다
+            tint.a *= c.afterimageCount > 1
+                ? Mathf.Lerp(0.45f, 1f, index / (float)(c.afterimageCount - 1))
+                : 1f;
+
+            var position = combat.transform.position;
+
+            var ghost = afterimagePool.Get();
+            ghost.Play(samuraiRenderer.sprite,
+                       new Vector3(cast.baseX + offset, position.y, position.z),
+                       samuraiRenderer.flipX, tint, ReleaseAfterimage);
+        }
+
+        private void ReleaseAfterimage(Afterimage ghost)
+        {
+            afterimagePool.Release(ghost);
+        }
+    }
+}

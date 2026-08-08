@@ -1,0 +1,190 @@
+using Onikiri.Core;
+using Onikiri.Progression;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace Onikiri.UI
+{
+    /**
+     * @brief 퀘스트 목록의 한 줄. 목표 · 진행바 · 보상 · 받기 버튼 · 완료 배지.
+     *
+     * ## 진행바를 두는 이유
+     *
+     * 숫자만 적어도 진행은 읽힌다("42 / 60"). 그런데 목록을 훑을 때 필요한 것은
+     * 정확한 값이 아니라 **어느 것이 곧 끝나는가**이고, 그것은 다섯 줄의 숫자를
+     * 비교해야 나온다. 막대는 훑는 순간에 답한다.
+     *
+     * 숫자도 함께 적는다. "골드 2,000 획득"처럼 목표가 큰 것은 막대만으로
+     * 남은 양을 가늠할 수 없다.
+     *
+     * ## 받기 버튼은 조건을 만족할 때만 눌린다
+     *
+     * 회색으로 두고 눌리지 않게 한다. 감추지 않는 이유는 LockedTab과 같다 -
+     * **자리는 있고 아직 못 누른다**가 사실이고, 감추면 그 줄에서 무엇을 할 수
+     * 있는지가 사라진다.
+     */
+    public sealed class QuestRow : MonoBehaviour
+    {
+        [SerializeField] private QuestKind kind;
+        [SerializeField] private int index;
+
+        [SerializeField] private TMP_Text title;
+        [SerializeField] private TMP_Text progressLabel;
+        [SerializeField] private TMP_Text rewardLabel;
+
+        [Tooltip("진행바의 채워지는 부분. 가로 앵커를 진행률로 민다")]
+        [SerializeField] private RectTransform progressFill;
+
+        [SerializeField] private Button claimButton;
+        [SerializeField] private TMP_Text claimLabel;
+
+        [Tooltip("이미 받은 줄에 뜨는 완료 배지")]
+        [SerializeField] private GameObject doneBadge;
+
+        [Header("색")]
+        [SerializeField] private Color readyText = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
+        [SerializeField] private Color dimText = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
+        [SerializeField] private Color readyFill = new Color32(0x8B, 0xD4, 0x50, 0xFF);
+        [SerializeField] private Color busyFill = new Color32(0x62, 0x6A, 0xC8, 0xFF);
+
+        private QuestSystem quests;
+
+        private void Start()
+        {
+            quests = QuestSystem.Instance;
+            if (quests != null) quests.Changed += Refresh;
+            if (claimButton != null) claimButton.onClick.AddListener(Claim);
+
+            Refresh();
+        }
+
+        /**
+         * @brief 켜질 때마다 다시 그린다.
+         *
+         * 이 줄은 퀘스트 판이 꺼진 채로 씬에 저장되므로 Start가 **처음 열릴 때**
+         * 돈다. 그 사이 진행이 바뀌어 있으면 빌더가 적어둔 초기 문구가 한 프레임
+         * 보인다 - LockedTab·StatPointButton과 같은 처리다.
+         */
+        private void OnEnable()
+        {
+            if (quests == null) quests = QuestSystem.Instance;
+            Refresh();
+        }
+
+        private void OnDestroy()
+        {
+            if (quests != null) quests.Changed -= Refresh;
+            if (claimButton != null) claimButton.onClick.RemoveListener(Claim);
+        }
+
+        private void Claim()
+        {
+            if (quests == null) return;
+            quests.TryClaim(kind, index);
+        }
+
+        private void Refresh()
+        {
+            var specs = QuestCatalog.Of(kind);
+            if (index < 0 || index >= specs.Length) return;
+            var spec = specs[index];
+
+            if (quests == null)
+            {
+                if (title != null) title.text = spec.Title;
+                return;
+            }
+
+            double progress = quests.ProgressOf(kind, index);
+            int claimable = quests.ClaimableCount(kind, index);
+            bool claimed = quests.IsClaimed(kind, index);
+
+            if (title != null)
+            {
+                // 반복은 지금 몇 단계째인지 함께 적는다. 같은 문구가 영원히
+                // 반복되면 "받았는데 그대로다"로 읽힌다
+                title.text = kind == QuestKind.Repeat
+                    ? spec.Title + "  <size=80%>(" + (quests.RepeatTier(index) + 1) + "단계)</size>"
+                    : spec.Title;
+
+                title.color = claimed ? dimText : readyText;
+            }
+
+            if (progressLabel != null)
+            {
+                progressLabel.text = FormatCount(progress) + " / " + FormatCount(spec.Target);
+                progressLabel.color = claimable > 0 ? readyText : dimText;
+            }
+
+            if (progressFill != null)
+            {
+                float fraction = spec.Target > 0d
+                    ? Mathf.Clamp01((float)(progress / spec.Target))
+                    : 0f;
+
+                // 앵커를 밀어 채운다. sizeDelta를 쓰면 행 폭이 바뀔 때 어긋난다
+                progressFill.anchorMin = new Vector2(0f, 0f);
+                progressFill.anchorMax = new Vector2(fraction, 1f);
+                progressFill.offsetMin = Vector2.zero;
+                progressFill.offsetMax = Vector2.zero;
+
+                var image = progressFill.GetComponent<Image>();
+                if (image != null) image.color = claimable > 0 ? readyFill : busyFill;
+            }
+
+            if (rewardLabel != null) rewardLabel.text = RewardText(spec);
+
+            if (claimButton != null)
+            {
+                claimButton.interactable = claimable > 0;
+                claimButton.gameObject.SetActive(!claimed);
+            }
+
+            if (claimLabel != null)
+            {
+                // 여러 티어가 쌓였으면 몇 개인지 적는다. 반복만 2 이상이 된다.
+                // 배수는 작게 - "받기"가 동사이고 배수는 곁가지인데, 같은 크기로
+                // 두면 "x20"이 버튼을 밀어내 진행 숫자와 겹친다
+                claimLabel.text = claimable > 1
+                    ? "받기 <size=70%>x" + claimable + "</size>"
+                    : "받기";
+                claimLabel.color = claimable > 0 ? readyText : dimText;
+            }
+
+            if (doneBadge != null && doneBadge.activeSelf != claimed)
+                doneBadge.SetActive(claimed);
+        }
+
+        /**
+         * @brief 보상 문구. 업적만 골드·경험치가 붙는다.
+         *
+         * 덧붙는 쪽을 **75% 크기로** 적는다. 보석은 세 종류가 다 주는 주 보상이고
+         * 골드·EXP는 업적에만 붙는 곁가지인데, 같은 크기로 두면 문구가 380px을
+         * 넘어 진행바를 밀어낸다.
+         */
+        private static string RewardText(QuestSpec spec)
+        {
+            string text = "보석 " + spec.Gems;
+
+            string extra = "";
+            if (spec.GoldMobs > 0d) extra += " ·골드";
+            if (spec.ExpBosses > 0d) extra += " ·EXP";
+
+            return extra.Length == 0 ? text : text + "<size=75%>" + extra + "</size>";
+        }
+
+        /**
+         * @brief 진행 숫자.
+         *
+         * 골드는 자릿수가 커서 축약하고(NumberFormatter), 처치 수처럼 작은 값은
+         * 그대로 적는다. 한 가지로 통일하지 않는 이유는 "60마리"가 "60"으로
+         * 보여야 하고 "2000골드"는 "2.0K"로 보여야 읽히기 때문이다.
+         */
+        private static string FormatCount(double value)
+        {
+            if (value >= 10000d) return NumberFormatter.Format(BigDouble.FromDouble(value));
+            return Mathf.FloorToInt((float)value).ToString();
+        }
+    }
+}

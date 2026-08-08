@@ -54,10 +54,40 @@ namespace Onikiri.EditorTools
 
             { CharacterLevel.AttackAmpId,   "Icon084" },  // 검 - 공격력과 같은 심볼
             { CharacterLevel.HealthAmpId,   "Icon066" },  // 심장 - 체력과 같은 심볼
+
+            // 26단계의 발도 오의 셋. **여기서는 심볼을 전부 다르게 쓴다.**
+            //
+            // 증폭 축이 기본 축과 같은 심볼을 쓰는 것(위)과 반대 판단인데, 상황이
+            // 다르다. 증폭은 같은 스탯을 다른 재화로 올리는 것이라 같은 심볼이
+            // 맞지만, 세 오의는 서로 다른 동작이고 **화면에서 어느 것이 터졌는지
+            // 알아봐야 한다.** 목록에서 고르는 것으로 끝나지 않고 전투 중에
+            // 다시 읽히는 축은 이 셋뿐이다.
+            //
+            // 색도 대형 참격의 색(SkillCatalog.SlashRgba)과 계열을 맞춘다 -
+            // 흰 삼연참 / 붉은 단발 / 금빛 오니.
+            { SkillCatalog.ChainSlashId,    "Icon076" },  // 흰 삼연 참격  (붉은 타일)
+            { SkillCatalog.FlashId,         "Icon140" },  // 붉은 단발 참격 (검은 타일)
+            { SkillCatalog.OniCleaveId,     "Icon118" },  // 오니 뿔        (금빛)
         };
 
         public const string GoldIcon = "Icon114";   // 금화
         public const string ExpIcon = "Icon175";    // 별
+
+        /**
+         * @brief 31단계에 쓴 아이템 팩. **다른 팩이라 로더가 따로 있다.**
+         *
+         * 스킬 아이콘 팩(KuraiSkillIcons)은 파일 하나에 아이콘 하나지만 이쪽은
+         * 시트 한 장에 133개가 잘려 있다. 새 팩을 들이지 않고 이미 프로젝트에
+         * 있는 것에서 고른 이유는, 필요한 것이 둘뿐이고 **팩 하나가 통째로
+         * 늘어나는 비용이 아이콘 두 개보다 크기** 때문이다.
+         */
+        public const string ItemSheet = "Assets/ThirdParty/UI/KyriseItemIcons/spritesheet_16x16.png";
+
+        /** 파란 다이아. 보석 재화 */
+        public const string GemSprite = "spritesheet_16x16_74";
+
+        /** 펼친 책. 퀘스트 탭 */
+        public const string QuestSprite = "spritesheet_16x16_23";
 
         /**
          * @brief 원본 채도를 반 톤 누르는 틴트.
@@ -100,6 +130,25 @@ namespace Onikiri.EditorTools
             if (sprite == null)
                 Debug.LogWarning("[Onikiri] Icon missing: " + Folder + "/" + file + ".png");
             return sprite;
+        }
+
+        /**
+         * @brief 아이템 시트에서 이름으로 하나 꺼낸다.
+         *
+         * `LoadAssetAtPath<Sprite>`로는 시트의 **첫 서브 스프라이트**만 나온다.
+         * 전부 읽어 이름으로 찾아야 한다 - 팩 참격 시트를 자를 때와 같은 자리다
+         * (SkillPanelBuilder.SliceSlashSheet).
+         */
+        public static Sprite LoadItem(string spriteName)
+        {
+            foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(ItemSheet))
+            {
+                var sprite = asset as Sprite;
+                if (sprite != null && sprite.name == spriteName) return sprite;
+            }
+
+            Debug.LogWarning("[Onikiri] Item icon missing: " + spriteName + " in " + ItemSheet);
+            return null;
         }
 
         /** 표에 등록된 축 id 전부. VerifyWiring이 빠진 축을 찾을 때 쓴다 */

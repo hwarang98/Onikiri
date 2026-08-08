@@ -19,10 +19,13 @@ namespace Onikiri.Progression
     public sealed class GameSession : MonoBehaviour
     {
         [SerializeField] private UpgradeSystem upgrades;
+        [SerializeField] private SkillSystem skills;
         [SerializeField] private CharacterLevel character;
         [SerializeField] private StageProgress stage;
         [SerializeField] private PlayerCombat combat;
         [SerializeField] private EnemySpawner spawner;
+        [SerializeField] private QuestSystem quests;
+        [SerializeField] private EquipmentSystem equipment;
         [SerializeField] private Onikiri.UI.OfflineRewardPopup offlinePopup;
 
         [Tooltip("자동 저장 간격 (초). 프로세스가 예고 없이 사라져도 잃는 양을 " +
@@ -88,7 +91,28 @@ namespace Onikiri.Progression
             // 순서가 뒤바뀌면 한 프레임 동안 어긋난 값으로 싸운다
             if (upgrades != null) upgrades.RestoreLevels(data.upgradeIds, data.upgradeLevels);
 
+            // 오의는 강화 다음이다. 오의 배율이 공격력에 곱해지므로(PlayerCombat.
+            // CastSkill), 강화가 먼저 적용돼 있어야 한 프레임이라도 어긋난 값으로
+            // 시전하지 않는다
+            if (skills != null) skills.RestoreLevels(data.skillIds, data.skillLevels, data.skillAutoCast);
+
+            // 장비는 강화 **다음**이다. 장비 배수가 강화 값에 곱해지므로
+            // (UpgradeSystem.Apply), 순서가 뒤바뀌면 장비가 배수 없는 값에 한 번
+            // 적용되고 그 상태가 다음 구매까지 남는다 - 레벨을 강화보다 먼저
+            // 복원하는 것과 정확히 같은 이유이고, 복원 끝에 ApplyAll을 다시
+            // 부르는 것도 같다
+            if (equipment != null)
+                equipment.Restore(data.equipmentIds, data.equipmentGrades, data.equipmentLevels);
+
+            // 퀘스트는 **맨 마지막**이다. 업적이 스테이지·레벨·강화 총합을 읽으므로
+            // 그 셋이 이미 복원돼 있어야 한다 - 먼저 돌면 전부 초기값으로 읽혀서
+            // 30스테이지 플레이어에게 "5스테이지 도달"이 미달성으로 뜬다
+            if (quests != null) quests.Restore(data);
+
             loaded = true;
+
+            // 방치 보상은 퀘스트 복원 뒤다. 지급이 wallet.Add를 지나 골드 카운터를
+            // 올리는데, 복원이 나중이면 그 값을 세이브의 옛 값이 덮어쓴다
             GrantOfflineReward(data);
         }
 
@@ -167,6 +191,24 @@ namespace Onikiri.Progression
                 data.healthPoints = character.HealthPoints;
             }
 
+            if (skills != null)
+            {
+                data.skillIds = skills.CollectIds();
+                data.skillLevels = skills.CollectLevels();
+                data.skillAutoCast = skills.AutoCast;
+            }
+
+            if (equipment != null)
+            {
+                data.equipmentIds = equipment.CollectIds();
+                data.equipmentGrades = equipment.CollectGrades();
+                data.equipmentLevels = equipment.CollectLevels();
+            }
+
+            // 퀘스트가 보석 잔액까지 함께 적는다. 지갑을 따로 읽지 않는 이유는
+            // 둘이 한 시스템이기 때문이다 - 보석은 퀘스트 말고 들어올 곳이 없다
+            if (quests != null) quests.Write(data);
+
             data.lastQuitUtcTicks = DateTime.UtcNow.Ticks;
             data.goldPerSecond = EstimateGoldPerSecond();
             data.expPerSecond = EstimateExpPerSecond(data.goldPerSecond);
@@ -191,9 +233,13 @@ namespace Onikiri.Progression
             // 제곱된다
             var goldGain = BigDouble.FromDouble(UpgradeSystem.CurrentGoldGain);
 
+            // 오의를 포함한 초당 환산 공격 횟수를 넘긴다. 방치는 파밍의 축소판인데
+            // 오의는 자동 시전이라 자리를 비운 동안에도 나간다 - 여기서 빼면
+            // 방치 수입이 실제 파밍보다 가난하게 계산되고, 그러면 "켜두는 것이
+            // 이득"이라는 관계가 26단계에 조용히 강해진다
             return IdleIncome.GoldPerSecond(
                 combat.Damage,
-                combat.AttacksPerSecond,
+                combat.EffectiveAttacksPerSecond,
                 spawner.AverageBaseHealth * multiplierHealth,
                 spawner.AverageBaseGold * multiplierGold * goldGain,
                 spawner.SpawnInterval);

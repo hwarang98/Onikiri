@@ -26,10 +26,13 @@ namespace Onikiri.Progression
          *   4  11단계. 체력·체력회복 축이 생겼다
          *   5  12단계. 경험치/레벨/스탯 포인트가 생겼다
          *   6  20단계. 골드 획득량 축이 생겼다
+         *   7  26단계. 발도 오의 셋(레벨 + 자동 시전 토글)이 생겼다
+         *   8  31단계. 퀘스트(일일/반복/업적) 진행·수령과 보석 잔액이 생겼다
+         *   9  32단계. 장비 두 슬롯(등급 + 단련 레벨)이 생겼다
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 6;
+        public const int CurrentVersion = 9;
 
         public int version = CurrentVersion;
 
@@ -91,6 +94,95 @@ namespace Onikiri.Progression
         /** 같은 이유로 함께 적는 초당 경험치. 방치 보상이 골드와 나란히 계산된다 */
         public double expPerSecond;
 
+        // ---------------------------------------------------------------- 26단계
+
+        /**
+         * @brief 발도 오의의 레벨. 강화 축과 **같은 방식**(id 배열 + 레벨 배열)이다.
+         *
+         * 강화 배열에 섞지 않은 이유는 복원 대상이 다르기 때문이다. 강화는
+         * UpgradeSystem이, 오의는 SkillSystem이 되돌린다. 한 배열에 섞으면 복원
+         * 쪽이 "내 것이 아닌 id는 조용히 건너뛴다"에 의존하게 되는데, 그 규칙은
+         * **모르는 id를 무시하는 안전장치**이지 두 시스템을 가르는 수단이 아니다.
+         * 섞어두면 한쪽 시스템이 씬에서 빠졌을 때 그쪽 레벨이 조용히 사라진다.
+         */
+        public string[] skillIds = new string[0];
+        public int[] skillLevels = new int[0];
+
+        /**
+         * @brief 자동 시전이 켜져 있는가.
+         *
+         * 기본값 true다. JsonUtility는 없는 필드를 bool 기본값(false)으로 채우는데,
+         * 그러면 v6 세이브가 **오의가 꺼진 채로** 올라온다 - 마이그레이션이
+         * 밸런스를 바꾸는 셈이다. Migrate가 v6 -> v7에서 명시적으로 true를 넣는다.
+         */
+        public bool skillAutoCast = true;
+
+        // ---------------------------------------------------------------- 31단계
+
+        /**
+         * @brief 보석 잔액.
+         *
+         * BigDouble이 아니라 long이다 - 파밍으로 늘지 않는 재화이기 때문이다.
+         * GemWallet 주석 참고.
+         */
+        public long gems;
+
+        /**
+         * @brief 퀘스트 수령 상태. **id 배열 + 값 배열**이다.
+         *
+         * 강화 축·오의와 같은 방식이고 같은 이유다 - 목록 중간에 퀘스트가 하나
+         * 추가되면 인덱스 저장은 엉뚱한 퀘스트에 수령 표시를 밀어 넣는다.
+         *
+         * 값의 뜻은 종류마다 다르다:
+         *   일일/업적  0 = 미수령, 1 = 수령
+         *   반복       지금까지 받은 티어 수
+         *
+         * 세 종류를 한 배열에 섞는다. 오의를 강화 배열에 섞지 않은 것과 달라
+         * 보이지만 기준은 같다 - **복원하는 주체가 하나인가**다. 퀘스트는 셋 다
+         * QuestSystem이 되돌리므로 나눌 이유가 없다.
+         */
+        public string[] questIds = new string[0];
+        public int[] questClaims = new int[0];
+
+        /** 오늘치 카운터. 자정에 0으로 돌아간다 */
+        public double questTodayMobKills;
+        public double questTodayBossKills;
+        public double questTodaySkillCasts;
+        public double questTodayUpgrades;
+        public BigDouble questTodayGold;
+
+        /** 누적 카운터. 반복 퀘스트의 티어가 이것으로 열린다 */
+        public double questTotalMobKills;
+        public double questTotalBossKills;
+        public double questTotalSkillCasts;
+        public double questTotalUpgrades;
+        public BigDouble questTotalGold;
+
+        /**
+         * @brief 마지막 일일 리셋의 기준 날짜 (UTC ticks).
+         *
+         * lastQuitUtcTicks와 같은 이유로 UTC다 - 시간대를 넘나들면 로컬 자정이
+         * 하루에 두 번 오거나 건너뛴다.
+         */
+        public long lastDailyResetUtcTicks;
+
+        // ---------------------------------------------------------------- 32단계
+
+        /**
+         * @brief 장비 슬롯. **id 배열 + 등급 배열 + 단련 레벨 배열**이다.
+         *
+         * 강화 축·오의·퀘스트와 같은 방식이고 같은 이유다 - 슬롯이 중간에 하나
+         * 늘면(액세서리) 인덱스 저장은 엉뚱한 슬롯에 등급을 밀어 넣는다.
+         *
+         * **장착 플래그가 없다.** 인벤토리가 없어서 슬롯이 곧 장비이고, 등급업은
+         * 새 물건을 얻는 것이 아니라 그 자리의 물건이 바뀌는 것이다
+         * (EquipmentSystem 주석). 여벌과 교체는 드랍 재료가 들어오는 다음
+         * 스텝의 일이고, 그때 배열이 하나 더 는다.
+         */
+        public string[] equipmentIds = new string[0];
+        public int[] equipmentGrades = new int[0];
+        public int[] equipmentLevels = new int[0];
+
         public static SaveData NewGame()
         {
             return new SaveData
@@ -106,7 +198,15 @@ namespace Onikiri.Progression
                 attackPoints = 0,
                 healthPoints = 0,
                 lastQuitUtcTicks = 0L,
-                goldPerSecond = 0d
+                goldPerSecond = 0d,
+                skillAutoCast = true,
+
+                // 새 게임은 퀘스트 0진행 · 보석 0이다. 리셋 기준 시각도 0으로 두고
+                // QuestSystem이 첫 프레임에 오늘 날짜를 적는다 - 여기서 UtcNow를
+                // 넣으면 SaveData가 시계를 읽게 되고, 그러면 테스트가 시각을
+                // 넘겨줄 수 없다
+                gems = 0L,
+                lastDailyResetUtcTicks = 0L
             };
         }
 
@@ -194,8 +294,157 @@ namespace Onikiri.Progression
                 data.version = 6;
             }
 
+            if (data.version == 6)
+            {
+                // v6에는 오의가 없었다. 앞의 축들과 같은 이유로 레벨 1을 명시적으로
+                // 적어 넣는다 - "레벨 1이라서 없는 것"과 "저장된 적이 없어서 없는
+                // 것"이 구분돼야 한다.
+                //
+                // **레벨 1이 곧 해금 직후 상태다.** 배율이 0이 아니라 기본값이므로
+                // 이 마이그레이션은 예전 플레이어에게 오의를 공짜로 주는 것처럼
+                // 보이는데, 그것이 맞다 - 해금 조건은 캐릭터 레벨이고 그 레벨은
+                // 이미 갖고 있다. 새 시스템이 열리는 것과 레벨을 소급해 주는 것은
+                // 다른 일이다(v4 -> v5가 레벨을 소급하지 않은 것과 같은 구분).
+                foreach (var skill in SkillCatalog.Skills) EnsureSkill(data, skill.Id);
+
+                // JsonUtility가 없는 bool을 false로 채운다. 명시하지 않으면 v6
+                // 플레이어가 오의가 꺼진 채로 올라오고, 그것은 마이그레이션이
+                // 아니라 밸런스 변경이다
+                data.skillAutoCast = true;
+                data.version = 7;
+            }
+
+            if (data.version == 7)
+            {
+                // v7에는 퀘스트와 보석이 없었다. **소급하지 않는다** - 지금까지
+                // 잡은 요괴를 누적 카운터에 넣어주면 예전 플레이어가 접속하자마자
+                // 반복 퀘스트 티어 수십 개를 한꺼번에 받는다.
+                //
+                // 그것이 관대해 보이지만 사실은 두 가지가 어긋난다. 하나는 리텐션이다 -
+                // 퀘스트는 "내일 또 올 이유"인데 첫날에 몇 달치가 열리면 그 이유가
+                // 사라진다. 다른 하나는 밴드다. 업적 골드/경험치가 한 스테이지에
+                // 몰려 떨어지면 시뮬레이션이 계산한 분포와 달라진다.
+                //
+                // v4 -> v5가 레벨을 소급하지 않은 것과 같은 판단이다: **새 시스템이
+                // 열리는 것과 지나간 플레이를 소급하는 것은 다른 일이다.**
+                //
+                // 업적은 예외처럼 보일 수 있다. 이미 20스테이지인 플레이어에게
+                // "5스테이지 도달"이 미수령으로 뜨는데, 그것은 맞다 - 조건은 이미
+                // 만족했으므로 **곧바로 받을 수 있는 상태**로 열린다. 조건 판정이
+                // 카운터가 아니라 현재 상태를 읽기 때문에 저절로 그렇게 된다
+                // (QuestSystem.CurrentStateOf).
+                data.gems = 0L;
+                data.questIds = new string[0];
+                data.questClaims = new int[0];
+
+                data.questTodayMobKills = 0d;
+                data.questTodayBossKills = 0d;
+                data.questTodaySkillCasts = 0d;
+                data.questTodayUpgrades = 0d;
+                data.questTodayGold = BigDouble.Zero;
+
+                data.questTotalMobKills = 0d;
+                data.questTotalBossKills = 0d;
+                data.questTotalSkillCasts = 0d;
+                data.questTotalUpgrades = 0d;
+                data.questTotalGold = BigDouble.Zero;
+
+                // 0으로 두면 QuestSystem이 첫 프레임에 오늘 날짜를 적는다. UtcNow를
+                // 여기서 읽지 않는 이유는 위 NewGame과 같다
+                data.lastDailyResetUtcTicks = 0L;
+
+                data.version = 8;
+            }
+
+            if (data.version == 8)
+            {
+                // v8에는 장비가 없었다. 두 슬롯을 **1등급 Lv.1**로 명시적으로
+                // 적어 넣는다. 앞의 축들과 같은 이유다 - 그래야 "기본값이라서
+                // 없는 것"과 "저장된 적이 없어서 없는 것"이 구분된다.
+                //
+                // **이 마이그레이션은 밸런스를 바꾸지 않는다.** 1등급 Lv.1의
+                // 배수가 정확히 1배이기 때문이고(EquipmentCurve.ValueAt), 그것은
+                // GoldGainCurve.BaseValue가 1인 것과 같은 설계다. 새 축이 생겼다고
+                // 기존 진행의 스탯이 달라지면 그것은 마이그레이션이 아니라 밸런스
+                // 변경이다.
+                //
+                // 소급하지 않는 것도 v7 -> v8과 같다. 이미 30스테이지인 플레이어가
+                // 접속하자마자 5등급을 갖고 있으면, 보석 소비처를 만들어놓고 그
+                // 소비처를 통과할 이유를 함께 지우는 셈이다
+                foreach (var slot in EquipmentCatalog.Slots) EnsureEquipment(data, slot.Id);
+                data.version = 9;
+            }
+
             data.version = CurrentVersion;
             return true;
+        }
+
+        /**
+         * @brief 세이브에 없는 장비 슬롯을 1등급 Lv.1로 추가한다.
+         *
+         * EnsureTrack·EnsureSkill과 같은 규칙이다. 이미 있으면 건드리지 않는다
+         * (멱등) - 저장 실패 후 재시도 같은 경로에서 마이그레이션이 실제로 두 번
+         * 돌 수 있고, 그때 등급이 1로 초기화되면 보석이 사라진다.
+         */
+        private static void EnsureEquipment(SaveData data, string id)
+        {
+            if (data.equipmentIds == null) data.equipmentIds = new string[0];
+            if (data.equipmentGrades == null) data.equipmentGrades = new int[0];
+            if (data.equipmentLevels == null) data.equipmentLevels = new int[0];
+
+            for (int i = 0; i < data.equipmentIds.Length; i++)
+                if (data.equipmentIds[i] == id) return;
+
+            var ids = new string[data.equipmentIds.Length + 1];
+            var grades = new int[ids.Length];
+            var levels = new int[ids.Length];
+
+            for (int i = 0; i < data.equipmentIds.Length; i++)
+            {
+                ids[i] = data.equipmentIds[i];
+                // 예전 세이브의 배열 길이가 어긋나 있을 수 있다. 짧은 쪽을
+                // 넘어가면 1로 채운다 - 손상된 파일이 예외를 던지지 않게
+                grades[i] = i < data.equipmentGrades.Length ? data.equipmentGrades[i] : 1;
+                levels[i] = i < data.equipmentLevels.Length ? data.equipmentLevels[i] : 1;
+            }
+
+            ids[ids.Length - 1] = id;
+            grades[grades.Length - 1] = 1;
+            levels[levels.Length - 1] = 1;
+
+            data.equipmentIds = ids;
+            data.equipmentGrades = grades;
+            data.equipmentLevels = levels;
+        }
+
+        /**
+         * @brief 세이브에 없는 오의를 레벨 1로 추가한다. EnsureTrack과 같은 규칙.
+         *
+         * 이미 있으면 건드리지 않는다(멱등). 배열을 따로 두는 이유는 위
+         * skillIds 주석 참고.
+         */
+        private static void EnsureSkill(SaveData data, string id)
+        {
+            if (data.skillIds == null) data.skillIds = new string[0];
+            if (data.skillLevels == null) data.skillLevels = new int[0];
+
+            for (int i = 0; i < data.skillIds.Length; i++)
+                if (data.skillIds[i] == id) return;
+
+            var ids = new string[data.skillIds.Length + 1];
+            var levels = new int[ids.Length];
+
+            for (int i = 0; i < data.skillIds.Length; i++)
+            {
+                ids[i] = data.skillIds[i];
+                levels[i] = i < data.skillLevels.Length ? data.skillLevels[i] : 1;
+            }
+
+            ids[ids.Length - 1] = id;
+            levels[levels.Length - 1] = 1;
+
+            data.skillIds = ids;
+            data.skillLevels = levels;
         }
 
         /**
@@ -244,6 +493,22 @@ namespace Onikiri.Progression
                     return null;
                 }
                 return new DateTime(lastQuitUtcTicks, DateTimeKind.Utc);
+            }
+        }
+
+        /** 마지막 일일 리셋 날짜. 없으면 null (아직 한 번도 리셋한 적이 없다) */
+        public DateTime? LastDailyResetUtc
+        {
+            get
+            {
+                if (lastDailyResetUtcTicks <= 0L) return null;
+                if (lastDailyResetUtcTicks < DateTime.MinValue.Ticks
+                    || lastDailyResetUtcTicks > DateTime.MaxValue.Ticks)
+                {
+                    Debug.LogWarning("[Onikiri] Save has an out-of-range daily reset stamp; ignoring it.");
+                    return null;
+                }
+                return new DateTime(lastDailyResetUtcTicks, DateTimeKind.Utc);
             }
         }
     }

@@ -30,15 +30,38 @@ namespace Onikiri.Progression
         public double CritMultiplier;
 
         /**
+         * @brief 자동 시전 스킬이 만드는 **초당 환산 공격 횟수**.
+         *
+         * 스킬 한 번은 공격력 x 배율이고 자동 공격 한 대는 공격력 x1이므로,
+         * 배율을 쿨다운으로 나누면 두 값이 같은 단위가 된다. 그래서 공격속도에
+         * 더할 수 있다(SkillCatalog.CastRate).
+         *
+         * **더하는 자리가 괄호 안이라 치명타와 스탯 포인트 증폭이 자동으로
+         * 상속된다.** 지시가 요구한 "스킬 데미지 = 공격력 x 배율(치명타·증폭
+         * 상속)"이 계수를 따로 곱하지 않고 구조에서 나온다.
+         *
+         * 기본값 0이 중요하다. 스킬이 없던 시절의 스탯(AtLevel/CappedAtLevel과
+         * 효율 지표가 만드는 것)이 그대로 예전 값을 낸다.
+         */
+        public double SkillRate;
+
+        /**
          * @brief 치명타 기대값을 포함한 초당 피해.
          *
          * 한 타격씩 굴리지 않고 기대값을 쓴다. 보스전은 30초에 수십 번 때리므로
          * 기대값과 실제의 차이가 작고, 무작위를 넣으면 테스트가 실행할 때마다
          * 다른 답을 낸다.
+         *
+         * 스킬도 같은 기대값 처리다. 쿨다운 8~25초를 30초 보스전에 펴면 실제
+         * 시전 횟수는 정수(3~4번, 1~2번)라 기대값과 어긋나는 폭이 치명타보다
+         * 크지만, 그 어긋남을 모델링하려면 "언제 보스전이 시작했는가"라는
+         * 임의의 가정이 하나 더 필요하다. 대신 시뮬레이션이 보고하는 보스 여유가
+         * 정수 시전 횟수에 대해 안전한 쪽인지를 테스트가 따로 확인한다
+         * (SkillDps_SurvivesIntegerCastCounts).
          */
         public double ExpectedDps
         {
-            get { return Damage * AttacksPerSecond * CritFactor; }
+            get { return Damage * (AttacksPerSecond + SkillRate) * CritFactor; }
         }
 
         /** 치명타가 DPS에 곱하는 배수. 치명타가 없으면 1 */

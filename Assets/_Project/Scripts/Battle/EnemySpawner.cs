@@ -332,6 +332,16 @@ namespace Onikiri.Battle
                 if (progress != null) progress.RegisterKill();
             }
 
+            // 퀘스트 카운터. 잡몹과 보스를 여기서 가른다 - 스테이지 할당량과
+            // 같은 판정을 쓰므로 화면의 "처치 3/10"과 퀘스트의 처치 수가 같은
+            // 사건을 센다. 골드는 지갑 쪽에서 세므로 여기 없다
+            var quests = Onikiri.Progression.QuestSystem.Instance;
+            if (quests != null)
+            {
+                if (enemy.IsBoss) quests.ReportBossKill();
+                else quests.ReportMobKill();
+            }
+
             var handler = EnemyKilled;
             if (handler != null) handler(enemy);
         }

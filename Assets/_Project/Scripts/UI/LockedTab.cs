@@ -27,6 +27,21 @@ namespace Onikiri.UI
         [SerializeField] private int requiredLevel = 10;
 
         /**
+         * @brief 스테이지 조건. 0이면 안 쓴다.
+         *
+         * 32단계에 생겼다. 다른 탭은 전부 캐릭터 레벨로 잠그는데 **장비만
+         * 스테이지**다 - 대장간이 지역 1의 랜드마크이고, 화면에 서 있는 건물이
+         * 열리는 조건은 "그 지역을 지나왔는가"여야 말이 된다
+         * (EquipmentCurve.UnlockStage).
+         *
+         * 두 조건을 **또는**이 아니라 **그리고**로 묶는다. 어느 하나로만 열면
+         * 탭에 적을 문구가 둘이 되고("Lv.10 또는 11스테이지"), 그것은 조건이
+         * 아니라 수수께끼다. 실제로는 한 탭이 둘 중 하나만 쓴다.
+         */
+        [Tooltip("이 스테이지부터 열린다. 0이면 레벨 조건만 쓴다")]
+        [SerializeField] private int requiredStage;
+
+        /**
          * @brief 레벨은 넘겼는데 기능이 아직 없을 때 적을 문구. 비우면 안 쓴다.
          *
          * 위 주석은 "해금 레벨에 도달하면 잠금 표시만 풀린다"고 적어두고 그때
@@ -41,6 +56,22 @@ namespace Onikiri.UI
          */
         [Tooltip("레벨은 넘겼지만 기능이 아직 없을 때의 문구. 비우면 해금 시 이름만 남는다")]
         [SerializeField] private string pendingLabel = "";
+
+        /**
+         * @brief 열렸을 때 이 탭이 켜는 화면. 없으면 예전처럼 눌리지 않는다.
+         *
+         * 26단계에 생겼다. 그전까지 이 컴포넌트는 **눌리지 않는 것이 전부**였고,
+         * 아래 Refresh의 마지막 줄이 "이 줄이 다음 단계에서 사라지는 것이 실제로
+         * 구현됐다는 표시가 된다"고 적어뒀다. 스킬 화면이 생기면서 그 줄을 지우는
+         * 대신 조건으로 바꿨다 - 전직은 아직 화면이 없어서 예전 규칙이 그대로
+         * 필요하기 때문이다.
+         *
+         * 참조가 있으면 "구현됐다"의 증거가 된다. pendingLabel처럼 사람이 적는
+         * 문구가 아니라 **실제로 켤 대상이 있는가**로 판정하므로, 화면을 만들지
+         * 않고 잠금만 푸는 실수가 성립하지 않는다.
+         */
+        [Tooltip("열렸을 때 여는 화면. 비어 있으면 잠금 표시만 하고 눌리지 않는다")]
+        [SerializeField] private GameObject screen;
 
         [SerializeField] private Button button;
         [SerializeField] private TMP_Text label;
@@ -66,10 +97,27 @@ namespace Onikiri.UI
         [SerializeField] private Color unlockedBackground = new Color(0.78f, 0.80f, 1.00f, 1f);
 
         private CharacterLevel character;
+        private StageProgress stage;
 
         public bool IsUnlocked
         {
-            get { return character != null && character.Level >= requiredLevel; }
+            get
+            {
+                if (character == null || character.Level < requiredLevel) return false;
+                if (requiredStage <= 0) return true;
+                return stage != null && stage.Stage >= requiredStage;
+            }
+        }
+
+        /** 잠긴 탭에 적을 조건. 둘 중 실제로 쓰는 쪽만 적는다 */
+        private string Requirement
+        {
+            get
+            {
+                return requiredStage > 0
+                    ? requiredStage + "스테이지"
+                    : "Lv." + requiredLevel;
+            }
         }
 
         /**
@@ -82,6 +130,7 @@ namespace Onikiri.UI
         private void OnEnable()
         {
             if (character == null) character = CharacterLevel.Instance;
+            if (stage == null) stage = Object.FindFirstObjectByType<StageProgress>();
             Refresh();
         }
 
@@ -90,12 +139,35 @@ namespace Onikiri.UI
             if (character == null) character = CharacterLevel.Instance;
             if (character != null) character.Changed += Refresh;
 
+            // 스테이지 조건을 쓰는 탭(장비)은 보스를 잡는 순간 열려야 한다.
+            // 레벨 이벤트만 듣고 있으면 다음 레벨업까지 잠긴 채로 남는다
+            if (stage == null) stage = Object.FindFirstObjectByType<StageProgress>();
+            if (stage != null) stage.Changed += Refresh;
+
+            if (screen != null && button != null) button.onClick.AddListener(Toggle);
+
             Refresh();
         }
 
         private void OnDestroy()
         {
             if (character != null) character.Changed -= Refresh;
+            if (stage != null) stage.Changed -= Refresh;
+            if (screen != null && button != null) button.onClick.RemoveListener(Toggle);
+        }
+
+        /**
+         * @brief 화면을 열고 닫는다. 같은 버튼이 둘 다 한다.
+         *
+         * 닫기 버튼을 따로 두지 않는 이유는, 이 탭이 **화면의 이름표**이기
+         * 때문이다. 탭을 다시 누르면 닫히는 것이 하단 탭바에서 가장 배울 것이
+         * 없는 규칙이고, 별도의 X 버튼은 화면 안에 눌러야 할 것을 하나 더
+         * 만든다.
+         */
+        private void Toggle()
+        {
+            if (screen == null || !IsUnlocked) return;
+            screen.SetActive(!screen.activeSelf);
         }
 
         private void Refresh()
@@ -103,15 +175,19 @@ namespace Onikiri.UI
             bool unlocked = IsUnlocked;
 
             // 조건을 넘겨도 기능이 없으면 열린 것이 아니다. 밝게 그리면 눌러볼
-            // 이유를 만들어놓고 아무 일도 일어나지 않는다
-            bool pending = unlocked && !string.IsNullOrEmpty(pendingLabel);
+            // 이유를 만들어놓고 아무 일도 일어나지 않는다.
+            //
+            // 켤 화면이 있으면 문구가 있어도 pending이 아니다 - 화면의 존재가
+            // 문구보다 강한 증거다. 그래야 화면을 붙이면서 pendingLabel을 지우는
+            // 것을 잊어도 "밝은데 안 눌리는" 상태가 나오지 않는다
+            bool pending = unlocked && screen == null && !string.IsNullOrEmpty(pendingLabel);
             bool available = unlocked && !pending;
 
             if (label != null)
             {
                 // 잠겨 있을 때만 조건을 적는다. 열린 뒤에도 "Lv.10"이 남아 있으면
                 // 그것이 조건인지 현재 상태인지 구분되지 않는다
-                if (!unlocked) label.text = displayName + " Lv." + requiredLevel;
+                if (!unlocked) label.text = displayName + " " + Requirement;
                 else label.text = pending ? pendingLabel : displayName;
 
                 label.color = available ? unlockedColor : lockedColor;
@@ -120,9 +196,13 @@ namespace Onikiri.UI
             if (background != null)
                 background.color = available ? unlockedBackground : lockedBackground;
 
-            // 열려도 누를 수 없다. 화면이 아직 없기 때문이다. 이 줄이 다음 단계에서
-            // 사라지는 것이 스킬/전직이 실제로 구현됐다는 표시가 된다
-            if (button != null) button.interactable = false;
+            // 켤 화면이 있을 때만 눌린다. 없으면 열려도 못 누르는 것이 예전
+            // 규칙 그대로다 - 전직이 아직 그 상태다
+            if (button != null) button.interactable = available && screen != null;
+
+            // 잠긴 사이에 화면이 켜져 있을 수는 없다. 세이브를 지우거나 레벨이
+            // 내려가는 경로(테스트 패널)에서 열린 화면이 그대로 남는다
+            if (!available && screen != null && screen.activeSelf) screen.SetActive(false);
         }
     }
 }

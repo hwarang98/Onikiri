@@ -351,6 +351,51 @@ namespace Onikiri.Tests
             }
         }
 
+        /**
+         * @brief 21~30 구간도 같은 밴드 안인가.
+         *
+         * 13단계에 이 구간의 드리프트를 "범위 밖이라 보고만 한다"로 남겼고
+         * 16단계에 램프로 닫았다. 그런데 **검사는 20까지만 돌고 있었다** - 닫힌
+         * 것을 지키는 것이 아무것도 없었다는 뜻이다.
+         *
+         * 26단계에 스킬이 들어오면서 이 구간이 가장 크게 움직였다(스킬 몫이
+         * st9의 2%에서 st30의 38%까지 자란다). 20까지만 보는 검사로는 그 변화가
+         * 통째로 빠져나간다.
+         *
+         * 20까지의 검사를 지우지 않고 따로 두는 이유는 실패했을 때 **어느 구간이
+         * 깨졌는지**가 이름에서 읽혀야 하기 때문이다. 두 구간은 서로 다른 손잡이가
+         * 움직인다 - 앞은 램프의 Start, 뒤는 Final이다.
+         */
+        [Test]
+        public void BossMargin_StaysInBandThrough30()
+        {
+            var results = StageSimulation.Run(30, FieldFromAssets());
+
+            for (int i = 20; i < results.Count; i++)
+            {
+                var row = results[i];
+                var tier = BossCurve.TierOf(row.Stage);
+
+                double floor = tier == BossCurve.Tier.Finale ? FinaleMarginFloor
+                             : tier == BossCurve.Tier.Chapter ? ChapterMarginFloor
+                             : MarginFloor;
+                double ceiling = tier == BossCurve.Tier.Finale ? FinaleMarginCeiling
+                               : tier == BossCurve.Tier.Chapter ? ChapterMarginCeiling
+                               : MarginCeiling;
+                string kind = tier == BossCurve.Tier.Finale ? "피날레"
+                            : tier == BossCurve.Tier.Chapter ? "챕터" : "일반";
+
+                Assert.GreaterOrEqual(row.BossMargin, floor, string.Format(
+                    "stage {0}({1}): 여유 {2:F2}배 - 벽이다 (스킬 몫 {3:P0})",
+                    row.Stage, kind, row.BossMargin, row.SkillDpsShare));
+
+                Assert.LessOrEqual(row.BossMargin, ceiling, string.Format(
+                    "stage {0}({1}): 여유 {2:F2}배 - 제한 시간이 아무 일도 하지 않는다 "
+                    + "(스킬 몫 {3:P0}). BossHealthRampFinal을 올려라",
+                    row.Stage, kind, row.BossMargin, row.SkillDpsShare));
+            }
+        }
+
         // ------------------------------------------------------------ 생존 게이트
 
         /**
@@ -398,6 +443,12 @@ namespace Onikiri.Tests
                 new { Name = "치명타 피해", Level = final.CritDamageLevel },
                 new { Name = "체력",        Level = final.HealthLevel },
                 new { Name = "체력 회복",   Level = final.RegenLevel },
+
+                // 26단계의 오의 셋. 여기 함께 세는 이유는 이 검사가 "골드로 사는
+                // 축"의 생존성을 보는 자리이기 때문이다 - 재화가 같으면 같은
+                // 저울에 올라가야 한다. 해금 시점별 기한은 SkillAxisTests가 따로 본다
+                new { Name = SkillCatalog.Skills[0].DisplayName, Level = final.SkillLevels[0] },
+                new { Name = SkillCatalog.Skills[1].DisplayName, Level = final.SkillLevels[1] },
             };
 
             foreach (var axis in levels)
@@ -698,6 +749,15 @@ namespace Onikiri.Tests
          * 158초에서 남은 10초는 골드 축이 아니라 그 사이의 다른 곡선 변경에서
          * 왔다. 어느 것인지는 아직 못 짚었고, 온보딩 목표(3분 안쪽)에는 여유가
          * 있어 이번에는 쫓지 않았다.
+         *
+         * 26단계에 168초 -> 175초가 됐다(+4%). 원인이 하나로 짚인다 - 보스 골드
+         * 웃돈을 지우면서(BossGoldMultiplier 12 -> 10.8) 이 구간의 보스 보상이
+         * 10% 줄었고, 그만큼 강화를 덜 산다. 스킬은 무관하다(Lv.10 해금이라
+         * st8부터다).
+         *
+         * 웃돈을 지운 대가이고, 그 대가로 얻은 것이 골드 축의 액티브 이득이다
+         * (StageCurve.GoldAxisMarginExponent). 온보딩 목표 3분(180초) 안쪽에는
+         * 여전히 들어온다.
          */
         [Test]
         public void StageOneToFive_TakesTheDocumentedTime()
@@ -705,8 +765,14 @@ namespace Onikiri.Tests
             var results = StageSimulation.Run(5, FieldFromAssets());
             double total = StageSimulation.TotalSeconds(results);
 
-            Assert.AreEqual(168d, total, 12d,
-                "1~5 스테이지 소요 시간이 " + total.ToString("F0") + "초로 바뀌었다 (보고서 기준 168초)");
+            Assert.AreEqual(175d, total, 12d,
+                "1~5 스테이지 소요 시간이 " + total.ToString("F0") + "초로 바뀌었다 (보고서 기준 175초)");
+
+            // 온보딩 목표는 절대값이다. 위 기준값은 "바뀌면 보고서도 고쳐라"는
+            // 신호이지만 이 줄은 넘으면 안 되는 선이다 - 이탈이 가장 큰 구간이다
+            Assert.Less(total, 180d, string.Format(
+                "1~5가 {0:F0}초로 3분을 넘는다. 온보딩은 이탈이 가장 큰 구간이라 "
+                + "여기서 잃은 시간은 되돌아오지 않는다", total));
         }
 
         // ------------------------------------------------------------ 꽃잎 예산
@@ -1060,6 +1126,210 @@ namespace Onikiri.Tests
             Assert.Greater(perStage1, 0d);
             Assert.GreaterOrEqual(results[0].LevelsGained, 1,
                 "1스테이지에서 한 번도 레벨업하지 못한다 - 온보딩이 끊긴다");
+        }
+
+        // ------------------------------------------------------------ 32단계: 장비
+
+        /**
+         * @brief 밴드를 **양쪽 끝에서** 검사한다.
+         *
+         * 32단계에 이 검사가 두 벌이 된 이유가 있다. 장비의 등급은 보석으로
+         * 열리고 보석은 일일 퀘스트가 주므로, **접속 빈도가 밴드에 들어왔다.**
+         * 한쪽만 재면 다른 쪽 플레이어의 게임이 검사되지 않는다.
+         *
+         *   기본       보석 무제한 = 매일 접속하는 플레이어. **여유의 위쪽 끝**
+         *   보석 하한  업적 + 반복 티어만 = 일일을 한 번도 안 받은 플레이어.
+         *              **여유의 아래쪽 끝**
+         *
+         * 위 BossMargin_StaysInBand* 둘은 기본 정책만 본다. 여기가 하한 쪽을
+         * 맡는다 - 이름이 달라야 실패했을 때 어느 플레이어가 깨졌는지 읽힌다.
+         */
+        [Test]
+        public void BossMargin_StaysInBandForTheGemFloorPlayer()
+        {
+            var policy = new StageSimulation.Policy { GemsFromQuestsOnly = true };
+            var results = StageSimulation.Run(30, FieldFromAssets(), policy);
+
+            foreach (var row in results)
+            {
+                var tier = BossCurve.TierOf(row.Stage);
+
+                double floor = tier == BossCurve.Tier.Finale ? FinaleMarginFloor
+                             : tier == BossCurve.Tier.Chapter ? ChapterMarginFloor
+                             : MarginFloor;
+                double ceiling = tier == BossCurve.Tier.Finale ? FinaleMarginCeiling
+                               : tier == BossCurve.Tier.Chapter ? ChapterMarginCeiling
+                               : MarginCeiling;
+
+                Assert.GreaterOrEqual(row.BossMargin, floor, string.Format(
+                    "stage {0}: 일일 퀘스트를 한 번도 안 받은 플레이어의 여유가 {1:F2}다 "
+                    + "(무기 {2}등급 Lv.{3} x{4:F2}, 보석 {5}벌어 {6}씀). "
+                    + "보석 값을 낮추거나 EquipmentMarginExponent를 낮춰라",
+                    row.Stage, row.BossMargin, row.WeaponGrade, row.WeaponLevel,
+                    row.WeaponMultiplier, row.GemsEarned, row.GemsSpent));
+
+                Assert.LessOrEqual(row.BossMargin, ceiling, string.Format(
+                    "stage {0}: 보석 하한인데도 여유가 {1:F2}로 천장을 넘는다", row.Stage, row.BossMargin));
+            }
+        }
+
+        /**
+         * @brief 생존 밴드. **바닥만 있다.**
+         *
+         * 방어구가 유효체력을 곱하므로 이 축이 32단계에 처음으로 생존 여유를
+         * 위로 밀었다. 천장을 두지 않는 이유는 두꺼운 것이 문제가 아니기
+         * 때문이다 - 남는 골드가 화력으로 가고, 그것은 보스 여유 밴드가 이미
+         * 잡고 있다.
+         */
+        const double SurvivalMarginFloor = 1.16d;
+
+        [Test]
+        public void SurvivalMargin_StaysAboveTheFloorForBothGemPolicies()
+        {
+            var policies = new[]
+            {
+                StageSimulation.Policy.Default,
+                new StageSimulation.Policy { GemsFromQuestsOnly = true }
+            };
+
+            foreach (var policy in policies)
+            {
+                foreach (var row in StageSimulation.Run(30, FieldFromAssets(), policy))
+                {
+                    Assert.GreaterOrEqual(row.SurvivalMargin, SurvivalMarginFloor, string.Format(
+                        "stage {0}: 생존 여유 {1:F2} (체력 Lv.{2}, 방어구 {3}등급 Lv.{4} x{5:F2})",
+                        row.Stage, row.SurvivalMargin, row.HealthLevel,
+                        row.ArmorGrade, row.ArmorLevel, row.ArmorMultiplier));
+                }
+            }
+        }
+
+        /**
+         * @brief 죽은 버튼 검사 (a) - **장비가 실제로 진행을 움직이는가.**
+         *
+         * 16단계 방식이다. "샀는가"가 아니라 "사면 달라지는가"를 재고, 그
+         * 질문은 산 플레이어와 안 산 플레이어를 나란히 돌려야만 답이 나온다.
+         *
+         * 20단계의 골드 축이 정확히 여기서 걸렸어야 했다 - 장부에는 열세 번
+         * 샀다고 남았는데 30스테이지까지 총 시간이 안 산 것과 같았다.
+         *
+         * 세 가지를 함께 본다. 하나만 보면 빠져나간다:
+         *
+         *   레벨    두 슬롯이 실제로 올라가는가 (장부)
+         *   스탯    DPS와 EHP가 움직이는가 (값)
+         *   시간    30스테이지까지가 빨라지는가 (체감)
+         */
+        [Test]
+        public void Equipment_MovesDpsAndEhpAndProgress()
+        {
+            var field = FieldFromAssets();
+
+            var with = StageSimulation.Run(30, field);
+            var without = StageSimulation.Run(30, field,
+                new StageSimulation.Policy { SkipEquipment = true });
+
+            var end = with[29];
+
+            // 1. 장부 - 두 슬롯 다 올라간다
+            Assert.Greater(end.WeaponGrade, 1, "무기 등급이 30스테이지까지 한 번도 안 올랐다");
+            Assert.Greater(end.WeaponLevel, 1, "무기를 한 번도 단련하지 않았다");
+            Assert.Greater(end.ArmorGrade, 1, "방어구 등급이 30스테이지까지 한 번도 안 올랐다");
+            Assert.Greater(end.ArmorLevel, 1, "방어구를 한 번도 단련하지 않았다");
+
+            // 2. 값 - 배수가 실제로 스탯에 도달한다
+            Assert.Greater(end.WeaponMultiplier, 1d, "무기 레벨이 배수로 바뀌지 않았다");
+            Assert.Greater(end.ArmorMultiplier, 1d, "방어구 레벨이 배수로 바뀌지 않았다");
+            Assert.Greater(end.ExpectedDps, without[29].ExpectedDps, string.Format(
+                "장비를 다 올렸는데 DPS가 안 산 쪽보다 낮다 ({0:F0} 대 {1:F0})",
+                end.ExpectedDps, without[29].ExpectedDps));
+            Assert.Greater(end.MaxHealth, without[29].MaxHealth, string.Format(
+                "방어구를 올렸는데 최대 체력이 안 산 쪽보다 낮다 ({0:F0} 대 {1:F0})",
+                end.MaxHealth, without[29].MaxHealth));
+
+            // 3. 체감 - 30스테이지까지가 실제로 빨라진다
+            double withSeconds = StageSimulation.TotalSeconds(with);
+            double withoutSeconds = StageSimulation.TotalSeconds(without);
+            double gain = 1d - withSeconds / withoutSeconds;
+
+            Assert.GreaterOrEqual(gain, MinimumAxisTimeGain, string.Format(
+                "장비를 산 플레이어가 {0:F0}초, 안 산 플레이어가 {1:F0}초로 이득이 {2:P1}뿐이다. "
+                + "지표는 사라고 말하는데 실제로는 손해인 축이다 (20단계 골드 축과 같은 함정)",
+                withSeconds, withoutSeconds, gain));
+        }
+
+        /**
+         * @brief 축 하나가 30스테이지 총 시간에서 가져야 할 최소 이득.
+         *
+         * 4%는 20단계가 골드 축에 쓴 기준과 같다
+         * (SkillAxisTests.GoldAxis_AddsValueToTheGame). 같은 자를 쓰는 것이
+         * 요점이다 - 축마다 다른 기준을 쓰면 "이 축은 원래 작다"가 언제든
+         * 변명이 된다.
+         */
+        const double MinimumAxisTimeGain = 0.04d;
+
+        /**
+         * @brief 죽은 버튼 검사 (b) - **보석이 값어치가 있는가.**
+         *
+         * (a)와 다른 질문이다. 저쪽은 장비 전체를, 이쪽은 그중 **보석 몫**을
+         * 묻는다. 등급업이 보석의 유일한 소비처이므로 SkipGradeUps 는 곧
+         * "보석을 한 개도 안 쓴 플레이어"다.
+         *
+         * 20단계가 두 질문을 섞어 읽었다가 "사면 손해"라는 결론을 냈고, 그래서
+         * Policy가 SkipGoldGain / NeutralizeGoldAxis 두 벌로 남아 있다.
+         * 여기도 같은 이유로 두 벌이다.
+         */
+        [Test]
+        public void GemGradeUps_AreWorthTheirPrice()
+        {
+            var field = FieldFromAssets();
+
+            var with = StageSimulation.Run(30, field);
+            var without = StageSimulation.Run(30, field,
+                new StageSimulation.Policy { SkipGradeUps = true });
+
+            double withSeconds = StageSimulation.TotalSeconds(with);
+            double withoutSeconds = StageSimulation.TotalSeconds(without);
+            double gain = 1d - withSeconds / withoutSeconds;
+
+            Assert.GreaterOrEqual(gain, MinimumAxisTimeGain, string.Format(
+                "등급업을 산 플레이어가 {0:F0}초, 단련만 한 플레이어가 {1:F0}초로 이득이 {2:P1}뿐이다. "
+                + "보석이 죽은 재화다 - 값을 낮추거나 GradeStep을 키워라",
+                withSeconds, withoutSeconds, gain));
+
+            // 실제로 보석을 썼는가. 안 썼으면 위 비교가 아무것도 재지 않은 것이다
+            Assert.Greater(with[29].GemsSpent, 0, "기본 정책이 보석을 한 개도 안 썼다");
+            Assert.AreEqual(0, without[29].GemsSpent, "비교군이 보석을 썼다 - 비교가 성립하지 않는다");
+
+            // 한 번의 등급업이 DPS에서 **체감되는 크기**인가. 시간 이득이 있어도
+            // 한 칸이 안 느껴지면 그것은 "여러 번 눌러야 아는 버튼"이다
+            var weapon = EquipmentCatalog.Find(EquipmentCatalog.WeaponId);
+            Assert.GreaterOrEqual(weapon.GradeStep - 1d, 0.03d, string.Format(
+                "등급업 한 번이 DPS를 {0:P2}밖에 못 올린다", weapon.GradeStep - 1d));
+        }
+
+        /**
+         * @brief 장비가 온보딩(1~5)을 늘리지 않는다.
+         *
+         * 해금이 st11이라 구조적으로 0이어야 한다. 그래도 재는 이유는 31단계가
+         * 같은 검사를 업적에 붙여둔 것과 같다 - 해금 스테이지를 낮추고 싶어지는
+         * 날 여기서 걸린다.
+         */
+        [Test]
+        public void Equipment_DoesNotDistortOnboarding()
+        {
+            var field = FieldFromAssets();
+
+            double with = StageSimulation.TotalSeconds(StageSimulation.Run(5, field));
+            double without = StageSimulation.TotalSeconds(StageSimulation.Run(5, field,
+                new StageSimulation.Policy { NeutralizeEquipment = true }));
+
+            Assert.AreEqual(without, with, 1e-6d, string.Format(
+                "1~5 소요 시간이 장비 유무로 갈린다 ({0:F1}초 대 {1:F1}초) - "
+                + "해금이 온보딩 안으로 들어왔다", with, without));
+
+            // 31단계 보고서의 값. 여기가 움직이면 보고서도 함께 고쳐야 한다
+            Assert.AreEqual(173d, with, 5d,
+                "1~5가 " + with.ToString("F0") + "초로 바뀌었다 (31단계 기준 173초)");
         }
     }
 }
