@@ -38,7 +38,7 @@ MonoBehaviour:
   frameRate: 12
   spawnWeight: 5
   maxHealth:
-    m: 1.4
+    m: 1.2
     e: 1
   goldReward:
     m: 5

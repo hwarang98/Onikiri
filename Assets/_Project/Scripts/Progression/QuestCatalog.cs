@@ -131,7 +131,7 @@ namespace Onikiri.Progression
             new QuestSpec { Id = "daily_skill",   Kind = QuestKind.Daily, Metric = QuestMetric.SkillCasts,
                             Title = "오의 20회 시전",     Target = 20d,   Gems = 10 },
             new QuestSpec { Id = "daily_upgrade", Kind = QuestKind.Daily, Metric = QuestMetric.UpgradePurchases,
-                            Title = "강화 15회 구매",     Target = 15d,   Gems = 10 }
+                            Title = "강화 120회 구매",    Target = 120d,  Gems = 10 }
         };
 
         // ---------------------------------------------------------------- 반복
@@ -211,6 +211,23 @@ namespace Onikiri.Progression
             new QuestSpec { Id = "ach_stage30",  Kind = QuestKind.Achievement, Metric = QuestMetric.StageReached,
                             Title = "30스테이지 도달", Target = 30d, Gems = 80, GoldMobs = 2d,    ExpBosses = 0d },
 
+            // 가속 구간(st31~50)의 사슬. 펫 스텝에 늘었다 - "퀘스트 -> 보석"
+            // 순환이 새 소비처(펫 해금 680)와 함께 이어져야 하고, 특히 f2p
+            // 바닥이 여기 걸려 있다: 무과금의 st30까지 수입(약 535)은 장비
+            // 등급(390)과 전직 1티어(60)에 이미 배정돼 있어서, 이 네 줄이
+            // 없으면 첫 펫(80)을 살 재화가 **구조적으로 없다.** 보정은 펫을
+            // 가진 곡선 추종 플레이어를 따라가므로, 펫 없는 무과금은 st50
+            // 바닥(1.08) 밑으로 가라앉는다 - 실측 0.96. 전부 st31 이후에
+            // 열리므로 코리더(1~30)의 보석 경제는 한 개도 달라지지 않는다
+            new QuestSpec { Id = "ach_stage35",  Kind = QuestKind.Achievement, Metric = QuestMetric.StageReached,
+                            Title = "35스테이지 도달", Target = 35d, Gems = 40, GoldMobs = 2.25d, ExpBosses = 0d },
+            new QuestSpec { Id = "ach_stage40",  Kind = QuestKind.Achievement, Metric = QuestMetric.StageReached,
+                            Title = "지역 4 돌파",     Target = 40d, Gems = 60, GoldMobs = 2.5d,  ExpBosses = 0d },
+            new QuestSpec { Id = "ach_stage45",  Kind = QuestKind.Achievement, Metric = QuestMetric.StageReached,
+                            Title = "45스테이지 도달", Target = 45d, Gems = 60, GoldMobs = 2.75d, ExpBosses = 0d },
+            new QuestSpec { Id = "ach_stage50",  Kind = QuestKind.Achievement, Metric = QuestMetric.StageReached,
+                            Title = "50스테이지 도달", Target = 50d, Gems = 80, GoldMobs = 3d,    ExpBosses = 0d },
+
             new QuestSpec { Id = "ach_level10",  Kind = QuestKind.Achievement, Metric = QuestMetric.LevelReached,
                             Title = "레벨 10 달성",    Target = 10d, Gems = 20, GoldMobs = 1d,    ExpBosses = 0d },
             new QuestSpec { Id = "ach_level25",  Kind = QuestKind.Achievement, Metric = QuestMetric.LevelReached,
@@ -219,9 +236,9 @@ namespace Onikiri.Progression
                             Title = "레벨 50 달성",    Target = 50d, Gems = 60, GoldMobs = 1.5d,  ExpBosses = 0d },
 
             new QuestSpec { Id = "ach_upgrade50",  Kind = QuestKind.Achievement, Metric = QuestMetric.UpgradeLevelTotal,
-                            Title = "강화 총합 50",  Target = 50d,  Gems = 25, GoldMobs = 1d,   ExpBosses = 0d },
+                            Title = "강화 총합 400",  Target = 400d,  Gems = 25, GoldMobs = 1d,   ExpBosses = 0d },
             new QuestSpec { Id = "ach_upgrade150", Kind = QuestKind.Achievement, Metric = QuestMetric.UpgradeLevelTotal,
-                            Title = "강화 총합 150", Target = 150d, Gems = 50, GoldMobs = 1.5d, ExpBosses = 0d },
+                            Title = "강화 총합 1200", Target = 1200d, Gems = 50, GoldMobs = 1.5d, ExpBosses = 0d },
 
             new QuestSpec { Id = "ach_skill12", Kind = QuestKind.Achievement, Metric = QuestMetric.SkillLevelTotal,
                             Title = "오의 총 레벨 12", Target = 12d, Gems = 50, GoldMobs = 1.5d, ExpBosses = 0d }

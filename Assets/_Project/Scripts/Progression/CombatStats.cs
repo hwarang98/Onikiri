@@ -46,6 +46,52 @@ namespace Onikiri.Progression
         public double SkillRate;
 
         /**
+         * @brief 영체 소환이 만드는 **초당 환산 공격 횟수** (45단계).
+         *
+         * SkillRate와 같은 자리, 같은 단위다 - 소환 한 번이 공격력 x 배율
+         * 뭉치이고 그것을 쿨다운으로 나눴다. 오의와 같은 괄호 안이라
+         * 치명타·증폭·초월·연격을 자동으로 상속한다.
+         *
+         * **펫과 나눠 둔 것이 설계다.** 펫은 괄호 밖의 (1 + 보너스)이고
+         * 영체는 괄호 안의 항이다 - 상시 합산과 일시 버스트라는 결의 차이가
+         * 식의 자리로 적혀 있다(YodoSpiritCurve 머리 주석).
+         *
+         * SkillRate와 굳이 합치지 않은 이유는 죽은 버튼 검사다. 합치면
+         * "오의가 세진 것"과 "영체가 때린 것"이 한 숫자가 되어, 둘 중 어느
+         * 쪽이 진행을 움직였는지 잴 수 없다.
+         *
+         * 기본값 0이 중요하다 - 영체가 없던 시절의 스탯(AtLevel/CappedAtLevel과
+         * 효율 지표가 만드는 것)이 그대로 예전 값을 낸다. SkillRate·PetBonus와
+         * 같은 규칙이다.
+         */
+        public double SpiritRate;
+
+        /**
+         * @brief 액티브 펫이 DPS에 더하는 몫 (0~0.5).
+         *
+         * 곱하는 자리가 괄호 **바깥**이다. 펫의 한 타가 "보너스 x 플레이어 기대
+         * DPS x 공격 간격"이라(PetCurve 주석) 치명타·스킬까지 다 곱해진 값을
+         * 기준으로 삼기 때문이다 - SkillRate처럼 괄호 안에 더하면 펫 기여가
+         * 치명타 계수를 한 번 더 곱해 실제보다 크게 계산된다.
+         *
+         * 기본값 0이 중요하다. 펫이 없던 시절의 스탯(AtLevel/CappedAtLevel과
+         * 효율 지표가 만드는 것)이 그대로 예전 값을 낸다 - SkillRate와 같은 규칙.
+         */
+        public double PetBonus;
+
+        /**
+         * @brief 초월 치명타 배수 (43단계 심화 축). 피해 전체에 곱해진다.
+         *
+         * 기본값 0이 중요하다 - TranscendFactor가 1 미만을 1로 올리므로,
+         * 심화 축이 없던 시절의 스탯(AtLevel 등)이 그대로 예전 값을 낸다.
+         * SkillRate·PetBonus와 같은 규칙이다.
+         */
+        public double TranscendMultiplier;
+
+        /** 연격 확률 (0~1). 타격마다 한 번 더 - 기대값으로는 x(1 + 확률) */
+        public double ComboChance;
+
+        /**
          * @brief 치명타 기대값을 포함한 초당 피해.
          *
          * 한 타격씩 굴리지 않고 기대값을 쓴다. 보스전은 30초에 수십 번 때리므로
@@ -61,7 +107,29 @@ namespace Onikiri.Progression
          */
         public double ExpectedDps
         {
-            get { return Damage * (AttacksPerSecond + SkillRate) * CritFactor; }
+            get
+            {
+                return Damage * (AttacksPerSecond + SkillRate + SpiritRate) * CritFactor * PetFactor
+                     * TranscendFactor * ComboFactor;
+            }
+        }
+
+        /** 펫이 DPS에 곱하는 배수. 펫이 없으면 1 */
+        public double PetFactor
+        {
+            get { return 1d + (PetBonus < 0d ? 0d : PetBonus); }
+        }
+
+        /** 초월 치명타가 곱하는 배수. 축이 없으면(기본값 0) 1 */
+        public double TranscendFactor
+        {
+            get { return TranscendMultiplier < 1d ? 1d : TranscendMultiplier; }
+        }
+
+        /** 연격이 곱하는 배수. 추가타가 온전한 한 타라 기대값이 (1 + 확률)이다 */
+        public double ComboFactor
+        {
+            get { return 1d + (ComboChance < 0d ? 0d : ComboChance > 1d ? 1d : ComboChance); }
         }
 
         /** 치명타가 DPS에 곱하는 배수. 치명타가 없으면 1 */
@@ -89,7 +157,9 @@ namespace Onikiri.Progression
                 Damage = AttackPowerCurve.ValueAtLevel(level),
                 AttacksPerSecond = AttackSpeedCurve.ValueAtLevel(level),
                 CritRate = CritRateCurve.ValueAtLevel(level),
-                CritMultiplier = CritDamageCurve.ValueAtLevel(level)
+                CritMultiplier = CritDamageCurve.ValueAtLevel(level),
+                TranscendMultiplier = TranscendCurve.MultiplierAtLevel(level),
+                ComboChance = ComboCurve.UncappedChanceAtLevel(level)
             };
         }
 
@@ -107,7 +177,9 @@ namespace Onikiri.Progression
                 Damage = AttackPowerCurve.ValueAtLevel(level),
                 AttacksPerSecond = AttackSpeedCurve.CappedValueAtLevel(level),
                 CritRate = CritRateCurve.CappedValueAtLevel(level),
-                CritMultiplier = CritDamageCurve.ValueAtLevel(level)
+                CritMultiplier = CritDamageCurve.ValueAtLevel(level),
+                TranscendMultiplier = TranscendCurve.MultiplierAtLevel(level),
+                ComboChance = ComboCurve.ChanceAtLevel(level)
             };
         }
 
@@ -127,6 +199,8 @@ namespace Onikiri.Progression
                 case UpgradeSystem.AttackSpeedId: copy.AttacksPerSecond = value; break;
                 case UpgradeSystem.CritRateId: copy.CritRate = value; break;
                 case UpgradeSystem.CritDamageId: copy.CritMultiplier = value; break;
+                case UpgradeSystem.TranscendId: copy.TranscendMultiplier = value; break;
+                case UpgradeSystem.ComboId: copy.ComboChance = value; break;
             }
             return copy;
         }
@@ -143,7 +217,9 @@ namespace Onikiri.Progression
             return trackId == UpgradeSystem.AttackPowerId
                 || trackId == UpgradeSystem.AttackSpeedId
                 || trackId == UpgradeSystem.CritRateId
-                || trackId == UpgradeSystem.CritDamageId;
+                || trackId == UpgradeSystem.CritDamageId
+                || trackId == UpgradeSystem.TranscendId
+                || trackId == UpgradeSystem.ComboId;
         }
     }
 }

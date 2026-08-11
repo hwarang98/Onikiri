@@ -58,11 +58,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -134,115 +134,128 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ATTACK 3_0
+      name: ATTACK_3_0
       rect:
         serializedVersion: 2
-        x: 40
-        y: 8
-        width: 24
-        height: 38
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.0952381}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 2658d4f785ab48e40800000000000000
-      internalID: 5657851921139860834
+      spriteID: 2ae06ca24f04a5e4ca7e6c1d78d78e9e
+      internalID: 462769301
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 3_1
+      name: ATTACK_3_1
       rect:
         serializedVersion: 2
-        x: 144
-        y: 8
-        width: 24
-        height: 37
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 106
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.0952381}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 384ca44bd53385170800000000000000
-      internalID: 8167334401786168451
+      spriteID: f7e3fa5e5c8ee6e40bd9ecc923e1c560
+      internalID: -414033020
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 3_2
+      name: ATTACK_3_2
       rect:
         serializedVersion: 2
-        x: 247
-        y: 8
-        width: 60
-        height: 49
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 212
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.0952381}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: febc3cd566c2e7dd0800000000000000
-      internalID: -2486501126090535953
+      spriteID: fcb9419bd74d04444baa01b1bc4cc6eb
+      internalID: -1310021023
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 3_3
+      name: ATTACK_3_3
       rect:
         serializedVersion: 2
-        x: 360
-        y: 7
-        width: 51
-        height: 30
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 318
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.0952381}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f57470e60a1cccb40800000000000000
-      internalID: 5461953342878467935
+      spriteID: 2c122eac5ec0a5d49826e7bd4731b3e6
+      internalID: -1893631354
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 3_4
+      name: ATTACK_3_4
       rect:
         serializedVersion: 2
-        x: 466
-        y: 7
-        width: 36
-        height: 30
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 424
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.0952381}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 75ced2097845e8520800000000000000
-      internalID: 2706193367312493655
+      spriteID: 745777649205a65439b8edd9c732c450
+      internalID: -1552243015
       vertices: []
       indices: 
       edges: []
@@ -261,11 +274,11 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ATTACK 3_0: 5657851921139860834
-      ATTACK 3_1: 8167334401786168451
-      ATTACK 3_2: -2486501126090535953
-      ATTACK 3_3: 5461953342878467935
-      ATTACK 3_4: 2706193367312493655
+      ATTACK_3_0: 462769301
+      ATTACK_3_1: -414033020
+      ATTACK_3_2: -1310021023
+      ATTACK_3_3: -1893631354
+      ATTACK_3_4: -1552243015
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

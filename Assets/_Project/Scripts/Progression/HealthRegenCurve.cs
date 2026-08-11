@@ -46,7 +46,18 @@ namespace Onikiri.Progression
         public const double BaseValue = 0.01d;
 
         /** 체력과 같은 step. 두 축이 같은 속도로 자라야 비율이 안정된다 */
-        public const double Step = 1.10d;
+        /**
+         * 43단계에 여덟 배 미세화됐다(값 등가 재스케일). 옛 한 레벨이 새
+         * 여덟 칸이다: step^8 = 옛 step, growth^8 = 1.15, 기준 비용은 누적
+         * 골드가 같아지는 연속체 등가값((g-1)/0.15 배). 골드와 파워의 관계가
+         * 보존되므로 밸런스는 그대로이고, 레벨 숫자만 슬레이어처럼 깊어진다 -
+         * "곧 끝난다" 느낌이 없는 수천 레벨이 이 스텝의 목적이다.
+                  * 기준 비용에는 이산 보정 x1.3이 얹혀 있다(연속체 등가값의 1.3배).
+         * 등가 수식(누적 골드 동일)은 완벽한데도 미세 칸은 지갑을 끝전까지
+         * 즉시 소진해 복리를 앞당긴다 - 실측으로 코리더 여유가 +27%까지
+         * 떠서 10곳이 밴드를 깼고, 이 보정이 앵커를 +-3%로 되돌린다.
+         */
+        public const double Step = 1.0119850d;
 
         /**
          * @brief 비용.
@@ -55,8 +66,9 @@ namespace Onikiri.Progression
          * Lv.1에서 비율 1%/초 x 30초 = 0.3이라 EHP의 23%만 담당한다.
          * 정수 조합을 훑어 밴드와 생존성을 동시에 만족하는 값으로 잡았다.
          */
-        public const double BaseCost = 4d;
-        public const double CostGrowth = 1.15d;
+        /** E-3 수정: 전 축 일괄 상향 + 정수화. 규칙과 배율은 UpgradeCost가 단일 출처다 */
+        public const double BaseCost = 0.61091d * UpgradeCost.RaiseScale;
+        public const double CostGrowth = 1.0176225d;
 
         /**
          * @brief 초당 회복 비율의 상한.
@@ -131,7 +143,7 @@ namespace Onikiri.Progression
 
         public static double CostAtLevel(int level)
         {
-            return BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1));
+            return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1)));
         }
     }
 }

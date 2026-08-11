@@ -40,12 +40,12 @@ MonoBehaviour:
   - {fileID: 788642207260049123, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
   - {fileID: 4284320474717948680, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
   frameRate: 12
-  spawnWeight: 3
+  spawnWeight: 5
   maxHealth:
-    m: 8
-    e: 0
+    m: 1.2
+    e: 1
   goldReward:
-    m: 2
+    m: 5
     e: 0
   moveSpeed: 1.25
   queueSpacing: 1

@@ -20,6 +20,12 @@ namespace Onikiri.UI
      * 그때까지 열린 탭이 빈 화면을 보여주면 안 되므로, 실제 화면이 생기기 전까지
      * requiredLevel은 도달 불가능한 값이 아니라 **의도한 값**으로 두고 해금
      * 시점의 표시만 바뀐다.
+     *
+     * 41단계에서 "안 눌리는 탭"이 "미리보기 탭"이 됐다. 화면이 실제로 있으면
+     * 잠겨 있어도 들어가서 볼 수 있고, 잠기는 것은 화면 안의 액션(구매·장착·
+     * 레벨업)뿐이다 - 각 시스템이 모델 층에서 다시 막으므로 UI가 뚫려도 돈이
+     * 새지 않는다. 자물쇠 아이콘과 조건 라벨은 그대로다 - "볼 수는 있지만
+     * 아직 못 쓴다"가 탭의 형태에서 읽혀야 한다.
      */
     public sealed class LockedTab : MonoBehaviour
     {
@@ -79,6 +85,39 @@ namespace Onikiri.UI
         [Tooltip("탭 배경. 해금 여부에 따라 밝기만 바뀐다")]
         [SerializeField] private Image background;
 
+        /**
+         * @brief 탭 심볼 (38단계 아이콘화). 잠기면 자물쇠로 바뀐다.
+         *
+         * 잠금 문구("동료 31스테이지")를 탭 폭에 욱여넣던 방식을 대체한다 -
+         * 5탭 폭(내부 192px)에서 그 문구는 구조적으로 넘쳤다. 상태는 심볼이
+         * 말하고 글자는 조건 하나만 작게 남는다.
+         */
+        [Header("아이콘")]
+        [SerializeField] private Image icon;
+        [SerializeField] private Sprite normalIcon;
+        [SerializeField] private Sprite lockedIcon;
+
+        /**
+         * @brief 홈 탭인가 (38단계 층위 분리 - "캐릭터" 탭).
+         *
+         * 홈 탭의 화면(GrowthPanel)은 밴드의 바탕층이라 **절대 꺼지지 않는다.**
+         * 이 탭을 누르는 것은 자기 화면을 켜는 것이 아니라 **덮고 있는 다른
+         * 화면들을 닫는 것**이다 - 바탕이 드러나는 것으로 "캐릭터 화면에 왔다"가
+         * 성립한다.
+         */
+        [Tooltip("홈 탭. 자기 화면을 토글하지 않고 다른 화면들만 닫는다")]
+        [SerializeField] private bool homeTab;
+
+        /**
+         * @brief 이 탭이 열릴 때 닫아야 할 다른 화면들 (38단계 상호 배타).
+         *
+         * 그전에는 탭들이 자기 화면만 토글해서 스킬+퀘스트가 동시에 열릴 수
+         * 있었고, 형제 순서로 위의 것만 보였다 - 보이는 상태와 켜진 상태가
+         * 달라지는 구조다. 층위를 나누면서 규칙으로 바꾼다: 같은 띠를 쓰는
+         * 화면은 한 번에 하나다.
+         */
+        [SerializeField] private GameObject[] otherScreens;
+
         [Header("색")]
         [SerializeField] private Color lockedColor = new Color32(0x5A, 0x51, 0x6B, 0xFF);
         [SerializeField] private Color unlockedColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
@@ -105,7 +144,10 @@ namespace Onikiri.UI
             {
                 if (character == null || character.Level < requiredLevel) return false;
                 if (requiredStage <= 0) return true;
-                return stage != null && stage.Stage >= requiredStage;
+                // 현재 스테이지가 아니라 최전선이다(37단계). 재선택으로 클리어한
+                // 지역에 파밍하러 돌아간 순간 대장간이 다시 잠기면, 잠금 해제가
+                // "지나왔는가"가 아니라 "지금 서 있는가"가 돼버린다
+                return stage != null && stage.MaxStageReached >= requiredStage;
             }
         }
 
@@ -144,7 +186,7 @@ namespace Onikiri.UI
             if (stage == null) stage = Object.FindFirstObjectByType<StageProgress>();
             if (stage != null) stage.Changed += Refresh;
 
-            if (screen != null && button != null) button.onClick.AddListener(Toggle);
+            if ((screen != null || homeTab) && button != null) button.onClick.AddListener(Toggle);
 
             Refresh();
         }
@@ -153,7 +195,7 @@ namespace Onikiri.UI
         {
             if (character != null) character.Changed -= Refresh;
             if (stage != null) stage.Changed -= Refresh;
-            if (screen != null && button != null) button.onClick.RemoveListener(Toggle);
+            if ((screen != null || homeTab) && button != null) button.onClick.RemoveListener(Toggle);
         }
 
         /**
@@ -163,11 +205,37 @@ namespace Onikiri.UI
          * 때문이다. 탭을 다시 누르면 닫히는 것이 하단 탭바에서 가장 배울 것이
          * 없는 규칙이고, 별도의 X 버튼은 화면 안에 눌러야 할 것을 하나 더
          * 만든다.
+         *
+         * **잠겨 있어도 화면이 있으면 연다** (41단계 미리보기). 잠긴 콘텐츠를
+         * 들여다볼 수 있어야 "빨리 저기까지 가고 싶다"가 생긴다 - 벽이 아니라
+         * 목표다. 안전한 이유는 상태 변경이 전부 모델 층에서 다시 막히기
+         * 때문이다(SkillSystem.TryPurchase / EquipmentSystem.CanTemper /
+         * PetSystem.CanUnlock 모두 해금 조건을 첫 줄에서 본다). 화면 안에는
+         * 해금 조건 배너가 선다(PanelLockBanner).
+         *
+         * 열 때 같은 띠의 다른 화면들을 닫는다(상호 배타). 닫을 때는 아무것도
+         * 열지 않는다 - 바탕(GrowthPanel)이 드러나는 것이 곧 홈이다.
          */
         private void Toggle()
         {
-            if (screen == null || !IsUnlocked) return;
-            screen.SetActive(!screen.activeSelf);
+            if (homeTab)
+            {
+                CloseOthers();
+                return;
+            }
+
+            if (screen == null) return;
+
+            bool opening = !screen.activeSelf;
+            CloseOthers();
+            screen.SetActive(opening);
+        }
+
+        private void CloseOthers()
+        {
+            if (otherScreens == null) return;
+            foreach (var other in otherScreens)
+                if (other != null && other.activeSelf) other.SetActive(false);
         }
 
         private void Refresh()
@@ -185,24 +253,36 @@ namespace Onikiri.UI
 
             if (label != null)
             {
-                // 잠겨 있을 때만 조건을 적는다. 열린 뒤에도 "Lv.10"이 남아 있으면
-                // 그것이 조건인지 현재 상태인지 구분되지 않는다
-                if (!unlocked) label.text = displayName + " " + Requirement;
+                // 잠겨 있으면 이름 대신 **조건만** 적는다(38단계). 이름과 조건을
+                // 함께 적던 시절("동료 31스테이지")에는 5탭 폭에서 글자가 넘쳤다.
+                // 잠겼다는 사실은 자물쇠 아이콘이 말하므로 글자는 조건 하나면 된다
+                if (!unlocked) label.text = Requirement;
                 else label.text = pending ? pendingLabel : displayName;
 
                 label.color = available ? unlockedColor : lockedColor;
             }
 
+            if (icon != null)
+            {
+                var sprite = unlocked ? normalIcon : (lockedIcon != null ? lockedIcon : normalIcon);
+                icon.sprite = sprite;
+                icon.enabled = sprite != null;
+                icon.color = available ? unlockedColor : lockedColor;
+            }
+
             if (background != null)
                 background.color = available ? unlockedBackground : lockedBackground;
 
-            // 켤 화면이 있을 때만 눌린다. 없으면 열려도 못 누르는 것이 예전
-            // 규칙 그대로다 - 전직이 아직 그 상태다
-            if (button != null) button.interactable = available && screen != null;
+            // 켤 화면이 있으면 잠겨 있어도 눌린다(41단계 미리보기). 잠금 표시는
+            // 자물쇠와 색이 계속 말하고, 못 하는 것은 화면 안의 액션뿐이다.
+            // 화면이 없으면(pending 포함) 예전 규칙 그대로 안 눌린다 - 눌리는데
+            // 빈 화면이 나오는 것보다 안 눌리는 편이 정직하다.
+            // 홈 탭은 화면 대신 "다른 화면 닫기"가 동작이다
+            if (button != null) button.interactable = screen != null || homeTab;
 
-            // 잠긴 사이에 화면이 켜져 있을 수는 없다. 세이브를 지우거나 레벨이
-            // 내려가는 경로(테스트 패널)에서 열린 화면이 그대로 남는다
-            if (!available && screen != null && screen.activeSelf) screen.SetActive(false);
+            // 잠긴 채 열려 있는 화면을 여기서 닫지 않는다 - 미리보기가 그
+            // 상태다. 예전에는 닫았는데, 레벨 이벤트마다 Refresh가 돌아서
+            // 열어둔 미리보기를 다음 프레임에 도로 닫아버린다
         }
     }
 }

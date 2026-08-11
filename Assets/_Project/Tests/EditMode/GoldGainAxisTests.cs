@@ -89,18 +89,30 @@ namespace Onikiri.Tests
         [Test]
         public void GoldAxis_SkipsTheOnboardingRate_ButSellsOnceIncomeGrows()
         {
+            // E-3 후속의 온보딩 잡몹 완화까지 지난 **실제** st1 체력이다.
+            // 완화 전 체력으로 재면 여기 결론이 화면과 다른 세계의 것이 된다
             var stats = StageSimulation.StartingStats;
-            double killSeconds = StageSimulation.SecondsToKill(Field().AverageMobHealth, stats);
+            double killSeconds = StageSimulation.SecondsToKill(
+                StageCurve.MobHealth(Onikiri.Core.BigDouble.FromDouble(
+                    Field().AverageMobHealth), 1).ToDouble(), stats);
             double perKill = System.Math.Max(killSeconds, SpawnPacing.SettledInterval(killSeconds));
             double startingRate = Field().AverageMobGold / perKill;
 
-            Assert.IsFalse(GoldGainEfficiency.WorthBuying(1, startingRate),
-                string.Format("무강화 파밍(초당 {0:F2}골드)에서 벌써 팔린다 - 회수 {1:F0}초. "
-                    + "온보딩 구간이 이 축의 투자 기간을 감당하지 못한다",
+            // E-3 후속으로 이 반쪽의 뜻이 뒤집혔다. 완화가 st1 처치를 당겨
+            // 무강화 수입이 초당 6골드대가 됐고, 그 수입이면 회수(64초)가 이미
+            // 밴드 안이다 - **온보딩에서 안 팔리는 것은 이제 가격이 아니라
+            // 게이트의 일이다**(UnlockStage=6, GoldAxis_ContributesNothingBeforeUnlock).
+            // 21단계가 "등장 시점은 비용이 아니라 게이트가 정한다"로 떼어낸
+            // 분업이 문자 그대로가 됐고, 이 사실이 뒤집히면(회수가 다시 밴드
+            // 밖으로) 그건 완화나 곡선이 움직였다는 신호라 여기 못 박는다
+            Assert.IsTrue(GoldGainEfficiency.IsHealthy(
+                    GoldGainEfficiency.PaybackSeconds(1, startingRate)),
+                string.Format("완화된 온보딩 수입(초당 {0:F2}골드)에서 회수 {1:F0}초가 "
+                    + "건강 밴드 밖이다 - 완화 크기나 비용 곡선이 움직였다",
                     startingRate, GoldGainEfficiency.PaybackSeconds(1, startingRate)));
 
-            // 수입이 세 배가 되면(대략 3스테이지) 밴드 안으로 들어와야 한다.
-            // 이 조건이 없으면 "안 팔린다"만 만족하는 죽은 곡선도 통과한다
+            // 수입이 자라면 여전히 팔려야 한다. 이 조건이 없으면 죽은 곡선도
+            // 통과한다
             double grownRate = startingRate * 3d;
 
             Assert.IsTrue(GoldGainEfficiency.WorthBuying(1, grownRate),

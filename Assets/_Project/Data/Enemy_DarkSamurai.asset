@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
   m_Name: Enemy_DarkSamurai
   m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
-  displayName: "\uB2E4\uD06C \uC0AC\uBB34\uB77C\uC774"
+  displayName: "\uBD89\uC740\uB208 \uC694\uAD34"
   idleFrames:
   - {fileID: 815424164945274260, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
   - {fileID: -270785710348516584, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}

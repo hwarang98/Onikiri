@@ -73,6 +73,10 @@ namespace Onikiri.UI
         [SerializeField] private Color iconTint = new Color(0.82f, 0.80f, 0.86f, 1f);
         [SerializeField] private Color lockedIconTint = new Color(0.42f, 0.40f, 0.48f, 1f);
 
+        [Tooltip("버튼 판의 평상시 틴트. 잠긴 화면에서 되살릴 값이라 들고 있는다")]
+        [SerializeField] private Color temperButtonTint = new Color(0.34f, 0.36f, 0.68f, 1f);
+        [SerializeField] private Color gradeButtonTint = new Color(0.42f, 0.56f, 1.00f, 1f);
+
         private PlayerWallet wallet;
         private GemWallet gems;
         private StageProgress stage;
@@ -146,6 +150,11 @@ namespace Onikiri.UI
 
             if (icon != null) icon.color = iconTint;
 
+            // 잠긴 미리보기에서 눌러뒀던 판을 되살린다 - DrawLocked를 지난
+            // 카드가 해금 이벤트로 이 길로 돌아온다
+            if (temperBackground != null) temperBackground.color = temperButtonTint;
+            if (gradeBackground != null) gradeBackground.color = gradeButtonTint;
+
             bool maxed = system.IsMaxed(slotIndex);
 
             if (gradeLabel != null)
@@ -204,6 +213,12 @@ namespace Onikiri.UI
 
             SetButton(temperButton, temperTitle, temperCost, "단련", string.Empty, false, lockedColor);
             SetButton(gradeButton, gradeTitle, gradeCost, "등급업", string.Empty, false, lockedColor);
+
+            // 판까지 죽인다(41b - PetRow와 같은 원칙). interactable=false만으로는
+            // SpriteSwap 버튼의 판이 평소처럼 밝게 남아 활성처럼 보인다.
+            // 알파가 아니라 RGB를 누른다 - 알파는 뒤가 비친다
+            if (temperBackground != null) temperBackground.color = Dimmed(temperButtonTint);
+            if (gradeBackground != null) gradeBackground.color = Dimmed(gradeButtonTint);
         }
 
         private void DrawTemper(EquipmentSystem.Slot slot)
@@ -263,6 +278,12 @@ namespace Onikiri.UI
             if (title != null) { title.text = titleText; title.color = color; }
             if (cost != null) { cost.text = costText; cost.color = color; }
             if (button != null) button.interactable = interactable;
+        }
+
+        /** 판 죽이기. PetRow와 같은 값 - 두 화면의 "죽은 버튼"이 같은 어둠이어야 한다 */
+        private static Color Dimmed(Color c)
+        {
+            return new Color(c.r * 0.55f, c.g * 0.55f, c.b * 0.55f, c.a);
         }
 
         private static string StatName(EquipmentStat stat)

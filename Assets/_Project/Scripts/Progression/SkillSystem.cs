@@ -195,18 +195,42 @@ namespace Onikiri.Progression
 
         // ---------------------------------------------------------------- 값
 
+        /**
+         * @brief 이 오의가 **지금 실제로 내는** 배율. 45단계부터 상성이 곱해진다.
+         *
+         * 상성을 여기서 곱하는 것이 요점이다. 이 값 하나가 세 곳으로 간다 -
+         * 화면의 배율(SkillButton), 데미지(SkillPerformer가 받는 총 배율),
+         * 초당 환산 기여(CastRate). 한 자리에서 곱하면 셋이 영원히 같은
+         * 값을 말하고, 나누면 "패널에는 올랐는데 데미지는 그대로"가 된다.
+         *
+         * **상한 뒤에 곱한다.** 상성이 상한 안쪽에 들어가면 오의 배율 상한
+         * (SkillCurve.CeilingRatio)이 상성만큼 낮아진 것과 같아져, 요도를
+         * 벼릴수록 오의 레벨의 값이 줄어든다 - 두 축이 서로를 갉아먹는 상태다.
+         * 상성은 상한 **위에** 얹히는 별개의 층이고, 그래서 곡선도 자기 상한
+         * (요도 티어 10)에서 따로 닫힌다.
+         */
         public double MultiplierOf(int index)
         {
             var slot = GetSlot(index);
             if (slot == null) return 0d;
-            return SkillCurve.CappedMultiplierAtLevel(slot.baseMultiplier, slot.level);
+            return SkillCurve.CappedMultiplierAtLevel(slot.baseMultiplier, slot.level)
+                   * YodoSystem.CurrentAffinityForSkill(index);
         }
 
         public double NextMultiplierOf(int index)
         {
             var slot = GetSlot(index);
             if (slot == null) return 0d;
-            return SkillCurve.CappedMultiplierAtLevel(slot.baseMultiplier, slot.level + 1);
+            return SkillCurve.CappedMultiplierAtLevel(slot.baseMultiplier, slot.level + 1)
+                   * YodoSystem.CurrentAffinityForSkill(index);
+        }
+
+        /** 상성을 걷어낸 순수 오의 배율. 상성 표기가 "얼마가 얹혔는가"를 적을 때 쓴다 */
+        public double BaseMultiplierOf(int index)
+        {
+            var slot = GetSlot(index);
+            if (slot == null) return 0d;
+            return SkillCurve.CappedMultiplierAtLevel(slot.baseMultiplier, slot.level);
         }
 
         public bool IsMaxed(int index)

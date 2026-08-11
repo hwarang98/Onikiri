@@ -130,7 +130,8 @@ namespace Onikiri.Tests
             Assert.AreEqual(7, data.stage, "the stage moved during migration");
             Assert.AreEqual(4, data.killsThisStage);
             Assert.AreEqual(12345d, data.gold.ToDouble(), 1e-6d);
-            Assert.AreEqual(31, data.upgradeLevels[0], "upgrade levels are kept as-is (9-1)");
+            Assert.AreEqual(241, data.upgradeLevels[0],
+                "미세화 환산(43단계): 옛 Lv.31 = 새 (30x8)+1 = 241 - 가치 보존이 곧 유지다");
 
             // v1에는 보스가 없었다. 넘어온 스테이지 수를 보스 처치 수로 친다
             Assert.AreEqual(6, data.bossKillCount);

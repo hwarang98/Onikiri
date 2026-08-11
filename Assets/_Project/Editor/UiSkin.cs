@@ -101,6 +101,61 @@ namespace Onikiri.EditorTools
         public static readonly Color TextDim = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
 
         /**
+         * @brief 보석이 드는 동작 버튼의 틴트 (39단계 통일).
+         *
+         * 장비 등급업·동료 해금이 각자 같은 값을 들고 있었고, 전직 버튼만
+         * (0.55, 0.66, 1.00)으로 미세하게 밝았다 - 스텝별로 따로 만들어진
+         * 흔적이다. 근거는 상단 바의 보석 아이콘이 파란 다이아라는 것 하나이므로
+         * 값도 하나여야 한다.
+         */
+        public static readonly Color GemAction = new Color(0.42f, 0.56f, 1.00f, 1f);
+
+        /**
+         * @brief 완성 표기의 금색. MASTER 행·최종 경지가 같은 값을 쓴다.
+         *
+         * 강조색 규칙: 적(위험/배지)·금(완성)·청(보석) 셋뿐이다. 이 셋 밖의
+         * 강조색이 필요해 보이면 화면 설계를 다시 본다.
+         */
+        public static readonly Color Gold = new Color32(0xFF, 0xD3, 0x4D, 0xFF);
+
+        /**
+         * @brief 희귀도 사다리 다섯 칸의 색 (47단계). ★1 -> ★5.
+         *
+         * ## 강조색 셋 규칙의 유일한 예외이고, 그 예외에 근거가 있다
+         *
+         * 바로 위 주석이 "적·금·청 셋뿐이다. 그 밖의 강조색이 필요해 보이면
+         * 화면 설계를 다시 본다"라고 적었다. 여기가 그 재검토를 한 자리다.
+         *
+         * 사다리는 **순서가 있는 다섯 값**이라 강조색이 아니라 **눈금**이다.
+         * 강조색 규칙이 막으려는 것은 "빨강은 무슨 뜻이고 초록은 무슨
+         * 뜻인가"가 화면마다 달라지는 것인데, 눈금은 뜻이 하나다 - 위로
+         * 갈수록 귀하다. 그래서 색을 임의로 고르지 않고 **기존 셋을 사다리의
+         * 양 끝과 가운데에 배치**했다:
+         *
+         *   ★1 일반   TextDim   이미 "값이 없는 것"의 색이다
+         *   ★2 고급   Text      기본 글자색. 사다리의 기준선
+         *   ★3 희귀   청        보석의 색 - 돈으로 사는 것의 색이 여기서 시작
+         *   ★4 영웅   자주      **유일하게 새로 드는 색.** 청과 금 사이
+         *   ★5 전설   Gold      "완성"의 색. 오니키리 완성과 같은 금이다
+         *
+         * 새로 드는 것이 한 칸뿐이고, 그 한 칸이 청(★3)과 금(★5) 사이를
+         * 메우는 자리라 사다리가 색상환에서도 단조로 읽힌다.
+         *
+         * **색만으로 말하지 않는다.** 확률표와 결과 판이 별(GachaCurve.
+         * StarsFor)을 함께 적는다 - 색약에게 사다리가 통째로 사라지는 것을
+         * 막는 판단이고, 38b가 게이지에서 "그라데이션 금지"로 한 번 내린
+         * 것과 같은 종류다.
+         */
+        public static readonly Color[] Grades =
+        {
+            TextDim,
+            Text,
+            new Color32(0x7F, 0xB6, 0xFF, 0xFF),
+            new Color32(0xC9, 0x8B, 0xFF, 0xFF),
+            Gold
+        };
+
+        /**
          * @brief 동작 버튼의 색.
          *
          * 이 값들은 **최종 색이 아니라 나무 판에 곱할 틴트**다. 팩의 Colored 세트
@@ -142,6 +197,16 @@ namespace Onikiri.EditorTools
          * "위는 게임 아래는 메뉴"로 갈리지 않는다. 먹으로 그은 한 획이다.
          */
         public static readonly Color PanelEdge = new Color32(0x4A, 0x3E, 0x5C, 0xFF);
+
+        /**
+         * @brief 먹빛 바탕(PanelInk) 위에 서는 톤온톤 칩 (2b 상단 바).
+         *
+         * 상단 바의 칩들은 Ancient 나무 판을 벗었다 - 두꺼운 테두리 상자가
+         * 좁은 바에서 촌스러움의 핵심이었다. 대신 바탕보다 반 단 밝은 민짜
+         * 사각형이 "여기는 눌린다"를 말한다. 테두리가 없으므로 형태는 색차
+         * 하나로 선다 - PanelInk(0x221D30)와의 차이가 곧 칩의 윤곽이다.
+         */
+        public static readonly Color InkChip = new Color32(0x33, 0x2B, 0x45, 0xFF);
 
         // ---------------------------------------------------------------- 배율
 
@@ -237,6 +302,34 @@ namespace Onikiri.EditorTools
             // disabledSprite로 갈아끼우는데, 여기서 눌림 판을 주면 "살 수 없는 행"이
             // "지금 눌린 행"과 같아 보인다. 색(RowDisabled)이 그 역할을 한다
             button.spriteState = state;
+        }
+
+        /**
+         * @brief 민짜 칩(스프라이트 없음)을 버튼으로 만든다 (2b 상단 바).
+         *
+         * ApplyButton의 SpriteSwap은 눌림 **판**을 갈아끼우는 방식이라 판이
+         * 없는 칩에는 쓸 수 없다 - pressedSprite를 물리는 순간 Ancient 나무
+         * 테두리가 눌림 상태에만 되살아난다. 민짜에는 ColorTint가 맞다.
+         * 어두워지는 것만으로도 모바일에서 "눌렸다"는 충분히 읽힌다.
+         */
+        public static void ApplyFlatButton(Button button, Image target)
+        {
+            if (button == null || target == null) return;
+
+            button.targetGraphic = target;
+            button.transition = Selectable.Transition.ColorTint;
+
+            var colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = Color.white;
+            colors.selectedColor = Color.white;
+            colors.pressedColor = new Color(0.70f, 0.70f, 0.78f, 1f);
+            colors.disabledColor = new Color(1f, 1f, 1f, 0.5f);
+            colors.fadeDuration = 0.06f;
+            button.colors = colors;
+
+            // SpriteSwap 세대의 잔재가 남아 있으면 ColorTint와 겹쳐 이상해진다
+            button.spriteState = new SpriteState();
         }
     }
 }

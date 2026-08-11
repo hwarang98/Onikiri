@@ -13,9 +13,8 @@ namespace Onikiri.UI
      * HUD의 재화 표기와 갈라지는 유일한 자리이고, 이유는 그쪽 주석에 적어뒀다 -
      * 잔고는 크기만 알면 되지만 타격은 크기의 변화가 곧 정보다.
      *
-     * 경험치 흡수(ShowExp)만 예외로 축약을 쓴다. 그것이 향하는 경험치 바가 축약
-     * 표기라, 날아가는 숫자와 도착지의 숫자가 같은 표기여야 "저것이 여기로 들어갔다"가
-     * 읽힌다.
+     * 경험치 흡수(ShowExp)만 예외로 축약을 쓴다. 획득량은 크기만 알면 되는
+     * 값이고(잔고와 같은 쪽), 날아가는 동안 읽혀야 하니 짧을수록 좋다.
      */
     public sealed class DamageNumberSpawner : MonoBehaviour
     {
@@ -176,7 +175,7 @@ namespace Onikiri.UI
         }
 
         [Header("경험치 흡수")]
-        [Tooltip("경험치가 빨려 들어갈 목표. 보통 상단 바의 경험치 바다. " +
+        [Tooltip("경험치가 빨려 들어갈 목표. 성장 패널 상단 경계의 경험치 스트립이다. " +
                  "비어 있으면 흡수 연출을 생략한다 - 목표 없이 날리면 화면 " +
                  "왼쪽 아래 구석으로 사라진다")]
         [SerializeField] private RectTransform expTarget;
@@ -205,7 +204,7 @@ namespace Onikiri.UI
                     container, screenPoint, uiCamera, out from))
                 return;
 
-            // 목표는 다른 계층에 있다(상단 바). 월드를 거쳐 컨테이너 좌표로 옮긴다 -
+            // 목표는 다른 계층에 있다(성장 패널). 월드를 거쳐 컨테이너 좌표로 옮긴다 -
             // 두 rect의 앵커가 달라서 anchoredPosition을 그대로 쓸 수 없다
             var targetScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, expTarget.position);
 

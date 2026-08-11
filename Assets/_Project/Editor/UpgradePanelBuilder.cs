@@ -38,6 +38,16 @@ namespace Onikiri.EditorTools
 
             /** 이 스테이지 전에는 잠긴다. 0이면 잠금 없음 */
             public int UnlockStage;
+
+            /**
+             * @brief 심화 게이트 (43단계). 치명타 확률이 MASTER(100%)여야 열린다.
+             *
+             * 스테이지 게이트(UnlockStage)와 종류가 다르다 - 저쪽은 여정의
+             * 위치, 이쪽은 다른 축의 완성이 문이다. 조건 판정은
+             * TranscendCurve.IsUnlockedAt 한 곳이고 화면·시뮬·시스템이 전부
+             * 그것을 읽는다.
+             */
+            public bool DeepGate;
         }
 
         private static readonly TrackSpec[] Specs =
@@ -153,6 +163,31 @@ namespace Onikiri.EditorTools
                 // 온보딩 뒤에 열린다. 그 전에는 회수보다 구간이 먼저 끝나서
                 // 지표가 사라고 말하지만 실제로는 손해다(21단계)
                 UnlockStage = GoldGainCurve.UnlockStage
+            },
+
+            // ---------------------------------------------------- 43단계: 심화
+            // 초월 치명타: 전타 치명타(확률 100%) 뒤의 무한 배수. 곱연산 +
+            // 상한 없음 - 공격력·치명타 피해와 같은 부류이고, 자기 제한은
+            // 비용 증가율 2.0이 한다(TranscendCurve 주석)
+            new TrackSpec {
+                Id = UpgradeSystem.TranscendId, DisplayName = "초월 치명타",
+                BaseCost = TranscendCurve.BaseCost, CostGrowth = TranscendCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Multiplicative,
+                BaseValue = 1d, Step = TranscendCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.Multiplier,
+                DeepGate = true
+            },
+            // 연격: 타격마다 한 번 더 베는 확률. 가산 + 상한 100%(확정
+            // 2연격 = MASTER) - 치명타 확률과 같은 생애를 산다
+            new TrackSpec {
+                Id = UpgradeSystem.ComboId, DisplayName = "연격",
+                BaseCost = ComboCurve.BaseCost, CostGrowth = ComboCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Additive,
+                BaseValue = 0d, Step = ComboCurve.Step,
+                MaxLevel = ComboCurve.MaxLevel, ValueCeiling = ComboCurve.Ceiling,
+                Display = UpgradeTrack.Display.Percent,
+                DeepGate = true
             }
         };
 
@@ -216,17 +251,30 @@ namespace Onikiri.EditorTools
             return 0;
         }
 
-        /** 전직 페이지의 잠금 안내 하나 */
-        private const int AwakenRows = 1;
+        /**
+         * @brief 전직 페이지의 자식 수. **잠금 안내 + 진화 카드 둘이다** (33단계).
+         *
+         * 둘은 같은 자리에 겹쳐 서고 상태(Lv.30 해금)에 따라 하나만 켜진다
+         * (EvolutionPanel). 잔재 검사는 켜짐과 무관하게 개수를 세므로 둘 다 든다.
+         */
+        private const int AwakenRows = 2;
 
         /**
-         * @brief 그 안내가 세로로 차지하는 줄 수.
+         * @brief 잠금 안내가 세로로 차지하는 줄 수.
          *
-         * 개수(AwakenRows)와 따로 두는 이유는 안내가 두 줄 높이로 서기 때문이다.
-         * 높이 계산에 개수를 그대로 쓰면 페이지가 실제보다 짧다고 보고되고,
-         * 스크롤 검사가 넘침을 놓친다
+         * 한 줄짜리 안내가 텅 빈 페이지 맨 위에 붙어 있으면 "행 하나만 로드된
+         * 목록"처럼 보이므로 두 줄 높이로 세운다.
          */
         private const int AwakenRowSpan = 2;
+
+        /**
+         * @brief 진화 카드의 높이 (33단계).
+         *
+         * 페이지 높이가 이 값에서 나온다. 뷰포트(584px)를 넘지 않아야 한다 -
+         * 성장·전직 페이지는 스크롤하지 않는 것이 설계이고(VerifyPageHeights),
+         * TopPadding(12) + 540 + RowGap(14) = 566 < 584가 그 검산이다.
+         */
+        private const float AwakenCardHeight = 540f;
 
         /**
          * @brief 강화 축의 계열. 이제 **목록 안의 머리글**이고 탭이 아니다.
@@ -258,6 +306,12 @@ namespace Onikiri.EditorTools
             // 하는가"의 분류이므로 새 이름이 필요하다
             new CategorySpec { DisplayName = "획득", TrackIds = new[] {
                 UpgradeSystem.GoldGainId } },
+
+            // 43단계. 치명타 확률 100% 뒤에 열리는 심화 축들. 맨 끝이 맞다 -
+            // 목록의 순서가 여정의 순서다(잠긴 마지막 절이 "앞으로 무엇이
+            // 열리는가"를 말한다 - LockedTab과 같은 규칙)
+            new CategorySpec { DisplayName = "심화", TrackIds = new[] {
+                UpgradeSystem.TranscendId, UpgradeSystem.ComboId } },
         };
 
         /** 탭 줄 높이와 그 아래 여백 */
@@ -269,10 +323,28 @@ namespace Onikiri.EditorTools
 
         public const string TopTabBarName = "TopTabBar";
 
+        /**
+         * @brief 경험치 스트립 (2a 후속). 패널 최상단 경계의 풀폭 얇은 바.
+         *
+         * 상단 바에 있던 60px 경험치 바가 내려온 자리다. 세우는 것은
+         * BattleContentBuilder.BuildExpRow(LevelHud 배선이 거기 있다)이고,
+         * 여기는 자리만 안다 - 탭 줄과 뷰포트가 그만큼 내려앉는다.
+         *
+         * 높이 10px은 "채움이 보이는 가장 얇은 줄"이다. 바탕의 경계선(TopEdge,
+         * 6px)과 같은 색 트랙이라, 비어 있을 때는 구분선으로만 읽힌다.
+         */
+        public const string ExpStripName = "ExpStrip";
+        public const float ExpStripHeight = 10f;
+
+        /** 스트립이 패널 위쪽에서 먹는 몫. 탭 줄이 이만큼 내려앉는다 */
+        public const float ExpStripStride = ExpStripHeight + TabBarGap;
+
         /** 성장 패널 직속에 있어도 되는 것. 그 외는 잔재다 */
+        // 2b: 레벨업 버튼이 상단 바에서 패널 헤더(스트립 라인)로 내려왔다.
+        // 세우는 것은 BattleContentBuilder.BuildExpRow다
         public static readonly string[] PanelChildNames =
         {
-            "Viewport", TopTabBarName
+            "Viewport", TopTabBarName, ExpStripName, "LevelUpButton"
         };
 
         // 1080 폭 캔버스 기준 배치값. 55pt 글자가 들어가야 하므로 줄 높이는 넉넉히 준다
@@ -360,8 +432,9 @@ namespace Onikiri.EditorTools
         private const float TextLeft = IconLeft + UiIcons.Size + 20f;
 
         private static readonly Color RowColor = new Color32(0x3A, 0x35, 0x50, 0xFF);
-        private static readonly Color TextColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
-        private static readonly Color DimColor = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
+        // 39단계 톤 통일: 팔레트의 단일 출처는 UiSkin이다
+        private static readonly Color TextColor = UiSkin.Text;
+        private static readonly Color DimColor = UiSkin.TextDim;
 
         /**
          * @brief 안전 영역 루트가 없는 기존 씬을 옮겨 붙인다.
@@ -472,6 +545,18 @@ namespace Onikiri.EditorTools
             var edgeImage = edge.AddComponent<Image>();
             edgeImage.color = UiSkin.PanelEdge;
             edgeImage.raycastTarget = false;
+
+            // 화지 위의 벚가지 (39단계). 다른 하단 패널들이 같은 자리에 같은
+            // 가지를 얹으므로, 어느 탭을 열어도 가지가 이어져 보인다.
+            // 형제 순서: AddSakuraBranch가 맨 앞에 넣지만 TopEdge보다는 뒤에
+            // 그려져야 하는데, 여기서는 TopEdge가 자식이라 어차피 나중에 그려진다
+            BackdropTextureBuilder.AddSakuraBranch(rect);
+
+            // 가지는 밴드 안(경계선 아래)에 있어야 한다. 백드롭은 GrowthPanelTop에서
+            // 시작하므로 그대로 두면 경계선(6px)에 물린다
+            var branch = rect.Find(BackdropTextureBuilder.BranchName);
+            if (branch != null)
+                ((RectTransform)branch).anchoredPosition = new Vector2(0f, -6f);
         }
 
         /** 성장 패널을 채우고 UpgradeSystem을 배선한다 */
@@ -531,9 +616,9 @@ namespace Onikiri.EditorTools
 
             Debug.Log(string.Format(
                 "[Onikiri] Upgrade panel built: 강화 {0} gold tracks in {1} groups ({2:F0}px, scrolls) / "
-                + "성장 {3} stat axes / 전직 locked, {4} pages under Content.",
+                + "성장 {3} stat axes / 전직 Lv.{4} 진화 카드, {5} pages under Content.",
                 Specs.Length, Categories.Length, PageHeight(EnhancePageName),
-                StatSpecs.Length, content.childCount));
+                StatSpecs.Length, AwakenRequiredLevel, content.childCount));
             return system;
         }
 
@@ -615,10 +700,10 @@ namespace Onikiri.EditorTools
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
             viewportRect.offsetMin = Vector2.zero;
-            // 최상위 탭 줄 **하나만** 비운다. 계열 탭 줄은 강화 페이지에만 있으므로
-            // 여기서 비우면 성장·전직 탭에서 그 자리가 빈 채로 남는다 - 대신 강화
-            // 페이지 루트가 자기 몫으로 흡수한다(EnsurePage)
-            viewportRect.offsetMax = new Vector2(0f, -TabRowStride);
+            // 경험치 스트립과 최상위 탭 줄 몫을 비운다. 계열 탭 줄은 강화
+            // 페이지에만 있으므로 여기서 비우면 성장·전직 탭에서 그 자리가 빈
+            // 채로 남는다 - 대신 강화 페이지 루트가 자기 몫으로 흡수한다(EnsurePage)
+            viewportRect.offsetMax = new Vector2(0f, -(ExpStripStride + TabRowStride));
 
             if (viewport.GetComponent<RectMask2D>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
@@ -702,6 +787,16 @@ namespace Onikiri.EditorTools
                 SetBigDouble(element.FindPropertyRelative("baseCost"), spec.BaseCost);
                 SetBigDouble(element.FindPropertyRelative("baseValue"), spec.BaseValue);
 
+                // 관문(2상 비용, 43단계) - 치명타 확률만 쓴다. 곡선 상수가
+                // 단일 출처이고 트랙은 사본이다(UpgradeTrack.CostAtLevel 주석)
+                bool wall = spec.Id == UpgradeSystem.CritRateId;
+                element.FindPropertyRelative("wallFromLevel").intValue =
+                    wall ? CritRateCurve.DeepPhaseLevel - 1 : 0;
+                element.FindPropertyRelative("wallJump").doubleValue =
+                    wall ? CritRateCurve.WallJump : 1d;
+                element.FindPropertyRelative("wallGrowth").doubleValue =
+                    wall ? CritRateCurve.DeepGrowth : 1d;
+
                 // 새로 생긴 칸만 레벨 1로 초기화한다
                 if (i >= previousCount) element.FindPropertyRelative("level").intValue = 1;
                 if (element.FindPropertyRelative("level").intValue < 1)
@@ -761,8 +856,11 @@ namespace Onikiri.EditorTools
         {
             if (pageName == EnhancePageName) return WalkEnhanceList(null, null);
 
-            // 전직은 행 하나가 두 줄 높이로 선다
-            int rows = pageName == AwakenPageName ? AwakenRowSpan : RowsInPage(pageName);
+            // 전직은 잠금 안내와 진화 카드가 **같은 자리에 겹쳐** 서므로 행 수가
+            // 아니라 둘 중 큰 쪽(카드)의 높이를 쓴다
+            if (pageName == AwakenPageName) return TopPadding + AwakenCardHeight + RowGap;
+
+            int rows = RowsInPage(pageName);
             return TopPadding + rows * (RowHeight + RowGap);
         }
 
@@ -780,8 +878,8 @@ namespace Onikiri.EditorTools
         /**
          * @brief 성장 패널이 스크롤 없이 담을 수 있는 높이.
          *
-         * 화면 10~45%가 성장 패널이고(DisplayConfig), 그 위쪽 한 줄은 최상위
-         * 탭이 가져간다. 남는 것이 페이지가 쓸 수 있는 전부다.
+         * 화면 10~45%가 성장 패널이고(DisplayConfig), 그 위쪽은 경험치 스트립과
+         * 최상위 탭 줄이 가져간다. 남는 것이 페이지가 쓸 수 있는 전부다.
          *
          * 성장(486px)과 전직(328px)은 이 안에 들어간다. 강화는 여섯 축을 한
          * 목록으로 보여주므로 넘치고, 그것이 19단계의 선택이다 - 탭으로 감추는
@@ -794,7 +892,7 @@ namespace Onikiri.EditorTools
                 float panelHeight = Onikiri.Core.DisplayConfig.DesignHeight
                                     * (Onikiri.Core.DisplayConfig.GrowthPanelTop
                                        - Onikiri.Core.DisplayConfig.BottomTabBarTop);
-                return panelHeight - TabRowStride;
+                return panelHeight - ExpStripStride - TabRowStride;
             }
         }
 
@@ -911,16 +1009,22 @@ namespace Onikiri.EditorTools
             // 자라도 줄 전체가 흔들리지 않는다
             CreateIcon(go.transform, UiIcons.For(Specs[index].Id), UiIcons.Tint);
 
+            // 행의 글자는 전부 캡션 크기다(38단계 위계). 목록은 훑는 화면이고,
+            // 큰 글자는 상단 바의 재화·머리글·스탯 창의 최종 값에만 남는다 -
+            // 크기가 하나면 색으로만 위계를 만들어야 했다
             var nameLabel = CreateLabel(go.transform, font, "Name", TextAlignmentOptions.Left);
+            UiFonts.Demote(nameLabel);
             PlaceStretched((RectTransform)nameLabel.transform, TextLeft, CostWidth + 24f, 10f, LineHeight);
 
             var costLabel = CreateLabel(go.transform, font, "Cost", TextAlignmentOptions.Right);
+            UiFonts.Demote(costLabel);
             PlaceRight((RectTransform)costLabel.transform, 24f, 10f, LineHeight);
             costLabel.color = DimColor;
 
             // 증가폭은 흐린 색으로 둔다. 이름과 비용이 먼저 읽히고, 값은 그 다음에
             // 확인하는 정보다
             var valueLabel = CreateLabel(go.transform, font, "Value", TextAlignmentOptions.Left);
+            UiFonts.Demote(valueLabel);
             PlaceStretched((RectTransform)valueLabel.transform, TextLeft, 24f, 10f + LineHeight, LineHeight);
             valueLabel.color = DimColor;
 
@@ -937,7 +1041,7 @@ namespace Onikiri.EditorTools
 
             // 완성 표현. 상한에 닿은 축이 죽은 회색이 아니라 금색이 된다
             so.FindProperty("rowBackground").objectReferenceValue = image;
-            so.FindProperty("masteredColor").colorValue = new Color32(0xFF, 0xD3, 0x4D, 0xFF);
+            so.FindProperty("masteredColor").colorValue = UiSkin.Gold;
             so.FindProperty("masteredRowTint").colorValue = new Color(0.62f, 0.55f, 0.42f, 1f);
             so.FindProperty("masteredLabel").stringValue = "MASTER";
 
@@ -945,6 +1049,9 @@ namespace Onikiri.EditorTools
             so.FindProperty("unlockStage").intValue = Specs[index].UnlockStage;
             so.FindProperty("lockedColor").colorValue = new Color32(0x5A, 0x51, 0x6B, 0xFF);
             so.FindProperty("lockedRowTint").colorValue = new Color(0.34f, 0.36f, 0.55f, 1f);
+
+            // 심화 게이트(43단계). 잠긴 비용 칸에는 스테이지 대신 조건이 선다
+            so.FindProperty("deepGate").boolValue = Specs[index].DeepGate;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -982,7 +1089,8 @@ namespace Onikiri.EditorTools
             barRect.offsetMin = new Vector2(SidePadding, 0f);
             barRect.offsetMax = new Vector2(-SidePadding, 0f);
             barRect.sizeDelta = new Vector2(-SidePadding * 2f, TabBarHeight);
-            barRect.anchoredPosition = Vector2.zero;
+            // 경험치 스트립이 패널 최상단을 가져갔다. 탭 줄은 그 아래다
+            barRect.anchoredPosition = new Vector2(0f, -ExpStripStride);
 
             var pageRoots = new[]
             {
@@ -992,8 +1100,10 @@ namespace Onikiri.EditorTools
             };
             string[] names = { "강화", "성장", "전직" };
 
-            // 배지는 성장 탭에만. 남은 포인트가 있을 때만 켜진다
+            // 남은 포인트 배지는 성장 탭에. 33단계부터 전직 탭에도 자기 배지가
+            // 붙는다 - 진화 가능(해금 + 두 재화 충족)할 때만 켜진다
             const int BadgePage = 1;
+            const int EvolutionBadgePage = 2;
 
             var tabs = barObject.AddComponent<Onikiri.UI.GrowthPanelTabs>();
             var tabsSo = new SerializedObject(tabs);
@@ -1046,6 +1156,22 @@ namespace Onikiri.EditorTools
                     element.FindPropertyRelative("badgeLabel").objectReferenceValue = badgeLabel;
 
                     VerifyBadgeClearsLabel(label, TabInnerWidth(names.Length));
+                }
+
+                if (i == EvolutionBadgePage)
+                {
+                    // GrowthPanelTabs의 배지 칸은 남은 포인트 전용이라 쓰지 않는다.
+                    // 전직 배지는 자기 판정(EvolutionSystem.AnyAffordable)을 가진
+                    // 별도 컴포넌트가 굴린다 - EquipmentTabBadge와 같은 구조다
+                    TMP_Text badgeLabel;
+                    var badge = CreateBadge(tabObject.transform, font, out badgeLabel);
+                    badge.gameObject.SetActive(false);
+
+                    var evolutionBadge = tabObject.AddComponent<Onikiri.UI.EvolutionTabBadge>();
+                    var badgeSo = new SerializedObject(evolutionBadge);
+                    badgeSo.FindProperty("badge").objectReferenceValue = badge.gameObject;
+                    badgeSo.FindProperty("label").objectReferenceValue = badgeLabel;
+                    badgeSo.ApplyModifiedPropertiesWithoutUndo();
                 }
             }
 
@@ -1121,6 +1247,9 @@ namespace Onikiri.EditorTools
             image.raycastTarget = false;
 
             label = CreateLabel(go.transform, font, "Count", TextAlignmentOptions.Center);
+            // 배지 숫자는 캡션 크기(38단계). 62px 판에 44pt 숫자는 두 자리부터
+            // 삐져나오고 있었다
+            UiFonts.Demote(label);
             var labelRect = (RectTransform)label.transform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
@@ -1132,15 +1261,16 @@ namespace Onikiri.EditorTools
         }
 
         /**
-         * @brief 전직 페이지. 아직 화면이 없으므로 잠금 안내 하나뿐이다.
+         * @brief 전직 페이지. **33단계에 실체가 생겼다** - 잠금 안내 + 진화 카드.
          *
-         * 17단계까지 이 안내는 하단 탭바에 "전직 Lv.30" 버튼으로 따로 서 있었다.
-         * 성장 패널에 전직 탭이 생긴 이상 그것은 같은 것이 두 곳에 있는 상태이고,
-         * 둘 중 어느 쪽이 진짜 전직 화면인지 알 수 없게 된다. 하단에서 지우고
-         * 여기로 옮겼다 - 하단에는 스킬만 남는다.
+         * 12단계부터 여기 서 있던 잠금 안내는 남는다. Lv.30 전에는 그것이 화면의
+         * 전부여야 하기 때문이다(값을 보여주면 이미 가진 것으로 읽힌다 -
+         * EquipmentRow.DrawLocked과 같은 규칙). 해금되면 EvolutionPanel이 안내를
+         * 끄고 카드를 켠다. 둘은 같은 자리에 겹쳐 있고 동시에 켜지지 않는다.
          *
-         * 문구는 LockedTab이 쓴다. 해금 레벨에 닿으면 "전직 Lv.30"이 "전직"으로
-         * 바뀌는 규칙이 이미 그 안에 있고, 같은 규칙을 두 번 적을 이유가 없다.
+         * pendingLabel("전직 준비 중")은 지웠다 - 그 문구의 존재 이유가 "조건은
+         * 넘겼는데 화면이 없다"였고, 이제 화면이 있다. LockedTab.screen에 카드를
+         * 넣는 것이 그 증거다(참조가 있어야 구현됐다는 판정이 서는 규칙).
          */
         private static void BuildAwakenPage(RectTransform page, TMP_FontAsset font)
         {
@@ -1159,8 +1289,7 @@ namespace Onikiri.EditorTools
             var button = notice.GetComponent<Button>();
             if (button != null) Object.DestroyImmediate(button);
 
-            // 안으로 파인 판. "여기는 아직 비어 있다"를 색이 아니라 형태로 말한다.
-            // 하단 탭바의 잠긴 탭이 쓰던 것과 같은 판이라, 옮겨온 것이 눈에도 같다
+            // 안으로 파인 판. "여기는 아직 잠겨 있다"를 색이 아니라 형태로 말한다
             var image = notice.GetComponent<Image>();
             UiSkin.ApplyPanel(image, UiSkin.Inlay, UiSkin.InlayTint * 0.7f);
 
@@ -1172,27 +1301,333 @@ namespace Onikiri.EditorTools
             labelRect.offsetMax = Vector2.zero;
 
             // 빌더가 완성된 문구를 적어둔다. LockedTab.Start는 페이지가 **처음
-            // 켜진 다음 프레임**에 도는데, 그때까지 CreateLabel이 넣어둔 자리표시
-            // "Label"이 화면에 그대로 보인다 - 탭을 처음 누른 사람이 한 프레임
-            // 동안 정확히 그 글자를 본다. 잠긴 쪽 문구를 적어두면 최악이어도
-            // 말이 되는 화면이다
+            // 켜진 다음 프레임**에 돌고, 그때까지 자리표시가 그대로 보인다
             label.text = "전직 Lv." + AwakenRequiredLevel;
             label.color = DimColor;
+
+            var card = BuildEvolutionCard(page, font);
 
             var locked = notice.gameObject.AddComponent<Onikiri.UI.LockedTab>();
             var so = new SerializedObject(locked);
             so.FindProperty("displayName").stringValue = "전직";
             so.FindProperty("requiredLevel").intValue = AwakenRequiredLevel;
-
-            // 지금 세이브는 Lv.41이라 조건을 이미 넘겼다. 이 줄이 없으면 밝게
-            // 열린 빈 판이 나오고, 그 화면은 "해금됐다"와 "고장났다"가 구분되지
-            // 않는다. 전직 화면이 실제로 생기는 단계에서 이 줄을 지우면 된다
-            so.FindProperty("pendingLabel").stringValue = "전직 준비 중";
+            so.FindProperty("pendingLabel").stringValue = string.Empty;
+            so.FindProperty("screen").objectReferenceValue = card.gameObject;
             so.FindProperty("label").objectReferenceValue = label;
             so.FindProperty("background").objectReferenceValue = image;
             so.FindProperty("lockedBackground").colorValue = UiSkin.InlayTint * 0.7f;
             so.FindProperty("unlockedBackground").colorValue = UiSkin.InlayTint;
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            WireEvolutionPanel(page, notice.gameObject, card);
+        }
+
+        // ------------------------------------------------------------ 33단계: 진화 카드
+
+        /** 카드 안 배치. 위에서부터 초상 / 이름 / 배수 / 버튼 순이다 */
+        private const float PortraitTop = 16f;
+        private const float PortraitSize = 180f;
+        private const float TierNameTop = PortraitTop + PortraitSize + 4f;
+        private const float TierStatTop = TierNameTop + LineHeight;
+        private const float EvolveButtonTop = TierStatTop + LineHeight * 2f + 12f;
+        private const float EvolveButtonHeight = AwakenCardHeight - EvolveButtonTop - 16f;
+
+        /** 초상 반쪽의 좌우 여백. 카드 폭의 절반씩을 현재/다음이 나눠 쓴다 */
+        private const float PortraitInset = 90f;
+
+        /**
+         * @brief 진화 카드. 현재/다음 티어를 나란히 놓고 아래에 진화 버튼 하나.
+         *
+         * 초상은 티어 idle 첫 프레임이다 - 아이콘을 따로 그리지 않는 이유는
+         * 이 화면의 약속이 "전직하면 **이 모습**이 된다"이기 때문이다. 별도
+         * 아이콘은 그 약속과 실물 사이에 한 겹을 더 끼운다.
+         */
+        private static RectTransform BuildEvolutionCard(RectTransform page, TMP_FontAsset font)
+        {
+            var card = EnsureRow(page, "EvolutionCard", 0);
+            var rect = (RectTransform)card;
+            rect.sizeDelta = new Vector2(-SidePadding * 2f, AwakenCardHeight);
+
+            // 카드 자체는 눌리는 것이 아니다. 행 아이콘 검사(버튼 유무)도 피한다
+            var cardButton = card.GetComponent<Button>();
+            if (cardButton != null) Object.DestroyImmediate(cardButton);
+
+            var image = card.GetComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Inlay, UiSkin.InlayTint);
+
+            float half = (Onikiri.Core.DisplayConfig.DesignWidth - SidePadding * 4f) * 0.5f;
+
+            // 현재 티어 (왼쪽 반)
+            BuildPortraitColumn(card, font, "Current", 0f, half);
+
+            // 화살표. 두 초상 사이 - "이것이 저것이 된다"를 기호 하나로 말한다
+            var arrow = CreateLabel(card, font, "Arrow", TextAlignmentOptions.Center);
+            var arrowRect = (RectTransform)arrow.transform;
+            PlaceStretched(arrowRect, half - 40f, half - 40f,
+                           PortraitTop + PortraitSize * 0.5f - LineHeight * 0.5f, LineHeight);
+            arrow.text = "→";
+            arrow.color = DimColor;
+
+            // 다음 티어 (오른쪽 반)
+            BuildPortraitColumn(card, font, "Next", half, half);
+
+            // 진화 버튼. 등급업과 같은 청색 - 보석이 드는 버튼의 색이다.
+            // 39단계까지 이 버튼만 (0.55, 0.66, 1.00)으로 미세하게 밝았다 -
+            // 같은 뜻(보석이 든다)이면 같은 값이어야 한다
+            var buttonObject = new GameObject("EvolveButton", typeof(RectTransform));
+            buttonObject.transform.SetParent(card, false);
+            var buttonRect = (RectTransform)buttonObject.transform;
+            PlaceStretched(buttonRect, 120f, 120f, EvolveButtonTop, EvolveButtonHeight);
+
+            var buttonImage = buttonObject.AddComponent<Image>();
+            UiSkin.ApplyPanel(buttonImage, UiSkin.GemAction);
+
+            var evolveButton = buttonObject.AddComponent<Button>();
+            UiSkin.ApplyButton(evolveButton, buttonImage);
+
+            // 동작은 44pt, 비용은 캡션(39단계 - 장비·동료 버튼과 같은 위계)
+            var title = CreateLabel(buttonObject.transform, font, "Title", TextAlignmentOptions.Center);
+            PlaceStretched((RectTransform)title.transform, 0f, 0f, 6f, LineHeight);
+            title.text = "진화";
+
+            var cost = CreateLabel(buttonObject.transform, font, "Cost", TextAlignmentOptions.Center);
+            UiFonts.Demote(cost);
+            PlaceStretched((RectTransform)cost.transform, 0f, 0f, 6f + LineHeight, LineHeight);
+            cost.text = string.Empty;
+
+            // 카드가 켜진 채로 저장되면 에디터에서 잠금 안내와 겹쳐 보인다.
+            // 런타임에는 EvolutionPanel이 상태에 맞게 다시 정한다
+            card.gameObject.SetActive(false);
+
+            return rect;
+        }
+
+        private static void BuildPortraitColumn(Transform card, TMP_FontAsset font, string prefix,
+                                                float left, float width)
+        {
+            var iconObject = new GameObject(prefix + "Icon", typeof(RectTransform));
+            iconObject.transform.SetParent(card, false);
+            var iconRect = (RectTransform)iconObject.transform;
+            iconRect.anchorMin = new Vector2(0f, 1f);
+            iconRect.anchorMax = new Vector2(0f, 1f);
+            iconRect.pivot = new Vector2(0.5f, 1f);
+            iconRect.sizeDelta = new Vector2(PortraitSize, PortraitSize);
+            iconRect.anchoredPosition = new Vector2(left + width * 0.5f, -PortraitTop);
+
+            var icon = iconObject.AddComponent<Image>();
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+
+            // 경지 이름·배수는 캡션 크기(39단계). 이 카드에서 44pt로 남는 것은
+            // 진화 버튼의 동사 하나다 - 그림(초상)이 크게 말하고 글자는 받친다
+            var name = CreateLabel(card, font, prefix + "Name", TextAlignmentOptions.Center);
+            UiFonts.Demote(name);
+            PlaceStretchedHalf((RectTransform)name.transform, left, width, TierNameTop, LineHeight);
+
+            var stat = CreateLabel(card, font, prefix + "Stat", TextAlignmentOptions.Center);
+            UiFonts.Demote(stat);
+            PlaceStretchedHalf((RectTransform)stat.transform, left, width, TierStatTop, LineHeight * 2f);
+            stat.text = string.Empty;
+
+            // 배수 두 줄("공격 ×n\n체력 ×n")이 들어온다. NoWrap이 기본이라
+            // 명시적으로 줄바꿈을 허용해야 한 줄로 뭉개지지 않는다
+            stat.textWrappingMode = TMPro.TextWrappingModes.Normal;
+        }
+
+        /** 카드의 왼쪽/오른쪽 반쪽에 붙인다. PlaceStretched의 반폭 버전 */
+        private static void PlaceStretchedHalf(RectTransform rect, float left, float width,
+                                               float top, float height)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = new Vector2(left, -top);
+        }
+
+        /**
+         * @brief EvolutionPanel을 페이지 루트에 앉히고 참조를 배선한다.
+         *
+         * 초상은 EvolutionAppearance가 구운 티어 idle 첫 프레임에서 가져온다.
+         * 그쪽 빌더(Build Evolution Content)를 먼저 돌리지 않았으면 초상이
+         * 비는데, 그 상태를 조용히 넘기지 않고 경고한다.
+         */
+        private static void WireEvolutionPanel(RectTransform page, GameObject notice, RectTransform card)
+        {
+            var panel = page.GetComponent<Onikiri.UI.EvolutionPanel>();
+            if (panel == null) panel = page.gameObject.AddComponent<Onikiri.UI.EvolutionPanel>();
+
+            var so = new SerializedObject(panel);
+            so.FindProperty("system").objectReferenceValue =
+                Object.FindFirstObjectByType<EvolutionSystem>(FindObjectsInactive.Include);
+            so.FindProperty("lockedRoot").objectReferenceValue = notice;
+            so.FindProperty("contentRoot").objectReferenceValue = card.gameObject;
+
+            so.FindProperty("currentIcon").objectReferenceValue = FindImage(card, "CurrentIcon");
+            so.FindProperty("currentName").objectReferenceValue = FindText(card, "CurrentName");
+            so.FindProperty("currentStat").objectReferenceValue = FindText(card, "CurrentStat");
+            so.FindProperty("nextIcon").objectReferenceValue = FindImage(card, "NextIcon");
+            so.FindProperty("nextName").objectReferenceValue = FindText(card, "NextName");
+            so.FindProperty("nextStat").objectReferenceValue = FindText(card, "NextStat");
+
+            var buttonTransform = card.Find("EvolveButton");
+            if (buttonTransform != null)
+            {
+                so.FindProperty("evolveButton").objectReferenceValue = buttonTransform.GetComponent<Button>();
+                so.FindProperty("evolveTitle").objectReferenceValue = FindText(buttonTransform, "Title");
+                so.FindProperty("evolveCost").objectReferenceValue = FindText(buttonTransform, "Cost");
+            }
+
+            var appearance = Object.FindFirstObjectByType<Onikiri.Battle.EvolutionAppearance>(
+                FindObjectsInactive.Include);
+            var portraits = so.FindProperty("tierPortraits");
+            var feet = so.FindProperty("tierPortraitFeet");
+            var centers = so.FindProperty("tierPortraitCenter");
+            var nudges = so.FindProperty("tierPortraitNudge");
+
+            if (appearance == null || appearance.TierCount == 0)
+            {
+                portraits.arraySize = 0;
+                feet.arraySize = 0;
+                centers.arraySize = 0;
+                nudges.arraySize = 0;
+                Debug.LogWarning("[Onikiri] EvolutionAppearance has no tiers baked"
+                                 + " - run Onikiri/Build Evolution Content first, then rebuild this panel.");
+            }
+            else
+            {
+                portraits.arraySize = appearance.TierCount;
+                feet.arraySize = appearance.TierCount;
+                centers.arraySize = appearance.TierCount;
+                nudges.arraySize = appearance.TierCount;
+                for (int t = 0; t < appearance.TierCount; t++)
+                {
+                    var frames = appearance.GetTier(t);
+                    var portrait = frames != null && frames.idle != null && frames.idle.Length > 0
+                        ? frames.idle[0] : null;
+
+                    portraits.GetArrayElementAtIndex(t).objectReferenceValue = portrait;
+
+                    // 발선·가로 중심은 초상 프레임의 그려진 픽셀에서 실측한다.
+                    // 스프라이트 피벗은 팩 전체(쓰러지는 DEATH까지)의 최솟값이라
+                    // idle의 실제 발보다 낮다 - 검객(팩 2px, idle 13px)이 그
+                    // 차이만큼 떠 보였다. 정렬의 기준은 메타데이터가 아니라 픽셀이다
+                    var bounds = MeasurePortraitBounds(portrait);
+                    feet.GetArrayElementAtIndex(t).floatValue = bounds.x;
+                    centers.GetArrayElementAtIndex(t).floatValue = bounds.y;
+
+                    // 마지막 픽셀은 눈으로 잡는다 (39단계) - 팩별 표 참고
+                    nudges.GetArrayElementAtIndex(t).vector2Value = PortraitNudgeOf(t);
+                }
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /**
+         * @brief 팩별 초상 마감 넛지 (원본 아트 픽셀, 39단계).
+         *
+         * 실측 발선이 못 잡는 마지막 어긋남의 표다. 팩마다 잉크 경계에 섞이는
+         * 것이 다르다 - 칼끝이 발보다 낮게 그려진 팩은 실측 발선이 칼끝이 되어
+         * 몸이 위로 뜨고, 발밑 그림자가 있는 팩은 반 픽셀 가라앉는다. 값은
+         * 실기 캡처를 눈으로 재서 적는다 - 여기 산식을 넣으려는 시도가 곧
+         * 실측 발선이었고, 그것이 못 잡는 잔차가 이 표다.
+         *
+         * 티어 5·6은 같은 팩(Demon_Samurai)이라 같은 값을 쓴다.
+         */
+        private static Vector2 PortraitNudgeOf(int tier)
+        {
+            string folder = tier <= 0
+                ? Onikiri.Progression.EvolutionCatalog.BaseSpriteFolder
+                : Onikiri.Progression.EvolutionCatalog.Tiers[
+                      Mathf.Min(tier, Onikiri.Progression.EvolutionCatalog.Count) - 1].SpriteFolder;
+
+            switch (folder)
+            {
+                // 39단계 실기 캡처 실측 전까지 전부 0. 캡처에서 잰 값을 여기 적는다
+                case "FULL_Samurai": return Vector2.zero;
+                case "Samurai_3": return Vector2.zero;
+                case "Samurai_5": return Vector2.zero;
+                case "Samurai_6": return Vector2.zero;
+                case "Samurai_2": return Vector2.zero;
+                case "Demon_Samurai": return Vector2.zero;
+                default: return Vector2.zero;
+            }
+        }
+
+        /**
+         * @brief 초상 스프라이트의 (발선, 가로 중심, 머리선) - 셀 안에서 그려진
+         * 픽셀의 최저 줄 비율, 좌우 범위 중앙 비율, 최고 줄 비율(전부 0~1,
+         * 아래 기준). 못 재면 (-1, -1, -1) (런타임이 피벗/셀 중앙으로 내려간다).
+         *
+         * 임포트된 텍스처는 CPU에서 못 읽으므로 원본 PNG를 직접 읽는다 -
+         * CharacterSpriteSlicer가 빈 셀을 거를 때와 같은 방법이다.
+         *
+         * public인 이유: 캐릭터 탭 초상(BattleContentBuilder, 39단계)이 같은
+         * 실측을 쓴다 - 측정이 두 벌이면 두 화면의 정렬이 따로 논다.
+         */
+        public static Vector3 MeasurePortraitBounds(Sprite portrait)
+        {
+            var missing = new Vector3(-1f, -1f, -1f);
+            if (portrait == null || portrait.texture == null) return missing;
+
+            string path = AssetDatabase.GetAssetPath(portrait.texture);
+            if (string.IsNullOrEmpty(path)) return missing;
+
+            Texture2D readable = null;
+            try
+            {
+                var bytes = System.IO.File.ReadAllBytes(path);
+                readable = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (!readable.LoadImage(bytes)) return missing;
+
+                var cell = portrait.rect;
+                int x0 = Mathf.Clamp((int)cell.x, 0, readable.width);
+                int y0 = Mathf.Clamp((int)cell.y, 0, readable.height);
+                int w = Mathf.Clamp((int)cell.width, 0, readable.width - x0);
+                int h = Mathf.Clamp((int)cell.height, 0, readable.height - y0);
+                if (w <= 0 || h <= 0) return missing;
+
+                var pixels = readable.GetPixels(x0, y0, w, h);
+
+                int lowest = -1, highest = -1, minX = int.MaxValue, maxX = -1;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        if (pixels[y * w + x].a <= 0.03f) continue;
+                        if (lowest < 0) lowest = y;   // 아래에서 위로 훑으므로 첫 줄이 발선
+                        highest = y;                  // 마지막으로 걸린 줄이 머리선
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                    }
+
+                if (lowest < 0) return missing;   // 전부 투명 - 잘못 잘린 셀이다
+
+                return new Vector3(lowest / (float)h,
+                                   (minX + maxX + 1) * 0.5f / w,
+                                   (highest + 1) / (float)h);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[Onikiri] Could not measure portrait bounds in " + path + ": " + e.Message);
+                return missing;
+            }
+            finally
+            {
+                if (readable != null) Object.DestroyImmediate(readable);
+            }
+        }
+
+        private static Image FindImage(Transform root, string childName)
+        {
+            var child = root.Find(childName);
+            return child != null ? child.GetComponent<Image>() : null;
+        }
+
+        private static TMP_Text FindText(Transform root, string childName)
+        {
+            var child = root.Find(childName);
+            return child != null ? child.GetComponent<TMP_Text>() : null;
         }
 
         private static int IndexOfSpec(string trackId)
@@ -1268,14 +1703,18 @@ namespace Onikiri.EditorTools
             // 증폭 축은 기본 축과 같은 심볼을 쓰고 밝기로 가른다. UiIcons 참고
             CreateIcon(row, UiIcons.For(spec.AxisId), UiIcons.AmplifierTint);
 
+            // 강화 행과 같은 캡션 크기(38단계 위계)
             var nameLabel = CreateLabel(row, font, "Name", TextAlignmentOptions.Left);
+            UiFonts.Demote(nameLabel);
             PlaceStretched((RectTransform)nameLabel.transform, TextLeft, CostWidth + 24f, 10f, LineHeight);
 
             var costLabel = CreateLabel(row, font, "Cost", TextAlignmentOptions.Right);
+            UiFonts.Demote(costLabel);
             PlaceRight((RectTransform)costLabel.transform, 24f, 10f, LineHeight);
             costLabel.color = DimColor;
 
             var valueLabel = CreateLabel(row, font, "Value", TextAlignmentOptions.Left);
+            UiFonts.Demote(valueLabel);
             PlaceStretched((RectTransform)valueLabel.transform, TextLeft, 24f, 10f + LineHeight, LineHeight);
             valueLabel.color = DimColor;
 

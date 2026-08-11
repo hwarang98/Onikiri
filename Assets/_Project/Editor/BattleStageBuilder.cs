@@ -379,12 +379,13 @@ namespace Onikiri.EditorTools
             var roster = BossConfigBuilder.EnsureDefaultAssets();
             if (roster == null || roster.regions == null) return;
 
-            // 순서가 곧 지역 번호다. 24단계 톤 아크: 봄 여명 -> 가을 -> 자줏빛 밤
+            // 순서가 곧 지역 번호다. 톤 아크: 봄 여명 -> 가을 -> 자줏빛 밤 -> 요괴 소굴
             string[] setPaths =
             {
                 RegionBackgroundBuilder.Region1Path,
                 RegionBackgroundBuilder.Region2Path,
-                RegionBackgroundBuilder.Region3Path
+                RegionBackgroundBuilder.Region3Path,
+                RegionBackgroundBuilder.Region4Path
             };
 
             for (int i = 0; i < roster.regions.Length; i++)

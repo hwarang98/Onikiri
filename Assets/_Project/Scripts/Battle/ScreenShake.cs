@@ -114,7 +114,27 @@ namespace Onikiri.Battle
             float amplitude = pixels * falloff;
 
             float offsetX = Mathf.Round(Random.Range(-amplitude, amplitude)) / DisplayConfig.PixelsPerUnit;
-            float offsetY = Mathf.Round(Random.Range(-amplitude, amplitude)) / DisplayConfig.PixelsPerUnit;
+
+            // **세로는 위로만 흔든다.** 아래로 내려가면 화면 밑에 하늘이 뜬다.
+            //
+            // 배경은 전투 밴드의 밑단에 **딱 붙어** 서 있다 - 레이어마다 자기
+            // 스프라이트의 밑변이 밴드 바닥에 오도록 놓인다(BackgroundStage.
+            // BuildScrollingLayer). 아래쪽 여유가 0이라는 뜻이고, 카메라가
+            // 한 픽셀이라도 내려가면 그만큼 밴드 바닥에 **아무것도 안 그려진
+            // 자리**가 생긴다. 거기서 비치는 것이 SkyFill이라, 성장 패널
+            // 윗선과 지면 사이에 하늘색 띠가 번쩍인다(실기 제보 - 경험치 바
+            // 위에 이상한 띠가 하나 더 생겼다는 것이 이것이다).
+            //
+            // 위로는 안전하다. 배경 꼭대기가 전투 창 위로 216px 남고(스카이
+            // 레이어 216px 대 밴드), 최대 흔들림은 귀참의 3px x2.8 = 8.4px,
+            // 화면으로 42px다. 아래로만 막으면 그 여유를 그대로 쓴다.
+            //
+            // 아트로 푸는 길도 있었다 - 지면 스트립을 아래로 더 굽는 것인데,
+            // 그러면 SurfaceFromBottom이 함께 움직여 캐릭터가 서는 선이 바뀐다
+            // (SpringForestBuilder.SurfaceFromBottom). 연출 버그를 고치자고
+            // 레이아웃을 옮기는 것은 값이 맞지 않는다.
+            float offsetY = Mathf.Abs(Mathf.Round(Random.Range(-amplitude, amplitude)))
+                            / DisplayConfig.PixelsPerUnit;
 
             transform.position = basePosition + new Vector3(offsetX, offsetY, 0f);
         }

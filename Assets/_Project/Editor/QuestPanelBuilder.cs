@@ -75,8 +75,9 @@ namespace Onikiri.EditorTools
          */
         private const float ClaimWidth = 208f;
 
-        private static readonly Color TextColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
-        private static readonly Color DimColor = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
+        // 39단계 톤 통일: 자기 색을 갖지 않는다. 팔레트의 단일 출처는 UiSkin이다
+        private static readonly Color TextColor = UiSkin.Text;
+        private static readonly Color DimColor = UiSkin.TextDim;
 
         private static readonly QuestKind[] Kinds =
         {
@@ -130,6 +131,9 @@ namespace Onikiri.EditorTools
                 + "가장 긴 페이지 {4:F0}px (뷰포트 {5:F0}px).",
                 QuestCatalog.DailyCount, QuestCatalog.RepeatCount, QuestCatalog.AchievementCount,
                 QuestCatalog.TotalCount, TallestPageHeight, ViewportHeight));
+
+            // 판을 새로 만들었으니 하단 탭을 다시 물린다 (RelinkScreenTabs 주석)
+            BattleContentBuilder.RelinkScreenTabs();
 
             return system;
         }
@@ -226,6 +230,9 @@ namespace Onikiri.EditorTools
             backdrop.color = UiSkin.PanelInk;
             backdrop.raycastTarget = true;
 
+            // 화지 위의 벚가지 (39단계). 스킬 패널과 같은 헬퍼 - 한 결로 읽힌다
+            BackdropTextureBuilder.AddSakuraBranch(rect);
+
             return rect;
         }
 
@@ -257,7 +264,10 @@ namespace Onikiri.EditorTools
             title.text = "퀘스트";
             title.color = DimColor;
 
+            // 남은 시간은 보조정보다(39단계 위계). 머리글에서 44pt로 남는 것은
+            // 제목뿐이고, 시계는 캡션으로 받친다
             var timer = CreateLabel(go.transform, font, "ResetTimer", TextAlignmentOptions.Right);
+            UiFonts.Demote(timer);
             var timerRect = (RectTransform)timer.transform;
             timerRect.anchorMin = new Vector2(0.35f, 0f);
             timerRect.anchorMax = new Vector2(1f, 1f);
@@ -369,17 +379,22 @@ namespace Onikiri.EditorTools
             // **짧은 것이 윗줄이다.** 처음에는 보상을 제목 옆에 뒀는데, 업적 보상이
             // "보석 20 · 골드 · EXP"까지 길어져(44pt에서 약 500px) "30스테이지 도달"
             // 같은 긴 제목과 정면으로 겹쳤다. 진행 숫자는 "1 / 30"이라 짧다.
+            // 행 글자는 전부 캡션 크기(39단계 - 캐릭터 화면과 같은 위계). 이
+            // 행에서 44pt로 남는 것은 받기 버튼뿐이다 - 목록은 훑는 화면이다
             var title = CreateLabel(go.transform, font, "Title", TextAlignmentOptions.Left);
+            UiFonts.Demote(title);
             PlaceStretched((RectTransform)title.transform, 24f, ClaimWidth + 200f, 6f, 50f);
             title.text = spec.Title;
 
             var progress = CreateLabel(go.transform, font, "Progress", TextAlignmentOptions.Right);
+            UiFonts.Demote(progress);
             PlaceStretched((RectTransform)progress.transform, 24f, ClaimWidth + 24f, 6f, 50f);
             progress.color = DimColor;
             progress.text = "0 / " + spec.Target;
 
             // 아랫줄: 진행바(왼쪽) + 보상(오른쪽)
             var reward = CreateLabel(go.transform, font, "Reward", TextAlignmentOptions.Right);
+            UiFonts.Demote(reward);
             PlaceStretched((RectTransform)reward.transform, 24f, ClaimWidth + 24f, 58f, 50f);
             reward.color = DimColor;
             reward.text = "보석 " + spec.Gems;
@@ -390,7 +405,9 @@ namespace Onikiri.EditorTools
             // 75% 크기로 적으므로 약 380px이다
             PlaceStretched((RectTransform)track.transform, 24f, ClaimWidth + 400f, 78f, 12f);
             var trackImage = track.AddComponent<Image>();
-            trackImage.color = new Color32(0x2A, 0x25, 0x3C, 0xFF);
+            // 바의 빈 부분은 화면 어디서든 같은 어둠이다(UiSkin.BarTrack 규칙).
+            // 이 판만 #2A253C를 따로 들고 있었다 - 39단계 톤 통일
+            trackImage.color = UiSkin.BarTrack;
             trackImage.raycastTarget = false;
 
             var fill = new GameObject("Fill", typeof(RectTransform));
@@ -439,7 +456,10 @@ namespace Onikiri.EditorTools
             doneRect.sizeDelta = new Vector2(ClaimWidth, 72f);
             doneRect.anchoredPosition = new Vector2(-20f, 0f);
 
+            // "완료"는 상태 표시지 동작이 아니다. 받기(44)와 크기가 갈려야
+            // 눌리는 것과 끝난 것이 형태로 나뉜다
             var doneLabel = CreateLabel(doneBadge.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(doneLabel);
             var doneLabelRect = (RectTransform)doneLabel.transform;
             doneLabelRect.anchorMin = Vector2.zero;
             doneLabelRect.anchorMax = Vector2.one;
@@ -501,7 +521,9 @@ namespace Onikiri.EditorTools
                 var button = go.AddComponent<Button>();
                 UiSkin.ApplyButton(button, image);
 
+                // 서브탭 글자는 캡션 크기 - 하단 탭(38단계)과 같은 티어다
                 var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+                UiFonts.Demote(label);
                 var labelRect = (RectTransform)label.transform;
                 labelRect.anchorMin = Vector2.zero;
                 labelRect.anchorMax = Vector2.one;
@@ -535,6 +557,11 @@ namespace Onikiri.EditorTools
          */
         public static Image BuildBadge(Transform parent, TMP_FontAsset font)
         {
+            // 같은 이름이 있으면 지우고 다시 만든다. 안 지우면 빌드할 때마다
+            // 배지가 한 장씩 쌓인다 - EnsurePage와 같은 규칙이다
+            var stale = parent.Find("Badge");
+            if (stale != null) Object.DestroyImmediate(stale.gameObject);
+
             var go = new GameObject("Badge", typeof(RectTransform));
             go.transform.SetParent(parent, false);
 
@@ -550,6 +577,9 @@ namespace Onikiri.EditorTools
             image.raycastTarget = false;
 
             var label = CreateLabel(go.transform, font, "Count", TextAlignmentOptions.Center);
+            // 배지 숫자는 캡션 크기(38단계). 52px 판에 44pt 숫자는 두 자리부터
+            // 빡빡했다
+            UiFonts.Demote(label);
             var labelRect = (RectTransform)label.transform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;

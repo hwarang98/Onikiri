@@ -1,6 +1,7 @@
 using Onikiri.Progression;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Onikiri.UI
 {
@@ -14,7 +15,11 @@ namespace Onikiri.UI
     public sealed class HUDStage : MonoBehaviour
     {
         [SerializeField] private TMP_Text label;
-        [SerializeField] private string prefix = "스테이지 ";
+
+        [Tooltip("칩의 심볼. 보스 스테이지에서 깃발이 해골로 바뀐다 (2b)")]
+        [SerializeField] private Image icon;
+        [SerializeField] private Sprite flagSprite;
+        [SerializeField] private Sprite skullSprite;
 
         private StageProgress progress;
 
@@ -37,7 +42,7 @@ namespace Onikiri.UI
         }
 
         /**
-         * @brief "지역 1 · 스테이지 7/10" + 잡몹 진행.
+         * @brief "지역 1 · 7/10" + 보스면 해골.
          *
          * 17단계에서 지역을 드러냈다. 그전에는 "스테이지 37"처럼 연속 번호만
          * 보여줬는데, 그 숫자는 **지금 어디쯤인지도 얼마나 남았는지도** 말하지
@@ -45,6 +50,9 @@ namespace Onikiri.UI
          *
          * 내부 진행은 여전히 연속(stage)이고 여기서만 환산한다. 세이브에 지역
          * 필드를 만들지 않은 이유는 BossCurve.RegionOf 주석에 적었다.
+         *
+         * "클리어"는 뺐다(2b 압축). 되돌아간 스테이지의 상태는 재선택 화면과
+         * 도전 버튼 부재가 이미 말하고 있고, 좁은 칩에서 네 글자 값을 못 한다.
          */
         private void Refresh()
         {
@@ -55,16 +63,17 @@ namespace Onikiri.UI
             int local = BossCurve.StageInRegion(stage);
 
             // "스테이지"라는 단어는 뺀다. "지역 1 · 7/10"이면 그 7이 스테이지라는
-            // 것이 자리로 읽히고, 55pt 글자에서 네 글자는 112px이라 상단 바에서
-            // 그만한 값을 하지 않는다
-            string place = "지역 " + region + " · " + local + "/" + BossCurve.RegionLength;
+            // 것이 자리로 읽히고, 그만한 폭 값을 하지 않는다
+            label.text = "지역 " + region + " · " + local + "/" + BossCurve.RegionLength;
 
-            // 할당량을 채우면 처치 수 대신 보스를 알린다. 멈춘 숫자는 진행이 끝났다는
-            // 것만 말하고 다음에 무엇을 해야 하는지는 말하지 않는데, 이 게임에서
-            // 그 다음은 화면 어딘가의 버튼을 누르는 것이라 안내가 필요하다
-            label.text = progress.IsBossReady
-                ? place + "  보스"
-                : place + "  처치 " + progress.KillsThisStage + "/" + progress.KillsRequired;
+            // 보스 스테이지의 심볼은 해골이다. 최전선에서만 - 되돌아간 스테이지는
+            // 보스가 잠겨 있으므로(재선택 규칙) 해골이 거짓말이 된다
+            if (icon != null && flagSprite != null && skullSprite != null)
+            {
+                bool bossHere = BossCurve.IsChapterBoss(stage) && progress.IsAtFrontier;
+                var wanted = bossHere ? skullSprite : flagSprite;
+                if (icon.sprite != wanted) icon.sprite = wanted;
+            }
         }
     }
 }

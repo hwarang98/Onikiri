@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
+  m_Name: Enemy_Kedama
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
+  displayName: Kedama
+  idleFrames:
+  - {fileID: -7383346747490490564, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: 6059547711284947430, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: 7799493383349700999, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: -5093167488217836194, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: 714050597413933628, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: -2592568299171350268, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: 958940054661557993, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: -9204685525349449791, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  walkFrames: []
+  hurtFrames: []
+  deathFrames:
+  - {fileID: 3203211795594528200, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: -7254466663161085750, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: -7901934422075025254, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: 2492249635967742817, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: 4012371663832350989, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  - {fileID: -3513962490691168396, guid: 43ed9d2aee7629a41be244ed0d0be6f0, type: 3}
+  frameRate: 12
+  spawnWeight: 5
+  maxHealth:
+    m: 1.2
+    e: 1
+  goldReward:
+    m: 5
+    e: 0
+  moveSpeed: 1.05
+  queueSpacing: 1.1
+  attackFrames: []
+  attackInterval: 2
+  attackImpactPoint: 0.5
+  hoverHeight: 0
+  artBottomOffset: 0.71875
+  artFacesLeft: 0

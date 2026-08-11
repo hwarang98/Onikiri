@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
+  m_Name: Enemy_Kasaobake
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
+  displayName: Kasa-obake
+  idleFrames:
+  - {fileID: 2786085037738588323, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -5446576598264866928, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 8027012048305182069, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -7084853813924944909, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -1202946610988648661, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -4309799324765762741, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -7593556217723304275, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 5072013732343049138, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  walkFrames: []
+  hurtFrames: []
+  deathFrames:
+  - {fileID: 6430769945977200959, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -4060390977751247440, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 4210356846021469784, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -683003301095693172, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 2177323108184018482, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -1441195664952008524, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  frameRate: 12
+  spawnWeight: 4
+  maxHealth:
+    m: 1.7
+    e: 1
+  goldReward:
+    m: 6
+    e: 0
+  moveSpeed: 0.9
+  queueSpacing: 1.1
+  attackFrames: []
+  attackInterval: 2
+  attackImpactPoint: 0.5
+  hoverHeight: 0
+  artBottomOffset: 0.59375
+  artFacesLeft: 0

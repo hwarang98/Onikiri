@@ -35,6 +35,15 @@ namespace Onikiri.Battle
          */
         public RegionBackgroundSet background;
 
+        /**
+         * @brief 이 지역의 잡몹 한 벌. 비우면 앞 지역의 잡몹을 그대로 쓴다.
+         *
+         * 배경과 같은 규칙이다(36단계). 지역을 늘리는 것과 그 지역의 몹을
+         * 고르는 것이 같은 속도로 진행되지 않으므로, 몹이 아직 없는 지역도
+         * 배치는 할 수 있어야 한다.
+         */
+        public RegionMobSet mobs;
+
         [Tooltip("챕터 보스. 지역 중간의 관문")]
         public BossConfig chapterBoss;
 

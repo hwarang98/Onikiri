@@ -16,22 +16,39 @@ namespace Onikiri.Battle
         public RegionConfig[] regions;
 
         /**
-         * @brief 정의된 지역을 모두 지난 뒤의 처리.
+         * @brief 정의된 지역을 모두 지난 뒤의 처리 - **처음부터 다시 돈다** (42단계).
          *
-         * 지금은 지역 1만 확정됐다(지역 2·3 피날레는 신규 보스 대기). 11스테이지
-         * 이후에 보스가 아예 없으면 진행이 멈추므로 **마지막 지역의 배치를
-         * 반복한다.**
+         * 41스테이지까지는 "마지막 지역 반복"이었다. 지역 2~4가 아직 없던
+         * 시절의 임시 처방이었는데, 네 지역이 다 들어온 지금 그 규칙은 무한
+         * 구간(st41+)을 요괴 소굴 한 판에 영원히 가둔다 - 배경도 잡몹도
+         * 보스도 지역 전환 연출도 st40에서 정지한다.
          *
-         * 이것이 최종 설계라서가 아니라, 지역이 추가되기 전까지 게임이 계속
-         * 돌아야 하기 때문이다. 지역 2 애셋이 들어오면 반복 구간은 그만큼
-         * 뒤로 밀린다.
+         * 순환이 나은 이유 셋:
+         *   - 시각 다양성 4배가 신규 애셋 0장으로 나온다 (값싼 콘텐츠 원칙)
+         *   - 밸런스 중립이다. 모든 지역의 잡몹 풀이 같은 가중 평균(128/9·49/9)을
+         *     지키므로(RegionMobPoolTests의 36단계 불변식) 어느 지역이 나와도
+         *     보스 체력·방치 보상이 같다. 난이도는 지역이 아니라 곡선이 낸다
+         *   - 지역 전환 연출(참격)이 무한 구간에서도 10스테이지마다 살아난다 -
+         *     스위처들의 "같은 지역이면 조기 반환"이 객체 동일성이라, 지역이
+         *     실제로 바뀌어야 연출이 돈다
+         *
+         * 화면의 지역 번호(HUDStage의 "지역 7")는 여기와 무관하게 계속
+         * 오른다 - 그쪽은 BossCurve.RegionOf(순수 산수)다. 이 함수는 그 번호에
+         * **어느 세트를 입힐 것인가**만 답한다.
          */
         public RegionConfig RegionForStage(int stage, out int stageInRegion)
         {
             stageInRegion = 1;
             if (regions == null || regions.Length == 0) return null;
 
-            int remaining = Mathf.Max(1, stage);
+            int total = 0;
+            foreach (var region in regions)
+                if (region != null && region.stageCount > 0) total += region.stageCount;
+            if (total <= 0) return null;
+
+            // 전체 한 바퀴(지금은 40) 안의 위치로 접는다. 1바퀴째든 10바퀴째든
+            // 같은 자리에는 같은 지역이 선다
+            int remaining = (Mathf.Max(1, stage) - 1) % total + 1;
 
             foreach (var region in regions)
             {
@@ -44,13 +61,9 @@ namespace Onikiri.Battle
                 remaining -= region.stageCount;
             }
 
-            // 정의된 지역을 다 지났다. 마지막 지역을 반복한다
-            var last = regions[regions.Length - 1];
-            if (last == null || last.stageCount <= 0) return null;
-
-            int into = (remaining - 1) % last.stageCount + 1;
-            stageInRegion = into;
-            return last;
+            // 접은 값은 total 이하이므로 위 루프가 반드시 답을 냈다. 여기는
+            // regions가 전부 null/0인 경로뿐인데 total 검사가 이미 걸렀다
+            return null;
         }
 
         /** 이 스테이지의 보스. null이면 그 스테이지 잡몹의 확대판 */

@@ -138,7 +138,9 @@ namespace Onikiri.Progression
 
         private int StageNow
         {
-            get { return stage != null ? Mathf.Max(1, stage.Stage) : 1; }
+            // 현재 스테이지가 아니라 최전선이다(37단계 재선택). "그 지역을
+            // 지나왔는가"는 되돌아가도 참으로 남아야 한다
+            get { return stage != null ? Mathf.Max(1, stage.MaxStageReached) : 1; }
         }
 
         // ---------------------------------------------------------------- 값

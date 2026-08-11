@@ -163,8 +163,10 @@ namespace Onikiri.Tests
             // 같은 배수를 공격력 강화로 내려면 몇 레벨이 필요한가
             double levels = System.Math.Log(amp) / System.Math.Log(AttackPowerCurve.Step);
 
-            Assert.Greater(levels, 20d, "maxed stat points are too weak to be worth spending");
-            Assert.Less(levels, 120d, "maxed stat points would overshadow the gold axes");
+            // 43단계 미세화: 공격력 한 칸이 1/8이 됐으므로 "몇 레벨 몫인가"의
+            // 눈금도 여덟 배다 (옛 20~120 = 새 160~960)
+            Assert.Greater(levels, 160d, "maxed stat points are too weak to be worth spending");
+            Assert.Less(levels, 960d, "maxed stat points would overshadow the gold axes");
         }
 
         [Test]
@@ -207,7 +209,8 @@ namespace Onikiri.Tests
             // 나머지 진행은 그대로여야 한다. 형식을 올리는 것이 진행을 지우는
             // 일이 되면 업데이트마다 플레이어가 처음부터 시작한다
             Assert.AreEqual(7, data.stage);
-            Assert.AreEqual(15, data.upgradeLevels[0]);
+            // 미세화 환산(43단계): 옛 Lv.15 = 새 (14x8)+1 = 113. 가치는 같다
+            Assert.AreEqual(113, data.upgradeLevels[0]);
         }
 
         /** 저장 실패 후 재시도 같은 경로에서 실제로 두 번 돈다 */

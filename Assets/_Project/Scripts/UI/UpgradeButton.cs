@@ -83,17 +83,52 @@ namespace Onikiri.UI
         [Tooltip("잠긴 행의 배경 틴트")]
         [SerializeField] private Color lockedRowTint = new Color(0.34f, 0.36f, 0.55f, 1f);
 
+        /**
+         * @brief 심화 게이트 (43단계). 치명타 확률이 MASTER(100%)여야 열린다.
+         *
+         * 스테이지 게이트와 별개의 문이다 - 조건이 여정의 위치가 아니라
+         * **다른 축의 완성**이다. 잠긴 비용 칸에는 스테이지 대신 조건
+         * ("치명타 100%")이 선다.
+         */
+        [SerializeField] private bool deepGate;
+
+        [Tooltip("심화 게이트가 잠겼을 때 비용 칸에 적을 문구")]
+        [SerializeField] private string deepLockedLabel = "치명타 Lv.1000";
+
         /** 지금 잠겨 있는가 */
         private bool IsLocked
         {
             get
             {
+                if (deepGate && !DeepUnlocked) return true;
+
                 if (unlockStage <= 0) return false;
                 var progress = StageProgress.Instance;
                 // 진행 정보가 없으면 잠그지 않는다. 전투 전용 테스트 씬은
                 // StageProgress 없이 강화만 세우는데, 거기서 전부 잠기면
-                // 21단계 이전에 쓰던 검사가 이유 없이 깨진다
-                return progress != null && progress.Stage < unlockStage;
+                // 21단계 이전에 쓰던 검사가 이유 없이 깨진다.
+                // 현재 스테이지가 아니라 최전선이다(37단계 재선택) - 되돌아가도
+                // 이미 열린 축이 다시 잠기지 않는다
+                return progress != null && progress.MaxStageReached < unlockStage;
+            }
+        }
+
+        /**
+         * @brief 치명타 확률이 상한(100%)에 서 있는가.
+         *
+         * 레벨이 아니라 **값의 상한**으로 판정한다(IsMaxed || IsValueCapped) -
+         * 상한이 움직인 업데이트에서 레벨만으로 판정하면 두 곳이 갈린다.
+         * 트랙이 없는 씬(전투 전용 테스트)에서는 잠그지 않는다 - 스테이지
+         * 게이트와 같은 규칙이다.
+         */
+        private bool DeepUnlocked
+        {
+            get
+            {
+                if (system == null) return true;
+                var crit = system.GetTrack(UpgradeSystem.CritRateId);
+                if (crit == null) return true;
+                return crit.IsMaxed || crit.IsValueCapped;
             }
         }
 
@@ -161,7 +196,10 @@ namespace Onikiri.UI
                 if (valueLabel != null) valueLabel.text = string.Empty;
                 if (costLabel != null)
                 {
-                    costLabel.text = string.Format(lockedLabel, unlockStage);
+                    // 심화 게이트의 조건은 스테이지가 아니다 - 문구가 갈린다
+                    costLabel.text = deepGate && !DeepUnlocked
+                        ? deepLockedLabel
+                        : string.Format(lockedLabel, unlockStage);
                     costLabel.color = lockedColor;
                 }
                 if (rowBackground != null)
@@ -211,6 +249,8 @@ namespace Onikiri.UI
                 // 계속 보이면 골드가 모자라서 못 사는 것인지 더 살 것이 없는
                 // 것인지 구분되지 않는다. 공격속도는 아트가 정한 상한이 있어서
                 // (AttackSpeedCurve) 실제로 여기 도달한다
+                // 비용은 언제나 정수 골드다(E-3 수정, UpgradeCost) - 43단계의
+                // 소수 표기는 규칙과 함께 사라졌다. Format의 정수 축약이 맞다
                 costLabel.text = capped ? masteredLabel : NumberFormatter.Format(track.Cost);
                 costLabel.color = capped ? masteredColor
                                 : affordable ? affordableColor : unaffordableColor;

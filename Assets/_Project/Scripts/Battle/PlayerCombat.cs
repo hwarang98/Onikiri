@@ -186,6 +186,65 @@ namespace Onikiri.Battle
         /** 오의가 겨냥할 때 쓰는 사거리. 진단용으로 내보낸다 */
         public float AttackRange { get { return attackRange; } }
 
+        /**
+         * @brief 전방 일렬을 벤다. 사거리 안의 살아 있는 요괴 **전부**에 같은 배율.
+         *
+         * ## 왜 여기로 올라왔는가
+         *
+         * 45c까지 이 산수는 SkillPerformer 안에 있었다. 손님이 오의 하나뿐이라
+         * 그래도 됐는데, 영체(SpiritSummon)가 같은 모양의 타격을 하게 되면서
+         * 둘이 됐다 - 그때 복사하면 "무엇이 맞는가"의 정의가 두 곳에 살고,
+         * 한쪽만 고쳐지는 날 오의는 도깨비불을 베는데 영체는 지나친다.
+         *
+         * PlayerCombat이 맞는 자리인 이유는 이미 여기가 **한 대가 무엇을
+         * 하는가**의 주인이기 때문이다(DeliverSkillHit 머리 주석). 누가 맞는가도
+         * 같은 질문의 일부다. 안무(언제·몇 번)는 여전히 부르는 쪽이 정한다.
+         *
+         * ## 세로 폭을 함께 보는 이유
+         *
+         * 떠 있는 도깨비불이다. 그려진 중심이 지면보다 1u 위에 있어서, 세로를
+         * 안 보면 관통이 지면의 요괴만 베고 도깨비불은 지나친다 - 화면에서는
+         * "가끔 안 맞는다"로만 보인다.
+         *
+         * @param originX 앞을 재는 기준 x. 뒤로 0.3u까지는 봐준다(발치의 요괴)
+         * @param originY 세로 창의 중심. 사무라이의 **그려진** 중심이지 발이 아니다
+         * @return 실제로 벤 수
+         */
+        public int DeliverSkillLane(float originX, float originY, float range, float height,
+                                    BigDouble multiplier, Color tint, int numberSizeMultiple)
+        {
+            int hits = 0;
+            var enemies = ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var enemy = enemies[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                var point = enemy.HitPoint;
+                float dx = point.x - originX;
+                if (dx < -0.3f || dx > range) continue;
+                if (Mathf.Abs(point.y - originY) > height * 0.5f) continue;
+
+                if (DeliverSkillHit(enemy, multiplier, tint, numberSizeMultiple)) hits++;
+            }
+            return hits;
+        }
+
+        /** 화면 광역. 살아 있는 요괴 전부. 관통과 같은 이유로 여기 있다 */
+        public int DeliverSkillAll(BigDouble multiplier, Color tint, int numberSizeMultiple)
+        {
+            int hits = 0;
+            var enemies = ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var enemy = enemies[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                if (DeliverSkillHit(enemy, multiplier, tint, numberSizeMultiple)) hits++;
+            }
+            return hits;
+        }
+
         public int SakuraPoolGrowthCount { get { return sakura != null ? sakura.PoolGrowthCount : 0; } }
 
         /**
@@ -267,6 +326,34 @@ namespace Onikiri.Battle
         }
 
         /**
+         * @brief 초월 치명타 배수 (43단계 심화 축). 피해 전체에 곱해진다.
+         *
+         * 기본 1이 중요하다 - 심화 축이 잠긴(또는 없던 시절의) 세이브가
+         * 그대로 예전 피해를 낸다. 상한이 없는 축이라 아래로만 막는다.
+         */
+        public float TranscendMultiplier
+        {
+            get { return transcendMultiplier; }
+            set { transcendMultiplier = Mathf.Max(1f, value); }
+        }
+
+        /**
+         * @brief 연격 확률 (43단계 심화 축). 타격마다 이 확률로 한 번 더 벤다.
+         *
+         * 추가타는 온전한 한 타다 - 치명타·초월을 그대로 상속하고, 자기
+         * 숫자가 따로 뜬다. 0~1로 자르는 것은 치명타 확률과 같은 이중
+         * 안전장치다.
+         */
+        public float ComboChance
+        {
+            get { return comboChance; }
+            set { comboChance = Mathf.Clamp01(value); }
+        }
+
+        private float transcendMultiplier = 1f;
+        private float comboChance;
+
+        /**
          * @brief 자동 공격 + 오의를 합친 **초당 환산 공격 횟수**.
          *
          * 오의 한 번은 공격력 x 배율이고 평타 한 대는 공격력 x1이므로, 배율을
@@ -280,7 +367,19 @@ namespace Onikiri.Battle
          */
         public float EffectiveAttacksPerSecond
         {
-            get { return attacksPerSecond + (float)Onikiri.Progression.SkillSystem.CurrentCastRate; }
+            get
+            {
+                // 45단계의 영체도 같은 괄호 안이다. 소환 한 번이 공격력 x 배율
+                // 뭉치이므로 쿨다운으로 나누면 오의와 같은 단위가 되고, 그래서
+                // 더할 수 있다(CombatStats.SpiritRate).
+                //
+                // 빠뜨리면 **방치 보상이 시뮬레이션보다 가난해진다** - 화면의
+                // DPS도 실제보다 낮게 뜬다. YodoSystem이 없으면 0이라 전투 전용
+                // 테스트 씬은 예전 값 그대로다
+                return attacksPerSecond
+                     + (float)Onikiri.Progression.SkillSystem.CurrentCastRate
+                     + (float)Onikiri.Progression.YodoSystem.CurrentSpiritRate;
+            }
         }
 
         /** 치명타 기대값을 포함한 초당 피해. 테스트 패널과 방치 보상이 쓴다 */
@@ -288,8 +387,12 @@ namespace Onikiri.Battle
         {
             get
             {
+                // 심화 축(초월·연격)까지 곱한다. CombatStats.ExpectedDps와 같은
+                // 식이어야 한다 - 두 구현이 갈리면 방치 보상이 시뮬레이션과
+                // 다른 플레이어를 잰다
                 float factor = 1f + critChance * (critMultiplier - 1f);
-                return damage * BigDouble.FromDouble(EffectiveAttacksPerSecond * factor);
+                float mastery = transcendMultiplier * (1f + comboChance);
+                return damage * BigDouble.FromDouble(EffectiveAttacksPerSecond * factor * mastery);
             }
         }
 
@@ -433,6 +536,9 @@ namespace Onikiri.Battle
                 ? damage * BigDouble.FromDouble(critMultiplier)
                 : damage;
 
+            // 초월 치명타(43단계). 치명타 여부와 무관하게 피해 전체에 곱해진다
+            if (transcendMultiplier > 1f) dealt = dealt * BigDouble.FromDouble(transcendMultiplier);
+
             // transform이 아니라 그려진 스프라이트의 중심을 겨냥한다. Enemy.HitPoint 참고
             var hitPoint = target.HitPoint;
 
@@ -472,6 +578,29 @@ namespace Onikiri.Battle
             ScreenShake.Request(cameraShake,
                 CombatFeel.ScaledDuration(shakeSeconds, shakeBudgetPerSecond, attacksPerSecond),
                 shakePixels);
+
+            // 연격(43단계). 같은 프레임에 한 번 더 벤다 - 온전한 한 타라 같은
+            // 피해에 자기 숫자·불꽃이 따로 난다. 정지·흔들림은 다시 내지
+            // 않는다(한 프레임에 두 번 내면 예산 계산이 두 배로 샌다).
+            // 첫 타로 죽었으면 벨 것이 없다
+            if (!killed && comboChance > 0f && Random.value < comboChance)
+            {
+                SpawnSpark(target, hitPoint);
+                target.TakeDamage(dealt);
+
+                if (damageNumbers != null)
+                    damageNumbers.Show(dealt, hitPoint,
+                        !target.IsAlive ? Onikiri.UI.DamageStyle.Kill
+                            : crit ? Onikiri.UI.DamageStyle.Critical
+                                   : Onikiri.UI.DamageStyle.Normal,
+                        target);
+
+                if (hitAudio != null)
+                {
+                    if (!target.IsAlive) hitAudio.PlayKill();
+                    else hitAudio.PlayHit();
+                }
+            }
         }
 
         // ---------------------------------------------------------------- 오의
@@ -509,6 +638,10 @@ namespace Onikiri.Battle
             BigDouble dealt = damage * multiplier;
             if (crit) dealt = dealt * BigDouble.FromDouble(critMultiplier);
 
+            // 초월 치명타(43단계). 평타와 같은 자리, 같은 이유 - 오의만 빠지면
+            // 시뮬레이션의 기대값(DPS 전체에 곱함)과 갈린다
+            if (transcendMultiplier > 1f) dealt = dealt * BigDouble.FromDouble(transcendMultiplier);
+
             var hitPoint = target.HitPoint;
 
             // 불꽃은 평타와 같은 것을 쓴다. 오의 전용 불꽃을 만들지 않는 이유는
@@ -531,6 +664,23 @@ namespace Onikiri.Battle
             {
                 if (killed) hitAudio.PlayKill();
                 else hitAudio.PlayHit();
+            }
+
+            // 연격(43단계). 오의의 한 대에도 같은 확률로 한 번 더 - 평타만
+            // 빼거나 오의만 빼면 기대값 식(모든 타격 x (1+p))과 갈린다
+            if (!killed && comboChance > 0f && Random.value < comboChance)
+            {
+                SpawnSpark(target, hitPoint);
+                target.TakeDamage(dealt);
+
+                if (damageNumbers != null)
+                    damageNumbers.ShowSkill(dealt, hitPoint, tint, numberSizeMultiple);
+
+                if (hitAudio != null)
+                {
+                    if (!target.IsAlive) hitAudio.PlayKill();
+                    else hitAudio.PlayHit();
+                }
             }
 
             return true;
@@ -583,6 +733,32 @@ namespace Onikiri.Battle
 
         /** 오의 클립이 도는 동안 평타 스윙이 끼어들지 않게 막는다 */
         public bool IsPlayingOneShot { get { return animator != null && animator.IsOneShot; } }
+
+        /**
+         * @brief 전직이 사무라이의 클립 세트를 통째로 바꾼다 (33단계).
+         *
+         * EvolutionAppearance만 부른다. 애니메이터를 직접 내보내지 않는 이유는
+         * PlaySkillClip과 같다 - 재생 주체가 둘이면 "진행 중인 클립을 다시
+         * 재생하면 첫 프레임으로 튄다"는 사고가 간헐적으로만 나타난다.
+         *
+         * **measuredAttackDuration은 되재지 않는다.** 공격속도 상한
+         * (MaxAttacksPerSecond -> AttackSpeedCurve.MaxLevel)이 그 값에서
+         * 유도되는데, 팩마다 발도 프레임 수가 달라서 진화할 때마다 상한이
+         * 움직이면 강화 트랙의 maxLevel과 어긋난다. 상한은 기본 팩(로닌)의
+         * 클립 길이에 앵커하고, 새 클립은 그 길이 안에서 재생 속도로 맞춘다 -
+         * PlaySwing이 원래 그렇게 돈다(프레임 수 / 길이 = 재생 속도).
+         *
+         * 도는 중인 루프 클립(idle/달리기)은 즉시 갈아탄다. 스윙·오의 같은
+         * 원샷은 끝나면 PlayIdle이 새 프레임으로 돌아오므로 건드리지 않는다.
+         */
+        public void SetCharacterFrames(Sprite[] idle, Sprite[] attack, Sprite[] run)
+        {
+            if (idle != null && idle.Length > 0) idleFrames = idle;
+            if (attack != null && attack.Length > 0) attackFrames = attack;
+            if (run != null && run.Length > 0) runFrames = run;
+
+            if (animator != null && !animator.IsOneShot) PlayIdle();
+        }
 
         /** 사무라이의 기준 X. Awake에서 한 번 기억한다 */
         private float baseLocalX;
@@ -655,12 +831,35 @@ namespace Onikiri.Battle
             //
             // 프레임 수를 줄이지 않고 재생 속도만 올린다. 형태는 그대로 두고 화면에
             // 머무는 시간만 줄이는 쪽이 픽셀 아트에서 훨씬 덜 티가 난다.
+            SpawnSparkAt(at, facing < 0);
+        }
+
+        /**
+         * @brief 불꽃 하나를 **자리를 지정해** 터뜨린다. 풀은 평타 것을 그대로 쓴다.
+         *
+         * 요괴가 아니라 좌표를 받는 것이 SpawnSpark와의 차이다. 영체의 강림
+         * (SpiritSummon)이 찍고 싶은 자리는 피격점이 아니라 **소환 지점**이라,
+         * 대상에서 자리를 끌어올 수가 없다.
+         *
+         * 재생 속도의 예산 규칙은 그대로 탄다. 공격속도가 두 자릿수인 구간에서
+         * 이것만 고정 속도로 두면 영체 불꽃 하나가 화면에 계속 켜져 있다.
+         */
+        public void SpawnSparkAt(Vector3 position, bool mirror)
+        {
+            if (sparkPool == null || sparkFrames == null || sparkFrames.Length == 0) return;
+
+            // 불꽃도 히트스톱·흔들림과 같은 예산 규칙을 따른다. 스윙 압축으로 공격속도가
+            // 두 자릿수까지 올라가므로, 고정 재생 속도를 유지하면 초당 열 번 구간에서
+            // 불꽃이 끊이지 않고 켜져 있어 '터진다'가 아니라 '켜져 있다'로 읽힌다.
+            //
+            // 프레임 수를 줄이지 않고 재생 속도만 올린다. 형태는 그대로 두고 화면에
+            // 머무는 시간만 줄이는 쪽이 픽셀 아트에서 훨씬 덜 티가 난다.
             float baseDuration = sparkFrames.Length / Mathf.Max(0.0001f, sparkFrameRate);
             float duration = CombatFeel.ScaledDuration(baseDuration, sparkBudgetPerSecond, attacksPerSecond);
             float rate = sparkFrames.Length / Mathf.Max(0.0001f, duration);
 
             var spark = sparkPool.Get();
-            spark.Play(sparkFrames, rate, at, facing < 0, ReleaseSpark);
+            spark.Play(sparkFrames, rate, position, mirror, ReleaseSpark);
         }
 
         private void ReleaseSpark(ImpactSpark spark)

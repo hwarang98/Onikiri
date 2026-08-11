@@ -32,6 +32,19 @@ namespace Onikiri.EditorTools
      * 대장간이 하는 일은 **이름과 톤**이다 - 화면 제목이 "대장간"이고, 판의
      * 색이 그 건물의 먹빛·적을 따라간다. 랜드마크가 화면의 출처라는 것은
      * 그렇게 남는다.
+     *
+     * ## 44단계에 서브탭 셋이 됐다 - 장비 / 요도 / 도감
+     *
+     * 요도(妖刀)는 대장간에서 벼린다. 하단 탭을 하나 더 만들지 않은 이유가
+     * 둘이다. 하나는 자리다 - 하단 탭은 다섯이고(38단계) 여섯째를 넣으면
+     * 아이콘 폭이 무너진다. 다른 하나가 더 중요하다: **같은 건물에서 하는
+     * 일이다.** 요도 탭을 따로 세우면 화면 두 곳이 "칼을 만드는 곳"이 되고,
+     * 그중 어느 쪽이 진짜 대장간인지 알 수 없어진다.
+     *
+     * 서브탭이 생기면서 목록이 스크롤 안으로 들어갔다(퀘스트 판과 같은 구조).
+     * 32단계에 "둘뿐이라 스크롤이 필요 없다"고 적었는데, 페이지가 셋이 되면
+     * 가장 긴 페이지가 띠를 넘는다 - 그때 걸리라고 둔 검산
+     * (VerifyPanelFits)이 실제로 걸렸다.
      */
     public static class EquipmentPanelBuilder
     {
@@ -44,6 +57,12 @@ namespace Onikiri.EditorTools
 
         private const float HeaderHeight = 60f;
         private const float HeaderGap = 10f;
+
+        /** 서브탭 줄. 퀘스트 판과 같은 값이어야 두 화면이 같은 결로 읽힌다 */
+        private const float TabHeight = 68f;
+        private const float TabGap = 12f;
+
+        private static readonly string[] TabNames = { "장비", "요도", "도감" };
 
         /**
          * @brief 슬롯 카드 하나의 높이.
@@ -63,8 +82,9 @@ namespace Onikiri.EditorTools
         private const float IconLeft = 24f;
         private const float TextLeft = IconLeft + UiIcons.Size + 20f;
 
-        private static readonly Color TextColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
-        private static readonly Color DimColor = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
+        // 39단계 톤 통일: 자기 색을 갖지 않는다. 팔레트의 단일 출처는 UiSkin이다
+        private static readonly Color TextColor = UiSkin.Text;
+        private static readonly Color DimColor = UiSkin.TextDim;
 
         /**
          * @brief 등급업 버튼의 틴트. **보석 쪽 색이다.**
@@ -73,8 +93,9 @@ namespace Onikiri.EditorTools
          * 민다. 두 재화가 섞이지 않게 하는 세 장치 중 하나이고(EquipmentRow
          * 주석), 색을 고른 근거는 상단 바의 보석 아이콘이 파란 다이아라는 것이다 -
          * 화면에 이미 있는 연결을 쓰는 것이 새 규칙을 하나 만드는 것보다 싸다.
+         * 값은 UiSkin이 갖는다(39단계) - 동료 해금·전직 버튼과 같은 청이어야 한다.
          */
-        private static readonly Color GemButtonTint = new Color(0.42f, 0.56f, 1.00f, 1f);
+        private static readonly Color GemButtonTint = UiSkin.GemAction;
 
         [MenuItem("Onikiri/Build Equipment Panel")]
         public static void BuildMenu()
@@ -104,11 +125,25 @@ namespace Onikiri.EditorTools
                 return null;
             }
 
+            var yodoSystem = YodoPanelBuilder.EnsureSystem(battle);
+
+            // 영체 소환체(45단계). 화면이 아니라 전장에 서는 물건인데 여기서
+            // 세우는 이유는 **요도의 소유자가 하나여야** 하기 때문이다 -
+            // 상성·영체·도감이 전부 같은 티어를 읽으므로, 그 배선이 두 빌더로
+            // 갈리면 한쪽만 돌린 씬이 반쯤 동작한다
+            YodoPanelBuilder.EnsureSpiritSummon(battle);
+
             var panel = EnsurePanel(safeArea);
             BuildHeader(panel, font);
 
-            for (int i = 0; i < EquipmentCatalog.Count; i++)
-                BuildCard(panel, system, font, i);
+            var content = EnsureScroll(panel);
+
+            var pages = new GameObject[TabNames.Length];
+            pages[0] = BuildEquipmentPage(content, system, font);
+            pages[1] = YodoPanelBuilder.BuildForgePage(content, yodoSystem, font);
+            pages[2] = YodoPanelBuilder.BuildCodexPage(content, yodoSystem, font);
+
+            BuildTabs(panel, font, pages);
 
             VerifyPanelFits();
 
@@ -116,11 +151,21 @@ namespace Onikiri.EditorTools
             panel.gameObject.SetActive(false);
 
             Debug.Log(string.Format(
-                "[Onikiri] Equipment panel built: {0} slots, {1:F0}px (band {2:F0}px). "
-                + "무기 상한 x{3:F2} / 방어구 상한 x{4:F2}, 해금 st{5}.",
-                EquipmentCatalog.Count, PanelContentHeight, BandHeight,
+                "[Onikiri] Forge panel built: 장비 {0}슬롯 / 요도 {1}자루 / 도감 {2}줄. "
+                + "가장 긴 페이지 {3:F0}px (뷰포트 {4:F0}px). "
+                + "무기 상한 x{5:F2} / 방어구 상한 x{6:F2} (해금 st{7}), "
+                + "요도 상한 x{8:F2} (해금 st{9}).",
+                // 도감 줄 수는 요도 넷 + 오니키리 + 전설 둘이다(47단계).
+                // 손으로 적으면 풀이 늘어나는 날 로그만 옛 수를 말한다
+                EquipmentCatalog.Count, YodoCatalog.Count,
+                YodoCatalog.Count + 1 + LegendaryYodoCatalog.Count,
+                TallestPageHeight, ViewportHeight,
                 EquipmentCatalog.Slots[0].Ceiling, EquipmentCatalog.Slots[1].Ceiling,
-                EquipmentCurve.UnlockStage));
+                EquipmentCurve.UnlockStage, YodoCurve.Ceiling, YodoCurve.UnlockStage));
+
+            // 판을 새로 만들었으니 이 판을 가리키던 하단 탭을 다시 물린다.
+            // 안 하면 장비 탭이 잠긴 채 남는다 - RelinkScreenTabs 주석 참고
+            BattleContentBuilder.RelinkScreenTabs();
 
             return system;
         }
@@ -204,30 +249,50 @@ namespace Onikiri.EditorTools
             }
         }
 
-        private static float PanelContentHeight
+        /** 스크롤 안쪽의 높이. 셋 중 가장 긴 페이지가 여기에 담긴다 */
+        private static float ViewportHeight
+        {
+            get { return BandHeight - (TopPadding + HeaderHeight + HeaderGap + TabHeight + TabGap); }
+        }
+
+        private static float EquipmentPageHeight
+        {
+            get { return EquipmentCatalog.Count * (CardHeight + CardGap); }
+        }
+
+        private static float TallestPageHeight
         {
             get
             {
-                return TopPadding + HeaderHeight + HeaderGap
-                       + EquipmentCatalog.Count * (CardHeight + CardGap);
+                float tallest = EquipmentPageHeight;
+                tallest = Mathf.Max(tallest, YodoPanelBuilder.ForgePageHeight);
+                tallest = Mathf.Max(tallest, YodoPanelBuilder.CodexPageHeight);
+                return tallest;
             }
         }
 
         /**
-         * @brief 목록이 띠 안에 들어가는지 빌드가 검산한다.
+         * @brief 헤더·탭이 띠 안에 들어가는지 빌드가 검산한다.
          *
-         * 스크롤을 두지 않았다. 둘뿐이라 필요가 없고, 스크롤이 있으면 "더
-         * 있나?" 하고 끌어보게 된다 - 없는 것을 찾게 만드는 UI다. 대신 셋째
-         * 슬롯(액세서리)이 생기는 순간 여기서 걸린다.
+         * ## 32단계에는 "스크롤을 두지 않았다"였고, 그 판단이 44단계에 걸렸다
+         *
+         * 그때 근거는 "슬롯이 둘뿐이라 필요가 없고, 스크롤이 있으면 없는 것을
+         * 찾게 만든다"였다. 옳았지만 **셋째 페이지가 생기는 순간 무너지는
+         * 근거**였고, 그때 걸리라고 이 검산을 남겼다. 실제로 걸렸다 -
+         * 요도 페이지가 뷰포트의 1.4배다.
+         *
+         * 이제 검산하는 것은 목록이 아니라 **머리다.** 목록은 스크롤이
+         * 받으므로 넘칠 수 없고, 헤더+탭이 띠를 먹어 뷰포트가 한 행보다
+         * 작아지는 것이 새 실패 모양이다.
          */
         private static void VerifyPanelFits()
         {
-            if (PanelContentHeight <= BandHeight) return;
+            if (ViewportHeight >= CardHeight) return;
 
             Debug.LogWarning(string.Format(
-                "[Onikiri] Equipment panel needs {0:F0}px but the band is {1:F0}px - the last card "
-                + "is cut off. Add a ScrollRect or shrink the card. {2} slots x {3:F0}px.",
-                PanelContentHeight, BandHeight, EquipmentCatalog.Count, CardHeight + CardGap));
+                "[Onikiri] Forge viewport is only {0:F0}px but one card is {1:F0}px - "
+                + "the header and tabs ate the band ({2:F0}px). Shrink the header or the tabs.",
+                ViewportHeight, CardHeight, BandHeight));
         }
 
         private static RectTransform EnsurePanel(Transform safeArea)
@@ -251,6 +316,9 @@ namespace Onikiri.EditorTools
 
             // 뒤의 성장 패널이 드래그를 받지 않게 막는다
             backdrop.raycastTarget = true;
+
+            // 화지 위의 벚가지 (39단계). 스킬·퀘스트 패널과 같은 헬퍼
+            BackdropTextureBuilder.AddSakuraBranch(rect);
 
             return rect;
         }
@@ -315,37 +383,197 @@ namespace Onikiri.EditorTools
             var so = new SerializedObject(hud);
             so.FindProperty("label").objectReferenceValue = balance;
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 잠긴 미리보기의 해금 조건 배너(41단계). 행마다 "대장간 미개방"이
+            // 이미 서 있지만, 화면 전체가 왜 죽어 있는지는 헤더가 한 문장으로
+            // 말한다. 조건은 탭과 같은 출처(EquipmentCurve)다
+            LockBannerBuilder.Build(go.transform, font,
+                                    EquipmentCurve.UnlockStage + "스테이지 도달 시 해금",
+                                    1, EquipmentCurve.UnlockStage);
+        }
+
+        // ---------------------------------------------------------------- 스크롤·탭
+
+        /**
+         * @brief 스크롤. 세 페이지가 이 안에 겹쳐 선다.
+         *
+         * 퀘스트 판과 같은 구조다 - Viewport(RectMask2D) 안에 Content가 있고
+         * 페이지들이 그 아래 겹쳐 있다. Content 높이는 **가장 긴 페이지**에
+         * 맞춘다. 합으로 잡으면 어느 탭을 보든 그 아래로 빈 공간이 스크롤된다.
+         *
+         * 좌우 여백(SidePadding)을 뷰포트가 먹는다. 32단계에는 카드가 직접
+         * 물고 있었는데, 스크롤이 생기면 마스크 경계가 카드 테두리를 자르므로
+         * 여백이 마스크 밖에 있어야 한다.
+         */
+        private static RectTransform EnsureScroll(RectTransform panel)
+        {
+            var go = new GameObject("Viewport", typeof(RectTransform));
+            go.transform.SetParent(panel, false);
+
+            var viewport = (RectTransform)go.transform;
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = new Vector2(SidePadding, 0f);
+            viewport.offsetMax = new Vector2(-SidePadding,
+                -(TopPadding + HeaderHeight + HeaderGap + TabHeight + TabGap));
+
+            go.AddComponent<RectMask2D>();
+
+            var contentObject = new GameObject("Content", typeof(RectTransform));
+            contentObject.transform.SetParent(viewport, false);
+
+            var content = (RectTransform)contentObject.transform;
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.offsetMin = Vector2.zero;
+            content.offsetMax = Vector2.zero;
+            content.sizeDelta = new Vector2(0f, TallestPageHeight);
+            content.anchoredPosition = Vector2.zero;
+
+            var scroll = panel.gameObject.AddComponent<ScrollRect>();
+            scroll.content = content;
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.elasticity = 0.1f;
+            scroll.inertia = true;
+            scroll.decelerationRate = 0.135f;
+            scroll.scrollSensitivity = 30f;
+
+            return content;
+        }
+
+        private static GameObject BuildEquipmentPage(RectTransform content, EquipmentSystem system,
+                                                     TMP_FontAsset font)
+        {
+            var page = YodoPanelBuilder.CreatePage(content, "EquipmentPage", EquipmentPageHeight);
+
+            for (int i = 0; i < EquipmentCatalog.Count; i++)
+                BuildCard(page, system, font, i);
+
+            return page.gameObject;
+        }
+
+        /** 서브탭 줄. 스크롤 밖에 고정된다 - 목록이 움직여도 탭은 제자리 */
+        private static void BuildTabs(RectTransform panel, TMP_FontAsset font, GameObject[] pages)
+        {
+            var bar = new GameObject("Tabs", typeof(RectTransform));
+            bar.transform.SetParent(panel, false);
+
+            var barRect = (RectTransform)bar.transform;
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot = new Vector2(0.5f, 1f);
+            barRect.sizeDelta = new Vector2(-SidePadding * 2f, TabHeight);
+            barRect.anchoredPosition = new Vector2(0f, -(TopPadding + HeaderHeight + HeaderGap));
+
+            var sources = new[]
+            {
+                Onikiri.UI.ForgePanelTabs.Source.Equipment,
+                Onikiri.UI.ForgePanelTabs.Source.Yodo,
+
+                // 도감은 배지가 없다. 누를 것이 없는 화면에 배지를 달면
+                // 그 배지는 "가서 할 일이 있다"를 뜻하지 못한다
+                Onikiri.UI.ForgePanelTabs.Source.None
+            };
+
+            var tabs = panel.gameObject.AddComponent<Onikiri.UI.ForgePanelTabs>();
+            var so = new SerializedObject(tabs);
+            var list = so.FindProperty("pages");
+            list.arraySize = TabNames.Length;
+
+            for (int i = 0; i < TabNames.Length; i++)
+            {
+                var go = new GameObject("Tab" + i, typeof(RectTransform));
+                go.transform.SetParent(bar.transform, false);
+
+                var rect = (RectTransform)go.transform;
+                float slice = 1f / TabNames.Length;
+                rect.anchorMin = new Vector2(i * slice, 0f);
+                rect.anchorMax = new Vector2((i + 1) * slice, 1f);
+                rect.offsetMin = new Vector2(6f, 0f);
+                rect.offsetMax = new Vector2(-6f, 0f);
+
+                var image = go.AddComponent<Image>();
+                UiSkin.ApplyPanel(image, UiSkin.Chrome);
+
+                var button = go.AddComponent<Button>();
+                UiSkin.ApplyButton(button, image);
+
+                // 서브탭 글자는 캡션 크기 - 퀘스트 서브탭과 같은 티어다
+                var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+                UiFonts.Demote(label);
+                var labelRect = (RectTransform)label.transform;
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = new Vector2(0f, -6f);
+                labelRect.offsetMax = new Vector2(0f, 6f);
+                label.text = TabNames[i];
+
+                var badge = QuestPanelBuilder.BuildBadge(go.transform, font);
+
+                var element = list.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("badgeSource").enumValueIndex = (int)sources[i];
+                element.FindPropertyRelative("tab").objectReferenceValue = button;
+                element.FindPropertyRelative("tabLabel").objectReferenceValue = label;
+                element.FindPropertyRelative("tabBackground").objectReferenceValue = image;
+                element.FindPropertyRelative("root").objectReferenceValue = pages[i];
+                element.FindPropertyRelative("badge").objectReferenceValue = badge.gameObject;
+                element.FindPropertyRelative("badgeLabel").objectReferenceValue =
+                    badge.GetComponentInChildren<TMP_Text>(true);
+            }
+
+            // 탭마다 스크롤 길이를 맞춘다(ForgePanelTabs.FitScroll 주석). 페이지
+            // 높이는 빌더가 이미 알고 있으므로 여기서 적어 준다 - 런타임이 자식
+            // RectTransform을 재는 것보다 싸고, 레이아웃이 아직 안 돌았을 때도
+            // 맞는 값이다
+            so.FindProperty("scroll").objectReferenceValue = panel.GetComponent<ScrollRect>();
+            var heights = so.FindProperty("pageHeights");
+            heights.arraySize = TabNames.Length;
+            heights.GetArrayElementAtIndex(0).floatValue = EquipmentPageHeight;
+            heights.GetArrayElementAtIndex(1).floatValue = YodoPanelBuilder.ForgePageHeight;
+            heights.GetArrayElementAtIndex(2).floatValue = YodoPanelBuilder.CodexPageHeight;
+
+            so.FindProperty("selectedText").colorValue = TextColor;
+            so.FindProperty("unselectedText").colorValue = DimColor;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ---------------------------------------------------------------- 카드
 
-        private static void BuildCard(RectTransform panel, EquipmentSystem system,
+        private static void BuildCard(RectTransform page, EquipmentSystem system,
                                       TMP_FontAsset font, int index)
         {
             var spec = EquipmentCatalog.Slots[index];
 
             var go = new GameObject("Slot" + index, typeof(RectTransform));
-            go.transform.SetParent(panel, false);
+            go.transform.SetParent(page, false);
 
             var rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(-SidePadding * 2f, CardHeight);
-            rect.anchoredPosition = new Vector2(0f,
-                -(TopPadding + HeaderHeight + HeaderGap + index * (CardHeight + CardGap)));
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.sizeDelta = new Vector2(0f, CardHeight);
+            rect.anchoredPosition = new Vector2(0f, -index * (CardHeight + CardGap));
 
             var background = go.AddComponent<Image>();
             UiSkin.ApplyPanel(background, UiSkin.Row);
 
             var icon = CreateIcon(go.transform, UiIcons.LoadItem(spec.IconSprite));
 
-            // 윗줄: 등급 이름 (왼쪽) + 지금 배수 (오른쪽)
+            // 카드 글자는 전부 캡션 크기(39단계 - 캐릭터 화면과 같은 위계).
+            // 44pt로 남는 것은 두 동작 버튼의 제목과 머리글(제목·보석 잔액)뿐이다
             var gradeLabel = CreateLabel(go.transform, font, "Grade", TextAlignmentOptions.Left);
+            UiFonts.Demote(gradeLabel);
             PlaceStretched((RectTransform)gradeLabel.transform, TextLeft, 340f, 12f, LineHeight);
             gradeLabel.text = spec.GradeName(1);
 
             var statLabel = CreateLabel(go.transform, font, "Stat", TextAlignmentOptions.Right);
+            UiFonts.Demote(statLabel);
             PlaceStretched((RectTransform)statLabel.transform, TextLeft, 24f, 12f, LineHeight);
             statLabel.color = DimColor;
             statLabel.text = "×1.00";
@@ -358,12 +586,14 @@ namespace Onikiri.EditorTools
             // 겪은 것과 같은 종류이고, 그때처럼 **짧은 것을 오른쪽으로** 올려
             // 줄을 하나 없앴다
             var slotLabel = CreateLabel(go.transform, font, "Slot", TextAlignmentOptions.Left);
+            UiFonts.Demote(slotLabel);
             PlaceStretched((RectTransform)slotLabel.transform, TextLeft, 300f,
                            12f + LineHeight, LineHeight);
             slotLabel.color = DimColor;
             slotLabel.text = spec.SlotName + " · 장착 중";
 
             var levelLabel = CreateLabel(go.transform, font, "Level", TextAlignmentOptions.Right);
+            UiFonts.Demote(levelLabel);
             PlaceStretched((RectTransform)levelLabel.transform, TextLeft, 24f,
                            12f + LineHeight, LineHeight);
             levelLabel.color = DimColor;
@@ -402,6 +632,10 @@ namespace Onikiri.EditorTools
             so.FindProperty("unaffordableColor").colorValue = DimColor;
             so.FindProperty("normalRowTint").colorValue = UiSkin.Row;
             so.FindProperty("iconTint").colorValue = UiIcons.Tint;
+            // 버튼 판의 평상시 틴트. 잠긴 미리보기(41b)가 판을 눌렀다가
+            // 해금 때 이 값으로 되살린다 - 빌더가 칠한 값과 같아야 한다
+            so.FindProperty("temperButtonTint").colorValue = UiSkin.Chrome;
+            so.FindProperty("gradeButtonTint").colorValue = GemButtonTint;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -427,11 +661,14 @@ namespace Onikiri.EditorTools
             var button = go.AddComponent<Button>();
             UiSkin.ApplyButton(button, image);
 
+            // 동작(단련·등급업)은 44pt로 말하고, 비용은 캡션으로 받친다(39단계).
+            // 같은 크기로 두면 버튼 안에서 무엇이 동사인지 읽히지 않는다
             titleLabel = CreateLabel(go.transform, font, "Title", TextAlignmentOptions.Center);
             PlaceStretched((RectTransform)titleLabel.transform, 8f, 8f, 8f, 52f);
             titleLabel.text = title;
 
             costLabel = CreateLabel(go.transform, font, "Cost", TextAlignmentOptions.Center);
+            UiFonts.Demote(costLabel);
             PlaceStretched((RectTransform)costLabel.transform, 8f, 8f, 8f + 52f, 52f);
             costLabel.color = DimColor;
             costLabel.text = cost;

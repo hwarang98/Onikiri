@@ -210,7 +210,14 @@ namespace Onikiri.Battle
          */
         public bool CanChallenge
         {
-            get { return phase == Phase.Farming && progress != null && progress.IsBossReady; }
+            get
+            {
+                // 최전선에서만 열린다(37단계). 클리어한 스테이지에서 보스를 다시
+                // 잡을 수 있으면 클리어 보너스와 보스 경험치가 반복 수급된다 -
+                // 되돌아간 스테이지는 순수 파밍이고, 복귀는 재선택 화면이 맡는다
+                return phase == Phase.Farming && progress != null
+                       && progress.IsBossReady && progress.IsAtFrontier;
+            }
         }
 
         /** 이번 스테이지 보스의 체력. HUD와 실패 계산이 함께 쓴다 */
@@ -244,6 +251,19 @@ namespace Onikiri.Battle
          * 스테이지로 고른다. 무작위로 뽑으면 재도전할 때마다 다른 놈이 나와서
          * "이 스테이지의 우두머리"라는 인상이 생기지 않는다.
          */
+        /**
+         * @brief 일반 보스·정예로 쓸 잡몹 풀을 바꾼다. 지역이 넘어갈 때
+         * RegionMobSwitcher가 스포너와 함께 부른다.
+         *
+         * 스포너만 바꾸고 이쪽을 두면 잡몹은 새 지역인데 확대판 보스만 옛 지역
+         * 몹이 된다 - "방금까지 베던 놈의 우두머리"가 깨진다.
+         */
+        public void SetStageBossDefinitions(EnemyDefinition[] next)
+        {
+            if (next == null || next.Length == 0) return;
+            stageBossDefinitions = next;
+        }
+
         private EnemyDefinition StageBossDefinition()
         {
             if (stageBossDefinitions == null || stageBossDefinitions.Length == 0) return bossDefinition;
@@ -487,6 +507,17 @@ namespace Onikiri.Battle
             ClearedStage = clearedStage;
             ClearBonus = GrantClearBonus(clearedStage);
             ClearedRegion = roster != null && roster.IsFinale(clearedStage);
+
+            // 혼과 파편(44단계). **AdvanceStage보다 앞이다** - 드랍 판정이
+            // "방금 벤 보스가 서 있던 스테이지"를 봐야 하고, 스테이지가 먼저
+            // 오르면 한 칸 뒤의 등급을 읽는다(정예/피날레가 갈리는 자리라
+            // 그 한 칸이 곧 파편이냐 혼이냐다).
+            //
+            // 클리어 보너스가 여기 있는 것과 같은 이유로 여기 있다 - 요괴를
+            // 벤 대가가 아니라 **그 요괴가 무엇이었는가**의 대가이고, 그것은
+            // 스포너가 알 수 없는 사실이다(로스터가 안다)
+            var yodo = Onikiri.Progression.YodoSystem.Instance;
+            if (yodo != null) yodo.ReportBossDefeated(CurrentBossConfig, clearedStage);
 
             if (progress != null) progress.AdvanceStage();
 

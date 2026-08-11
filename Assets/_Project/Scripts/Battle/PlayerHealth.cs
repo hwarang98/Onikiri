@@ -63,6 +63,19 @@ namespace Onikiri.Battle
         public double MaxHealth { get { return maxHealth; } }
         public double Current { get { return current; } }
 
+        /**
+         * @brief 전직이 피격/사망 클립을 바꾼다 (33단계). PlayerCombat.
+         * SetCharacterFrames와 짝이다.
+         *
+         * 두 클립은 사건(피격·사망)에만 재생되므로 도는 클립을 갈아탈 일이
+         * 없다 - 배열만 바꾸면 다음 사건부터 새 모습으로 나온다.
+         */
+        public void SetCharacterFrames(Sprite[] hurt, Sprite[] death)
+        {
+            if (hurt != null && hurt.Length > 0) hurtFrames = hurt;
+            if (death != null && death.Length > 0) deathFrames = death;
+        }
+
         /** 초당 회복 비율. 강화가 밀어넣는 값 */
         public double RegenFraction { get { return regenFraction; } }
 

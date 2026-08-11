@@ -33,6 +33,17 @@ namespace Onikiri.Progression
          */
         public const string GoldGainId = "gold_gain";
 
+        /**
+         * @brief 심화 축 (43단계). 치명타 확률 100%(CritRateCurve.Ceiling)에
+         * 도달해야 열린다 - TranscendCurve.IsUnlockedAt이 그 문이다.
+         *
+         * 초월 치명타는 피해 전체의 순수 배수(전타 치명타 뒤의 무한 축),
+         * 연격은 타격마다 한 번 더 베는 확률이다. 요도 혼 축 같은 상위
+         * 티어는 수익화 스텝 몫이고, 여기는 그 훅이 걸릴 자리만 판다.
+         */
+        public const string TranscendId = "crit_transcend";
+        public const string ComboId = "combo_strike";
+
         [SerializeField] private PlayerCombat combat;
         [SerializeField] private PlayerHealth health;
         [SerializeField] private UpgradeTrack[] tracks;
@@ -263,9 +274,12 @@ namespace Onikiri.Progression
                     // 자리**이고 같은 이유다 - 곱해지는 값은 자기 자리에 저장되지
                     // 않고 강화 값 위에 얹히므로, 반영 경로가 이 함수 하나여야
                     // "레벨은 올랐는데 스탯은 안 올랐다"가 성립하지 않는다
+                    //
+                    // 33단계의 전직 체력 배수도 같은 자리다
                     health.MaxHealthStat = track.Value.ToDouble()
                         * StatAmp(CharacterLevel.HealthAmpId)
-                        * EquipmentSystem.CurrentMultiplierFor(EquipmentStat.MaxHealth);
+                        * EquipmentSystem.CurrentMultiplierFor(EquipmentStat.MaxHealth)
+                        * EvolutionSystem.CurrentHealthMultiplier;
                 else
                     // 회복은 증폭하지 않는다. 최대 체력의 비율이라(HealthRegenCurve)
                     // 체력 증폭이 오르면 초당 회복량도 같이 오른다. 여기서 또 곱하면
@@ -296,10 +310,20 @@ namespace Onikiri.Progression
                     // 둔 이유는 EquipmentCurve 머리 주석에 있다 - 가산이면 강화
                     // 곡선이 지수로 자라는 동안 장비의 몫이 스테이지마다 절반씩
                     // 줄어 반드시 죽는 축이 된다
+                    //
+                    // 33단계의 전직 배수도 같은 자리다. 공격력에 곱해지므로 스킬
+                    // 데미지(공격력 x 배율)에도 그대로 상속된다
+                    //
+                    // 44단계의 요도도 같은 자리다. 곱해지는 항이 넷이 됐는데
+                    // 전부 여기 모여 있는 것이 요점이다 - 스탯이 반영되는
+                    // 경로가 이 함수 하나여야 "레벨은 올랐는데 스탯은 안
+                    // 올랐다"가 성립하지 않는다
                     combat.Damage = track.Value
                         * BigDouble.FromDouble(StatAmp(CharacterLevel.AttackAmpId))
                         * BigDouble.FromDouble(
-                            EquipmentSystem.CurrentMultiplierFor(EquipmentStat.AttackPower));
+                            EquipmentSystem.CurrentMultiplierFor(EquipmentStat.AttackPower))
+                        * BigDouble.FromDouble(EvolutionSystem.CurrentAttackMultiplier)
+                        * BigDouble.FromDouble(YodoSystem.CurrentAttackMultiplier);
                     break;
 
                 case AttackSpeedId:
@@ -321,6 +345,18 @@ namespace Onikiri.Progression
 
                 case CritDamageId:
                     combat.CritMultiplier = (float)track.Value.ToDouble();
+                    break;
+
+                // 심화 축(43단계). 공격력처럼 증폭·장비·전직을 곱하지 않는다 -
+                // 이 축들은 자기 자신이 배수라, 다른 배수를 얹으면 같은 골드가
+                // 두 번 세지는 셈이 된다. 상속은 구조에서 나온다: 초월은 피해
+                // 전체에 곱해지고 연격의 추가타는 온전한 한 타다
+                case TranscendId:
+                    combat.TranscendMultiplier = (float)track.Value.ToDouble();
+                    break;
+
+                case ComboId:
+                    combat.ComboChance = (float)track.Value.ToDouble();
                     break;
 
                 default:

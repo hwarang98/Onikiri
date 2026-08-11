@@ -44,8 +44,16 @@ namespace Onikiri.Battle
             spriteRenderer.enabled = false;
         }
 
+        /**
+         * @param sortingOrder 그릴 층. **부르는 쪽이 정한다.**
+         *
+         * 45b까지는 여기서 `Player - 1`로 못 박고 있었다. 잔상을 남기는 것이
+         * 사무라이 하나뿐이었기 때문인데, 영체(Spirit = Player - 2)가 같은
+         * 잔상을 쓰면서 그 상수가 틀린 답이 됐다 - 49는 영체(48)보다 **앞**이라
+         * 잔상이 본체를 덮는다. 층은 남기는 쪽이 자기 층에서 계산해야 한다.
+         */
         public void Play(Sprite sprite, Vector3 position, bool flip, Color color,
-                         Action<Afterimage> onFinished)
+                         int sortingOrder, Action<Afterimage> onFinished)
         {
             finished = onFinished;
             tint = color;
@@ -54,7 +62,7 @@ namespace Onikiri.Battle
             spriteRenderer.sprite = sprite;
             spriteRenderer.flipX = flip;
             spriteRenderer.color = color;
-            spriteRenderer.sortingOrder = SortingOrders.Player - 1;
+            spriteRenderer.sortingOrder = sortingOrder;
             spriteRenderer.enabled = true;
 
             elapsed = 0f;
@@ -73,7 +81,10 @@ namespace Onikiri.Battle
             color.a = tint.a * (1f - t);
             spriteRenderer.color = color;
 
-            if (t < 1f) return;
+            if (t < 1f)
+            {
+                return;
+            }
 
             playing = false;
             spriteRenderer.enabled = false;

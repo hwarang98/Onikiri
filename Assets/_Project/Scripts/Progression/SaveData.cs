@@ -29,10 +29,17 @@ namespace Onikiri.Progression
          *   7  26단계. 발도 오의 셋(레벨 + 자동 시전 토글)이 생겼다
          *   8  31단계. 퀘스트(일일/반복/업적) 진행·수령과 보석 잔액이 생겼다
          *   9  32단계. 장비 두 슬롯(등급 + 단련 레벨)이 생겼다
+         *   10 33단계. 전직 티어가 생겼다
+         *   11 펫 스텝. 동료 셋(해금 + 레벨)과 액티브 선택이 생겼다
+         *   12 37단계. 스테이지 재선택 - 최전선(maxStageReached)이 생겼다
+         *   13 43단계. 심화 축 둘(초월 치명타·연격)이 생겼다
+         *   14 44단계. 요도 넷(혼·티어·발견)과 파편이 생겼다
+         *   15 46단계. 뽑기(천장 카운터·누적·일일 무료 쿨)가 생겼다
+         *   16 47단계. 희귀도 사다리 - 자루별 혼격과 전설 妖刀 보유
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 9;
+        public const int CurrentVersion = 16;
 
         public int version = CurrentVersion;
 
@@ -55,6 +62,14 @@ namespace Onikiri.Progression
 
         /** 지금까지 잡은 보스 수 */
         public int bossKillCount;
+
+        /**
+         * @brief 최고 도달 스테이지 - 최전선 (v12, 37단계 스테이지 재선택).
+         *
+         * stage는 "지금 서 있는 곳"이 됐고 이쪽이 "여기까지 왔다"다. 해금과
+         * 업적 도달 지표가 이쪽을 읽는다. stage보다 작을 수 없다.
+         */
+        public int maxStageReached = 1;
 
         // ---------------------------------------------------------------- 12단계
 
@@ -182,6 +197,132 @@ namespace Onikiri.Progression
         public string[] equipmentIds = new string[0];
         public int[] equipmentGrades = new int[0];
         public int[] equipmentLevels = new int[0];
+
+        // ---------------------------------------------------------------- 33단계
+
+        /**
+         * @brief 전직 티어. 0 = 로닌.
+         *
+         * 배열이 아니라 낱개 int다. 강화·오의·장비가 id 배열을 쓰는 이유는
+         * "목록 중간에 하나가 추가되면 인덱스가 밀린다"인데, 전직은 목록이
+         * 아니라 사다리 하나다 - 티어가 중간에 추가되는 날은 밸런스 전체를
+         * 다시 유도하는 날이고, 그때 세이브 형식이 지켜줄 수 있는 것이 없다.
+         */
+        public int evolutionTier;
+
+        // ---------------------------------------------------------------- 펫
+
+        /**
+         * @brief 펫 셋. **id 배열 + 해금 배열 + 레벨 배열**이다.
+         *
+         * 강화 축·오의·장비와 같은 방식이고 같은 이유다 - 펫이 중간에 하나
+         * 늘면(가챠) 인덱스 저장은 엉뚱한 펫에 해금 표시를 밀어 넣는다.
+         *
+         * 해금이 int(0/1)인 것은 questClaims와 같은 제약이다 - JsonUtility가
+         * bool 배열을 못 담는 것은 아니지만, 퀘스트 수령 상태가 이미 int 값
+         * 배열로 통일돼 있고 형식이 갈릴 이유가 없다.
+         *
+         * 레벨은 해금 전에도 1이다. "기본값이라서 1인 것"과 "저장된 적이
+         * 없어서 없는 것"이 구분돼야 한다는 규칙 그대로다.
+         */
+        public string[] petIds = new string[0];
+        public int[] petUnlocked = new int[0];
+        public int[] petLevels = new int[0];
+
+        /**
+         * @brief **레거시.** 단일 출전 시절의 액티브 동료 id.
+         *
+         * 다중 출전(보유 전원 출전)으로 바뀌면서 뜻을 잃었다. 필드를 지우지
+         * 않는 이유는 세이브 형식의 규칙이다 - 필드 삭제는 마이그레이션이
+         * 아니라 형식 파괴이고, JsonUtility는 모르는 필드를 조용히 버리므로
+         * 남겨 두는 비용이 0이다. 복원 쪽은 읽지 않는다(PetSystem.Restore).
+         */
+        public string activePetId = "";
+
+        // ---------------------------------------------------------------- 44단계
+
+        /**
+         * @brief 요도 넷. **id 배열 + 혼 배열 + 티어 배열 + 발견 배열**이다.
+         *
+         * 강화 축·오의·장비·동료와 같은 방식이고 같은 이유다 - 다섯째 지역이
+         * 생겨 요도가 하나 늘면 인덱스 저장은 엉뚱한 칼에 티어를 밀어 넣는다.
+         *
+         * **혼이 long인 것은 GemWallet과 같은 판단이다.** 파밍으로 늘지 않고
+         * 대요괴 처치로만 들어오므로(40스테이지에 넷) 평생 만 단위를 넘지
+         * 않는다. BigDouble로 두면 "언젠가 폭증할 수 있는 값"처럼 보이고,
+         * 그러면 다음 스텝이 혼 가격을 지수로 설계하고 싶어진다 - 그 순간
+         * 혼은 두 번째 골드가 된다.
+         *
+         * 발견(discovered)을 따로 적는 이유는 도감 때문이다. 티어와 혼 수만으로는
+         * **"한 번 받았다가 다 써버린 상태"**와 "한 번도 못 본 상태"가 구분되지
+         * 않는다. 앞의 것은 도감에 이름이 떠야 하고 뒤의 것은 실루엣이어야
+         * 한다 - 41단계 잠긴 미리보기 규칙이 요구하는 구분이다.
+         * 형식이 int(0/1)인 것은 questClaims·petUnlocked와 같은 이유다.
+         */
+        public string[] yodoIds = new string[0];
+        public long[] yodoSouls = new long[0];
+        public int[] yodoTiers = new int[0];
+        public int[] yodoDiscovered = new int[0];
+
+        /** 합성 재료. 종류가 없어서 낱개 값이다 - 전직 티어와 같은 자리 */
+        public long yodoShards;
+
+        // ---------------------------------------------------------------- 46단계
+
+        /**
+         * @brief 마지막 혼 정수 뒤로 돌린 뽑기 수. **천장의 카운터다.**
+         *
+         * 오의 쿨다운·영체 순번은 저장하지 않는데 이것은 저장한다. 기준이
+         * 다르기 때문이다 - 저쪽은 **런타임이 다시 만들 수 있는 값**이고
+         * 이쪽은 **플레이어가 지불한 것**이다. 29회에서 껐다 켰더니 0으로
+         * 돌아가면 그것은 리셋이 아니라 몰수이고, 세이브가 지켜야 할 것의
+         * 정의에 정확히 들어맞는다.
+         */
+        public int gachaPity;
+
+        /** 지금까지 돌린 총 횟수. 상점 표시용 - 밸런스에는 쓰이지 않는다 */
+        public int gachaTotalPulls;
+
+        /**
+         * @brief 마지막으로 무료 뽑기를 쓴 **퀘스트일** (UTC ticks).
+         *
+         * lastDailyResetUtcTicks와 같은 형식이고 같은 경계(KST 04:00)다.
+         * 시각이 아니라 날짜를 적는 이유는 GachaSystem 쪽 주석에 있다 -
+         * 시각으로 24시간을 재면 리셋이 매일 조금씩 늦어진다.
+         *
+         * 0이면 "아직 한 번도 안 썼다"이고, 그래서 마이그레이션이 이 값을
+         * 0으로 두는 것만으로 기존 플레이어가 접속 즉시 무료 뽑기를 하나
+         * 들고 시작한다.
+         */
+        public long gachaFreePullDayTicks;
+
+        // ---------------------------------------------------------------- 47단계
+
+        /**
+         * @brief 요도 넷의 혼격. yodoIds와 **같은 순서**다.
+         *
+         * 티어와 나란히 서는 두 번째 숫자이고(YodoSystem.Blade.rarity),
+         * 그래서 자기 배열로 둔다 - 티어에 접어 넣으면(예: tier * 10 +
+         * rarity) 세이브를 사람이 못 읽고, 상한이 바뀌는 날 인코딩이
+         * 통째로 무효가 된다.
+         *
+         * 비어 있으면 전부 0이다 - v15까지의 세이브가 정확히 그 상태이고,
+         * 혼격 0의 기여가 정확히 1이라 마이그레이션이 밸런스를 안 바꾼다.
+         */
+        public int[] yodoRarities = new int[0];
+
+        /**
+         * @brief 전설 妖刀의 id와 사본 수. **보스 요도와 별개 배열이다.**
+         *
+         * 한 배열에 섞지 않는 이유는 런타임과 같다(YodoSystem.LegendaryBlade
+         * 주석) - YodoCatalog.Count가 세계 순환의 길이를 유도하는 값이라,
+         * 전설이 그 표에 들어가면 한 바퀴가 40에서 60스테이지가 된다.
+         *
+         * id를 함께 적는 것은 표의 순서가 바뀌어도 보유가 안 섞이게 하려는
+         * 것이고, 강화 축·오의·장비·동료·요도가 전부 같은 규칙이다.
+         */
+        public string[] legendaryYodoIds = new string[0];
+        public int[] legendaryYodoCopies = new int[0];
 
         public static SaveData NewGame()
         {
@@ -375,8 +516,300 @@ namespace Onikiri.Progression
                 data.version = 9;
             }
 
+            if (data.version == 9)
+            {
+                // v9에는 전직이 없었다. **0티어(로닌)를 명시적으로 적어 넣는다.**
+                //
+                // 이 마이그레이션은 밸런스를 바꾸지 않는다 - 티어 0의 배수가
+                // 정확히 1배다(EvolutionCurve.AttackMultiplierAt). 장비 v8 -> v9가
+                // 1등급 Lv.1(배수 1배)을 적어 넣은 것과 같은 성질이다.
+                //
+                // 소급하지 않는 것도 같다. 이미 Lv.74인 플레이어에게 티어를
+                // 얹어주면 보석 소비처를 만들어놓고 통과할 이유를 지우는 셈이고,
+                // 진화 연출(로닌 -> 데몬사무라이)을 볼 기회도 함께 사라진다.
+                //
+                // JsonUtility가 없는 int를 0으로 채우므로 사실 아무것도 안 해도
+                // 값은 같다. 그래도 명시하는 이유는 앞의 모든 버전과 같다 -
+                // "0이라서 없는 것"과 "저장된 적이 없어서 없는 것"이 코드에서
+                // 구분돼야 한다.
+                data.evolutionTier = 0;
+                data.version = 10;
+            }
+
+            if (data.version == 10)
+            {
+                // v10에는 펫이 없었다. 세 마리를 **잠금 + Lv.1**로 명시적으로
+                // 적어 넣고 액티브는 비워 둔다.
+                //
+                // **이 마이그레이션은 밸런스를 바꾸지 않는다.** 잠긴 펫의
+                // 기여가 정확히 0이기 때문이다 - 장비 1등급 Lv.1(배수 1배),
+                // 전직 0티어(배수 1배)와 같은 성질이다.
+                //
+                // 소급하지 않는 것도 같다. 이미 st40인 플레이어에게 펫을
+                // 쥐여주면 보석 소비처를 만들어놓고 통과할 이유를 지우는
+                // 셈이고, 동료가 화면에 처음 걸어 들어오는 순간도 함께
+                // 사라진다. 조건(st31)은 이미 넘겼으므로 접속하자마자 해금
+                // 버튼이 눌리는 상태로 열린다 - v7 -> v8 업적과 같은 결이다.
+                foreach (var pet in PetCatalog.Pets) EnsurePet(data, pet.Id);
+
+                // JsonUtility가 없는 string을 null로 채운다. 명시적으로 빈
+                // 문자열을 넣는다 - "아무도 없다"가 null과 ""로 두 가지가
+                // 되면 읽는 쪽마다 검사가 갈린다
+                if (data.activePetId == null) data.activePetId = "";
+
+                data.version = 11;
+            }
+
+            if (data.version == 11)
+            {
+                // v11에는 최전선이 없었다. **지금 서 있는 스테이지가 곧 최전선이다** -
+                // v11까지는 스테이지가 내려가는 경로가 존재하지 않았으므로 이 등식은
+                // 참이고, 그래서 이 마이그레이션은 아무 상태도 지어내지 않는다.
+                //
+                // 밸런스도 바꾸지 않는다. 최전선은 해금 판정과 재선택 상한에만
+                // 쓰이는 기록이고, 그 판정들은 지금까지 stage로 하던 것과 같은
+                // 답을 낸다.
+                data.maxStageReached = Mathf.Max(1, data.stage);
+                data.version = 12;
+            }
+
+            if (data.version == 12)
+            {
+                // 43단계 - 강화 축이 미세화됐다(슬레이어식 수천 레벨). 값 등가
+                // 재스케일이라 **레벨 숫자도 함께 환산해야** 구세이브의 파워가
+                // 보존된다: 옛 한 레벨 = 새 여덟 칸(공격력·치명타피해·체력·회복),
+                // 치명타 확률은 옛 +0.5%p가 새 +0.088%p라 5.676칸이다.
+                // 환산 없이 두면 공격력 Lv.84가 x1.0143^83 = 3.2배가 되어
+                // (옛 값은 x1.12^83 = 만二천 배) 진행이 통째로 무너진다.
+                //
+                // 공격속도(아트 상한)와 골드 획득(밴드 손잡이)은 곡선이 그대로라
+                // 환산도 없다.
+                ConvertLevel(data, UpgradeSystem.AttackPowerId, 8d);
+                ConvertLevel(data, UpgradeSystem.CritDamageId, 8d);
+                ConvertLevel(data, UpgradeSystem.HealthId, 8d);
+                ConvertLevel(data, UpgradeSystem.HealthRegenId, 8d);
+
+                // 0.005 = 42단계까지의 치명타 스텝. 새 스텝과의 비가 환산 계수다
+                ConvertLevel(data, UpgradeSystem.CritRateId, 0.005d / CritRateCurve.Step);
+
+                // 심화 축 둘. 레벨 1의 값이 곧 무보정 상태(배수 1 / 확률 0)라
+                // 이 승격은 밸런스를 바꾸지 않는다. 해금 상태는 저장하지 않는다 -
+                // 치명타 확률 트랙의 상한 도달에서 유도되는 값이고, 유도되는
+                // 것을 저장하면 언젠가 두 값이 갈린다(챕터를 스테이지에서
+                // 유도하는 것과 같은 규칙)
+                EnsureTrack(data, UpgradeSystem.TranscendId);
+                EnsureTrack(data, UpgradeSystem.ComboId);
+                data.version = 13;
+            }
+
+            if (data.version == 13)
+            {
+                // v13에는 요도가 없었다. 네 자루를 **미봉인(티어 0) · 혼 0 ·
+                // 미발견**으로 명시적으로 적어 넣고 파편도 0으로 둔다.
+                //
+                // **이 마이그레이션은 밸런스를 바꾸지 않는다.** 티어 0의
+                // 배수가 정확히 1배이고(YodoCurve.TierValue) 세트 보너스도
+                // 0자루에서 1배다 - 장비 v8 -> v9(1등급 Lv.1), 전직 v9 -> v10
+                // (0티어), 펫 v10 -> v11(잠금)과 같은 성질이다.
+                //
+                // **소급하지 않는 것도 같다.** 이미 st200인 플레이어는 지나온
+                // 순환에서 대요괴를 열 번도 넘게 벴지만, 그 처치를 혼으로
+                // 쳐주면 접속하자마자 오니키리가 완성된다 - 도감이 채워지는
+                // 과정 전체가 사라지는 셈이고, 그것이 이 스텝이 만든 것의
+                // 전부다. 조건(st41)은 이미 넘겼으므로 요도 탭은 열린 채로
+                // 시작하고, 다음 순환에서 첫 혼이 떨어진다. v7 -> v8 업적이
+                // "곧바로 받을 수 있는 상태로 열린다"였던 것과 같은 결이다.
+                foreach (var blade in YodoCatalog.Blades) EnsureYodo(data, blade.Id);
+                data.yodoShards = 0L;
+
+                data.version = 14;
+            }
+
+            if (data.version == 14)
+            {
+                // v14에는 뽑기가 없었다. 천장 카운터 0 · 누적 0 · 무료 뽑기
+                // **미사용**으로 명시적으로 적어 넣는다.
+                //
+                // **이 마이그레이션은 밸런스를 바꾸지 않는다.** 뽑기는
+                // 요도의 재료만 주고, 한 번도 안 돌린 상태의 기여가 정확히
+                // 0이다 - 장비 v8 -> v9(1등급 Lv.1), 전직 v9 -> v10(0티어),
+                // 펫 v10 -> v11(잠금), 요도 v13 -> v14(미봉인)와 같은 성질이다.
+                //
+                // **소급하지 않는 것도 같다.** 이미 st200인 플레이어에게
+                // 지나온 날수만큼 무료 뽑기를 쌓아주면 접속하자마자 200회가
+                // 돌아가고, 그것은 천장(GachaCurve.PityPulls)을 여섯 번
+                // 지나는 양이라 요도가 통째로 리드 상한까지 올라간다.
+                // 조건(st41)은 이미 넘겼으므로 상점은 열린 채로 시작하고
+                // **오늘치 무료 뽑기 하나**를 곧바로 쓸 수 있다 - v7 -> v8
+                // 업적이 "곧바로 받을 수 있는 상태로 열린다"였던 것과 같은 결이다.
+                data.gachaPity = 0;
+                data.gachaTotalPulls = 0;
+                data.gachaFreePullDayTicks = 0L;
+
+                data.version = 15;
+            }
+
+            if (data.version == 15)
+            {
+                // v15에는 희귀도 사다리가 없었다. 혼격은 **전부 0**이고
+                // 전설은 **한 자루도 없다.**
+                //
+                // **이 마이그레이션도 밸런스를 바꾸지 않는다.** 혼격 0의
+                // 배수가 정확히 1이고(YodoRarityCurve.ValueAt) 미보유 전설의
+                // 배수도 정확히 1이라(LegendaryYodoCurve.PowerAt), 승격 직후의
+                // 기여가 0이다 - 장비 v8->v9, 전직 v9->v10, 펫 v10->v11,
+                // 요도 v13->v14, 뽑기 v14->v15와 같은 성질이고 이유도 같다.
+                //
+                // **소급도 없다.** 이미 뽑기를 200회 돌린 플레이어에게 그
+                // 회수만큼 ★4·★5를 나눠 주면 접속 즉시 혼격이 상한까지
+                // 차오르고, 그것은 이 스텝이 판 재고를 통째로 지우는 일이다.
+                // 지나온 뽑기는 그때의 표로 이미 값을 받았다.
+                //
+                // 천장 카운터(gachaPity)는 **그대로 둔다.** 지키는 대상이
+                // ★3에서 ★4+로 승격했지만 카운터의 뜻("마지막 보장 뒤로
+                // 몇 번 돌렸는가")은 같고, 0으로 되돌리면 29회에서 승격을
+                // 맞은 플레이어의 지불이 몰수된다 - v14 -> v15가 그 값을
+                // 저장하기로 한 이유가 여기서도 그대로 성립한다.
+                data.yodoRarities = new int[data.yodoIds != null ? data.yodoIds.Length : 0];
+
+                data.legendaryYodoIds = new string[0];
+                data.legendaryYodoCopies = new int[0];
+                EnsureLegendaryYodo(data, LegendaryYodoCatalog.WhiteMaskId);
+                EnsureLegendaryYodo(data, LegendaryYodoCatalog.ThousandHandId);
+
+                data.version = 16;
+            }
+
             data.version = CurrentVersion;
             return true;
+        }
+
+        /**
+         * @brief 세이브에 없는 전설 요도를 **미보유**로 추가한다.
+         *
+         * EnsureYodo와 같은 규칙이다 - 이미 있으면 건드리지 않는다(멱등).
+         * 마이그레이션이 두 번 돌 때 사본이 0으로 되돌아가면 200회에 한 번
+         * 나오는 것이 사라진다.
+         */
+        private static void EnsureLegendaryYodo(SaveData data, string id)
+        {
+            if (data.legendaryYodoIds == null) data.legendaryYodoIds = new string[0];
+            if (data.legendaryYodoCopies == null) data.legendaryYodoCopies = new int[0];
+
+            for (int i = 0; i < data.legendaryYodoIds.Length; i++)
+                if (data.legendaryYodoIds[i] == id) return;
+
+            int index = data.legendaryYodoIds.Length;
+            Array.Resize(ref data.legendaryYodoIds, index + 1);
+            Array.Resize(ref data.legendaryYodoCopies, index + 1);
+
+            data.legendaryYodoIds[index] = id;
+            data.legendaryYodoCopies[index] = 0;
+        }
+
+        /**
+         * @brief 세이브에 없는 요도를 미봉인 + 혼 0으로 추가한다.
+         *
+         * EnsureTrack·EnsureSkill·EnsureEquipment·EnsurePet과 같은 규칙이다.
+         * 이미 있으면 건드리지 않는다(멱등) - 마이그레이션이 두 번 돌 때
+         * 티어가 0으로 되돌아가면 한 바퀴가 통째로 사라진다.
+         */
+        private static void EnsureYodo(SaveData data, string id)
+        {
+            if (data.yodoIds == null) data.yodoIds = new string[0];
+            if (data.yodoSouls == null) data.yodoSouls = new long[0];
+            if (data.yodoTiers == null) data.yodoTiers = new int[0];
+            if (data.yodoDiscovered == null) data.yodoDiscovered = new int[0];
+
+            for (int i = 0; i < data.yodoIds.Length; i++)
+                if (data.yodoIds[i] == id) return;
+
+            var ids = new string[data.yodoIds.Length + 1];
+            var souls = new long[ids.Length];
+            var tiers = new int[ids.Length];
+            var discovered = new int[ids.Length];
+
+            for (int i = 0; i < data.yodoIds.Length; i++)
+            {
+                ids[i] = data.yodoIds[i];
+                // 예전 세이브의 배열 길이가 어긋나 있을 수 있다. 짧은 쪽을
+                // 넘어가면 0으로 채운다 - 손상된 파일이 예외를 던지지 않게
+                souls[i] = i < data.yodoSouls.Length ? data.yodoSouls[i] : 0L;
+                tiers[i] = i < data.yodoTiers.Length ? data.yodoTiers[i] : 0;
+                discovered[i] = i < data.yodoDiscovered.Length ? data.yodoDiscovered[i] : 0;
+            }
+
+            ids[ids.Length - 1] = id;
+            souls[souls.Length - 1] = 0L;
+            tiers[tiers.Length - 1] = 0;
+            discovered[discovered.Length - 1] = 0;
+
+            data.yodoIds = ids;
+            data.yodoSouls = souls;
+            data.yodoTiers = tiers;
+            data.yodoDiscovered = discovered;
+        }
+
+        /**
+         * @brief 강화 레벨을 미세화 격자로 환산한다 (43단계 전용).
+         *
+         * 새 레벨 = (옛 레벨 - 1) x 계수 + 1. 값 등가다 - 옛 Lv.84의 배수와
+         * 새 Lv.665의 배수가 같다(스텝이 계수 제곱근 관계라서). 반올림 오차는
+         * 반 칸(공격력 기준 +-0.7%) 이내다.
+         *
+         * **v12 블록 안에서만 부른다.** 멱등성은 버전 게이트가 지킨다 -
+         * v13 세이브는 이 길을 다시 지나지 않으므로 두 번 곱해질 수 없다.
+         */
+        private static void ConvertLevel(SaveData data, string id, double factor)
+        {
+            if (data.upgradeIds == null || data.upgradeLevels == null) return;
+
+            for (int i = 0; i < data.upgradeIds.Length && i < data.upgradeLevels.Length; i++)
+            {
+                if (data.upgradeIds[i] != id) continue;
+
+                int old = Mathf.Max(1, data.upgradeLevels[i]);
+                data.upgradeLevels[i] = (int)Math.Round((old - 1) * factor) + 1;
+                return;
+            }
+        }
+
+        /**
+         * @brief 세이브에 없는 펫을 잠금 + Lv.1로 추가한다.
+         *
+         * EnsureTrack·EnsureSkill·EnsureEquipment와 같은 규칙이다. 이미 있으면
+         * 건드리지 않는다(멱등) - 마이그레이션이 두 번 돌 때 해금이 잠금으로
+         * 되돌아가면 보석이 사라진다.
+         */
+        private static void EnsurePet(SaveData data, string id)
+        {
+            if (data.petIds == null) data.petIds = new string[0];
+            if (data.petUnlocked == null) data.petUnlocked = new int[0];
+            if (data.petLevels == null) data.petLevels = new int[0];
+
+            for (int i = 0; i < data.petIds.Length; i++)
+                if (data.petIds[i] == id) return;
+
+            var ids = new string[data.petIds.Length + 1];
+            var unlocked = new int[ids.Length];
+            var levels = new int[ids.Length];
+
+            for (int i = 0; i < data.petIds.Length; i++)
+            {
+                ids[i] = data.petIds[i];
+                // 예전 세이브의 배열 길이가 어긋나 있을 수 있다. 짧은 쪽을
+                // 넘어가면 잠금/Lv.1로 채운다 - 손상된 파일이 예외를 던지지 않게
+                unlocked[i] = i < data.petUnlocked.Length ? data.petUnlocked[i] : 0;
+                levels[i] = i < data.petLevels.Length ? data.petLevels[i] : 1;
+            }
+
+            ids[ids.Length - 1] = id;
+            unlocked[unlocked.Length - 1] = 0;
+            levels[levels.Length - 1] = 1;
+
+            data.petIds = ids;
+            data.petUnlocked = unlocked;
+            data.petLevels = levels;
         }
 
         /**

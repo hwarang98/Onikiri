@@ -23,6 +23,7 @@ namespace Onikiri.EditorTools
         public const string Region1Path = Folder + "/Background_Region1.asset";
         public const string Region2Path = Folder + "/Background_Region2.asset";
         public const string Region3Path = Folder + "/Background_Region3.asset";
+        public const string Region4Path = Folder + "/Background_Region4.asset";
 
         private const string JapanFolder = "Assets/ThirdParty/Backgrounds/TinyPixelJapan";
         private const string AutumnFolder = "Assets/ThirdParty/Backgrounds/AutumnForest";
@@ -85,9 +86,21 @@ namespace Onikiri.EditorTools
          * 여기서는 **완전한 0을 낼 수 없다.** 끝선 바로 아래에 있는 것이 흐르는 구름이라
          * 그 높이의 색이 매 프레임 달라지기 때문이다. 하늘 장의 맨 윗줄(구름이 닿지 않는
          * 평평한 하늘)에 맞추면 남는 차이는 구름 자체이고, 그것은 이음매가 아니라 내용이다.
-         * 실측 단차 0.0339 - 눈에 보이는 기준(0.05)의 아래다.
+         *
+         * ## 2b 후속 - 계산값을 버리고 렌더 실측으로 다시 맞췄다
+         *
+         * 옛 값(#92CCD7)은 "실측 단차 0.0339"라고 적혀 있었지만 화면 실측은
+         * 0.145였다 - 9:21에서 상단 바 아래 54px이 채움인데, 그 바로 밑 아트
+         * 첫 줄의 파랑(화면 실측 103,182,208)보다 눈에 띄게 밝아 가로선이 그였다.
+         * 계산으로 낸 값이 틀렸다는 것이 아니라, **그 뒤에 여명 안개가 아트
+         * 위에만 얹히도록 재배치되면서**(24단계 안개 순서 조정) 합성 결과가
+         * 달라진 것이다. 가을(AutumnSkyTint)과 같은 교훈이다 - 채움 색은
+         * 언제나 렌더된 화면에서 나와야 한다.
+         *
+         * 값 산출: 목표 렌더색(103,182,208)을 채움 시트 자체 그라디언트 실측
+         * 계수(0.96)로 나눈 것. 결과 단차 0.05 기준 아래 - 재검은 캡처로 한다.
          */
-        private static readonly Color SpringSkyFillTint = new Color32(0x92, 0xCC, 0xD7, 0xFF);
+        private static readonly Color SpringSkyFillTint = new Color32(0x6B, 0xBD, 0xD8, 0xFF);
 
         /** 밴드 안의 하늘. 채움보다 밝다 */
         private static readonly Color SpringSkyTint = new Color32(0xD8, 0xD4, 0xD0, 0xFF);
@@ -190,6 +203,69 @@ namespace Onikiri.EditorTools
 
         private static readonly Color AutumnClear = new Color32(0x2A, 0x2C, 0x48, 0xFF);
 
+        // ---------------------------------------------------------------- 지역 4 색
+        //
+        // 요괴 소굴. 톤 아크의 끝이라 **밤(지역 3)보다 짙어야 한다** - 자줏빛
+        // 황혼 다음이 핏빛 어둠이다. 전용 팩 없이 가을숲 실루엣을 재틴트한다.
+        //
+        // 가을숲을 고른 이유: 곱연산은 원본에 없는 채널을 만들 수 없다(봄숲
+        // 주석의 "따뜻함은 곱연산으로 만들 수 없다"와 같은 산수). 적흑으로
+        // 밀려면 원본에 R이 있어야 하고, 가을숲은 팩 전체가 주황·남색이라
+        // R이 살아 있다. 봄숲(시안)은 어떤 틴트를 곱해도 붉어지지 않는다.
+        //
+        // 어두운 틴트의 함정(검은 덩어리)은 알고 쓰는 것이다 - 이 지역은
+        // 실루엣이 목적이고, 요괴·사무라이는 틴트하지 않으므로 배경이 눌린
+        // 만큼 전투가 화면에서 가장 밝다. 보스는 림 라이트가 실루엣을 가른다.
+
+        /**
+         * @brief 채움. 아트 끝선 아래 화면 색을 이어받는 자리다.
+         *
+         * 규칙은 25단계와 같다 - **렌더된 화면을 찍어 실측**으로 맞춘다. 합성
+         * 결과라 계산으로 낼 수 없는 값이다. 처음 추정치(#381E27, 적갈)는 단차
+         * 0.0379였고, 끝선 아래 실측(#251B30 부근)에 맞춘 이 값이 0.0026이다.
+         * 채움만 보면 자주색이지만 그것이 3.png 윗부분의 실제 합성색이다.
+         */
+        private static readonly Color HellSkyTint = new Color32(0x27, 0x1D, 0x33, 0xFF);
+
+        /**
+         * @brief 가장 먼 안개. 핏빛으로 물들이되 형태가 남게.
+         *
+         * 첫 값(#B8666E/#C05E66)은 화면에서 **연분홍 줄기 숲**이 됐다 - 2.png가
+         * 밝은 남색이라 절반만 눌러서는 "지옥"이 아니라 "붉은 가을"로 읽혔고,
+         * 지역 3(밤)보다 밝아 톤 아크가 거꾸로 섰다. 실기기 확인으로 눌러 내린 값이다.
+         */
+        private static readonly Color HellFarTint = new Color32(0x8A, 0x48, 0x4E, 0xFF);
+        private static readonly Color HellMidTint = new Color32(0x70, 0x3A, 0x46, 0xFF);
+
+        /**
+         * @brief 가까운 실루엣. 원본이 이미 검은 남색이라 색조만 적갈로 민다.
+         *
+         * 밝기를 더 누르지 않는 이유는 가을숲과 같다 - 원본 밝기 0.207이 이미
+         * 실루엣이고, 여기서 더 곱하면 형태가 사라진다.
+         */
+        private static readonly Color HellNearTint = new Color32(0xE8, 0xA8, 0xA8, 0xFF);
+
+        /**
+         * @brief 단풍과 지면. 핏빛 숲의 본체다.
+         *
+         * 가을숲(#CCAAB4)보다 세게 누른다. 같은 시트를 두 지역이 쓰므로 틴트가
+         * 비슷하면 "가을숲을 다시 도는" 인상이 남는다 - 주황 단풍이 검붉은
+         * 잎으로 읽힐 만큼 G·B를 죽여야 지역이 바뀐 것이 색에서 읽힌다.
+         */
+        private static readonly Color HellFoliageTint = new Color32(0x8C, 0x3E, 0x48, 0xFF);
+
+        /**
+         * @brief 버려진 신사. 요괴 소굴의 랜드마크다.
+         *
+         * 사쿠라 밤의 탑과 같은 처리(landmarkSeconds)로 드물게 지나간다. 같은
+         * 시트를 쓰지만 지역 3은 자줏빛, 여기는 핏빛 실루엣이라 다른 것으로
+         * 읽힌다 - 재탕이 아니라 "그 신사가 물들었다"는 서사가 덤으로 남는다.
+         */
+        private static readonly Color HellShrineTint = new Color32(0x84, 0x46, 0x52, 0xFF);
+
+        /** 배경이 못 덮는 곳. 핏빛 어둠의 가장 어두운 끝 */
+        private static readonly Color HellClear = new Color32(0x20, 0x10, 0x16, 0xFF);
+
         [MenuItem("Onikiri/Scene/Build Region Backgrounds")]
         public static void BuildMenu()
         {
@@ -210,8 +286,69 @@ namespace Onikiri.EditorTools
             EnsureRegion1();
             EnsureRegion2();
             EnsureRegion3();
+            EnsureRegion4();
 
             BackfillArtBottom();
+            BackfillSkyLayers();
+        }
+
+        /**
+         * @brief 하늘 채움 틴트와 지역 1 하늘 시트를 기존 애셋에 다시 민다.
+         *
+         * 씨앗(LoadOrCreate)은 애셋을 만들 때만 돌므로, 위의 틴트 상수를 고쳐도
+         * 이미 있는 애셋은 옛 값을 들고 있다 - BackfillArtBottom과 같은 처지다.
+         * 채움 틴트의 단일 출처는 이 파일의 상수이고(전부 렌더 실측값), 실측이
+         * 바뀌면 상수를 고치고 이것을 돌리는 것이 갱신 경로다.
+         *
+         * 지역 1의 하늘 장도 같이 민다 - 줄무늬를 지운 구운 사본(SpringSky)으로
+         * 바뀌었는데, 이 참조 역시 씨앗에만 적혀 있기 때문이다.
+         */
+        public static void BackfillSkyLayers()
+        {
+            var fills = new[]
+            {
+                new { Path = Region1Path, Tint = SpringSkyFillTint },
+                new { Path = Region2Path, Tint = AutumnSkyTint },
+                new { Path = Region3Path, Tint = JapanSkyFillTint },
+                new { Path = Region4Path, Tint = HellSkyTint },
+            };
+
+            int changed = 0;
+            foreach (var entry in fills)
+            {
+                var set = AssetDatabase.LoadAssetAtPath<RegionBackgroundSet>(entry.Path);
+                if (set == null || set.layers == null) continue;
+
+                bool dirty = false;
+                foreach (var layer in set.layers)
+                {
+                    if (layer == null || !layer.isSkyFill) continue;
+                    if (layer.tint == entry.Tint) continue;
+
+                    Debug.Log(string.Format("[Onikiri] {0} / {1}: 채움 틴트 {2} -> {3}",
+                        set.name, layer.name, (Color32)layer.tint, (Color32)entry.Tint));
+                    layer.tint = entry.Tint;
+                    dirty = true;
+                }
+
+                if (dirty) { EditorUtility.SetDirty(set); changed++; }
+            }
+
+            var region1 = AssetDatabase.LoadAssetAtPath<RegionBackgroundSet>(Region1Path);
+            var bakedSky = AssetDatabase.LoadAssetAtPath<Sprite>(SpringForestBuilder.SkyPath);
+            if (region1 != null && region1.layers != null && bakedSky != null)
+            {
+                foreach (var layer in region1.layers)
+                {
+                    if (layer == null || layer.name != "Sky" || layer.sprite == bakedSky) continue;
+                    Debug.Log("[Onikiri] 지역 1 하늘 장 -> 구운 사본 " + SpringForestBuilder.SkyPath);
+                    layer.sprite = bakedSky;
+                    EditorUtility.SetDirty(region1);
+                    changed++;
+                }
+            }
+
+            if (changed > 0) AssetDatabase.SaveAssets();
         }
 
         /**
@@ -226,7 +363,7 @@ namespace Onikiri.EditorTools
          */
         public static void BackfillArtBottom()
         {
-            string[] paths = { Region1Path, Region2Path, Region3Path };
+            string[] paths = { Region1Path, Region2Path, Region3Path, Region4Path };
             int changed = 0;
 
             foreach (var path in paths)
@@ -295,7 +432,10 @@ namespace Onikiri.EditorTools
                     // BackdropTextureBuilder.SkyFillPath 주석 참고
                     Layer("Sky_Fill", BackdropTextureBuilder.SkyFillPath, 0f,
                           SpringSkyFillTint, sky: true),
-                    Layer("Sky", SpringFolder + "/Background/layer_1.png", 0.12f, SpringSkyTint),
+
+                    // 원본 layer_1이 아니라 줄무늬를 지운 구운 사본이다
+                    // (SpringForestBuilder.BuildSkySheet 주석 참고)
+                    Layer("Sky", SpringForestBuilder.SkyPath, 0.12f, SpringSkyTint),
                     Layer("Mountains", SpringFolder + "/Background/layer_2.png", 0.30f, SpringFarTint),
 
                     /**
@@ -474,6 +614,53 @@ namespace Onikiri.EditorTools
 
                     // 타일셋에서 구운 스트립(AutumnGroundBuilder)
                     Layer("Ground", AutumnGroundBuilder.OutputPath, 1f, AutumnFoliageTint)
+                };
+            });
+        }
+
+        // ---------------------------------------------------------------- 지역 4 (요괴 소굴)
+
+        /**
+         * @brief 요괴 소굴. **신규 시트가 한 장도 없다** - 가을숲 실루엣 + 사쿠라 밤의
+         * 신사 + 가을 지면 스트립을 전부 재틴트로 세운다.
+         *
+         * 레이어 순서·속도는 가을숲과 같다. 그 순서는 21단계에 불투명도·밝기
+         * 실측으로 정한 것이고, 같은 시트를 쓰는 한 실측도 같다. seam도 마찬가지다 -
+         * 3=0.0007 / 2=0.0000 / 1=0.0120, 단풍은 끝 열이 투명이라 이음매 자체가 없다.
+         * 틴트는 좌우 끝에 같은 값이 곱해지므로 seam을 바꾸지 못한다.
+         *
+         * 다른 것은 색과 랜드마크뿐이다. 색이 곧 지역이다.
+         */
+        private static RegionBackgroundSet EnsureRegion4()
+        {
+            return LoadOrCreate(Region4Path, set =>
+            {
+                set.displayName = "지역 4 · 요괴 소굴";
+                set.clearColor = HellClear;
+
+                // 지면 스트립을 가을숲과 공유하므로 표면 높이도 같은 상수를 읽는다
+                set.groundSurfacePixels = AutumnGroundBuilder.SurfaceFromBottom;
+                set.backgroundPixelHeight = 180f;
+
+                set.layers = new[]
+                {
+                    // 채움은 그림 없는 면(25단계 규칙). 세로 커버는 SkyFill 시트가
+                    // 22u라 카메라(최대 19.36u)를 반복 없이 덮는다 - B-0
+                    Layer("Sky_Fill", BackdropTextureBuilder.SkyFillPath, 0f, HellSkyTint, sky: true),
+                    Layer("Mist_Far_Scroll", AutumnFolder + "/Background/3.png", 0.18f, HellFarTint),
+                    Layer("Mist_Mid", AutumnFolder + "/Background/2.png", 0.40f, HellMidTint),
+                    Layer("Silhouette", AutumnFolder + "/Background/1.png", 0.66f, HellNearTint),
+
+                    // 버려진 신사. 지역 3 탑과 같은 랜드마크 주기 계열이되 값을
+                    // 달리해 두 지역의 리듬이 같지 않게 한다
+                    Layer("Shrine", JapanFolder + "/Shrine_Single.png", 0.22f, HellShrineTint,
+                          landmarkSeconds: 110f),
+
+                    // 검붉은 단풍. 가을숲과 같은 시트, 같은 rooting(sitsOnGround)
+                    Layer("Maples", AutumnFolder + "/Trees/Trees.png", 0.88f, HellFoliageTint,
+                          onGround: true),
+
+                    Layer("Ground", AutumnGroundBuilder.OutputPath, 1f, HellFoliageTint)
                 };
             });
         }

@@ -27,7 +27,18 @@ namespace Onikiri.Progression
         public const double BaseValue = CombatBaseline.CritMultiplier;
 
         /** 레벨당 배수 */
-        public const double Step = 1.03d;
+        /**
+         * 43단계에 여덟 배 미세화됐다(값 등가 재스케일). 옛 한 레벨이 새
+         * 여덟 칸이다: step^8 = 옛 step, growth^8 = 1.15, 기준 비용은 누적
+         * 골드가 같아지는 연속체 등가값((g-1)/0.15 배). 골드와 파워의 관계가
+         * 보존되므로 밸런스는 그대로이고, 레벨 숫자만 슬레이어처럼 깊어진다 -
+         * "곧 끝난다" 느낌이 없는 수천 레벨이 이 스텝의 목적이다.
+                  * 기준 비용에는 이산 보정 x1.3이 얹혀 있다(연속체 등가값의 1.3배).
+         * 등가 수식(누적 골드 동일)은 완벽한데도 미세 칸은 지갑을 끝전까지
+         * 즉시 소진해 복리를 앞당긴다 - 실측으로 코리더 여유가 +27%까지
+         * 떠서 10곳이 밴드를 깼고, 이 보정이 앵커를 +-3%로 되돌린다.
+         */
+        public const double Step = 1.0037017d;
 
         /**
          * @brief 비용.
@@ -38,8 +49,9 @@ namespace Onikiri.Progression
          * 6.7배까지 벌어지고, 3배면 Lv.1에서 5.6배로 벌어진다. 2배가 유일하게
          * 양쪽 끝을 모두 통과한다. 10단계 보고서 참고.
          */
-        public const double BaseCost = 2d;
-        public const double CostGrowth = 1.15d;
+        /** E-3 수정: 전 축 일괄 상향 + 정수화. 규칙과 배율은 UpgradeCost가 단일 출처다 */
+        public const double BaseCost = 0.30546d * UpgradeCost.RaiseScale;
+        public const double CostGrowth = 1.0176225d;
 
         public static double ValueAtLevel(int level)
         {
@@ -48,7 +60,7 @@ namespace Onikiri.Progression
 
         public static double CostAtLevel(int level)
         {
-            return BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1));
+            return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1)));
         }
     }
 }

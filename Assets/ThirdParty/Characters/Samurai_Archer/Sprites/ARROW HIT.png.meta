@@ -58,11 +58,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -134,115 +134,172 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ARROW HIT_0
+      name: ARROW_HIT_0
       rect:
         serializedVersion: 2
-        x: 7
-        y: 6
-        width: 81
-        height: 10
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4414a2de4380f4310800000000000000
-      internalID: 1391339833291063620
+      spriteID: 0de96b9a7faca864a9b9d87ed7fe45a4
+      internalID: 687899216
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ARROW HIT_1
+      name: ARROW_HIT_1
       rect:
         serializedVersion: 2
-        x: 104
-        y: 1
-        width: 32
-        height: 10
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 48
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: fa82039d6c1f62630800000000000000
-      internalID: 3902071963512744111
+      spriteID: 38e52272c6c8d0848b9865c62f9e874e
+      internalID: -1201145095
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ARROW HIT_2
+      name: ARROW_HIT_2
       rect:
         serializedVersion: 2
-        x: 151
-        y: 6
-        width: 33
-        height: 7
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f86f723664c0d9af0800000000000000
-      internalID: -388140496433187185
+      spriteID: 7b8ce83742a4ced4e84956d8c09b786d
+      internalID: -879123003
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ARROW HIT_3
+      name: ARROW_HIT_3
       rect:
         serializedVersion: 2
-        x: 199
-        y: 5
-        width: 33
-        height: 6
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 144
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f2c002035ffa0af70800000000000000
-      internalID: 9196543906699807791
+      spriteID: 1649823d9cd1737429182593eb282f75
+      internalID: 1670457776
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ARROW HIT_4
+      name: ARROW_HIT_4
       rect:
         serializedVersion: 2
-        x: 247
-        y: 6
-        width: 81
-        height: 6
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: e2aa712d815e80540800000000000000
-      internalID: 4974477683197454894
+      spriteID: 433dbc271fc3c204e864594361940f9e
+      internalID: 1808649797
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ARROW_HIT_5
+      rect:
+        serializedVersion: 2
+        x: 240
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: e4619a5432eade447a9a3defdb3f6170
+      internalID: -1112997949
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ARROW_HIT_6
+      rect:
+        serializedVersion: 2
+        x: 288
+        y: 0
+        width: 48
+        height: 16
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 04a9a0708abb07b419e70c53f7fb29ea
+      internalID: 445656698
       vertices: []
       indices: 
       edges: []
@@ -261,11 +318,13 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ARROW HIT_0: 1391339833291063620
-      ARROW HIT_1: 3902071963512744111
-      ARROW HIT_2: -388140496433187185
-      ARROW HIT_3: 9196543906699807791
-      ARROW HIT_4: 4974477683197454894
+      ARROW_HIT_0: 687899216
+      ARROW_HIT_1: -1201145095
+      ARROW_HIT_2: -879123003
+      ARROW_HIT_3: 1670457776
+      ARROW_HIT_4: 1808649797
+      ARROW_HIT_5: -1112997949
+      ARROW_HIT_6: 445656698
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

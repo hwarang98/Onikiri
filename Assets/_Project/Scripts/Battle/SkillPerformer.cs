@@ -438,49 +438,35 @@ namespace Onikiri.Battle
         public bool LastCastMissed { get { return lastCastMissed; } }
 
         /**
-         * @brief 전방 일렬. 사무라이 앞 range 안의 살아 있는 요괴 전부.
+         * @brief 세로 창의 중심. **사무라이의 그려진 중심이지 발이 아니다.**
          *
-         * 세로 폭을 함께 보는 이유는 떠 있는 도깨비불이다. 그려진 중심이 지면보다
-         * 1u 위에 있어서, 세로를 안 보면 관통이 지면의 요괴만 베고 도깨비불은
-         * 지나친다 - 화면에서는 "가끔 안 맞는다"로만 보인다.
+         * 관통·광역이 쓰고, 45c부터 영체(SpiritSummon)도 같은 값을 빌려 간다 -
+         * 영체는 어깨 뒤 위쪽에 떠 있어서 자기 중심으로 창을 잡으면 1u 높은
+         * 곳을 훑고, 지면의 요괴를 통째로 지나친다.
          */
+        public float LaneOriginY
+        {
+            get
+            {
+                return samuraiRenderer != null
+                    ? samuraiRenderer.bounds.center.y
+                    : combat.transform.position.y;
+            }
+        }
+
+        /** 전방 일렬. 산수는 PlayerCombat이 갖고 있다 - 손님이 둘이 됐다 */
         private int DeliverLane(ActiveCast cast, BigDouble damage, float range, float height)
         {
-            float originX = combat.transform.position.x;
-            float originY = samuraiRenderer != null ? samuraiRenderer.bounds.center.y : combat.transform.position.y;
-
-            int hits = 0;
-            var enemies = combat.ActiveEnemies;
-            for (int i = 0; i < enemies.Count; i++)
-            {
-                var enemy = enemies[i];
-                if (enemy == null || !enemy.IsTargetable) continue;
-
-                var point = enemy.HitPoint;
-                float dx = point.x - originX;
-                if (dx < -0.3f || dx > range) continue;
-                if (Mathf.Abs(point.y - originY) > height * 0.5f) continue;
-
-                if (combat.DeliverSkillHit(enemy, damage, cast.tint,
-                                           cast.choreography.numberSizeMultiple)) hits++;
-            }
-            return hits;
+            return combat.DeliverSkillLane(combat.transform.position.x, LaneOriginY,
+                                           range, height, damage, cast.tint,
+                                           cast.choreography.numberSizeMultiple);
         }
 
         /** 화면 광역. 살아 있는 요괴 전부 */
         private int DeliverAll(ActiveCast cast, BigDouble damage)
         {
-            int hits = 0;
-            var enemies = combat.ActiveEnemies;
-            for (int i = 0; i < enemies.Count; i++)
-            {
-                var enemy = enemies[i];
-                if (enemy == null || !enemy.IsTargetable) continue;
-
-                if (combat.DeliverSkillHit(enemy, damage, cast.tint,
-                                           cast.choreography.numberSizeMultiple)) hits++;
-            }
-            return hits;
+            return combat.DeliverSkillAll(damage, cast.tint,
+                                          cast.choreography.numberSizeMultiple);
         }
 
         // ---------------------------------------------------------------- 참격
@@ -520,9 +506,32 @@ namespace Onikiri.Battle
                 originY + c.slashHeightOffset,
                 0f);
 
+            SpawnSlashAt(c.slashFrames, c.slashFrameRate, anchor,
+                         c.slashAngle, c.slashScale, mirror);
+        }
+
+        /**
+         * @brief 참격 한 장을 **자리를 지정해** 띄운다. 풀은 오의 것을 그대로 쓴다.
+         *
+         * 영체(SpiritSummon)가 부르는 입구다. 45단계까지 영체는 이 게임의 연출
+         * 시스템을 하나도 타지 않았다 - 반투명 스프라이트 하나와 데미지 숫자가
+         * 전부였고, 참격·플래시·히트스톱·흔들림이 죄다 없었다.
+         *
+         * 그 배선을 여기로 끌어오는 것이 프리팹과 풀을 두 벌로 만드는 것보다
+         * 싸다. 참격 프리팹·프리웜·해제 콜백이 한 곳에 남고, 화면에 참격이 몇
+         * 장 떠 있는지도 한 숫자로 세어진다(SlashPoolGrowthCount) - 영체가
+         * 자기 풀을 따로 가지면 그 진단이 둘로 갈라진다.
+         *
+         * 자리를 밖에서 받는 것이 SpawnSlash와의 유일한 차이다. 저쪽은 사무라이
+         * 기준으로 계산하는데, 영체는 사무라이 뒤 위쪽에 따로 서 있다.
+         */
+        public void SpawnSlashAt(Sprite[] frames, float fps, Vector3 anchor,
+                                 float angle, float scale, bool flip)
+        {
+            if (slashPool == null || frames == null || frames.Length == 0) return;
+
             var slash = slashPool.Get();
-            slash.Play(c.slashFrames, c.slashFrameRate, anchor,
-                       c.slashAngle, c.slashScale, mirror, ReleaseSlash);
+            slash.Play(frames, fps, anchor, angle, scale, flip, ReleaseSlash);
         }
 
         private void ReleaseSlash(PackSlash slash)
@@ -625,10 +634,28 @@ namespace Onikiri.Battle
 
             var position = combat.transform.position;
 
+            SpawnAfterimageAt(samuraiRenderer.sprite,
+                              new Vector3(cast.baseX + offset, position.y, position.z),
+                              samuraiRenderer.flipX, tint, SortingOrders.Player - 1, 1f);
+        }
+
+        /**
+         * @brief 잔상 한 장을 자리·층·크기를 지정해 남긴다. 영체의 강림이 쓴다.
+         *
+         * 층과 크기를 밖에서 받는 이유는 부르는 쪽이 사무라이가 아닐 수 있기
+         * 때문이다 - 영체는 Spirit(48) 층에 서고 자루에 따라 몸이 커진다.
+         * 풀에서 꺼낸 인스턴스는 앞사람이 쓰던 크기를 그대로 들고 있으므로
+         * **매번 다시 써야 한다** - 안 쓰면 큰 영체가 한 번 지나간 뒤 사무라이
+         * 잔상까지 커진다.
+         */
+        public void SpawnAfterimageAt(Sprite sprite, Vector3 position, bool flip,
+                                      Color tint, int sortingOrder, float scale)
+        {
+            if (afterimagePool == null || sprite == null) return;
+
             var ghost = afterimagePool.Get();
-            ghost.Play(samuraiRenderer.sprite,
-                       new Vector3(cast.baseX + offset, position.y, position.z),
-                       samuraiRenderer.flipX, tint, ReleaseAfterimage);
+            ghost.transform.localScale = Vector3.one * (scale > 0f ? scale : 1f);
+            ghost.Play(sprite, position, flip, tint, sortingOrder, ReleaseAfterimage);
         }
 
         private void ReleaseAfterimage(Afterimage ghost)

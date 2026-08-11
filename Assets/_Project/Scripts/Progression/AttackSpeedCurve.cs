@@ -31,7 +31,8 @@ namespace Onikiri.Progression
         /** 레벨당 배수. 공격력의 1.12보다 낮은 것은 의도적이다 */
         public const double Step = 1.04d;
 
-        public const double BaseCost = 4d;
+        /** E-3 수정: 전 축 일괄 상향 + 정수화. 규칙과 배율은 UpgradeCost가 단일 출처다 */
+        public const double BaseCost = 4d * UpgradeCost.RaiseScale;
         public const double CostGrowth = 1.15d;
 
         /** 사무라이 공격 클립의 프레임 수와 프레임레이트. BattleContentBuilder가 쓰는 값 */
@@ -69,7 +70,7 @@ namespace Onikiri.Progression
 
         public static double CostAtLevel(int level)
         {
-            return BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1));
+            return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1)));
         }
 
         /**

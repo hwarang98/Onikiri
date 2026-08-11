@@ -104,6 +104,36 @@ namespace Onikiri.EditorTools
                 foreach (var grade in slot.GradeNames) yield return grade;
             }
 
+            // 펫 이름·역할도 코드(PetCatalog)에 있다. 카드와 전투 화면에 선다
+            foreach (var pet in Onikiri.Progression.PetCatalog.Pets)
+            {
+                yield return pet.Name;
+                yield return pet.Role;
+            }
+
+            // 요도 이름도 코드(YodoCatalog)에 있다 (44단계). 혼·요도·대요괴
+            // 이름 셋이 전부 화면에 선다 - 도감의 잠긴 줄이 "○○ 처치 시
+            // 해금"으로 보스 이름을 적으므로, 보스 애셋에서 오는 사본이 아니라
+            // 이쪽도 걷어야 한다(둘이 같은 글자라 아틀라스는 안 커진다)
+            foreach (var blade in Onikiri.Progression.YodoCatalog.Blades)
+            {
+                yield return blade.SoulName;
+                yield return blade.BladeName;
+                yield return blade.BossName;
+
+                // 영체 이름(45단계). 소환 순간에 이름 플래시로 화면 한가운데
+                // 뜨므로, 빠지면 정확히 그 연출이 ㅁㅁㅁ이 된다
+                yield return blade.SpiritName;
+            }
+            yield return Onikiri.Progression.YodoCatalog.OnikiriName;
+
+            // 전직 티어 이름도 코드(EvolutionCatalog)에 있다 (33단계). 티어
+            // 이름은 진화 카드의 제목 자리에 뜬다 - "진 데몬사무라이"가 ㅁ으로
+            // 깨지는 화면은 정확히 축하해야 할 순간에 나온다
+            yield return Onikiri.Progression.EvolutionCatalog.BaseName;
+            foreach (var tier in Onikiri.Progression.EvolutionCatalog.Tiers)
+                yield return tier.Name;
+
             foreach (var guid in AssetDatabase.FindAssets("t:BossConfig", DataFolders))
             {
                 var config = AssetDatabase.LoadAssetAtPath<Onikiri.Battle.BossConfig>(

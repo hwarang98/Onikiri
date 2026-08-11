@@ -188,8 +188,11 @@ namespace Onikiri.Battle
             // 적은 오른쪽에서 와서 **왼쪽의 플레이어를 바라본다.** 대부분의 팩이
             // 오른쪽을 보고 그려져 있어 뒤집어야 하지만, 그것은 팩의 성질이지
             // 규칙이 아니다 - 처형인 팩은 왼쪽을 보고 그려져 있어서 뒤집으면
-            // 플레이어에게 등을 돌린다
-            spriteRenderer.flipX = def == null || !def.artFacesLeft;
+            // 플레이어에게 등을 돌린다.
+            //
+            // 규칙은 Facing이 들고 있다. 아군 쪽 식과 느낌표 하나 차이라
+            // 값으로 적으면 반드시 한 번은 틀린다(Facing 머리 주석)
+            spriteRenderer.flipX = def == null || Facing.Enemy(def.artFacesLeft);
 
             transform.position = new Vector3(spawnX, RestingY(), 0f);
             PlayResting();

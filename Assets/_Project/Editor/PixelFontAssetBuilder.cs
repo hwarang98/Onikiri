@@ -100,6 +100,12 @@ namespace Onikiri.EditorTools
             // 받아쓸 뿐이라, 구운 크기와 그리는 크기가 어긋날 여지가 없다.
             Build(GalmuriSourcePath, "Galmuri11", GalmuriSamplingSize, charset);
 
+            // 캡션 아틀라스 (38단계 폰트 위계). 같은 서체를 3배(33pt)로 한 벌 더
+            // 굽는다 - 44 아틀라스를 0.75배로 그리는 것은 Point 샘플링에서 글자가
+            // 깨지므로, 작은 크기는 작은 아틀라스와 1:1이어야 한다
+            Build(GalmuriSourcePath, "Galmuri11 Caption",
+                  Onikiri.UI.PixelFontSizes.GalmuriCaptionSize, charset);
+
             Build(ThaleahSourcePath, "ThaleahFat", ThaleahSamplingSize, NumberCharset);
 
             AssetDatabase.SaveAssets();

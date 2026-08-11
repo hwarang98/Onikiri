@@ -96,6 +96,8 @@ namespace Onikiri.UI
                 return;
             }
 
+            if (DrawIfLocked(spec)) return;
+
             double progress = quests.ProgressOf(kind, index);
             int claimable = quests.ClaimableCount(kind, index);
             bool claimed = quests.IsClaimed(kind, index);
@@ -154,6 +156,45 @@ namespace Onikiri.UI
 
             if (doneBadge != null && doneBadge.activeSelf != claimed)
                 doneBadge.SetActive(claimed);
+        }
+
+        /**
+         * @brief 아직 기능이 없는 지표의 일일 칸을 잠금 표시로 대체한다 (39단계).
+         *
+         * "오의 20회 시전"은 오의가 열리는 Lv.10 전에는 **구조적으로 못 깨는
+         * 칸**이다. 신규 플레이어의 일일 목록에 영원히 0/20인 줄이 서 있으면
+         * "일일은 다 못 채우는 것"으로 학습된다 - LockedTab이 잠긴 기능을 밝은
+         * 빈 화면으로 두지 않는 것과 같은 이유로, 여기도 조건을 정직하게 적는다.
+         *
+         * 행을 통째로 숨기지 않는 이유도 LockedTab과 같다 - "앞으로 무엇이
+         * 열리는가"가 계속할 이유의 절반이고, 자리가 사라지면 오의를 열었을 때
+         * 일일 보상이 **늘어난 것**을 알 방법이 없다.
+         *
+         * 문구는 대장간의 "미개방"을 재사용한다 - 이미 아틀라스에 있는 글자다.
+         */
+        private bool DrawIfLocked(QuestSpec spec)
+        {
+            if (kind != QuestKind.Daily || spec.Metric != QuestMetric.SkillCasts) return false;
+
+            var character = CharacterLevel.Instance;
+            int needed = SkillCatalog.PanelUnlockLevel;
+            if (character == null || character.Level >= needed) return false;
+
+            if (title != null) { title.text = "오의 미개방"; title.color = dimText; }
+            if (progressLabel != null) { progressLabel.text = "Lv." + needed; progressLabel.color = dimText; }
+            if (rewardLabel != null) rewardLabel.text = RewardText(spec);
+
+            if (progressFill != null)
+            {
+                progressFill.anchorMin = new Vector2(0f, 0f);
+                progressFill.anchorMax = new Vector2(0f, 1f);
+                progressFill.offsetMin = Vector2.zero;
+                progressFill.offsetMax = Vector2.zero;
+            }
+
+            if (claimButton != null) claimButton.gameObject.SetActive(false);
+            if (doneBadge != null) doneBadge.SetActive(false);
+            return true;
         }
 
         /**

@@ -61,8 +61,44 @@ namespace Onikiri.Progression
 
         private bool[] achievementClaimed = new bool[QuestCatalog.AchievementCount];
 
-        /** 마지막 일일 리셋 기준 시각 (UTC). 자정 경계 비교의 기준 */
+        /** 마지막 일일 리셋 기준 시각 (UTC). 퀘스트일 경계 비교의 기준 */
         private DateTime lastDailyReset = DateTime.MinValue;
+
+        // ---------------------------------------------------------------- 퀘스트일
+
+        /**
+         * @brief 일일 리셋 시각 - **KST 새벽 4시** (39단계, UTC 자정에서 이동).
+         *
+         * UTC 자정은 한국의 오전 9시다. 아침에 켠 플레이어가 어제 밤에 하다 만
+         * 일일 퀘스트를 보고, 출근길에 그것이 눈앞에서 리셋된다 - 하루의 경계가
+         * 생활의 경계와 어긋나 있었다. 새벽 4시는 그 반대다: 자정 넘어서까지 한
+         * 판은 "오늘"에 남고, 아침에 켜면 새 하루가 시작돼 있다.
+         *
+         * 고정 오프셋(UTC+9)이지 기기 시간대가 아니다. 로컬 자정을 쓰면 시간대를
+         * 넘나드는 플레이어에게 리셋이 두 번 오거나 건너뛴다는 원칙은 그대로다 -
+         * 기준 시각만 한국 생활권에 맞춘 것이다. 서버가 없어 기기 시계 조작을
+         * 막지 못하는 것도 그대로다(수익화 단계의 몫).
+         */
+        public const int ResetHourKst = 4;
+        private const int KstUtcOffsetHours = 9;
+
+        /**
+         * @brief 이 시각이 속한 "퀘스트일". KST 새벽 4시마다 하루가 넘어간다.
+         *
+         * KST 04:00 = UTC 전날 19:00이므로, UTC에 (9-4)=5시간을 더한 날짜가
+         * 곧 퀘스트일이다. 정적 순수 함수인 이유는 테스트가 씬 없이 경계를
+         * 검사하기 때문이다(QuestTests).
+         */
+        public static DateTime QuestDayOf(DateTime utc)
+        {
+            return utc.AddHours(KstUtcOffsetHours - ResetHourKst).Date;
+        }
+
+        /** 다음 리셋의 UTC 시각. 퀘스트일 경계는 UTC (퀘스트일 + 19:00)이다 */
+        public static DateTime NextResetUtc(DateTime utcNow)
+        {
+            return QuestDayOf(utcNow).AddDays(1).AddHours(-(KstUtcOffsetHours - ResetHourKst));
+        }
 
         private void Awake()
         {
@@ -96,10 +132,8 @@ namespace Onikiri.Progression
         // ---------------------------------------------------------------- 일일 리셋
 
         /**
-         * @brief 날짜가 넘어갔으면 오늘치를 비운다.
-         *
-         * 방치 보상과 같은 방식으로 **UTC 자정**을 경계로 쓴다(IdleIncome). 로컬
-         * 자정을 쓰면 시간대를 넘나드는 플레이어에게 리셋이 두 번 오거나 건너뛴다.
+         * @brief 퀘스트일이 넘어갔으면 오늘치를 비운다. 경계는 KST 새벽 4시다
+         * (QuestDayOf 주석 참고).
          *
          * ⚠️ **기기 시간 조작은 막지 않는다.** 서버가 없으므로 UtcNow를 믿는 것
          * 외에 방법이 없고, 폰 시계를 돌리면 일일 퀘스트를 반복해서 받을 수 있다.
@@ -108,12 +142,23 @@ namespace Onikiri.Progression
          *
          * 며칠이 지났든 **한 번만** 리셋한다. 이틀 치를 주는 것이 아니라 오늘 것을
          * 새로 여는 것이 일일 퀘스트다.
+         *
+         * ## 예전 세이브와의 경계 (39단계 이동)
+         *
+         * 예전 필드에는 UTC 자정으로 자른 날짜가 들어 있다. 그 값을 그대로
+         * QuestDayOf에 넣으면 자정+5시간이 같은 날짜라 **그 날의 퀘스트일**이
+         * 되는데, 이는 항상 실제 마지막 리셋의 퀘스트일과 같거나 이르다 -
+         * 그래서 리셋이 **건너뛰는 경로는 없다.** 마지막 저장이 UTC 19시 이후였던
+         * 세이브만 로드 직후 리셋이 한 번 더 오는데, 그 시각은 새 규칙에서 이미
+         * 새 퀘스트일(KST 새벽 4시 경과)이므로 이중이 아니라 경계 이동이다.
+         * 세이브 필드는 그대로다 - 이후 저장부터 전체 시각이 들어간다.
          */
         public void RollDailyIfNeeded(DateTime utcNow)
         {
-            if (lastDailyReset != DateTime.MinValue && utcNow.Date <= lastDailyReset.Date) return;
+            if (lastDailyReset != DateTime.MinValue
+                && QuestDayOf(utcNow) <= QuestDayOf(lastDailyReset)) return;
 
-            lastDailyReset = utcNow.Date;
+            lastDailyReset = utcNow;
 
             todayMobKills = 0d;
             todayBossKills = 0d;
@@ -126,11 +171,10 @@ namespace Onikiri.Progression
             Raise();
         }
 
-        /** 다음 UTC 자정까지 남은 시간. 화면의 타이머가 읽는다 */
+        /** 다음 리셋(KST 새벽 4시)까지 남은 시간. 화면의 타이머가 읽는다 */
         public TimeSpan UntilDailyReset(DateTime utcNow)
         {
-            var next = utcNow.Date.AddDays(1);
-            var left = next - utcNow;
+            var left = NextResetUtc(utcNow) - utcNow;
             return left < TimeSpan.Zero ? TimeSpan.Zero : left;
         }
 
@@ -188,7 +232,10 @@ namespace Onikiri.Progression
             switch (metric)
             {
                 case QuestMetric.StageReached:
-                    return stage != null ? stage.Stage : 1d;
+                    // "도달"은 최전선이다(37단계 재선택). 현재 스테이지를 읽으면
+                    // 클리어한 지역으로 되돌아간 순간 달성했던 도달 업적이
+                    // 화면에서 미달성으로 되돌아간다
+                    return stage != null ? stage.MaxStageReached : 1d;
 
                 case QuestMetric.LevelReached:
                     return character != null ? character.Level : 1d;
@@ -355,8 +402,10 @@ namespace Onikiri.Progression
             // **받는 순간의 스테이지**로 환산한다. 업적마다 기준 스테이지를 적어
             // 두는 방법도 있었는데, 추정이 빗나가면 크기가 통째로 틀어진다 -
             // 시뮬레이션에서 st11 여유가 2.79에서 18.73으로 튀어 잡았다.
-            // QuestCatalog.Achievement 표 주석 참고
-            int at = stage != null ? stage.Stage : 1;
+            // QuestCatalog.Achievement 표 주석 참고.
+            // 재선택(37단계) 뒤로는 최전선이다 - 클리어한 지역에 내려가 받으면
+            // 보상이 쪼그라드는 것도, 그 반대로 부풀는 것도 없어야 한다
+            int at = stage != null ? stage.MaxStageReached : 1;
 
             var gold = QuestCatalog.AchievementGold(spec, mobGold, at);
             if (gold > BigDouble.Zero)

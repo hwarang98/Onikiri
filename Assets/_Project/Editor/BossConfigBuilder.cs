@@ -31,9 +31,13 @@ namespace Onikiri.EditorTools
 
         /** 지역 2 피날레 */
         public const string ExecutionerPath = ConfigFolder + "/Boss_Executioner.asset";
+
+        /** 지역 3 피날레. 시트는 YokaiSheetBaker가 림 라이트를 구워 만든다 */
+        public const string RedEyeYokaiPath = ConfigFolder + "/Boss_RedEyeYokai.asset";
         public const string Region1Path = ConfigFolder + "/Region_1.asset";
         public const string Region2Path = ConfigFolder + "/Region_2.asset";
         public const string Region3Path = ConfigFolder + "/Region_3.asset";
+        public const string Region4Path = ConfigFolder + "/Region_4.asset";
         public const string RosterPath = ConfigFolder + "/BossRoster.asset";
 
         private const string DemonSpriteFolder = "Assets/ThirdParty/Characters/Demon_Samurai/Sprites";
@@ -53,9 +57,23 @@ namespace Onikiri.EditorTools
         {
             EnsureFolder(ConfigFolder);
 
+            /**
+             * @brief Demon_Samurai 팩 아트 = 화면 이름 **"붉은눈 요괴"**. 지역 3 피날레.
+             *
+             * ## 애셋 파일명과 화면 이름이 다르다 (35단계 후속)
+             *
+             * 이 config는 12단계부터 "다크 사무라이"라는 이름으로 살았는데, 35단계에
+             * Inimig(9) 보스가 들어오면서 이름이 서로 뒤바뀌어 있었다는 것이 드러났다 -
+             * 화면에서 **갓 쓰고 검은 도포를 입은 Inimig(9) 쪽이 "다크 사무라이"로
+             * 읽히고**, 이쪽 아트는 붉은 오니 가면에 노란 안광이라 "붉은눈 요괴"가
+             * 어울린다. 사용자가 화면을 보고 확정했다.
+             *
+             * 파일명(Boss_DarkSamurai)은 GUID 참조 때문에 그대로 둔다 - 파일명은
+             * 아트 출처(Demon_Samurai 팩)를 가리키는 것으로 읽을 것.
+             */
             var darkSamurai = LoadOrCreate<BossConfig>(DarkSamuraiPath, config =>
             {
-                config.displayName = "다크 사무라이";
+                config.displayName = "붉은눈 요괴";
                 config.kind = BossConfig.ArtKind.Sheets;
 
                 // 지역 피날레만 전체 연출을 쓴다. 5의 배수마다 돌던 것을 여기로
@@ -86,7 +104,7 @@ namespace Onikiri.EditorTools
 
                 // 21단계에 챕터 관문에서 **지역 피날레로 승격**했다. 라인업이
                 // 지역마다 다른 피날레를 세우는 쪽으로 확정되면서(랜턴 -> 처형인
-                // -> 다크사무라이 -> 요괴), 지역 1의 얼굴이 이쪽이 됐다.
+                // -> 요괴 -> 다크사무라이), 지역 1의 얼굴이 이쪽이 됐다.
                 //
                 // 그래서 전체 연출을 켠다. 피날레만 암전을 쓰는 규칙은 그대로다
                 config.fullIntro = true;
@@ -175,7 +193,7 @@ namespace Onikiri.EditorTools
              * 지역 2. 21단계에 배경(가을숲)이 준비되면서 생겼다.
              *
              * 피날레가 처형인이다. 지역마다 다른 얼굴이 서는 것이 라인업의
-             * 요점이고(랜턴 -> 처형인 -> 다크사무라이 -> 요괴), 배경만 바뀌고
+             * 요점이고(랜턴 -> 처형인 -> 요괴 -> 다크사무라이), 배경만 바뀌고
              * 보스가 같으면 "같은 곳을 다시 도는" 인상이 남는다.
              */
             var region2 = LoadOrCreate<RegionConfig>(Region2Path, config =>
@@ -189,24 +207,72 @@ namespace Onikiri.EditorTools
             });
 
             /**
+             * @brief 지역 3 피날레 — 붉은눈 요괴.
+             *
+             * 다른 시트형 둘과 달리 원본이 PNG 시트가 아니라 잡몹 팩의 aseprite다
+             * (Inimig 9 colo 2 - 유일하게 안 쓰이던 대형 개체). YokaiSheetBaker가
+             * 클립을 림 라이트와 2배 확대까지 구워 PNG 시트로 만들고, 여기부터는
+             * 처형인과 같은 경로다.
+             *
+             * 굽기가 먼저다. 씨앗이 시트를 참조로 집는데, 첫 실행에서 시트가 아직
+             * 없으면 참조가 빈 채로 굳는다.
+             */
+            bool yokaiBaked = YokaiSheetBaker.BakeAll();
+
+            // 화면 이름은 **"다크 사무라이"**다. 갓 쓰고 검은 도포를 입은 그림자
+            // 사무라이라 화면에서 그렇게 읽힌다(사용자 확정). 파일명(RedEyeYokai)은
+            // 아트의 붉은 눈에서 왔고 GUID 참조 때문에 그대로 둔다
+            var yokai = LoadOrCreate<BossConfig>(RedEyeYokaiPath, config =>
+            {
+                config.displayName = "다크 사무라이";
+                config.kind = BossConfig.ArtKind.Sheets;
+                config.fullIntro = true;
+
+                config.idleSheet = Sheet(YokaiSheetBaker.IdlePath);
+                config.walkSheet = Sheet(YokaiSheetBaker.WalkPath);
+                config.hurtSheet = Sheet(YokaiSheetBaker.HurtPath);
+                config.deathSheet = Sheet(YokaiSheetBaker.DeathPath);
+                config.attackSheet = Sheet(YokaiSheetBaker.AttackPath);
+
+                config.cellWidth = YokaiSheetBaker.CellWidth;
+                config.cellHeight = YokaiSheetBaker.CellHeight;
+
+                // 자동 측정이 덮어쓴다. 폴백일 뿐이다
+                config.feetPadding = 0;
+
+                config.frameRate = 12f;
+                config.moveSpeed = 0.85f;
+            });
+
+            /**
+             * 셀 크기는 굽기 결과를 따라간다. 다른 config의 셀은 사람이 실측한
+             * 값이라 덮어쓰지 않지만, 이 시트는 베이커가 만드는 생성물이라 셀도
+             * 베이커가 말하는 것이 맞다 - 어긋난 채 두면 SliceGrid가 나누어
+             * 떨어지지 않아 빌드가 멈춘다.
+             */
+            if (yokaiBaked && yokai != null &&
+                (yokai.cellWidth != YokaiSheetBaker.CellWidth ||
+                 yokai.cellHeight != YokaiSheetBaker.CellHeight))
+            {
+                yokai.cellWidth = YokaiSheetBaker.CellWidth;
+                yokai.cellHeight = YokaiSheetBaker.CellHeight;
+                EditorUtility.SetDirty(yokai);
+                Debug.Log(string.Format("[Onikiri] Boss_RedEyeYokai 셀 -> {0}x{1} (베이커 실측)",
+                    yokai.cellWidth, yokai.cellHeight));
+            }
+
+            /**
              * @brief 지역 3. 24단계에 톤 아크(봄 여명 -> 가을 -> 자줏빛 밤)를 확정하며 생겼다.
              *
              * 자줏빛 밤 배경이 지역 3으로 내려왔는데, 그 배경이 화면에 뜨려면 지역이
              * 로스터에 있어야 한다 - `RegionForStage`는 마지막 지역을 반복하므로,
              * 지역 3이 없으면 21스테이지 이후로도 가을숲이 계속된다.
              *
-             * ## 피날레를 비워두려다 채웠다
+             * ## 피날레는 붉은눈 요괴다 (Demon_Samurai 아트, 35단계 후속에서 확정)
              *
-             * 배경만 확정하고 보스는 다음 스텝으로 미룰 생각이었다. `BossRosterTests`가
-             * 막았다 - **마지막 지역의 배치가 무한히 반복되므로**, 여기가 비면 30스테이지
-             * 이후 전체에서 피날레가 사라진다. 후반이 정예 관문만 도는 화면이 된다.
-             *
-             * 그래서 라인업이 이미 정해둔 자리를 채운다(랜턴 -> 처형인 -> **다크 사무라이**
-             * -> 요괴). 이 config는 12단계부터 있었고 21단계에 챕터에서 내려온 뒤로 아무도
-             * 쓰지 않고 있었다 - 원래 여기 설 놈이다.
-             *
-             * 배치 값(체력 배수·등장 연출 다듬기·전용 배경 정합)은 지역 3 콘텐츠 스텝의
-             * 몫으로 남는다. 여기서 하는 것은 **자리를 비워두지 않는 것**뿐이다.
+             * 라인업: 랜턴 -> 처형인 -> **붉은눈 요괴** -> 다크사무라이. 이름과
+             * 아트의 대응은 위 두 config 주석 참고 - 배치는 처음(35단계 초판)과
+             * 같고 화면 이름만 서로 바뀌었다.
              */
             var region3 = LoadOrCreate<RegionConfig>(Region3Path, config =>
             {
@@ -227,19 +293,59 @@ namespace Onikiri.EditorTools
                 Debug.Log("[Onikiri] Region_3 피날레 채움 -> " + darkSamurai.displayName);
             }
 
+            /**
+             * 지역 4. 톤 아크의 끝 - 요괴 소굴이고, 피날레는 **다크 사무라이**
+             * (Inimig 9 아트, 림 라이트 구움)다. 마지막 지역의 배치는 무한히
+             * 반복되므로 가장 어두운 실루엣이 반복 구간의 주인이 된다 - 림
+             * 라이트가 이 배경을 위해 구워졌다.
+             *
+             * 배경 참조는 여기서 채우지 않는다. 지역 1~3과 같은 규칙으로
+             * BattleStageBuilder.WireRegionSwitcher가 순서대로 물린다.
+             */
+            var region4 = LoadOrCreate<RegionConfig>(Region4Path, config =>
+            {
+                config.displayName = "지역 4";
+                config.stageCount = BossCurve.RegionLength;
+                config.chapterEvery = BossCurve.ChapterEvery;
+                config.chapterBoss = elite;
+                config.finaleBoss = yokai;
+                config.normalBossOverride = null;
+            });
+
+            if (region4 != null && region4.finaleBoss == null)
+            {
+                region4.finaleBoss = yokai;
+                EditorUtility.SetDirty(region4);
+                Debug.Log("[Onikiri] Region_4 피날레 채움 -> " + yokai.displayName);
+            }
+
             var roster = LoadOrCreate<BossRoster>(RosterPath, config =>
             {
-                config.regions = new[] { region, region2, region3 };
+                config.regions = new[] { region, region2, region3, region4 };
             });
 
             // 로스터는 이미 있으면 건드리지 않는 애셋이라, 지역이 늘어도 씨앗이
             // 반영되지 않는다. 뒤에 붙는 것만 채운다 - 순서를 바꾸거나 지우지는
             // 않으므로 손으로 배치한 것을 덮어쓰지 않는다
-            if (AppendRegion(roster, region3)) AssetDatabase.SaveAssets();
+            bool rosterGrew = AppendRegion(roster, region3);
+            rosterGrew |= AppendRegion(roster, region4);
+            if (rosterGrew) AssetDatabase.SaveAssets();
 
             int backfilled = 0;
             if (BackfillWalkSheet(darkSamurai, DemonSpriteFolder + "/RUN.png")) backfilled++;
             if (BackfillWalkSheet(executioner, ExecutionerSpriteFolder + "/WALK.png")) backfilled++;
+
+            // 44단계 요도. **지역 피날레 넷만** 혼을 남긴다 - 정예는 네 지역이
+            // 같은 애셋을 공유하므로 고유한 혼을 적을 수 없다(YodoCatalog 주석).
+            //
+            // 이름이 교차하는 자리를 그대로 잇는다: Boss_DarkSamurai.asset의
+            // 화면 이름이 "붉은눈 요괴"(적안), Boss_RedEyeYokai.asset이
+            // "다크 사무라이"(흑야)다. 이 두 줄을 뒤집으면 등롱을 베고 흑야의
+            // 혼이 나오는데, YodoTests.SoulSchedule_MatchesTheRoster가 잡는다
+            if (BackfillSoulId(lantern, YodoCatalog.LanternId)) backfilled++;
+            if (BackfillSoulId(executioner, YodoCatalog.ExecutionerId)) backfilled++;
+            if (BackfillSoulId(darkSamurai, YodoCatalog.RedEyeId)) backfilled++;
+            if (BackfillSoulId(yokai, YodoCatalog.DarkSamuraiId)) backfilled++;
 
             // 저장하지 않으면 SetDirty가 다음 리로드에 날아가고, 채움이 매 빌드마다
             // 다시 돈다. "한 번만 하는 일"이라고 로그에 적어놓고 매번 도는 것은
@@ -294,6 +400,28 @@ namespace Onikiri.EditorTools
             config.walkSheet = sheet;
             EditorUtility.SetDirty(config);
             Debug.Log("[Onikiri] " + config.name + ": walkSheet 채움 -> " + sheetPath);
+            return true;
+        }
+
+        /**
+         * @brief 이 보스가 남길 혼을 채운다 (44단계). **비어 있을 때만.**
+         *
+         * BackfillWalkSheet와 같은 규칙이다. 손으로 비워둔 것과 구분이 안
+         * 되는 것은 사실이지만, 이 칸의 빈 값은 "혼을 안 남긴다"는 44단계
+         * 이전의 상태이지 누가 고른 설정이 아니다.
+         *
+         * 채우는 곳이 여기여야 하는 이유는 애셋이 단일 출처이기 때문이다.
+         * 드랍 판정은 스테이지가 아니라 이 필드를 읽으므로(42단계 세계
+         * 순환에서 스테이지 유도는 어긋난다), 애셋이 지워졌다 다시 만들어질
+         * 때 이 값도 함께 살아나야 한다.
+         */
+        private static bool BackfillSoulId(BossConfig config, string soulId)
+        {
+            if (config == null || !string.IsNullOrEmpty(config.soulId)) return false;
+
+            config.soulId = soulId;
+            EditorUtility.SetDirty(config);
+            Debug.Log("[Onikiri] " + config.name + ": soulId 채움 -> " + soulId);
             return true;
         }
 

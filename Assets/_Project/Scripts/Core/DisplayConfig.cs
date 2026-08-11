@@ -30,8 +30,19 @@ namespace Onikiri.Core
         public const int ReferenceWidth = 216;
         public const int ReferenceHeight = 384;
 
-        /** 사양서의 화면 세로 분할. 캔버스 기준 아래에서 위 방향 */
-        public const float BottomTabBarTop = 0.10f;
+        /**
+         * @brief 화면 세로 분할. 캔버스 기준 아래에서 위 방향.
+         *
+         * 탭바는 사양서의 10%에서 7.5%로 줄었다(41단계). 192px 탭은 아이콘
+         * 64 + 캡션을 넣고도 위아래가 남는 두께였고, 매 화면에 상주하는
+         * 띠가 두꺼울수록 그만큼 목록이 짧아진다. 줄인 몫은 전부 성장
+         * 패널이 가져간다 - 전투 영역(0.45~0.90)은 카메라 밴드 산식과
+         * 물려 있어 건드리지 않는다.
+         *
+         * 밴드 앵커는 씬에 저장되므로 이 값을 바꾸면 Build Combat Content가
+         * MainSceneBuilder.ReassertBands로 씬을 따라오게 한다.
+         */
+        public const float BottomTabBarTop = 0.075f;
         public const float GrowthPanelTop = 0.45f;
         public const float BattleAreaTop = 0.90f;
 

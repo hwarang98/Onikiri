@@ -232,23 +232,62 @@ namespace Onikiri.Tests
         // ---------------------------------------------------------------- 일일 경계
 
         /**
-         * @brief 일일 리셋은 **UTC 자정**을 경계로 한다.
+         * @brief 일일 리셋 경계는 **KST 새벽 4시**다 (39단계, UTC 자정에서 이동).
          *
+         * KST 04:00 = UTC 전날 19:00. 고정 오프셋이지 기기 시간대가 아니다 -
          * 로컬 자정을 쓰면 시간대를 넘나드는 플레이어에게 리셋이 두 번 오거나
-         * 건너뛴다. 방치 보상이 UTC를 쓰는 것과 같은 이유다.
+         * 건너뛴다는 원칙은 그대로다.
          */
         [Test]
-        public void DailyReset_MeasuresToNextUtcMidnight()
+        public void DailyReset_RollsAtFourAmKst()
         {
+            // UTC 18:59:59 = KST 03:59:59 - 아직 같은 퀘스트일
+            var justBefore = new DateTime(2026, 8, 9, 18, 59, 59, DateTimeKind.Utc);
+            // UTC 19:00:00 = KST 04:00:00 - 새 퀘스트일
+            var boundary = new DateTime(2026, 8, 9, 19, 0, 0, DateTimeKind.Utc);
+
+            Assert.AreEqual(QuestSystem.QuestDayOf(justBefore).AddDays(1),
+                            QuestSystem.QuestDayOf(boundary),
+                "KST 새벽 4시(UTC 19시)에 퀘스트일이 정확히 한 칸 넘어가야 한다");
+
+            // KST 자정(UTC 15:00)은 경계가 아니다 - 자정 넘어서까지 한 판은 "오늘"이다
+            var kstMidnight = new DateTime(2026, 8, 9, 15, 0, 0, DateTimeKind.Utc);
+            Assert.AreEqual(QuestSystem.QuestDayOf(justBefore), QuestSystem.QuestDayOf(kstMidnight));
+        }
+
+        /** 타이머는 다음 KST 새벽 4시까지를 잰다 */
+        [Test]
+        public void DailyReset_MeasuresToNextFourAmKst()
+        {
+            // UTC 정오 = KST 21:00. 다음 KST 04:00까지 7시간
             var noon = new DateTime(2026, 8, 9, 12, 0, 0, DateTimeKind.Utc);
+            Assert.AreEqual(TimeSpan.FromHours(7d), QuestSystem.NextResetUtc(noon) - noon);
 
-            // 시스템을 띄우지 않고 같은 식을 검사한다 - MonoBehaviour 인스턴스가
-            // 없어도 이 성질은 성립해야 한다
-            var next = noon.Date.AddDays(1);
-            Assert.AreEqual(TimeSpan.FromHours(12d), next - noon);
+            // 경계 1초 전
+            var justBefore = new DateTime(2026, 8, 9, 18, 59, 59, DateTimeKind.Utc);
+            Assert.AreEqual(TimeSpan.FromSeconds(1d),
+                            QuestSystem.NextResetUtc(justBefore) - justBefore);
+        }
 
-            var justBefore = new DateTime(2026, 8, 9, 23, 59, 59, DateTimeKind.Utc);
-            Assert.AreEqual(TimeSpan.FromSeconds(1d), justBefore.Date.AddDays(1) - justBefore);
+        /**
+         * @brief 예전 세이브(UTC 자정으로 자른 날짜)가 들어와도 리셋이 **건너뛰지
+         * 않는다.** 옛 마커의 퀘스트일은 실제 마지막 리셋의 퀘스트일보다 뒤일 수
+         * 없다 - 자정+5시간은 같은 날짜이기 때문이다. QuestSystem.RollDailyIfNeeded
+         * 주석의 경계 이동 논증을 식으로 고정한다.
+         */
+        [Test]
+        public void DailyReset_LegacyMidnightMarkerNeverSkips()
+        {
+            for (int hour = 0; hour < 24; hour++)
+            {
+                var writeTime = new DateTime(2026, 8, 9, hour, 0, 0, DateTimeKind.Utc);
+                var legacyMarker = writeTime.Date;   // 옛 저장 형식
+
+                Assert.LessOrEqual(QuestSystem.QuestDayOf(legacyMarker),
+                                   QuestSystem.QuestDayOf(writeTime),
+                    "옛 마커의 퀘스트일이 저장 시각의 퀘스트일을 앞지르면 리셋이 건너뛴다"
+                    + " (hour=" + hour + ")");
+            }
         }
     }
 }

@@ -15,6 +15,7 @@ MonoBehaviour:
   displayName: "\uC678\uB208 \uB4F1\uB871"
   kind: 1
   fullIntro: 1
+  soulId: yodo_lantern
   idleSheet: {fileID: 0}
   hurtSheet: {fileID: 0}
   deathSheet: {fileID: 0}

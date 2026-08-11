@@ -42,7 +42,10 @@ namespace Onikiri.EditorTools
         private const string BossDefinitionPath = DataFolder + "/Enemy_DarkSamurai.asset";
         private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
 
-        public const string BossDisplayName = "다크 사무라이";
+        // Demon_Samurai 아트의 화면 이름. 12단계부터 "다크 사무라이"였는데 35단계
+        // 후속에서 이름이 Inimig(9) 보스와 서로 바뀌었다 - BossConfigBuilder의
+        // darkSamurai 씨앗 주석 참고. 이 상수는 로스터 없는 폴백 경로에만 쓰인다
+        public const string BossDisplayName = "붉은눈 요괴";
 
         private static readonly Color DimColor = new Color32(0x0A, 0x08, 0x10, 0xE0);
         private static readonly Color PanelColor = new Color32(0x3A, 0x35, 0x50, 0xF0);
@@ -72,14 +75,21 @@ namespace Onikiri.EditorTools
         private const string DataFolderForMobs = "Assets/_Project/Data";
 
         /**
-         * @brief 일반 스테이지 보스로 쓸 잡몹 정의들.
+         * @brief 일반 스테이지 보스로 쓸 잡몹 정의들. 씬에 굳는 것은 지역 1 풀이다.
          *
-         * 보스 정의(가중치 0)는 빠진다. 이름순으로 정렬해 스테이지 -> 잡몹 대응이
-         * 빌드할 때마다 달라지지 않게 한다 - 무작위면 재도전마다 다른 놈이 나와
-         * "이 스테이지의 우두머리"라는 인상이 생기지 않는다.
+         * 36단계부터 잡몹이 지역별 풀로 갈라졌다. 씬에는 스포너와 같은 지역 1
+         * 한 벌만 굳고, 지역이 넘어가면 RegionMobSwitcher가 런타임에 바꾼다 -
+         * 스포너와 이 배열이 다른 풀이면 잡몹은 새 지역인데 확대판 보스만 옛
+         * 지역 몹이 된다.
          */
         private static List<EnemyDefinition> LoadMobDefinitions()
         {
+            var set = AssetDatabase.LoadAssetAtPath<RegionMobSet>(BattleContentBuilder.RegionMobSetPath(1));
+            if (set != null && set.mobs != null && set.mobs.Length > 0)
+                return new List<EnemyDefinition>(set.mobs);
+
+            // 풀 애셋이 아직 없을 때(빌드 순서가 꼬인 옛 프로젝트)의 폴백.
+            // 가중치 0(보스)만 빼고 전부 줍는 12단계까지의 방식이다
             var definitions = new List<EnemyDefinition>();
 
             foreach (var guid in AssetDatabase.FindAssets("t:EnemyDefinition", new[] { DataFolderForMobs }))
@@ -323,6 +333,7 @@ namespace Onikiri.EditorTools
 
             Replace(safeArea, "BossIntro");
             Replace(band, "BossChallenge");
+            Replace(band, "BossQuota");
             Replace(band, "BossFightHud");
             Replace(band, "BossResult");
 
@@ -371,6 +382,44 @@ namespace Onikiri.EditorTools
             Stretch((RectTransform)challengeLabel.transform);
             challengeLabel.text = "보스 도전";
 
+            // 해골 글리프(38단계 아이콘화). "보스"라는 글자에 심볼이 얹혀야
+            // 버튼이 위협으로 읽힌다 - 글자를 밀지 않게 왼쪽 여백에 세운다
+            var skull = new GameObject("Skull", typeof(RectTransform));
+            skull.transform.SetParent(challenge.transform, false);
+            var skullRect = (RectTransform)skull.transform;
+            skullRect.anchorMin = skullRect.anchorMax = new Vector2(0f, 0.5f);
+            skullRect.pivot = new Vector2(0f, 0.5f);
+            skullRect.sizeDelta = new Vector2(48f, 48f);
+            skullRect.anchoredPosition = new Vector2(28f, 0f);
+            var skullImage = skull.AddComponent<Image>();
+            skullImage.sprite = UiGlyphBuilder.Load(UiGlyphBuilder.Skull);
+            skullImage.color = new Color(1f, 0.92f, 0.92f, 1f);
+            skullImage.raycastTarget = false;
+
+            // --- 처치 할당량: 도전 버튼과 같은 자리, 배타로 뜬다 (37단계).
+            //
+            // 상단 바 재배치에서 스테이지 문구에 붙어 있던 카운터가 이리로 왔다.
+            // 카운터가 차면 같은 자리가 도전 버튼으로 바뀌므로 "채우면 무슨 일이
+            // 생기는가"가 한 자리에서 이어진다. 버튼보다 작고 눌리지 않는다
+            var quota = new GameObject("BossQuota", typeof(RectTransform));
+            quota.transform.SetParent(band, false);
+            var quotaRect = (RectTransform)quota.transform;
+            quotaRect.anchorMin = quotaRect.anchorMax = new Vector2(0.5f, 1f);
+            quotaRect.pivot = new Vector2(0.5f, 1f);
+            quotaRect.sizeDelta = new Vector2(320f, 76f);
+            quotaRect.anchoredPosition = new Vector2(0f, -24f);
+
+            var quotaImage = quota.AddComponent<Image>();
+            UiSkin.ApplyPanel(quotaImage, UiSkin.Inlay, UiSkin.InlayTint);
+            quotaImage.raycastTarget = false;
+
+            var quotaLabel = CreateLabel(quota.transform, font, "Label",
+                                         PixelFontSizesSmall, TextAlignmentOptions.Center);
+            Stretch((RectTransform)quotaLabel.transform);
+            // 카운터는 보조 정보다(38단계 위계) - 도전 버튼(44pt)보다 한 단 작다
+            UiFonts.Demote(quotaLabel);
+            quotaLabel.text = "처치 0/10";
+
             // --- 전투 HUD: 밴드 위쪽에 체력 바, 그 아래 시계
             var fightHud = new GameObject("BossFightHud", typeof(RectTransform));
             fightHud.transform.SetParent(band, false);
@@ -391,14 +440,14 @@ namespace Onikiri.EditorTools
             Stretch((RectTransform)healthFill.transform);
             var fillImage = healthFill.AddComponent<Image>();
             fillImage.color = HealthColor;
-            // Filled 타입이라야 fillAmount가 동작한다. Simple이면 값을 넣어도 아무
-            // 일도 일어나지 않고, 체력 바가 항상 가득 찬 채로 남는다
-            fillImage.type = Image.Type.Filled;
-            fillImage.fillMethod = Image.FillMethod.Horizontal;
-            fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
-            fillImage.fillAmount = 1f;
-            // 스프라이트가 없으면 Filled가 무시된다. 내장 흰색 UI 스프라이트를 쓴다
-            fillImage.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            // **민짜 채움이다(38b 규칙).** Filled+내장 UISprite는 둥근 소프트
+            // 가장자리가 바에서 그라데이션으로 보인다 - 게이지는 처음부터
+            // 끝까지 균일하게 차야 한다(사용자 지적 두 번째). EXP 스트립
+            // (LevelHud)과 같은 방식으로, sprite 없는 판을 BossHud가
+            // anchorMax.x로 민다
+            fillImage.sprite = null;
+            fillImage.type = Image.Type.Simple;
+            fillImage.raycastTarget = false;
 
             // --- 플레이어 체력 바: 전투 밴드 아래쪽. 보스 바와 화면 반대편에 둔다.
             //     둘이 붙어 있으면 어느 쪽이 내 체력인지 매번 확인해야 한다
@@ -424,11 +473,10 @@ namespace Onikiri.EditorTools
             Stretch((RectTransform)playerFillGo.transform);
             var playerFill = playerFillGo.AddComponent<Image>();
             playerFill.color = PlayerHealthColor;
-            playerFill.type = Image.Type.Filled;
-            playerFill.fillMethod = Image.FillMethod.Horizontal;
-            playerFill.fillOrigin = (int)Image.OriginHorizontal.Left;
-            playerFill.fillAmount = 1f;
-            playerFill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            // 보스 바와 같은 민짜 채움(38b 규칙). 위 주석 참고
+            playerFill.sprite = null;
+            playerFill.type = Image.Type.Simple;
+            playerFill.raycastTarget = false;
 
             var playerHealthLabel = CreateLabel(fightHud.transform, font, "PlayerHealthLabel",
                                                 PixelFontSizesSmall, TextAlignmentOptions.Center);
@@ -531,6 +579,10 @@ namespace Onikiri.EditorTools
             hudSo.FindProperty("challengeRoot").objectReferenceValue = challenge;
             hudSo.FindProperty("challengeButton").objectReferenceValue = challengeButton;
             hudSo.FindProperty("challengeLabel").objectReferenceValue = challengeLabel;
+            hudSo.FindProperty("quotaRoot").objectReferenceValue = quota;
+            hudSo.FindProperty("quotaLabel").objectReferenceValue = quotaLabel;
+            hudSo.FindProperty("progress").objectReferenceValue =
+                Object.FindFirstObjectByType<Onikiri.Progression.StageProgress>();
             hudSo.FindProperty("introRoot").objectReferenceValue = intro;
             hudSo.FindProperty("introLabel").objectReferenceValue = introLabel;
             hudSo.FindProperty("fightRoot").objectReferenceValue = fightHud;

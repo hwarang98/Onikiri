@@ -19,7 +19,9 @@ namespace Onikiri.Tests
      */
     public class SurvivalEfficiencyTests
     {
-        const int MaxLevelChecked = 200;
+        // 43단계 미세화: 두 생존 축 다 옛 한 레벨 = 새 여덟 칸이라, 옛 200레벨
+        // 구간과 같은 값 범위를 보려면 여덟 배를 훑어야 한다
+        const int MaxLevelChecked = 1600;
 
         /** 생존 축끼리 허용하는 효율 차이. DPS 축과 같은 기준이다 */
         const double MaxRatio = 5d;
@@ -49,10 +51,13 @@ namespace Onikiri.Tests
          */
         static UpgradeTrack DeadRegen()
         {
+            // 43단계 미세화에 맞춰 대조군도 같은 격자다(1/8 걸음). 실곡선만
+            // 미세하고 대조군이 옛 격자면 같은 레벨 번호가 다른 지출 지점이
+            // 되어 비교가 무의미해진다
             return new UpgradeTrack(UpgradeSystem.HealthRegenId, "체력 회복 (나쁜 곡선)",
-                                    BigDouble.FromDouble(11d), 1.15d,
+                                    BigDouble.FromDouble(1.295d), 1.0176225d,
                                     UpgradeTrack.Curve.Additive,
-                                    BigDouble.FromDouble(1d), 0.05d);
+                                    BigDouble.FromDouble(1d), 0.00625d);
         }
 
         static UpgradeTrack[] Axes()
@@ -139,7 +144,7 @@ namespace Onikiri.Tests
             }
 
             Assert.AreNotEqual(-1, crossover, "회복이 골드당으로 체력을 한 번도 앞서지 않는다");
-            Assert.LessOrEqual(crossover, 30, string.Format(
+            Assert.LessOrEqual(crossover, 240, string.Format(   // 옛 30레벨 = 새 240칸
                 "회복이 Lv.{0}에서야 앞선다. 20스테이지 시점의 체력 레벨보다 뒤면 " +
                 "플레이어는 그 버튼을 만나지 못한다", crossover));
         }
@@ -199,7 +204,7 @@ namespace Onikiri.Tests
             var health = Health();
             var dead = DeadRegen();
 
-            Assert.IsTrue(SurvivalEfficiency.DecaysStructurally(dead, 1, 100),
+            Assert.IsTrue(SurvivalEfficiency.DecaysStructurally(dead, 1, 800),   // 옛 100레벨 = 새 800칸
                 "가산 회복 + 지수 비용은 구조적으로 죽어야 한다");
 
             double worst;

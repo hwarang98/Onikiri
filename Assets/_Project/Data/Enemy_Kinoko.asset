@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
+  m_Name: Enemy_Kinoko
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
+  displayName: Kinoko-obake
+  idleFrames:
+  - {fileID: 6714292178523018109, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: -4399803515821302776, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: -3697662465053885029, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 4878951561164972746, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 6383586542383717545, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 4935424704474139377, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 86722843868414153, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 8821116088638318782, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  walkFrames: []
+  hurtFrames: []
+  deathFrames:
+  - {fileID: -8161077547640508618, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 6593849759611034080, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 7998892150247255316, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: -3821894212203096607, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 4383174215136030027, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: -54578657236926920, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  frameRate: 12
+  spawnWeight: 4
+  maxHealth:
+    m: 1.7
+    e: 1
+  goldReward:
+    m: 6
+    e: 0
+  moveSpeed: 1.15
+  queueSpacing: 1
+  attackFrames: []
+  attackInterval: 2
+  attackImpactPoint: 0.5
+  hoverHeight: 0
+  artBottomOffset: 0.84375
+  artFacesLeft: 0

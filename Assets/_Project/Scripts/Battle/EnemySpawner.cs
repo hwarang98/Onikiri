@@ -69,6 +69,23 @@ namespace Onikiri.Battle
         /** 살아 있는 적. 플레이어에 가까운 순 */
         public IReadOnlyList<Enemy> Active { get { return active; } }
 
+        /** 지금 추첨에 쓰는 잡몹 정의들. 테스트 패널이 현재 풀을 보여줄 때 쓴다 */
+        public IReadOnlyList<EnemyDefinition> Definitions { get { return definitions; } }
+
+        /**
+         * @brief 스폰 풀을 통째로 바꾼다. 지역이 넘어갈 때 RegionMobSwitcher가 부른다.
+         *
+         * 이미 서 있는 요괴는 건드리지 않는다 - 교체는 다음 스폰부터다.
+         * AverageBaseHealth/Gold도 이 순간부터 새 풀로 계산되는데, 모든 지역 풀의
+         * 가중 평균이 같도록 데이터가 짜여 있어(RegionMobSet 참고) 보스 체력과
+         * 방치 보상은 교체 전후로 같은 값이 나온다.
+         */
+        public void SetDefinitions(EnemyDefinition[] next)
+        {
+            if (next == null || next.Length == 0) return;
+            definitions = next;
+        }
+
         public bool SpawningSuspended { get { return spawningSuspended; } }
 
         public int PoolGrowthCount { get { return pool != null ? pool.GrowthCount : 0; } }
@@ -254,20 +271,26 @@ namespace Onikiri.Battle
             // 배수는 스폰 시점에 확정한다. 스테이지 오브젝트가 아직 없으면(테스트 씬 등)
             // 1배로 떨어져 1스테이지 밸런스가 된다
             var progress = Onikiri.Progression.StageProgress.Instance;
-            var healthMultiplier = progress != null ? progress.HealthMultiplier : BigDouble.One;
             var goldMultiplier = progress != null ? progress.GoldMultiplier : BigDouble.One;
 
             // 경험치는 정의 에셋이 아니라 스테이지에서만 나온다. 요괴 종류마다
             // 다른 경험치를 주면 가중치 추첨이 진행 속도에 섞여 들어가고,
-            // ExpCurve가 재는 "스테이지당 경험치"가 추첨 결과에 따라 흔들린다
+            // ExpCurve가 재는 "스테이지당 경험치"가 추첨 결과에 따라 흔들린다.
+            // 최전선 아래(재선택)에서는 0이다 - ExpCurve.MobExp(stage, atFrontier) 참고
             int stageNumber = progress != null ? progress.Stage : 1;
+            bool atFrontier = progress == null || progress.IsAtFrontier;
 
+            // 체력은 온보딩 완화(StageCurve.MobHealth, st1~5 잡몹 전용)를 지난다.
+            // 진행 정보가 없는 전투 전용 테스트 씬은 예전처럼 정의값 그대로다 -
+            // 완화가 걸리면 1스테이지 밸런스라는 가정이 조용히 무너진다
             enemy.Killed += OnEnemyKilled;
             enemy.Died += OnEnemyDied;
             enemy.Spawn(definition, RightEdgeX() + offscreenMargin, stage.GroundY, sorting,
-                        definition.maxHealth * healthMultiplier,
+                        progress != null
+                            ? Onikiri.Progression.StageCurve.MobHealth(definition.maxHealth, stageNumber)
+                            : definition.maxHealth,
                         definition.goldReward * goldMultiplier,
-                        Onikiri.Progression.ExpCurve.MobExp(stageNumber));
+                        Onikiri.Progression.ExpCurve.MobExp(stageNumber, atFrontier));
             active.Add(enemy);
         }
 
@@ -317,7 +340,7 @@ namespace Onikiri.Battle
             // 언젠가 한쪽만 도는 상태가 생긴다 - BossFight가 골드를 여기 맡긴
             // 이유와 같다
             var character = Onikiri.Progression.CharacterLevel.Instance;
-            if (character != null)
+            if (character != null && enemy.ExpReward > BigDouble.Zero)
             {
                 character.AddExp(enemy.ExpReward);
                 if (damageNumbers != null)

@@ -16,6 +16,7 @@ MonoBehaviour:
   stageCount: 10
   chapterEvery: 5
   background: {fileID: 11400000, guid: 0d677bec3028da24f866d17776d9b56b, type: 2}
+  mobs: {fileID: 11400000, guid: abbf8e62338394e41a92e2609684e086, type: 2}
   chapterBoss: {fileID: 11400000, guid: efb080627d57cbe439211d25009fa03e, type: 2}
   finaleBoss: {fileID: 11400000, guid: 80a73e3e44c9fd147836cbac485596a2, type: 2}
   normalBossOverride: {fileID: 0}

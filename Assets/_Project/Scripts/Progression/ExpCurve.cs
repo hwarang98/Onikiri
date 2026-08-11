@@ -107,6 +107,26 @@ namespace Onikiri.Progression
                 BigDouble.FromDouble(ExpStageGrowth), steps);
         }
 
+        /**
+         * @brief 재선택(37단계)을 아는 판본. **최전선 아래에서는 잡몹 경험치가 없다.**
+         *
+         * 획득량이 골드보다 완만하게 오르는 것({@link ExpStageGrowth} 1.16 <
+         * 체력 배수 1.55)이 레벨을 골드보다 느리게 만드는 유일한 장치인데,
+         * 그 완만함이 재선택과 만나면 역전이 된다 - 한 스테이지 내려가면 처치가
+         * 1.55배 빨라지는데 경험치는 1.16배만 깎여서, **뒤로 갈수록 경험치/초가
+         * 오른다** (StageReselectTests가 실측. 보스에 막힌 플레이어일수록 격차가
+         * 커져 몇 배까지 벌어진다).
+         *
+         * 곡선을 세우는 것은 밸런스 변경이라 막혔고(둘의 비율이 레벨 속도의
+         * 전부다), 대신 축을 닫는다: 경험치는 전진의 재화이고, 클리어한 스테이지의
+         * 파밍은 골드만 준다. 방치 경험치(GameSession.EstimateExpPerSecond)도
+         * 같은 판정을 쓴다.
+         */
+        public static BigDouble MobExp(int stage, bool atFrontier)
+        {
+            return atFrontier ? MobExp(stage) : BigDouble.Zero;
+        }
+
         /** 이 스테이지의 보스가 주는 경험치. 챕터 보스면 배수가 한 번 더 붙는다 */
         public static BigDouble BossExp(int stage)
         {

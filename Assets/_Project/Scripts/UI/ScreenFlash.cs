@@ -66,6 +66,17 @@ namespace Onikiri.UI
         private bool playing;
 
         /**
+         * @brief 빌더가 적어준 엣지 색. 틴트를 준 시전 뒤에 되돌릴 값이다.
+         *
+         * 채집을 Awake에만 맡길 수 없다. 이 오브젝트는 꺼진 채로 저장되므로
+         * Awake가 **처음 Play하는 순간**에 도는데, 그 Play가 틴트를 주는
+         * 쪽이면 Awake는 이미 덧칠된 색을 원본으로 적어버린다. 그래서 Play가
+         * 활성화보다 먼저 한 번 채집한다.
+         */
+        private Color edgeBase = Color.white;
+        private bool edgeBaseRead;
+
+        /**
          * @brief 알파만 비운다. **자기 자신을 끄지 않는다.**
          *
          * 이 오브젝트는 꺼진 채로 씬에 저장되므로 Awake가 씬 로드가 아니라
@@ -79,8 +90,16 @@ namespace Onikiri.UI
          */
         private void Awake()
         {
+            CaptureEdgeBase();
             SetAlpha(edgeFlash, 0f);
             SetAlpha(vignette, 0f);
+        }
+
+        private void CaptureEdgeBase()
+        {
+            if (edgeBaseRead || edgeFlash == null) return;
+            edgeBase = edgeFlash.color;
+            edgeBaseRead = true;
         }
 
         /**
@@ -91,7 +110,33 @@ namespace Onikiri.UI
          */
         public void Play()
         {
+            Begin(Color.white, false);
+        }
+
+        /**
+         * @brief 엣지 색을 갈아끼우고 한 번 터뜨린다.
+         *
+         * 귀참은 이 연출의 주인이라 빌더가 적어준 색을 쓰고, **빌려 쓰는 쪽만**
+         * 색을 가져온다 - 45b의 흑야 영체가 첫 손님이다(먹빛에 붉은 기).
+         * 같은 번쩍이 두 사건에 쓰이면 화면이 "또 귀참인가"로 읽히는데,
+         * 색 하나로 갈리면 새 연출을 만들지 않고도 둘이 구분된다.
+         *
+         * 알파는 여기서 건드리지 않는다. 세기는 edgePeak가 정하고 이 함수는
+         * 색상만 바꾼다 - 빌려 쓰는 쪽이 세기까지 바꾸면 예산이 갈라진다.
+         */
+        public void Play(Color edgeTint)
+        {
+            Begin(edgeTint, true);
+        }
+
+        private void Begin(Color edgeTint, bool tinted)
+        {
+            // 채집이 활성화보다 먼저다. 위 edgeBase 주석 참고
+            CaptureEdgeBase();
+
             if (!gameObject.activeSelf) gameObject.SetActive(true);
+
+            SetRgb(edgeFlash, tinted ? edgeTint : edgeBase);
 
             elapsed = 0f;
             playing = true;
@@ -143,6 +188,14 @@ namespace Onikiri.UI
             var color = image.color;
             color.a = alpha;
             image.color = color;
+        }
+
+        /** 색상만 바꾼다. 알파는 연출이 매 프레임 다시 쓰므로 건드리지 않는다 */
+        private static void SetRgb(Image image, Color rgb)
+        {
+            if (image == null) return;
+            var color = image.color;
+            image.color = new Color(rgb.r, rgb.g, rgb.b, color.a);
         }
     }
 }

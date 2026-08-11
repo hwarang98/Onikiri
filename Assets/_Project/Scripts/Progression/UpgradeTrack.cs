@@ -84,6 +84,24 @@ namespace Onikiri.Progression
         [Tooltip("효과값의 상한. 0이면 없음. maxLevel과 달리 구매가 아니라 값을 막는다")]
         [SerializeField] private double valueCeiling;
 
+        /**
+         * @brief 관문 - 두 번째 비용 구간 (43단계, 치명타 확률 전용).
+         *
+         * 균등한 값 곡선(레벨당 +0.088%p) 위에 비용만 두 결이다: 60% 문턱
+         * 앞까지는 코리더 시절의 곡선을 미세화한 완만한 결, 문턱부터는
+         * 도약(wallJump) 뒤 가파른 결(wallGrowth). 값 곡선은 하나인데 비용이
+         * 갈리는 이유는 CritRateCurve.WallJump 주석에 있다 - 60%의 벽을
+         * 뚫는 수련은 앞의 545칸과 차원이 다르다.
+         *
+         * wallFromLevel은 **비용 인덱스**다(CostAtLevel(L) = L+1로 가는 가격,
+         * 이 클래스의 관례). 0이면 관문 없음 - 나머지 여덟 축이 그쪽이다.
+         */
+        [Header("관문")]
+        [Tooltip("이 비용 인덱스부터 두 번째 구간. 0이면 관문 없음")]
+        [SerializeField] private int wallFromLevel;
+        [SerializeField] private double wallJump = 1d;
+        [SerializeField] private double wallGrowth = 1d;
+
         public string Id { get { return id; } }
         public string DisplayName { get { return displayName; } }
         public int Level { get { return level; } }
@@ -129,7 +147,29 @@ namespace Onikiri.Progression
         public BigDouble CostAtLevel(int atLevel)
         {
             int steps = Mathf.Max(0, atLevel - 1);
-            return baseCost * BigDouble.Pow(BigDouble.FromDouble(costGrowth), steps);
+
+            // 관문 앞(또는 관문 없음): 단일 지수 그대로.
+            // 정수화(최소 1골드, E-3 수정)는 곡선 statics와 같은 규칙이어야
+            // 한다 - UpgradeCost.Quantize가 단일 출처다
+            if (wallFromLevel <= 0 || atLevel < wallFromLevel)
+                return UpgradeCost.Quantize(
+                    baseCost * BigDouble.Pow(BigDouble.FromDouble(costGrowth), steps));
+
+            // 관문 뒤: 앞 구간의 끝값 x 도약 x 두 번째 결.
+            // CritRateCurve.CostAtLevel과 같은 식이어야 한다 - 두 곳이 갈리면
+            // 시뮬레이션이 화면과 다른 가격을 잰다
+            return UpgradeCost.Quantize(baseCost
+                * BigDouble.Pow(BigDouble.FromDouble(costGrowth), wallFromLevel - 1)
+                * BigDouble.FromDouble(wallJump)
+                * BigDouble.Pow(BigDouble.FromDouble(wallGrowth), atLevel - wallFromLevel));
+        }
+
+        /** 관문 설정. 빌더가 곡선 상수에서 옮겨 적는다 */
+        public void SetWall(int fromLevel, double jump, double growth)
+        {
+            wallFromLevel = Mathf.Max(0, fromLevel);
+            wallJump = jump;
+            wallGrowth = growth;
         }
 
         /** 현재 레벨에서의 효과값 */

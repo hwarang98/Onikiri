@@ -135,6 +135,14 @@ namespace Onikiri.Progression
          *
          * 회수 밴드 30초를 이 축에 다시 물리려면 상한을 먼저 키워야 한다. 그때는
          * 보스 보정 지수도 함께 다시 재야 하고, 그것은 이 축 하나짜리 스텝이다.
+         *
+         * E-3 수정: 전 축 일괄 상향(UpgradeCost.RaiseScale)에서 **이 축만 뺀다.**
+         * 하네스 실측으로 x4를 얹자 상한까지 총 2.6K 골드가 되어 "해금 즉시
+         * 상한"(StagesToCeiling = 0)이 깨졌고, 보정(GoldAxisCompensation)은
+         * 여전히 즉시 상한을 가정하므로 st6~9 여유에 크레이터(결손 x6.7)가
+         * 파였다 - 26단계가 "이 값과 StagesToCeiling은 반드시 함께 움직인다"고
+         * 적어둔 바로 그 사고다. 이 축은 성장 축이 아니라 스위치라(총 600골드,
+         * 이득 상한 x1.25) 병목 상향의 목적과도 무관하다. 정수화만 받는다.
          */
         public const double BaseCost = 8d;
 
@@ -215,7 +223,7 @@ namespace Onikiri.Progression
 
         public static double CostAtLevel(int level)
         {
-            return BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1));
+            return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1)));
         }
 
         /**

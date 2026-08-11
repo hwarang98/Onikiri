@@ -54,6 +54,24 @@ namespace Onikiri.UI
         /** 제목용. 아틀라스 픽셀 하나가 2x2 블록이 된다 */
         public const float GalmuriLarge = GalmuriAtlasSize * 2;    // 88
 
+        /**
+         * @brief 보조 정보용 캡션 크기 (38단계 폰트 위계).
+         *
+         * 38단계까지 UI 전체가 44pt 단일 크기였다(씬 실측 44pt x311 / 88pt x5).
+         * 크기가 하나면 위계가 없고, 위계가 없으면 모든 글자가 소리를 지른다 -
+         * "올드해 보인다"의 뿌리가 이것이었다.
+         *
+         * 33 = 11 x 3. 별도 아틀라스("Galmuri11 Caption SDF")를 3배로 구워
+         * 1:1로 그린다 - 44 아틀라스를 0.75배로 그리면 Point 샘플링이 행을
+         * 버려 글자가 깨진다. 같은 서체의 다른 배수라 형태는 44와 동일하다.
+         *
+         * 쓰는 곳: 항목 라벨·레벨·비용·전후값·탭 라벨·배지. 큰 것(재화·헤더·
+         * 핵심 수치·데미지)은 44/48/88에 남는다.
+         */
+        public const int GalmuriCaptionScale = 3;
+        public const int GalmuriCaptionSize = GalmuriDesignSize * GalmuriCaptionScale;  // 33
+        public const float GalmuriCaption = GalmuriCaptionSize;    // 33
+
         /** Thaleah 폰트가 그려진 크기. 동봉된 레거시 비트맵 폰트에서 확인 */
         public const int ThaleahDesignSize = 16;
 

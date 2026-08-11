@@ -32,6 +32,16 @@ namespace Onikiri.Progression
         [Tooltip("지금까지 잡은 보스 수. 진행 자체는 stage가 들고 있고 이것은 통계다")]
         [SerializeField] private int bossKillCount;
 
+        /**
+         * @brief 최고 도달 스테이지 - **최전선**. 37단계(스테이지 재선택)에 생겼다.
+         *
+         * 재선택으로 stage가 내려갈 수 있게 되면서 "지금 서 있는 곳"과 "여기까지
+         * 왔다"가 갈라졌다. 해금(장비 st11·동료 st31·성장 축)과 업적 도달 지표는
+         * 이쪽을 읽어야 한다 - 현재 스테이지를 읽으면 클리어한 지역으로 파밍하러
+         * 돌아간 순간 대장간이 다시 잠기고 동료가 화면에서 사라진다.
+         */
+        [SerializeField] private int maxStageReached = 1;
+
         /** 스테이지·처치 수·보스 개방 여부가 바뀔 때마다 발생 */
         public event Action Changed;
 
@@ -39,6 +49,24 @@ namespace Onikiri.Progression
         public int KillsThisStage { get { return killsThisStage; } }
         public int KillsRequired { get { return StageCurve.KillsPerStage; } }
         public int BossKillCount { get { return bossKillCount; } }
+
+        /**
+         * @brief 최전선. stage보다 작게 보고하지 않는다.
+         *
+         * 필드가 어긋나는 경로(직렬화 기본값, 옛 테스트 픽스처)에서도 "현재 위치가
+         * 곧 최소한의 도달 기록"이라는 성질이 지켜져야 해금 판정이 뒤로 가지 않는다.
+         */
+        public int MaxStageReached { get { return Mathf.Max(maxStageReached, stage); } }
+
+        /**
+         * @brief 지금 최전선에 서 있는가.
+         *
+         * 보스 도전은 최전선에서만 열린다(BossFight.CanChallenge). 클리어한
+         * 스테이지에서 보스를 다시 잡을 수 있으면 클리어 보너스·보스 경험치가
+         * 반복 수급되고, bossKillCount 같은 통계도 이중으로 오른다. 되돌아간
+         * 스테이지는 순수 파밍이고, 복귀는 재선택 화면의 "최전선으로"가 맡는다.
+         */
+        public bool IsAtFrontier { get { return stage >= MaxStageReached; } }
 
         /** 할당량을 채워 보스에 도전할 수 있는 상태인가 */
         public bool IsBossReady { get { return killsThisStage >= StageCurve.KillsPerStage; } }
@@ -92,13 +120,70 @@ namespace Onikiri.Progression
         public void AdvanceStage()
         {
             stage++;
+            if (stage > maxStageReached) maxStageReached = stage;
             killsThisStage = 0;
             bossKillCount++;
             Raise();
         }
 
-        /** 세이브 복원용 */
+        /**
+         * @brief 재선택이 열리는 최전선. 대장간(EquipmentCurve.UnlockStage)과 같은
+         * 지점 - 지역 1을 완주해야 "되돌아갈 여정"이 생긴다.
+         *
+         * 온보딩 노이즈를 줄이는 것만이 이유가 아니다. **최전선 2에서는 1스테이지
+         * 파밍이 경험치/초에서 앞선다** (StageReselectTests가 실측한 유일한 역전 -
+         * 초반 경험치 곡선이 처치 속도 하락을 아직 못 따라잡는 구간이다). 게이트를
+         * st11에 두면 그 구간에서는 재선택 자체가 없으므로, "최전선이 최적"이
+         * 재선택이 존재하는 모든 구간에서 참이 된다.
+         */
+        public const int ReselectUnlockStage = 11;
+
+        /** 재선택이 열렸는가. 재선택 화면과 SelectStage가 같은 판정을 쓴다 */
+        public bool IsReselectUnlocked { get { return MaxStageReached >= ReselectUnlockStage; } }
+
+        /**
+         * @brief 스테이지 재선택. 최전선 이하로만 이동한다 (37단계).
+         *
+         * 미클리어 구간 앞지르기는 클램프로 막는다 - 보스 게이트가 진행의
+         * 유일한 상승 경로라는 규칙(AdvanceStage)은 그대로다.
+         *
+         * 처치 수는 0으로 되돌린다. 되돌아간 스테이지는 보스가 잠겨 있어
+         * 할당량이 의미가 없고, 최전선으로 복귀할 때 남아 있던 할당량을
+         * 이어받으면 "어느 스테이지에서 채운 10마리인가"가 애매해진다.
+         */
+        public void SelectStage(int target)
+        {
+            if (!IsReselectUnlocked) return;
+
+            int clamped = Mathf.Clamp(target, 1, MaxStageReached);
+            if (clamped == stage) return;
+
+            stage = clamped;
+            killsThisStage = 0;
+            Raise();
+        }
+
+        /** 재선택 화면의 "최전선으로" */
+        public void ReturnToFrontier()
+        {
+            SelectStage(MaxStageReached);
+        }
+
+        /**
+         * @brief 세이브 복원용 (v11 이하 - 최전선 기록이 없던 시절).
+         *
+         * 최전선은 낮추지 않고 현재 스테이지까지만 끌어올린다. 테스트 패널의
+         * 지역 점프가 이 경로를 쓰므로, 여기서 최전선을 stage로 덮으면
+         * 점프 한 번에 도달 기록이 사라진다.
+         */
         public void SetProgress(int savedStage, int savedKills, int savedBossKills)
+        {
+            SetProgress(savedStage, savedKills, savedBossKills,
+                Mathf.Max(maxStageReached, savedStage));
+        }
+
+        /** 세이브 복원용 (v12 - 최전선 포함) */
+        public void SetProgress(int savedStage, int savedKills, int savedBossKills, int savedMaxStage)
         {
             stage = Mathf.Max(1, savedStage);
             // 상한을 포함해서 클램프한다. 10/10은 유효한 상태이고 "보스가 열려 있다"는
@@ -106,6 +191,7 @@ namespace Onikiri.Progression
             // 순간 스테이지가 올라가 그 상태가 존재하지 않았기 때문이다
             killsThisStage = Mathf.Clamp(savedKills, 0, StageCurve.KillsPerStage);
             bossKillCount = Mathf.Max(0, savedBossKills);
+            maxStageReached = Mathf.Max(stage, savedMaxStage);
             Raise();
         }
 

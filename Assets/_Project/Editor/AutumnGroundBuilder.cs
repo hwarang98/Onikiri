@@ -179,6 +179,18 @@ namespace Onikiri.EditorTools
                     return;
                 }
 
+                // 바위흙을 흙 질감으로 다시 칠한다(41단계). 표면 아래 48px가
+                // 좁은 명암(75~92)의 반복이라 화면에서 평평한 암적색 띠로
+                // 읽혔고, 지역 4의 재틴트(HellFoliageTint)에서는 거의 검정까지
+                // 눌렸다. 갈색 흙의 밝기 폭을 넓히고 위에서 아래로 잠기게
+                // 한다 - 원본이 밝아지면 재틴트 결과도 함께 밝아진다.
+                // 낙엽 지대는 건드리지 않는다(잎이 촘촘해 틈이 없다)
+                DirtTextureBaker.Apply(pixels, width, StripHeight, SurfaceFromBottom,
+                                       new Color(0.188f, 0.118f, 0.110f, 1f),   // 어두운 흙 #301E1C
+                                       new Color(0.502f, 0.322f, 0.227f, 1f),   // 밝은 흙 #80523A
+                                       new Color(0.612f, 0.424f, 0.282f, 1f),   // 자갈 #9C6C48
+                                       false);
+
                 var strip = new Texture2D(width, StripHeight, TextureFormat.RGBA32, false);
                 strip.SetPixels(pixels);
                 strip.Apply();

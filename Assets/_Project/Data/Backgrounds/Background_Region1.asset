@@ -17,14 +17,14 @@ MonoBehaviour:
   - name: Sky_Fill
     sprite: {fileID: 21300000, guid: 2ded06b632477c3478980b0b51a64b15, type: 3}
     scrollSpeed: 0
-    tint: {r: 0.57254905, g: 0.8, b: 0.84313726, a: 1}
+    tint: {r: 0.41960785, g: 0.7411765, b: 0.84705883, a: 1}
     isSkyFill: 1
     isGroundCover: 0
     sitsOnGround: 0
     artBottomPixels: 0
     landmarkRepeatSeconds: 0
   - name: Sky
-    sprite: {fileID: 21300000, guid: 2a7bc8ccd57b4ac42ac66258e2141c9d, type: 3}
+    sprite: {fileID: 21300000, guid: fef73eced54fbdc40b1389886757810a, type: 3}
     scrollSpeed: 0.12
     tint: {r: 0.84705883, g: 0.83137256, b: 0.8156863, a: 1}
     isSkyFill: 0

@@ -27,6 +27,21 @@ namespace Onikiri.UI
         [SerializeField] private Button challengeButton;
         [SerializeField] private TMP_Text challengeLabel;
 
+        /**
+         * @brief 처치 할당량 표시. 도전 버튼과 같은 자리에 뜬다 (37단계).
+         *
+         * 원래 상단 바의 스테이지 문구에 붙어 있었는데, 상단 바 재배치에서
+         * 이리로 옮겼다. 카운터가 차면 같은 자리가 도전 버튼으로 바뀌므로
+         * "채우면 무슨 일이 생기는가"가 한 자리에서 이어진다.
+         *
+         * 최전선 아래(재선택)에서는 숨긴다 - 보스가 잠겨 있어 할당량이
+         * 거짓말이 된다. 그 상태는 상단 바가 "클리어"로 말한다.
+         */
+        [Header("할당량")]
+        [SerializeField] private GameObject quotaRoot;
+        [SerializeField] private TMP_Text quotaLabel;
+        [SerializeField] private StageProgress progress;
+
         [Header("등장 연출")]
         [Tooltip("화면 전체를 덮는 어두운 판. 보스가 들어오기 전 1초 동안 떠 있다")]
         [SerializeField] private GameObject introRoot;
@@ -35,7 +50,9 @@ namespace Onikiri.UI
         [Header("전투")]
         [SerializeField] private GameObject fightRoot;
         [SerializeField] private TMP_Text timerLabel;
-        [Tooltip("Image.type = Filled 여야 한다. fillAmount만 건드리므로 메시 재생성이 없다")]
+        [Tooltip("sprite 없는 민짜 판. 폭은 anchorMax.x로 구동한다 - Filled+UISprite는 " +
+                 "둥근 소프트 가장자리가 얇은 바에서 그라데이션으로 보인다(38b 규칙, " +
+                 "EXP 스트립 = LevelHud와 같은 방식)")]
         [SerializeField] private Image healthFill;
 
         /**
@@ -64,7 +81,7 @@ namespace Onikiri.UI
         private int shownSeconds = -1;
 
         /** 마지막으로 찍은 플레이어 체력. 정수가 바뀔 때만 다시 그린다 */
-        private int shownPlayerHealth = -1;
+        private double shownPlayerHealth = -1d;
 
         private void Start()
         {
@@ -106,6 +123,14 @@ namespace Onikiri.UI
             Show(fightRoot, phase == BossFight.Phase.Approaching || phase == BossFight.Phase.Fighting);
             Show(resultRoot, phase == BossFight.Phase.Failed);
 
+            // 할당량은 도전 버튼의 앞 단계다 - 같은 자리, 배타로 뜬다.
+            // Changed는 처치마다 발생하므로(StageProgress) 숫자가 여기서 갱신된다
+            bool farmingTowardBoss = phase == BossFight.Phase.Farming && !fight.CanChallenge
+                                     && progress != null && progress.IsAtFrontier;
+            Show(quotaRoot, farmingTowardBoss);
+            if (farmingTowardBoss && quotaLabel != null)
+                quotaLabel.text = "처치 " + progress.KillsThisStage + "/" + progress.KillsRequired;
+
             if (phase == BossFight.Phase.Intro && introLabel != null)
                 introLabel.text = fight.BossName;
 
@@ -123,41 +148,92 @@ namespace Onikiri.UI
                 shownPlayerHealth = -1;
             }
 
+            // 전투 화면이 뜨는 순간(접근 포함) 바를 즉시 맞춘다. Update의 바
+            // 구동은 접근+전투에서만 돌아서, 여기서도 한 번 밀어주지 않으면
+            // 상태 전환 프레임에 직전 보스전의 마지막 값이 잠깐 비친다 -
+            // "새 보스인데 체력 바가 초기화가 안 돼 있다"로 신고된 버그다
+            if (phase == BossFight.Phase.Approaching || phase == BossFight.Phase.Fighting)
+                SyncBars(phase);
+
             // 달려가는 동안은 제한 시간이 가득 찬 채로 서 있는다. 0으로 두면
             // 도착하는 순간 0에서 30으로 튀어 시계가 고장 난 것처럼 보인다
             if (phase == BossFight.Phase.Approaching && timerLabel != null)
                 timerLabel.text = Mathf.CeilToInt(StageCurve.BossTimeLimitSeconds) + "초";
         }
 
+        /**
+         * @brief 두 체력 바와 플레이어 수치를 지금 값으로 그린다.
+         *
+         * 접근 중 플레이어 바는 **가득**으로 그린다. 실제 current에는 직전
+         * 보스전의 잔량이 남아 있지만, 개전 순간 BeginFight가 가득 채우는 것이
+         * 계약이다("가득 찬 상태로 연다") - 잔량을 보여주면 새 보스 앞에서
+         * 깎인 바로 시작하는 것처럼 읽힌다.
+         */
+        private void SyncBars(BossFight.Phase phase)
+        {
+            bool approaching = phase == BossFight.Phase.Approaching;
+
+            SetBar(healthFill, fight.BossHealthFraction);
+
+            if (playerHealth == null) return;
+
+            SetBar(playerHealthFill, approaching ? 1f : playerHealth.Fraction);
+
+            // 숫자는 정수로만 바꾼다. 회복이 매 프레임 소수점을 올리는데
+            // 그때마다 TMP 메시를 다시 만들면 보스전 내내 재생성이 돈다.
+            //
+            // 현재값은 올림, 최대값은 반올림을 쓰다가 "2811 / 2810"이 나왔다.
+            // 체력이 가득 찬 상태에서 소수점이 남으면 올림과 반올림이 서로 다른
+            // 정수로 가기 때문이다. 둘 다 올림으로 맞추고, 표시값을 최대값에서
+            // 한 번 더 자른다 - 회복이 상한을 넘지 않는데 화면만 넘는 것은
+            // 계산이 틀린 것처럼 보인다.
+            //
+            // **int로 내리지 않는다.** Mathf.CeilToInt는 21억을 넘는 순간
+            // -2147483648로 뒤집힌다 - 체력 축이 지수 곡선이라 후반에는 실제로
+            // 닿는 값이고, 화면에서 확인했다. double로 자르고 표기는 골드와
+            // 같은 NumberFormatter를 쓴다(2811 -> "2811", 3.2조 -> "3.2T")
+            double max = System.Math.Ceiling(playerHealth.MaxHealth);
+            double shown = approaching
+                ? max
+                : System.Math.Min(max, System.Math.Ceiling(playerHealth.Current));
+
+            if (shown != shownPlayerHealth && playerHealthLabel != null)
+            {
+                shownPlayerHealth = shown;
+                playerHealthLabel.text = Onikiri.Core.NumberFormatter.Format(shown)
+                                         + " / " + Onikiri.Core.NumberFormatter.Format(max);
+            }
+        }
+
+        /**
+         * @brief 채움 폭 = anchorMax.x. 스프라이트 없는 민짜 판이라 끝까지 균일하다.
+         *
+         * fillAmount를 버린 이유는 38b의 함정 그대로다 - Filled는 스프라이트가
+         * 필요하고, 내장 UISprite의 둥근 소프트 가장자리는 얇은 바에서
+         * 그라데이션으로 보인다(게이지에 그라데이션 금지). 앵커 쓰기도 메시
+         * 재생성 없이 사각형만 늘리므로 매 프레임 써도 된다(LevelHud 실증).
+         */
+        private static void SetBar(Image fill, float fraction)
+        {
+            if (fill == null) return;
+
+            var rect = (RectTransform)fill.transform;
+            rect.anchorMax = new Vector2(Mathf.Clamp01(fraction), rect.anchorMax.y);
+        }
+
         private void Update()
         {
-            if (fight == null || fight.Current != BossFight.Phase.Fighting) return;
+            if (fight == null) return;
 
-            // fillAmount는 셰이더 파라미터라 메시를 다시 만들지 않는다. 매 프레임
-            // 써도 되는 몇 안 되는 UI 값이고, 체력 바는 끊기면 곧바로 티가 난다
-            if (healthFill != null) healthFill.fillAmount = fight.BossHealthFraction;
+            var phase = fight.Current;
 
-            if (playerHealth != null)
-            {
-                if (playerHealthFill != null) playerHealthFill.fillAmount = playerHealth.Fraction;
+            // 접근부터 바가 산다. 예전에는 Fighting에서만 돌아서, 달려가는 5.3초
+            // 동안 직전 보스전의 마지막 값이 그대로 떠 있었다
+            if (phase != BossFight.Phase.Approaching && phase != BossFight.Phase.Fighting) return;
 
-                // 숫자는 정수로만 바꾼다. 회복이 매 프레임 소수점을 올리는데
-                // 그때마다 TMP 메시를 다시 만들면 보스전 내내 재생성이 돈다.
-                //
-                // 현재값은 올림, 최대값은 반올림을 쓰다가 "2811 / 2810"이 나왔다.
-                // 체력이 가득 찬 상태에서 소수점이 남으면 올림과 반올림이 서로 다른
-                // 정수로 가기 때문이다. 둘 다 올림으로 맞추고, 표시값을 최대값에서
-                // 한 번 더 자른다 - 회복이 상한을 넘지 않는데 화면만 넘는 것은
-                // 계산이 틀린 것처럼 보인다
-                int max = Mathf.CeilToInt((float)playerHealth.MaxHealth);
-                int shown = Mathf.Min(max, Mathf.CeilToInt((float)playerHealth.Current));
+            SyncBars(phase);
 
-                if (shown != shownPlayerHealth && playerHealthLabel != null)
-                {
-                    shownPlayerHealth = shown;
-                    playerHealthLabel.text = shown + " / " + max;
-                }
-            }
+            if (phase != BossFight.Phase.Fighting) return;
 
             // 남은 시간은 올림한다. 29.4초를 "29"로 찍으면 시작하자마자 1초가
             // 사라진 것처럼 보이고, 0은 시간이 실제로 다 됐을 때만 나와야 한다

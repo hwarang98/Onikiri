@@ -34,6 +34,21 @@ namespace Onikiri.EditorTools
             public string DisplayName;
             public string IdleClip;
             public string DeathClip;
+
+            /**
+             * @brief 클립 대신 스프라이트 이름으로 프레임을 집는 폴백.
+             *
+             * Inimig (2)는 태그가 하나뿐이라(43프레임 중 12프레임만 태그) 사망이
+             * 클립으로 안 나온다. 미태그 프레임도 스프라이트로는 전부 임포트되므로
+             * 화면 실측으로 확정한 이름 범위를 직접 적는다. IdleClip/DeathClip이
+             * 비어 있을 때만 쓴다.
+             */
+            public string[] IdleNames;
+            public string[] DeathNames;
+
+            /** 이 몹이 속한 지역(1~4). 0이면 어느 풀에도 안 들어가는 보스 전용 */
+            public int Region;
+
             public float SpawnWeight;
             public float Health;
             public float MoveSpeed;
@@ -42,27 +57,100 @@ namespace Onikiri.EditorTools
             public double Gold;
         }
 
+        /**
+         * @brief 지역별 잡몹 배분 (36단계). 이 표가 "어느 지역에 어떤 몹이 나오나"의
+         * 단일 출처다.
+         *
+         * ## 스탯 구조는 모든 지역이 같다
+         *
+         * 주력(w5, HP12, 골드5) + 부몹(w4, HP17, 골드6). 가중 평균이 정확히
+         * 128/9 = 14.222, 49/9 = 5.444로, 8단계부터 쓰던 3종(w3/5/1, HP 8/14/34,
+         * 골드 2/5/18) 시절의 필드 평균과 같다. 보스 체력과 방치 보상이 스포너의
+         * 가중 평균에서 유도되므로, **평균이 같으면 풀을 바꿔도 밸런스가 한 치도
+         * 안 움직인다.** 시뮬레이션·밴드 테스트가 전부 그대로인 이유다.
+         *
+         * 지역 3과 4는 같은 두 종을 주력만 바꿔 쓴다(의도된 겹침 - 팩에 남는 몹이
+         * 없다). 같은 에셋에 가중치를 지역마다 다르게 줄 수 없어서(가중치가 정의
+         * 안에 있다) 지역 4는 _Den 접미사의 별도 에셋이다. 엔드게임 전용 몹 팩을
+         * 사면 지역 4의 두 줄만 갈아끼우면 된다.
+         *
+         * 제외: Inimig (1) 초롱은 지역 1 피날레(외눈 등롱)의 원본이라 잡몹으로
+         * 쓰지 않는다 - 보스와 잡몹이 같은 그림이면 피날레의 무게가 사라진다.
+         * Inimig (9)는 다크 사무라이 보스 시트다.
+         */
         private static readonly EnemyTier[] Tiers =
         {
-            // 필러: 가느다란 불꽃, 빨리 죽고, 화면이 비지 않게 한다
-            new EnemyTier {
-                Aseprite = "Inimig (4)", AssetName = "Enemy_Hitodama", DisplayName = "Hitodama",
-                IdleClip = "Tag", DeathClip = "Tag_1",
-                SpawnWeight = 3f, Health = 8f, MoveSpeed = 1.25f,
-                QueueSpacing = 1.0f, HoverHeight = 0.35f, Gold = 2d
-            },
-            // 일반: 전투의 대부분을 차지한다
+            // ---- 지역 1 (봄숲 여명): 밝은 숲의 장난스러운 것들
             new EnemyTier {
                 Aseprite = "Inimig (7)", AssetName = "Enemy_Kourin", DisplayName = "Mossback",
-                IdleClip = "Tag", DeathClip = "Tag_0",
-                SpawnWeight = 5f, Health = 14f, MoveSpeed = 1.0f,
+                IdleClip = "Tag", DeathClip = "Tag_0", Region = 1,
+                SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.0f,
                 QueueSpacing = 1.25f, HoverHeight = 0f, Gold = 5d
             },
-            // 정예: 등롱은 의도적으로 사무라이보다 크므로 드물게 유지한다
+            new EnemyTier {
+                Aseprite = "Inimig (8)", AssetName = "Enemy_Kinoko", DisplayName = "Kinoko-obake",
+                IdleClip = "Tag", DeathClip = "Tag_1", Region = 1,
+                SpawnWeight = 4f, Health = 17f, MoveSpeed = 1.15f,
+                QueueSpacing = 1.0f, HoverHeight = 0f, Gold = 6d
+            },
+
+            // ---- 지역 2 (가을숲): 흙빛 장난 요괴
+            new EnemyTier {
+                Aseprite = "Inimig (6)", AssetName = "Enemy_Kedama", DisplayName = "Kedama",
+                IdleClip = "Tag", DeathClip = "Tag_0", Region = 2,
+                SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.05f,
+                QueueSpacing = 1.1f, HoverHeight = 0f, Gold = 5d
+            },
+            new EnemyTier {
+                Aseprite = "Inimig (2)", AssetName = "Enemy_Kasaobake", DisplayName = "Kasa-obake",
+                // 태그가 하나뿐인 개체다. idle은 첫 줄의 깡충 뛰기(F0~7)를,
+                // 사망은 팩 공통 규칙(하양 플래시 -> 붕괴 -> 먼지)과 같은 모양의
+                // 미태그 구간(F28~33)을 이름으로 집는다. 화면 실측으로 확정했다
+                IdleNames = new[] { "Frame_0", "Frame_1", "Frame_2", "Frame_3",
+                                    "Frame_4", "Frame_5", "Frame_6", "Frame_7" },
+                DeathNames = new[] { "Frame_28", "Frame_29", "Frame_30",
+                                     "Frame_31", "Frame_32", "Frame_33" },
+                Region = 2,
+                SpawnWeight = 4f, Health = 17f, MoveSpeed = 0.9f,
+                QueueSpacing = 1.1f, HoverHeight = 0f, Gold = 6d
+            },
+
+            // ---- 지역 3 (자줏빛 밤): 유령과 악귀
+            new EnemyTier {
+                Aseprite = "Inimig (4)", AssetName = "Enemy_Hitodama", DisplayName = "Hitodama",
+                IdleClip = "Tag", DeathClip = "Tag_1", Region = 3,
+                SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.25f,
+                QueueSpacing = 1.0f, HoverHeight = 0.35f, Gold = 5d
+            },
+            new EnemyTier {
+                Aseprite = "Inimig (3)", AssetName = "Enemy_Onigashira", DisplayName = "Onigashira",
+                IdleClip = "Tag", DeathClip = "Tag_2", Region = 3,
+                SpawnWeight = 4f, Health = 17f, MoveSpeed = 1.2f,
+                QueueSpacing = 1.0f, HoverHeight = 0.4f, Gold = 6d
+            },
+
+            // ---- 지역 4 (요괴 소굴): 지역 3 재활용, 주력만 오니 두상으로 역전.
+            // 틴트는 걸지 않는다 - 적 틴트 금지는 가독성 규칙이다(배경만 틴트)
+            new EnemyTier {
+                Aseprite = "Inimig (3)", AssetName = "Enemy_Onigashira_Den", DisplayName = "Onigashira",
+                IdleClip = "Tag", DeathClip = "Tag_2", Region = 4,
+                SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.2f,
+                QueueSpacing = 1.0f, HoverHeight = 0.4f, Gold = 5d
+            },
+            new EnemyTier {
+                Aseprite = "Inimig (4)", AssetName = "Enemy_Hitodama_Den", DisplayName = "Hitodama",
+                IdleClip = "Tag", DeathClip = "Tag_1", Region = 4,
+                SpawnWeight = 4f, Health = 17f, MoveSpeed = 1.25f,
+                QueueSpacing = 1.0f, HoverHeight = 0.35f, Gold = 6d
+            },
+
+            // ---- 보스 전용: 외눈 등롱(지역 1 피날레)의 원본. 가중치 0이라
+            // 어느 풀에도, 어느 평균에도 안 들어간다 - 스폰 경로는 잃지만
+            // Boss_CyclopsLantern이 baseMob으로 계속 참조한다
             new EnemyTier {
                 Aseprite = "Inimig (1)", AssetName = "Enemy_Chochin", DisplayName = "Chochin-obake",
-                IdleClip = "Tag", DeathClip = "Tag_2",
-                SpawnWeight = 1f, Health = 34f, MoveSpeed = 0.8f,
+                IdleClip = "Tag", DeathClip = "Tag_2", Region = 0,
+                SpawnWeight = 0f, Health = 34f, MoveSpeed = 0.8f,
                 QueueSpacing = 1.5f, HoverHeight = 0.1f, Gold = 18d
             }
         };
@@ -134,9 +222,16 @@ namespace Onikiri.EditorTools
             // 만들어두게 해서 메뉴 실행 순서를 외우지 않아도 되게 한다
             SfxTrimBuilder.Rebuild();
 
+            // UI 글리프(톱니·자물쇠·해골 등)도 같은 이유로 스스로 굽는다 (38단계)
+            UiGlyphBuilder.Build();
+
             foreach (var tier in Tiers) BuildEnemyDefinition(tier);
             BossContentBuilder.BuildDefinition();
             BossContentBuilder.BuildBosses();
+
+            // 지역 몹 풀은 보스 빌드 다음이다. Region_N 애셋이 그쪽(EnsureDefaultAssets)
+            // 에서 만들어지고, 풀을 물릴 자리가 있어야 물릴 수 있다
+            BuildRegionMobSets();
             BuildEnemyPrefab();
             BuildDamageNumberPrefab();
             SakuraContentBuilder.BuildArt();
@@ -148,9 +243,12 @@ namespace Onikiri.EditorTools
             // 참조는 그때 발생하는 재임포트로 무효화될 수 있고, 무효한 UnityEngine.Object를
             // SerializedProperty에 대입하면 아무 에러 없이 null이 기록된다.
             // 스포너에 프리팹이 비어 있던 원인이 정확히 이것이었다
+            // 스포너의 시작 풀은 지역 1이다. 지역이 넘어가면 RegionMobSwitcher가
+            // 런타임에 바꾸므로, 씬에 굳는 것은 첫 지역 한 벌뿐이다
             var definitions = new List<EnemyDefinition>();
             foreach (var tier in Tiers)
             {
+                if (tier.Region != 1) continue;
                 var loaded = AssetDatabase.LoadAssetAtPath<EnemyDefinition>(DefinitionPath(tier));
                 if (loaded != null) definitions.Add(loaded);
             }
@@ -168,6 +266,10 @@ namespace Onikiri.EditorTools
             // 안전 영역 루트를 먼저 세운다. 아래의 배선이 밴드를 찾아 쓰는데, 그 사이에
             // 밴드의 부모가 바뀌면 방금 연결한 참조가 가리키는 계층이 달라진다
             UpgradePanelBuilder.EnsureSafeArea();
+
+            // 밴드 앵커를 DisplayConfig에 다시 맞춘다(41단계 탭바 7.5%).
+            // 씬에 저장된 옛 비율이 남으면 코드의 배치 계산과 씬이 어긋난다
+            MainSceneBuilder.ReassertBands();
 
             var shake = WireCameraShake();
             var hitAudio = WireHitAudio();
@@ -200,12 +302,31 @@ namespace Onikiri.EditorTools
             // 통해 스탯에 도달한다). 잠긴 탭보다 먼저인 것은 앞의 둘과 같은 이유다
             var equipment = EquipmentPanelBuilder.Build();
 
+            // 상점은 대장간 다음이다(46단계). 뽑기가 요도의 상태를 읽어
+            // 혼 정수의 상한을 판정하므로(YodoSystem.TryTakeEssence)
+            // YodoSystem이 이미 씬에 있어야 하고, 그것을 세우는 것은 대장간
+            // 빌더다. 잠긴 탭보다 먼저인 것은 앞의 셋과 같은 이유다
+            ShopPanelBuilder.Build();
+
             WireLockedTabs();
             WireStageAdvance();
 
             // 보스전은 강화 다음이다. 실패 문구가 "어느 축을 올려라"를 고르려면
             // UpgradeSystem이 이미 씬에 있어야 한다
             BossContentBuilder.Wire(spawner);
+
+            // 지역 몹 스위처는 보스전 다음이다. 확대판 보스도 그 지역의 잡몹이어야
+            // 하므로 BossFight가 씬에 있어야 물릴 수 있다
+            WireRegionMobSwitcher(spawner);
+
+            // 상단 바에서 열리는 화면 셋(스탯/재선택/설정)도 보스전 다음이다 -
+            // 재선택 화면이 BossFight(파밍 중 가드)와 스포너를 참조한다
+            HudScreensBuilder.Build();
+
+            // 상호 배타 배선은 **모든 화면이 만들어진 뒤** 마지막이다. 패널
+            // 빌더들이 자기 판을 지우고 다시 만들므로, 먼저 배선하면 죽은
+            // 참조가 남는다
+            WireScreenExclusivity();
 
             // 세션은 마지막이다. 강화·스테이지·전투가 전부 자리를 잡은 뒤라야
             // 세이브를 복원할 대상을 찾을 수 있다
@@ -228,6 +349,103 @@ namespace Onikiri.EditorTools
             return DataFolder + "/" + tier.AssetName + ".asset";
         }
 
+        private const string MobSetFolder = DataFolder + "/Mobs";
+
+        /** 지역 N의 잡몹 풀 애셋 경로. BossContentBuilder가 지역 1 풀을 배선에 쓴다 */
+        public static string RegionMobSetPath(int region)
+        {
+            return MobSetFolder + "/RegionMobs_" + region + ".asset";
+        }
+
+        /**
+         * @brief 지역별 잡몹 풀 애셋을 만들고 Region_N에 물린다.
+         *
+         * 풀의 구성원은 Tiers 표의 Region 칸에서 나온다. Region_N 애셋은 씨앗이
+         * 한 번만 도는 물건이라(LoadOrCreate), mobs 칸은 여기서 매번 덮어쓴다 -
+         * 풀은 손으로 배치하는 데이터가 아니라 빌더 생성물이기 때문이다.
+         */
+        private static void BuildRegionMobSets()
+        {
+            EnsureFolder(MobSetFolder);
+
+            string[] regionPaths =
+            {
+                BossConfigBuilder.Region1Path, BossConfigBuilder.Region2Path,
+                BossConfigBuilder.Region3Path, BossConfigBuilder.Region4Path
+            };
+
+            for (int region = 1; region <= regionPaths.Length; region++)
+            {
+                var mobs = new List<EnemyDefinition>();
+                foreach (var tier in Tiers)
+                {
+                    if (tier.Region != region) continue;
+                    var definition = AssetDatabase.LoadAssetAtPath<EnemyDefinition>(DefinitionPath(tier));
+                    if (definition != null) mobs.Add(definition);
+                }
+
+                if (mobs.Count == 0)
+                {
+                    Debug.LogError("[Onikiri] Region " + region + " has no mobs in the tier table.");
+                    continue;
+                }
+
+                string setPath = RegionMobSetPath(region);
+                var set = AssetDatabase.LoadAssetAtPath<RegionMobSet>(setPath);
+                if (set == null)
+                {
+                    set = ScriptableObject.CreateInstance<RegionMobSet>();
+                    AssetDatabase.CreateAsset(set, setPath);
+                }
+
+                set.mobs = mobs.ToArray();
+                EditorUtility.SetDirty(set);
+
+                var regionConfig = AssetDatabase.LoadAssetAtPath<RegionConfig>(regionPaths[region - 1]);
+                if (regionConfig == null)
+                {
+                    Debug.LogError("[Onikiri] Region config missing at " + regionPaths[region - 1]);
+                    continue;
+                }
+
+                if (regionConfig.mobs != set)
+                {
+                    regionConfig.mobs = set;
+                    EditorUtility.SetDirty(regionConfig);
+                }
+
+                Debug.Log(string.Format("[Onikiri] Region {0} mobs: {1}",
+                    region, string.Join(", ", mobs.ConvertAll(m => m.displayName).ToArray())));
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
+        /**
+         * @brief 지역이 바뀔 때 스폰 풀을 갈아끼우는 컴포넌트를 배선한다.
+         *
+         * RegionBackgroundSwitcher(BattleStageBuilder)와 같은 GameObject에 산다.
+         * 이 배선이 빠지면 전 지역이 지역 1 몹으로 돈다 - 화면은 멀쩡해 보이고
+         * 지역 2부터만 조용히 틀린다.
+         */
+        private static void WireRegionMobSwitcher(EnemySpawner spawner)
+        {
+            var battle = GameObject.Find("Battle");
+            if (battle == null) return;
+
+            var switcher = battle.GetComponent<RegionMobSwitcher>();
+            if (switcher == null) switcher = battle.AddComponent<RegionMobSwitcher>();
+
+            var so = new SerializedObject(switcher);
+            so.FindProperty("roster").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<BossRoster>(BossConfigBuilder.RosterPath);
+            so.FindProperty("spawner").objectReferenceValue = spawner;
+            so.FindProperty("bossFight").objectReferenceValue = battle.GetComponent<BossFight>();
+            so.FindProperty("progress").objectReferenceValue =
+                Object.FindFirstObjectByType<Onikiri.Progression.StageProgress>();
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static EnemyDefinition BuildEnemyDefinition(EnemyTier tier)
         {
             string path = DefinitionPath(tier);
@@ -241,11 +459,11 @@ namespace Onikiri.EditorTools
             }
 
             definition.displayName = tier.DisplayName;
-            definition.idleFrames = FramesFromClip(aseprite, tier.IdleClip);
+            definition.idleFrames = Frames(aseprite, tier.IdleClip, tier.IdleNames);
             // 이 팩들에는 피격 태그가 없다. Enemy가 색 플래시로 대체하며,
             // 이 스프라이트 크기에서는 충분히 읽힌다
             definition.hurtFrames = new Sprite[0];
-            definition.deathFrames = FramesFromClip(aseprite, tier.DeathClip);
+            definition.deathFrames = Frames(aseprite, tier.DeathClip, tier.DeathNames);
             definition.frameRate = 12f;
 
             // 이 정의는 잡몹으로도, 그 스테이지의 '거대' 보스로도 쓰인다.
@@ -280,6 +498,40 @@ namespace Onikiri.EditorTools
                 definition.spawnWeight, definition.maxHealth, tier.Gold, definition.artBottomOffset));
 
             return definition;
+        }
+
+        /** 클립 이름이 있으면 클립에서, 없으면 스프라이트 이름 범위에서 프레임을 뽑는다 */
+        private static Sprite[] Frames(string assetPath, string clipName, string[] spriteNames)
+        {
+            if (!string.IsNullOrEmpty(clipName)) return FramesFromClip(assetPath, clipName);
+            if (spriteNames != null && spriteNames.Length > 0) return FramesByName(assetPath, spriteNames);
+            return new Sprite[0];
+        }
+
+        /**
+         * @brief 스프라이트 이름으로 프레임을 집는다. 태그가 없는 구간용 폴백.
+         *
+         * Inimig (2)처럼 태그가 안 붙은 프레임은 클립이 없지만 스프라이트로는
+         * 임포트된다(임포터가 Frame_N으로 이름 붙인다. 중복 프레임은 건너뛰므로
+         * 번호에 구멍이 있을 수 있다 - 그래서 범위가 아니라 이름을 하나씩 적는다).
+         */
+        private static Sprite[] FramesByName(string assetPath, string[] spriteNames)
+        {
+            var byName = new Dictionary<string, Sprite>();
+            foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+            {
+                var sprite = asset as Sprite;
+                if (sprite != null) byName[sprite.name] = sprite;
+            }
+
+            var frames = new List<Sprite>();
+            foreach (var name in spriteNames)
+            {
+                Sprite sprite;
+                if (byName.TryGetValue(name, out sprite)) frames.Add(sprite);
+                else Debug.LogWarning("[Onikiri] Sprite '" + name + "' not found in " + assetPath);
+            }
+            return frames.ToArray();
         }
 
         /**
@@ -364,6 +616,20 @@ namespace Onikiri.EditorTools
             var definitions = spawnerSo.FindProperty("definitions");
             if (definitions.arraySize == 0 || definitions.GetArrayElementAtIndex(0).objectReferenceValue == null)
                 problems.Add("EnemySpawner.definitions is empty");
+
+            // 씬에 굳는 시작 풀은 지역 1이어야 한다. 다른 풀이 굳어 있으면 첫
+            // 프레임 스폰과 세이브 복원 직후의 평균이 잠깐 다른 풀에서 나온다
+            var region1Set = AssetDatabase.LoadAssetAtPath<RegionMobSet>(RegionMobSetPath(1));
+            if (region1Set == null || region1Set.mobs == null)
+                problems.Add("Region-1 mob set missing at " + RegionMobSetPath(1));
+            else if (definitions.arraySize != region1Set.mobs.Length)
+                problems.Add("EnemySpawner.definitions is not the region-1 pool");
+            else
+            {
+                for (int i = 0; i < region1Set.mobs.Length; i++)
+                    if (definitions.GetArrayElementAtIndex(i).objectReferenceValue != region1Set.mobs[i])
+                        problems.Add("EnemySpawner.definitions[" + i + "] differs from the region-1 pool");
+            }
 
             var samurai = GameObject.Find("Samurai");
             if (samurai == null) { Debug.LogError("[Onikiri] Samurai missing from scene."); return false; }
@@ -512,6 +778,22 @@ namespace Onikiri.EditorTools
                                  + " - the pixel grid would break at some device scales");
             }
 
+            // 지역 잡몹 스위처. 빠지면 전 지역이 지역 1 몹으로 돈다 - 화면은
+            // 멀쩡해 보이고 지역 2부터만 조용히 틀린다
+            var mobSwitcher = layoutObject != null ? layoutObject.GetComponent<RegionMobSwitcher>() : null;
+            if (mobSwitcher == null)
+                problems.Add("Battle has no RegionMobSwitcher - every region would spawn region-1 mobs");
+            else
+            {
+                var mobSwitcherSo = new SerializedObject(mobSwitcher);
+                RequireReference(mobSwitcherSo, "roster", problems);
+                RequireReference(mobSwitcherSo, "spawner", problems);
+                RequireReference(mobSwitcherSo, "bossFight", problems);
+            }
+
+            VerifyRegionMobPools(problems);
+            VerifyHudScreens(problems);
+
             // 플레이어 체력이 없으면 보스전에서 아무도 죽지 않는다
             var playerHealthComponent = samurai.GetComponent<PlayerHealth>();
             if (playerHealthComponent == null) problems.Add("Samurai has no PlayerHealth");
@@ -564,6 +846,136 @@ namespace Onikiri.EditorTools
                 return false;
             }
             return true;
+        }
+
+        /**
+         * @brief 상단 바 버튼 셋과 그 화면들이 배선됐는지 (37단계).
+         *
+         * HudScreenButton.screen이 비면 버튼은 정상으로 보이고 눌러도 아무 일도
+         * 일어나지 않는다 - LockedTab의 "구현 안 된 탭"과 같은 종류의 실패인데,
+         * 이쪽은 잠금 표시도 없어서 화면에서 구분할 방법이 없다.
+         */
+        private static void VerifyHudScreens(List<string> problems)
+        {
+            var topBar = MainSceneBuilder.FindBand("TopBar");
+            var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+            if (topBar == null || safeArea == null) return;
+
+            string[][] pairs =
+            {
+                new[] { "StageButton", HudScreensBuilder.RegionSelectPanelName },
+                new[] { "PortraitButton", HudScreensBuilder.StatsPanelName },
+                new[] { "SettingsButton", HudScreensBuilder.SettingsPanelName }
+            };
+
+            foreach (var pair in pairs)
+            {
+                var buttonObject = topBar.Find(pair[0]);
+                if (buttonObject == null)
+                {
+                    problems.Add("Top bar has no " + pair[0]);
+                    continue;
+                }
+
+                var control = buttonObject.GetComponent<Onikiri.UI.HudScreenButton>();
+                if (control == null)
+                {
+                    problems.Add(pair[0] + " has no HudScreenButton - it would do nothing");
+                    continue;
+                }
+
+                var so = new SerializedObject(control);
+                var screen = so.FindProperty("screen").objectReferenceValue as GameObject;
+                if (screen == null || screen.name != pair[1])
+                    problems.Add(pair[0] + " is not wired to " + pair[1]);
+                else if (screen.activeSelf)
+                    problems.Add(pair[1] + " is saved active - it would cover the growth panel on boot");
+            }
+
+            // 스탯 창의 값 라벨이 전부 물려 있는지. 하나라도 비면 그 줄만 "-"로 남는다
+            var statsObject = safeArea.Find(HudScreensBuilder.StatsPanelName);
+            var stats = statsObject != null
+                ? statsObject.GetComponent<Onikiri.UI.StatsPanel>() : null;
+            if (stats == null) problems.Add("StatsPanel component missing");
+            else
+            {
+                var statsSo = new SerializedObject(stats);
+                RequireReference(statsSo, "combat", problems);
+                RequireReference(statsSo, "health", problems);
+                RequireReference(statsSo, "damageValue", problems);
+                RequireReference(statsSo, "dpsValue", problems);
+                RequireReference(statsSo, "multiplierDetail", problems);
+                // 경험치 수치는 이제 이 창에만 있다(스트립에는 숫자가 없다).
+                // 빠지면 정확한 경험치를 볼 자리가 게임 어디에도 없어진다
+                RequireReference(statsSo, "expValue", problems);
+            }
+
+            var selectObject = safeArea.Find(HudScreensBuilder.RegionSelectPanelName);
+            var select = selectObject != null
+                ? selectObject.GetComponent<Onikiri.UI.RegionSelectPanel>() : null;
+            if (select == null) problems.Add("RegionSelectPanel component missing");
+            else
+            {
+                var selectSo = new SerializedObject(select);
+                RequireReference(selectSo, "progress", problems);
+                RequireReference(selectSo, "fight", problems);
+                RequireReference(selectSo, "spawner", problems);
+                RequireReference(selectSo, "frontierButton", problems);
+                RequireArray(selectSo, "rows", problems);
+            }
+
+            // 처치 할당량이 보스 자리로 옮겨왔는지. 상단 바에서 뺐는데 여기도
+            // 없으면 진행 신호가 화면에서 통째로 사라진다
+            var band = MainSceneBuilder.FindBand("BattleArea");
+            if (band != null && band.Find("BossQuota") == null)
+                problems.Add("BossQuota missing - the kill counter left the top bar and never landed");
+        }
+
+        /**
+         * @brief 지역 1~4의 잡몹 풀이 전부 서 있고, 각 몹이 화면에 나올 수 있는지.
+         *
+         * idle이 비면 투명한 요괴가, death가 비면 죽는 순간 뚝 사라지는 요괴가
+         * 나온다. 특히 Kasa-obake는 클립이 아니라 이름 범위로 프레임을 집으므로
+         * (태그가 없는 개체다), 임포터가 이름 규칙을 바꾸면 여기서 잡혀야 한다.
+         */
+        private static void VerifyRegionMobPools(List<string> problems)
+        {
+            string[] regionPaths =
+            {
+                BossConfigBuilder.Region1Path, BossConfigBuilder.Region2Path,
+                BossConfigBuilder.Region3Path, BossConfigBuilder.Region4Path
+            };
+
+            for (int region = 1; region <= regionPaths.Length; region++)
+            {
+                var config = AssetDatabase.LoadAssetAtPath<RegionConfig>(regionPaths[region - 1]);
+                if (config == null)
+                {
+                    problems.Add("Region config missing at " + regionPaths[region - 1]);
+                    continue;
+                }
+
+                if (config.mobs == null || config.mobs.mobs == null || config.mobs.mobs.Length == 0)
+                {
+                    problems.Add("Region " + region + " has no mob pool - it would inherit the previous region's mobs");
+                    continue;
+                }
+
+                foreach (var definition in config.mobs.mobs)
+                {
+                    if (definition == null)
+                    {
+                        problems.Add("Region " + region + " mob pool has a null entry");
+                        continue;
+                    }
+                    if (definition.idleFrames == null || definition.idleFrames.Length == 0)
+                        problems.Add(definition.name + " has no idle frames - it would be invisible");
+                    if (definition.deathFrames == null || definition.deathFrames.Length == 0)
+                        problems.Add(definition.name + " has no death frames - it would vanish without dying");
+                    if (definition.spawnWeight <= 0f)
+                        problems.Add(definition.name + " has zero spawn weight but sits in the region " + region + " pool");
+                }
+            }
         }
 
         /**
@@ -723,37 +1135,124 @@ namespace Onikiri.EditorTools
         }
 
         /**
-         * @brief 상단 둘째 줄의 글자가 상자에 들어가는지를 빌드가 직접 잰다.
+         * @brief 상단 바 라벨들이 상자에 들어가는지를 빌드가 직접 잰다.
          *
-         * 이 줄은 두 번 잘렸고 두 번 다 원인이 같았다 - **글자 폭을 눈으로
+         * 이 바는 두 번 잘렸고 두 번 다 원인이 같았다 - **글자 폭을 눈으로
          * 어림했기 때문이다.** 16단계에서 28px/글자로 잡았지만 55pt Galmuri의
          * 실측은 33.7px이었고, 20%의 오차가 레벨 41에서 터졌다. 어림이 틀렸다는
          * 신호는 스크린샷뿐이었다.
          *
-         * 그래서 어림을 걷어내고 TMP에게 직접 묻는다. 세 라벨의 최악 문자열을
+         * 그래서 어림을 걷어내고 TMP에게 직접 묻는다. 라벨마다 최악 문자열을
          * 실제 폰트로 재서 상자와 비교한다. 여기서 걸리면 빌드가 실패하므로,
-         * 다음에 이 줄에 무언가를 더 넣는 사람은 스크린샷이 아니라 에러로
+         * 다음에 이 바에 무언가를 더 넣는 사람은 스크린샷이 아니라 에러로
          * 알게 된다. 행 아이콘 검사, 글리프 검사와 같은 계열이다.
          *
          * 최악 문자열의 근거:
-         *   "레벨 999"     3자리 레벨. 방치형 수명 안에 반드시 닿는다
-         *   "레벨업 99"    쌓인 레벨업 개수. 쓸어담기 전까지 두 자리가 될 수 있다
-         *   "999aa/999aa"  경험치 필요량 48 x 1.26^n 이 10^17에 닿는 레벨 173 부근
+         *   "Lv.999"        3자리 레벨. 방치형 수명 안에 반드시 닿는다
+         *   "999.9aa"       골드 축약의 최악(단위 두 글자). 보석은 미축약 "99,999"
+         *   "지역 4 · 10/10" 마지막 지역의 마지막 스테이지
+         *   "레벨업 99"      쌓인 레벨업 개수. 쓸어담기 전까지 두 자리가 될 수 있다
+         *
+         * 경험치 숫자("999aa/999aa")는 2a 후속에서 화면을 떠났다 - 바가 얇은
+         * 스트립이 되면서 숫자는 스탯 창으로 갔고, 그쪽은 값 폭이 행 폭이라
+         * 잘릴 수 없다.
          */
         private static void VerifyExpRowFits(List<string> problems)
         {
             var topBar = MainSceneBuilder.FindBand("TopBar");
             if (topBar == null) return;
 
-            // 라벨 경로, 폭을 잴 대상, 최악 문자열.
-            // 경험치 라벨만 상자가 막대에서 안쪽 여백만큼 줄어든다
-            CheckLabelFits(topBar, "LevelLabel", "레벨 999", LevelLabelWidth, problems);
-            CheckLabelFits(topBar, "LevelUpButton/Label", "레벨업 99", LevelUpWidth, problems);
+            // 캡션 아틀라스가 없으면 Demote가 조용히 아무것도 안 해서 위계가
+            // 사라진다 - 에러가 아니라 "전부 44pt인 화면"으로만 나타난다
+            if (UiFonts.Caption == null)
+                problems.Add("Caption font missing at " + UiFonts.CaptionPath
+                             + " - run Onikiri/Art/Build Pixel Font Assets");
 
-            var track = topBar.Find("ExpTrack") as RectTransform;
-            if (track != null)
-                CheckLabelFits(topBar, "ExpTrack/ExpLabel", "999aa/999aa",
-                               track.rect.width - ExpLabelInset * 2f, problems);
+            // ---- 2b 상단 바: 초상 배지 / 재화 트레이 / 스테이지 칩
+
+            CheckLabelFits(topBar, "PortraitButton/LevelBadge/Label", "Lv.999",
+                           LevelBadgeWidth - 8f, problems);
+            CheckLabelFits(topBar, "CurrencyTray/GoldLabel", "999.9aa", GoldLabelWidth, problems);
+            CheckLabelFits(topBar, "CurrencyTray/GemLabel", "99,999", GemLabelWidth, problems);
+
+            // 최악 문구가 짧아졌다 - "클리어"가 빠졌다(2b 압축). 상자는 깃발
+            // 글리프 자리만큼 줄어 있다.
+            // 42단계부터 지역 번호가 무한히 오른다(무한 구간). 두 자리(지역
+            // 10~99 = st91~989)까지가 현실적인 최악이고, 세 자리는 st991부터라
+            // 그때 다시 잰다
+            CheckLabelFits(topBar, "StageButton/StageLabel", "지역 99 · 10/10",
+                           StageChipWidth - (StageChipIconLeft + StageChipIconSize + 8f + 14f),
+                           problems);
+
+            // 1행에서 트레이와 설정 톱니가 다투지 않는지. 상자끼리의 검사라
+            // 폰트와 무관하게 상수에서 바로 나온다
+            float trayRight = ContentLeft + CurrencyTrayWidth;
+            float settingsLeft = DisplayConfig.DesignWidth - SideMargin - SettingsSize;
+            if (trayRight + 12f > settingsLeft)
+                problems.Add(string.Format(
+                    "Top bar row 1 overlaps: the currency tray ends at {0:F0}px but the "
+                    + "settings button starts at {1:F0}px", trayRight, settingsLeft));
+
+            // 컨텐츠가 바 밴드(디자인 높이의 10% = 192px)를 넘지 않는지. 초상
+            // 배지가 가장 아래다 - 여기가 넘치면 배지가 전투 화면에 걸린다
+            float badgeBottom = PortraitTop + PortraitSize + LevelBadgeOverhang;
+            float bandHeight = DisplayConfig.DesignHeight * (1f - DisplayConfig.BattleAreaTop);
+            if (badgeBottom > bandHeight - TopBarEdgeHeight)
+                problems.Add(string.Format(
+                    "Top bar content overflows its band: the level badge ends at {0:F0}px "
+                    + "but the band is {1:F0}px tall", badgeBottom, bandHeight));
+
+            // 초상 버튼이 스탯 창 입구 노릇을 하려면 실제로 서 있어야 한다
+            if (topBar.Find("PortraitButton/Window/PortraitMask/TierPortrait") == null)
+                problems.Add("Top bar portrait is missing - run Build Combat Content "
+                             + "after Build Evolution Content");
+
+            // ---- 레벨업 버튼 (2b: 성장 패널 헤더로 내려왔다)
+
+            var growthPanel = MainSceneBuilder.FindBand("GrowthPanel");
+            var levelUp = growthPanel != null ? growthPanel.Find("LevelUpButton") : null;
+            if (levelUp == null)
+                problems.Add("LevelUpButton missing under GrowthPanel - run Build Combat Content");
+            else
+            {
+                CheckLabelFits(growthPanel, "LevelUpButton/Label", "레벨업 99",
+                               LevelUpWidth, problems);
+                if (levelUp.gameObject.activeSelf)
+                    problems.Add("LevelUpButton is saved active - it must start hidden and "
+                                 + "only appear when a level-up is pending (LevelHud)");
+
+                // 41단계 재배치의 회귀 가드: 밑변이 패널 상단(스트립 윗변)
+                // 아래로 내려오면 스트립을 덮고 탭 줄을 압박한다 - 그 모양이
+                // 정확히 "어색하게 걸친 상자"였다. pivot(1,1)이므로 밑변 =
+                // anchoredPosition.y - 높이다
+                var levelUpRect = levelUp as RectTransform;
+                if (levelUpRect != null
+                    && levelUpRect.anchoredPosition.y - levelUpRect.sizeDelta.y < 0f)
+                    problems.Add(string.Format(
+                        "LevelUpButton dips {0:F0}px into the growth panel - its bottom must "
+                        + "sit on the exp strip line, not cover it",
+                        levelUpRect.sizeDelta.y - levelUpRect.anchoredPosition.y));
+            }
+
+            // 경험치 스트립(2a 후속). 상단 바가 아니라 성장 패널 최상단에 있다.
+            // 채움은 앵커 폭 방식이라, 빈 상태(anchorMax.x=0)와 민짜 사각형
+            // (스프라이트 없음 - UISprite의 소프트 가장자리는 얇은 줄에서
+            // 그라데이션으로 읽힌다)을 빌드가 대조한다
+            var stripFill = growthPanel != null
+                ? growthPanel.Find(UpgradePanelBuilder.ExpStripName + "/Fill") as RectTransform : null;
+            var stripImage = stripFill != null
+                ? stripFill.GetComponent<UnityEngine.UI.Image>() : null;
+            if (stripImage == null)
+                problems.Add("Exp strip missing under GrowthPanel - run Build Combat Content");
+            else
+            {
+                if (stripImage.sprite != null)
+                    problems.Add("Exp strip fill has a sprite - soft edges read as a gradient "
+                                 + "on a 10px line. It must be a plain quad.");
+                if (stripFill.anchorMax.x > 0f)
+                    problems.Add("Exp strip fill is not empty in the built scene - "
+                                 + "LevelHud drives anchorMax.x at runtime and starts from 0");
+            }
         }
 
         private static void CheckLabelFits(Transform topBar, string path, string worst,
@@ -832,11 +1331,12 @@ namespace Onikiri.EditorTools
                 problems.Add("No growth rows found to check icons on");
 
             // 재화 아이콘도 같이 본다. 상단 바만 심볼이 없으면 두 화면이 서로
-            // 다른 규칙으로 읽힌다
+            // 다른 규칙으로 읽힌다. 경험치 별은 바와 함께 화면에서 빠졌다(2a 후속)
             var topBar = MainSceneBuilder.FindBand("TopBar");
             if (topBar != null)
             {
-                foreach (var name in new[] { "GoldIcon", "ExpIcon" })
+                // 재화 아이콘은 트레이 안에 있다(2b)
+                foreach (var name in new[] { "CurrencyTray/GoldIcon", "CurrencyTray/GemIcon" })
                 {
                     var found = topBar.Find(name);
                     var image = found != null ? found.GetComponent<UnityEngine.UI.Image>() : null;
@@ -962,18 +1462,30 @@ namespace Onikiri.EditorTools
             if (definition.attackFrames == null || definition.attackFrames.Length == 0)
                 problems.Add(config.name + ": attack clip has no frames - the boss would never hit");
 
-            // 시트 폭 / 셀 폭 = 프레임 수. 자른 결과가 그것과 다르면 셀 크기가
-            // 틀린 것이고, 화면에서는 프레임이 반씩 잘려 나온다
-            if (config.idleSheet != null && config.cellWidth > 0)
+            // 격자 칸 수와 프레임 수를 대조한다. 자른 결과가 격자와 안 맞으면 셀
+            // 크기가 틀린 것이고, 화면에서는 프레임이 반씩 잘려 나온다.
+            //
+            // 등호가 아니라 범위인 이유: 시트가 여러 줄일 수 있고(요괴 - 임포트
+            // 상한 4096px 때문에 줄바꿈해 굽는다) SliceGrid가 끝의 빈 칸을
+            // 버리므로, 프레임 수는 "마지막 줄에 하나 이상"과 "전체 칸 이하"
+            // 사이에 있어야 한다. 한 줄 시트에서는 이 범위가 등호와 같다
+            if (config.idleSheet != null && config.cellWidth > 0 && config.cellHeight > 0)
             {
-                int expected = config.idleSheet.width / config.cellWidth;
                 if (config.idleSheet.width % config.cellWidth != 0)
                     problems.Add(string.Format("{0}: IDLE sheet {1}px does not divide by cell width {2}",
                         config.name, config.idleSheet.width, config.cellWidth));
-                else if (definition.idleFrames != null && definition.idleFrames.Length != expected)
-                    problems.Add(string.Format(
-                        "{0}: idle clip has {1} frames but the sheet holds {2} - cell size is wrong",
-                        config.name, definition.idleFrames.Length, expected));
+                else if (definition.idleFrames != null)
+                {
+                    int columns = config.idleSheet.width / config.cellWidth;
+                    int gridRows = Mathf.Max(1, config.idleSheet.height / config.cellHeight);
+                    int capacity = columns * gridRows;
+                    int frames = definition.idleFrames.Length;
+
+                    if (frames > capacity || frames <= capacity - columns)
+                        problems.Add(string.Format(
+                            "{0}: idle clip has {1} frames but the {2}x{3} grid holds {4} - cell size is wrong",
+                            config.name, frames, columns, gridRows, capacity));
+                }
             }
 
             if (config.feetPadding < 0 || config.feetPadding >= config.cellHeight)
@@ -1011,7 +1523,6 @@ namespace Onikiri.EditorTools
                 var hudSo = new SerializedObject(hud);
                 RequireReference(hudSo, "levelLabel", problems);
                 RequireReference(hudSo, "expFill", problems);
-                RequireReference(hudSo, "expLabel", problems);
                 RequireReference(hudSo, "levelUpRoot", problems);
                 RequireReference(hudSo, "levelUpButton", problems);
                 RequireReference(hudSo, "levelUpLabel", problems);
@@ -1450,12 +1961,15 @@ namespace Onikiri.EditorTools
             so.FindProperty("canvas").objectReferenceValue = canvas.GetComponent<Canvas>();
             so.FindProperty("prewarm").intValue = 12;
 
-            // 경험치가 빨려 들어갈 곳. 상단 바의 경험치 바이고, WireWalletAndHud가
-            // 이미 세워뒀다 - 순서가 뒤바뀌면 여기서 null이 기록된다
-            var topBar = MainSceneBuilder.FindBand("TopBar");
-            var expTrack = topBar != null ? topBar.Find("ExpTrack") : null;
-            so.FindProperty("expTarget").objectReferenceValue = expTrack;
-            so.FindProperty("expColor").colorValue = ExpFillColor;
+            // 경험치가 빨려 들어갈 곳. 성장 패널 상단 경계의 얇은 스트립이고
+            // (2a 후속 - 상단 바에서 내려왔다), WireWalletAndHud가 이미 세워뒀다 -
+            // 순서가 뒤바뀌면 여기서 null이 기록된다. 처치 지점에서 **아래로**
+            // 떨어지는 연출이 되는데, 흡수처가 화면 아래 패널이니 방향도 맞다
+            var growthPanel = MainSceneBuilder.FindBand("GrowthPanel");
+            var expStrip = growthPanel != null
+                ? growthPanel.Find(UpgradePanelBuilder.ExpStripName) : null;
+            so.FindProperty("expTarget").objectReferenceValue = expStrip;
+            so.FindProperty("expColor").colorValue = ExpStripFillColor;
 
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -1463,10 +1977,21 @@ namespace Onikiri.EditorTools
         }
 
         /**
-         * @brief Battle 루트에 지갑/스테이지를, 상단 바에 골드·스테이지 표시를 붙인다.
+         * @brief Battle 루트에 지갑/스테이지를, 상단 바에 초상·재화·스테이지를 세운다.
          *
-         * 상단 바는 세로 192px밖에 안 되므로 두 표시를 좌우로 나눈다. 골드는 왼쪽에서
-         * 자릿수가 계속 늘어나고, 스테이지는 오른쪽에 붙어 폭이 거의 변하지 않는다.
+         * ## 2b 재디자인 - 초상 앵커
+         *
+         * 37~38단계의 상단 바는 "칩들의 줄 두 개"였다: Ancient 나무 판 테두리의
+         * 상자들이 좌우로 흩어져 있었고, 2행은 레벨 칩과 설정뿐이라 성겼다.
+         * 좁은 바에서 두꺼운 테두리 상자가 겹겹이 서는 것이 촌스러움의 핵심이었다.
+         *
+         * 재배치의 축은 **왼쪽의 캐릭터 초상**이다(슬레이어 참고). 초상이 1.5행을
+         * 채우고, 그 옆에 재화 트레이(1행)와 스테이지 칩(2행)이 붙는다. 레벨은
+         * 텍스트 칩에서 초상 코너의 배지가 됐고, 레벨업 버튼은 성장 패널 헤더로
+         * 내려갔다(BuildExpRow) - 상단 바는 "상태", 패널이 "행동"이다.
+         *
+         * 판은 전부 민짜다. 바탕은 성장 패널과 같은 화지+먹빛이고, 칩은 반 단
+         * 밝은 톤온톤(UiSkin.InkChip) - 테두리 없이 색차가 윤곽이다.
          */
         private static void WireWalletAndHud()
         {
@@ -1481,55 +2006,117 @@ namespace Onikiri.EditorTools
             var topBar = MainSceneBuilder.FindBand("TopBar");
             if (topBar == null) return;
 
-            // 재화 아이콘. 성장 행이 심볼을 쓰기 시작했으므로 상단 바도 같은
-            // 언어를 써야 한다 - 한쪽만 아이콘이면 두 화면이 다른 규칙으로 읽힌다
-            EnsureBarIcon(topBar, "GoldIcon", UiIcons.Load(UiIcons.GoldIcon), new Vector2(48f, -40f));
+            // 칩 세대의 잔재. 재화는 트레이 안으로 들어갔고 레벨 칩은 초상
+            // 배지가 됐다 - 옛 직속 자식이 남으면 유령 텍스트다(11단계 계열)
+            foreach (var staleName in new[]
+                     { "GoldIcon", "GoldLabel", "GemIcon", "GemLabel", "LevelButton", "StageLabel" })
+            {
+                var stale = topBar.Find(staleName);
+                if (stale != null) Object.DestroyImmediate(stale.gameObject);
+            }
 
-            var goldLabel = EnsureHudLabel(topBar, "GoldLabel", TMPro.TextAlignmentOptions.Left,
-                                           new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                           new Vector2(48f + BarIconSize + 12f, -46f));
-            goldLabel.text = "골드 0";
+            BuildTopBarChrome(topBar);
+            BuildPortraitAnchor(topBar);
 
-            var stageLabel = EnsureHudLabel(topBar, "StageLabel", TMPro.TextAlignmentOptions.Right,
-                                            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-48f, -46f));
+            // ---- 재화 트레이. 골드와 보석이 **한 판** 위에 나란히 선다.
+            // 개별 상자 둘이 아니라 얕은 먹빛 웰 하나 - 눌리지 않는 표시라
+            // 바탕보다 어둡게 판다(BarTrack). 성장 행과 같은 심볼 언어다
+            var tray = EnsureImage(topBar, "CurrencyTray", UiSkin.BarTrack);
+            var trayRect = (RectTransform)tray.transform;
+            trayRect.anchorMin = trayRect.anchorMax = new Vector2(0f, 1f);
+            trayRect.pivot = new Vector2(0f, 1f);
+            trayRect.sizeDelta = new Vector2(CurrencyTrayWidth, RowHeight2b);
+            trayRect.anchoredPosition = new Vector2(ContentLeft, -RowTop);
+            tray.sprite = null;
+            tray.type = UnityEngine.UI.Image.Type.Simple;
+            tray.raycastTarget = false;
 
-            // 지역 표시가 붙어 길어졌다. "지역 4 · 7/10  처치 3/10" 이 최악이고
-            // 55pt에서 627px이다
-            ((RectTransform)stageLabel.transform).sizeDelta = new Vector2(660f, 72f);
-            stageLabel.text = "지역 1 · 1/10  처치 0/10";
+            float x = TrayPad;
+            EnsureTrayIcon(tray.transform, "GoldIcon", UiIcons.Load(UiIcons.GoldIcon), x);
+            x += BarIconSize + 10f;
+            var goldLabel = EnsureTrayLabel(tray.transform, "GoldLabel", x, GoldLabelWidth);
+            goldLabel.text = "0";
+            x += GoldLabelWidth + 14f;
+            EnsureTrayIcon(tray.transform, "GemIcon", UiIcons.LoadItem(UiIcons.GemSprite), x);
+            x += BarIconSize + 8f;
+            var gemLabel = EnsureTrayLabel(tray.transform, "GemLabel", x, GemLabelWidth);
+            gemLabel.text = "0";
 
+            // ---- 스테이지 칩 (2행, 트레이 아래). 깃발 심볼 + "지역 1 · 1/10".
+            // "클리어"는 뺐다(HUDStage 주석) - 압축이 이 칩의 2b 몫이다
+            var stageButton = EnsureImage(topBar, "StageButton", UiSkin.InkChip);
+            var stageButtonRect = (RectTransform)stageButton.transform;
+            stageButtonRect.anchorMin = stageButtonRect.anchorMax = new Vector2(0f, 1f);
+            stageButtonRect.pivot = new Vector2(0f, 1f);
+            stageButtonRect.sizeDelta = new Vector2(StageChipWidth, StageChipHeight);
+            stageButtonRect.anchoredPosition = new Vector2(ContentLeft, -Row2Top);
+            stageButton.sprite = null;
+            stageButton.type = UnityEngine.UI.Image.Type.Simple;
+
+            var stageButtonControl = stageButton.GetComponent<UnityEngine.UI.Button>();
+            if (stageButtonControl == null)
+                stageButtonControl = stageButton.gameObject.AddComponent<UnityEngine.UI.Button>();
+            UiSkin.ApplyFlatButton(stageButtonControl, stageButton);
+
+            var stageChipIcon = EnsureImage(stageButton.transform, "Icon", UiIcons.Tint);
+            var stageChipIconRect = (RectTransform)stageChipIcon.transform;
+            stageChipIconRect.anchorMin = stageChipIconRect.anchorMax = new Vector2(0f, 0.5f);
+            stageChipIconRect.pivot = new Vector2(0f, 0.5f);
+            stageChipIconRect.sizeDelta = new Vector2(StageChipIconSize, StageChipIconSize);
+            stageChipIconRect.anchoredPosition = new Vector2(StageChipIconLeft, 0f);
+            stageChipIcon.sprite = UiGlyphBuilder.Load(UiGlyphBuilder.Flag);
+            stageChipIcon.raycastTarget = false;
+
+            var stageLabel = EnsureHudLabel(stageButton.transform, "StageLabel",
+                                            TMPro.TextAlignmentOptions.Center,
+                                            new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero);
+            UiFonts.Demote(stageLabel);
+            var stageLabelRect = (RectTransform)stageLabel.transform;
+            stageLabelRect.anchorMin = Vector2.zero;
+            stageLabelRect.anchorMax = Vector2.one;
+            // 세로는 넓힌다. Ellipsis가 세로 부족으로 한 줄을 통째로 지우는
+            // 것을 막는다 - 55pt 시절 경험치 숫자가 통째로 사라졌던 함정이다
+            stageLabelRect.offsetMin = new Vector2(StageChipIconLeft + StageChipIconSize + 8f, -14f);
+            stageLabelRect.offsetMax = new Vector2(-14f, 14f);
+            stageLabel.overflowMode = TMPro.TextOverflowModes.Ellipsis;
+            stageLabel.text = "지역 1 · 1/10";
+
+            // ---- 설정 톱니. 우측 유지, 판만 민짜 칩으로
+            var settings = EnsureImage(topBar, "SettingsButton", UiSkin.InkChip);
+            var settingsRect = (RectTransform)settings.transform;
+            settingsRect.anchorMin = settingsRect.anchorMax = new Vector2(1f, 1f);
+            settingsRect.pivot = new Vector2(1f, 1f);
+            settingsRect.sizeDelta = new Vector2(SettingsSize, RowHeight2b);
+            settingsRect.anchoredPosition = new Vector2(-SideMargin, -RowTop);
+            settings.sprite = null;
+            settings.type = UnityEngine.UI.Image.Type.Simple;
+
+            var settingsButton = settings.GetComponent<UnityEngine.UI.Button>();
+            if (settingsButton == null)
+                settingsButton = settings.gameObject.AddComponent<UnityEngine.UI.Button>();
+            UiSkin.ApplyFlatButton(settingsButton, settings);
+
+            var staleSettingsLabel = settings.transform.Find("Label");
+            if (staleSettingsLabel != null) Object.DestroyImmediate(staleSettingsLabel.gameObject);
+
+            var settingsIcon = EnsureImage(settings.transform, "Icon", UiIcons.Tint);
+            var settingsIconRect = (RectTransform)settingsIcon.transform;
+            settingsIconRect.anchorMin = settingsIconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            settingsIconRect.pivot = new Vector2(0.5f, 0.5f);
+            settingsIconRect.sizeDelta = new Vector2(BarIconSize, BarIconSize);
+            settingsIconRect.anchoredPosition = Vector2.zero;
+            settingsIcon.sprite = UiGlyphBuilder.Load(UiGlyphBuilder.Gear);
+            settingsIcon.raycastTarget = false;
+
+            // ---- HUD 컴포넌트 배선
             var hud = topBar.GetComponent<Onikiri.UI.HUDCurrency>();
             if (hud == null) hud = topBar.gameObject.AddComponent<Onikiri.UI.HUDCurrency>();
 
             var currencySo = new SerializedObject(hud);
             currencySo.FindProperty("label").objectReferenceValue = goldLabel;
-
-            // "골드"라는 글자를 뺀다. 15단계에서 코인 아이콘을 앞에 붙였으므로
-            // 그 두 글자는 같은 말을 두 번 하는 것이고, 55pt에서 112px을 먹는다.
-            // 17단계에서 스테이지 표시가 "지역 4 · 7/10  처치 3/10"으로 길어지면서
-            // 그 112px이 실제로 모자랐다
+            // "골드"라는 글자는 아이콘이 이미 말한다(15단계부터)
             currencySo.FindProperty("prefix").stringValue = string.Empty;
             currencySo.ApplyModifiedPropertiesWithoutUndo();
-
-            // 보석. **골드 오른쪽에 붙인다.**
-            //
-            // 상단 바는 세로 192px에 좌우로 골드와 스테이지가 이미 있다. 보석을
-            // 오른쪽 줄에 두면 스테이지 표시("지역 4 · 7/10  처치 3/10", 최악 627px)와
-            // 자리를 다투므로, 왼쪽 골드 옆에 이어 붙인다 - 둘 다 재화라 한 묶음으로
-            // 읽히는 것이 오히려 맞다.
-            //
-            // 골드 라벨의 폭을 잡아 그 오른쪽에 놓는다. 골드는 자릿수가 늘어나므로
-            // 고정 폭을 주고 그만큼 띄운다
-            ((RectTransform)goldLabel.transform).sizeDelta = new Vector2(GoldLabelWidth, 72f);
-
-            EnsureBarIcon(topBar, "GemIcon", UiIcons.LoadItem(UiIcons.GemSprite),
-                          new Vector2(48f + BarIconSize + 12f + GoldLabelWidth + 16f, -40f));
-
-            var gemLabel = EnsureHudLabel(topBar, "GemLabel", TMPro.TextAlignmentOptions.Left,
-                new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(48f + BarIconSize + 12f + GoldLabelWidth + 16f + BarIconSize + 10f, -46f));
-            ((RectTransform)gemLabel.transform).sizeDelta = new Vector2(180f, 72f);
-            gemLabel.text = "0";
 
             var gemHud = topBar.GetComponent<Onikiri.UI.HUDGems>();
             if (gemHud == null) gemHud = topBar.gameObject.AddComponent<Onikiri.UI.HUDGems>();
@@ -1543,10 +2130,232 @@ namespace Onikiri.EditorTools
 
             var stageSo = new SerializedObject(stageHud);
             stageSo.FindProperty("label").objectReferenceValue = stageLabel;
-            stageSo.FindProperty("prefix").stringValue = "스테이지 ";
+            stageSo.FindProperty("icon").objectReferenceValue = stageChipIcon;
+            stageSo.FindProperty("flagSprite").objectReferenceValue =
+                UiGlyphBuilder.Load(UiGlyphBuilder.Flag);
+            stageSo.FindProperty("skullSprite").objectReferenceValue =
+                UiGlyphBuilder.Load(UiGlyphBuilder.Skull);
             stageSo.ApplyModifiedPropertiesWithoutUndo();
 
             BuildExpRow(topBar);
+        }
+
+        /**
+         * @brief 상단 바 바탕. Ancient 나무 판을 벗고 성장 패널과 같은 화지+먹빛.
+         *
+         * 두꺼운 9-슬라이스 테두리가 2b가 지목한 촌스러움의 핵심이었다. 바탕이
+         * 하단 UI와 같은 언어(화지 결 x PanelInk)를 쓰면 "위아래 프레임은 같은
+         * 먹, 가운데만 씬"으로 화면이 선다. 전투와의 경계에는 하단 UI의
+         * TopEdge와 같은 먹선 한 획을 긋는다.
+         */
+        private static void BuildTopBarChrome(Transform topBar)
+        {
+            var chrome = EnsureImage(topBar, "Chrome", UiSkin.PanelInk);
+            var chromeRect = (RectTransform)chrome.transform;
+            chromeRect.anchorMin = Vector2.zero;
+            chromeRect.anchorMax = Vector2.one;
+            chromeRect.offsetMin = Vector2.zero;
+            chromeRect.offsetMax = Vector2.zero;
+            chrome.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(BackdropTextureBuilder.WashiPath);
+            chrome.type = UnityEngine.UI.Image.Type.Tiled;
+            chrome.color = UiSkin.PanelInk;
+            chrome.raycastTarget = false;
+
+            // 판은 라벨보다 뒤에 있어야 한다. 나중에 만든 자식이 위에 그려지므로
+            // 맨 앞으로 보낸다
+            chrome.transform.SetAsFirstSibling();
+
+            var edge = EnsureImage(topBar, "BottomEdge", UiSkin.PanelEdge);
+            var edgeRect = (RectTransform)edge.transform;
+            edgeRect.anchorMin = new Vector2(0f, 0f);
+            edgeRect.anchorMax = new Vector2(1f, 0f);
+            edgeRect.pivot = new Vector2(0.5f, 0f);
+            edgeRect.sizeDelta = new Vector2(0f, TopBarEdgeHeight);
+            edgeRect.anchoredPosition = Vector2.zero;
+            edge.sprite = null;
+            edge.type = UnityEngine.UI.Image.Type.Simple;
+            edge.raycastTarget = false;
+            edge.transform.SetSiblingIndex(1);
+        }
+
+        /**
+         * @brief 왼쪽의 캐릭터 초상 앵커: 액자 + 경지 초상 + Lv 배지.
+         *
+         * 초상은 캐릭터 탭(39단계)과 같은 물건이다 - EvolutionAppearance의 idle
+         * 첫 프레임을 머리 기준으로 세우는 CharacterTabPortrait를 그대로 쓰고,
+         * 칸이 크니 배율만 3배다. 측정이 두 벌이면 두 화면이 따로 논다.
+         *
+         * 배지가 옛 "레벨 74" 칩을 대체한다. 숫자의 출처는 그대로 LevelHud이고
+         * (levelPrefix만 "Lv."로), 탭 = 스탯 창 진입도 옛 레벨 칩의 경로 그대로
+         * 다 - 버튼 오브젝트 이름만 PortraitButton으로 바뀌었다(HudScreensBuilder).
+         */
+        private static void BuildPortraitAnchor(Transform topBar)
+        {
+            var frame = EnsureImage(topBar, "PortraitButton", UiSkin.InkChip);
+            var frameRect = (RectTransform)frame.transform;
+            frameRect.anchorMin = frameRect.anchorMax = new Vector2(0f, 1f);
+            frameRect.pivot = new Vector2(0f, 1f);
+            frameRect.sizeDelta = new Vector2(PortraitSize, PortraitSize);
+            frameRect.anchoredPosition = new Vector2(SideMargin, -PortraitTop);
+            frame.sprite = null;
+            frame.type = UnityEngine.UI.Image.Type.Simple;
+
+            var frameButton = frame.GetComponent<UnityEngine.UI.Button>();
+            if (frameButton == null)
+                frameButton = frame.gameObject.AddComponent<UnityEngine.UI.Button>();
+            UiSkin.ApplyFlatButton(frameButton, frame);
+
+            // 액자 안쪽. 트레이와 같은 어둠(BarTrack)이라 "창"으로 읽히고,
+            // 초상의 크림색 옷이 그 위에서 가장 밝다
+            var window = EnsureImage(frame.transform, "Window", UiSkin.BarTrack);
+            var windowRect = (RectTransform)window.transform;
+            windowRect.anchorMin = Vector2.zero;
+            windowRect.anchorMax = Vector2.one;
+            windowRect.offsetMin = new Vector2(PortraitBorder, PortraitBorder);
+            windowRect.offsetMax = new Vector2(-PortraitBorder, -PortraitBorder);
+            window.sprite = null;
+            window.type = UnityEngine.UI.Image.Type.Simple;
+            window.raycastTarget = false;
+
+            WireTopBarPortrait(window);
+
+            // Lv 배지. 초상 아래변에 겹쳐 "이 캐릭터의 레벨"로 붙는다.
+            //
+            // **가운데 정렬이다.** 처음에는 오른쪽 모서리 겹침(앵커 (1,0) +
+            // 오른쪽으로 8px 내밈)이었는데, 배지(132px)가 액자(144px)와 거의
+            // 같은 폭이라 모서리 배지가 아니라 "삐뚤어진 아래 띠"로 읽혔다 -
+            // 왼쪽 틈 20px 대 오른쪽 내밈 8px의 비대칭이 그대로 보인다
+            // (사용자 지적). 폭이 칸의 절반쯤일 때만 모서리 겹침이 성립한다
+            var badge = EnsureImage(frame.transform, "LevelBadge", UiSkin.InkChip);
+            var badgeRect = (RectTransform)badge.transform;
+            badgeRect.anchorMin = badgeRect.anchorMax = new Vector2(0.5f, 0f);
+            badgeRect.pivot = new Vector2(0.5f, 0f);
+            badgeRect.sizeDelta = new Vector2(LevelBadgeWidth, LevelBadgeHeight);
+            badgeRect.anchoredPosition = new Vector2(0f, -LevelBadgeOverhang);
+            badge.sprite = null;
+            badge.type = UnityEngine.UI.Image.Type.Simple;
+            badge.raycastTarget = false;
+
+            var badgeLabel = EnsureHudLabel(badge.transform, "Label",
+                                            TMPro.TextAlignmentOptions.Center,
+                                            new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero);
+            UiFonts.Demote(badgeLabel);
+            var badgeLabelRect = (RectTransform)badgeLabel.transform;
+            badgeLabelRect.anchorMin = Vector2.zero;
+            badgeLabelRect.anchorMax = Vector2.one;
+            badgeLabelRect.offsetMin = new Vector2(4f, -14f);
+            badgeLabelRect.offsetMax = new Vector2(-4f, 14f);
+            badgeLabel.overflowMode = TMPro.TextOverflowModes.Ellipsis;
+            badgeLabel.text = "Lv.1";
+        }
+
+        /**
+         * @brief 액자 창 안에 경지 초상을 세운다. 캐릭터 탭(39단계)의 재사용이다.
+         *
+         * WireCharacterTabPortrait와 같은 재료(EvolutionAppearance idle 첫 프레임
+         * + 전직 카드의 잉크 실측)를 같은 컴포넌트에 넣는다. 다른 것은 배율(3배 -
+         * 칸이 136px로 탭의 두 배)과 머리 여백뿐이다. 초상이 아직 안 구워진
+         * 씬에서는 인물 글리프가 자리를 지킨다.
+         */
+        private static void WireTopBarPortrait(UnityEngine.UI.Image window)
+        {
+            var stale = window.transform.Find("PortraitMask");
+            if (stale != null) Object.DestroyImmediate(stale.gameObject);
+
+            var appearance = Object.FindFirstObjectByType<Onikiri.Battle.EvolutionAppearance>(
+                FindObjectsInactive.Include);
+
+            var maskObject = new GameObject("PortraitMask", typeof(RectTransform));
+            maskObject.transform.SetParent(window.transform, false);
+            var maskRect = (RectTransform)maskObject.transform;
+            maskRect.anchorMin = Vector2.zero;
+            maskRect.anchorMax = Vector2.one;
+            maskRect.offsetMin = Vector2.zero;
+            maskRect.offsetMax = Vector2.zero;
+            maskObject.AddComponent<UnityEngine.UI.RectMask2D>();
+
+            var portraitObject = new GameObject("TierPortrait", typeof(RectTransform));
+            portraitObject.transform.SetParent(maskObject.transform, false);
+            var portraitRect = (RectTransform)portraitObject.transform;
+            portraitRect.anchorMin = Vector2.zero;
+            portraitRect.anchorMax = Vector2.one;
+            portraitRect.pivot = new Vector2(0.5f, 1f);
+            portraitRect.offsetMin = Vector2.zero;
+            portraitRect.offsetMax = Vector2.zero;
+
+            var portraitImage = portraitObject.AddComponent<UnityEngine.UI.Image>();
+            portraitImage.preserveAspect = true;
+            portraitImage.raycastTarget = false;
+
+            if (appearance == null || appearance.TierCount == 0)
+            {
+                Debug.LogWarning("[Onikiri] Top bar portrait keeps the person glyph"
+                                 + " - run Build Evolution Content first.");
+                portraitImage.sprite = UiGlyphBuilder.Load(UiGlyphBuilder.Person);
+                portraitImage.color = UiIcons.Tint;
+                return;
+            }
+
+            var component = window.GetComponent<Onikiri.UI.CharacterTabPortrait>();
+            if (component == null)
+                component = window.gameObject.AddComponent<Onikiri.UI.CharacterTabPortrait>();
+
+            var so = new SerializedObject(component);
+            so.FindProperty("portrait").objectReferenceValue = portraitImage;
+            so.FindProperty("pixelScale").floatValue = TopBarPortraitScale;
+            so.FindProperty("topInset").floatValue = TopBarPortraitTopInset;
+
+            var portraits = so.FindProperty("tierPortraits");
+            var tops = so.FindProperty("tierInkTop");
+            var centers = so.FindProperty("tierInkCenter");
+            portraits.arraySize = appearance.TierCount;
+            tops.arraySize = appearance.TierCount;
+            centers.arraySize = appearance.TierCount;
+
+            for (int t = 0; t < appearance.TierCount; t++)
+            {
+                var frames = appearance.GetTier(t);
+                var portrait = frames != null && frames.idle != null && frames.idle.Length > 0
+                    ? frames.idle[0] : null;
+
+                portraits.GetArrayElementAtIndex(t).objectReferenceValue = portrait;
+
+                var bounds = UpgradePanelBuilder.MeasurePortraitBounds(portrait);
+                tops.GetArrayElementAtIndex(t).floatValue = bounds.z;
+                centers.GetArrayElementAtIndex(t).floatValue = bounds.y;
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /** 트레이 안의 재화 아이콘 하나. 세로 가운데 정렬이다 */
+        private static void EnsureTrayIcon(Transform tray, string name, Sprite sprite, float x)
+        {
+            var image = EnsureImage(tray, name, UiIcons.Tint);
+            var rect = (RectTransform)image.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.sizeDelta = new Vector2(BarIconSize, BarIconSize);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            image.sprite = sprite;
+            image.type = UnityEngine.UI.Image.Type.Simple;
+            image.color = sprite != null ? UiIcons.Tint : new Color(1f, 0f, 1f, 0.35f);
+            image.raycastTarget = false;
+        }
+
+        /** 트레이 안의 재화 숫자 하나. 아이콘 오른쪽, 세로 가운데 */
+        private static TMPro.TMP_Text EnsureTrayLabel(Transform tray, string name, float x, float width)
+        {
+            var label = EnsureHudLabel(tray, name, TMPro.TextAlignmentOptions.Left,
+                                       new Vector2(0f, 0f), new Vector2(0f, 1f), Vector2.zero);
+            var rect = (RectTransform)label.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.sizeDelta = new Vector2(width, 0f);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            label.overflowMode = TMPro.TextOverflowModes.Ellipsis;
+            return label;
         }
 
         /**
@@ -1560,196 +2369,176 @@ namespace Onikiri.EditorTools
         /**
          * @brief 골드 라벨에 잡아두는 폭.
          *
-         * 31단계에 보석이 그 오른쪽에 붙으면서 필요해졌다. 그전에는 라벨이
-         * 내용에 맞춰 늘어나도 오른쪽이 비어 있어 상관없었지만, 이제 그쪽에
-         * 아이콘이 서므로 **자리를 확정해야** 골드가 길어질 때 겹치지 않는다.
+         * 31단계에 보석이 그 오른쪽에 붙으면서 필요해졌다. 최악 문자열은
+         * "999.9aa"(축약 단위 두 글자)이고, 55pt 실측 183px -> 44pt는 그 0.8배
+         * 언저리다(32/37단계에서 두 번 줄인 역사와 그때의 실측 근거는 git에
+         * 있다). 어림이 아니라는 보장은 VerifyExpRowFits가 빌드마다 현재
+         * 폰트로 실측하는 것으로 유지된다.
          *
-         * ## 260 -> 200. 32단계에 실측으로 줄였다
-         *
-         * 260은 "999.9M까지 들어가는 폭"이라고 적혀 있었는데 **어림이었다.**
-         * TMP 실측:
-         *
-         *   "999.9M"    168px
-         *   "999.9aa"   183px   <- 축약 단위가 두 글자가 되는 최악
-         *   "100.2M"    161px
-         *
-         * 92px이 놀고 있었고, 그 뒤에 선 보석 라벨이 그만큼 오른쪽으로 밀려
-         * **스테이지 문구와 5px까지 붙어 있었다.** 보석 세 자리("860" 87px)에서
-         * 이미 그 상태이고, 네 자리("9999" 116px)면 24px 겹친다.
-         *
-         * 31단계에는 보석이 두 자리였고(퀘스트 몇 개분) 소비처가 없어 자릿수가
-         * 늘 이유도 없었다. 32단계가 그 이유를 만들었다 - 등급업 하나가 40~260개라
-         * 네 자리가 정상 구간이 된다. **재화에 소비처가 생기면 그 재화의 자릿수
-         * 가정도 다시 재야 한다.**
-         *
-         * 200 = 183 + 17. 이 값도 어림이 아니라 위 실측에서 나온 것이고, 넘치면
-         * 축약 단위가 하나 올라가 자릿수가 다시 줄어든다(NumberFormatter).
+         * 2b: 재화가 트레이 한 판으로 묶이면서 이 폭이 곧 트레이 폭의 일부다.
+         * 170으로 줄였다가 빌드 실측(183px)에 걸려 되돌렸다 - 검사가 일한 것이다.
          */
-        private const float GoldLabelWidth = 200f;
+        private const float GoldLabelWidth = 190f;
 
-        /** 상단 바 아이콘 하나. 위 기준 앵커라 바 높이가 바뀌어도 위치가 유지된다 */
-        private static UnityEngine.UI.Image EnsureBarIcon(
-            Transform parent, string name, Sprite sprite, Vector2 anchoredPosition)
-        {
-            var image = EnsureImage(parent, name, UiIcons.Tint);
+        /** 보석 라벨 폭. "99,999" 실측 160 + 6. VerifyExpRowFits가 재검한다 */
+        private const float GemLabelWidth = 166f;
 
-            var rect = (RectTransform)image.transform;
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.sizeDelta = new Vector2(BarIconSize, BarIconSize);
-            rect.anchoredPosition = anchoredPosition;
+        // ---------------------------------------------------------------- 2b 상단 바 기하
 
-            image.sprite = sprite;
-            image.type = UnityEngine.UI.Image.Type.Simple;
-            image.color = sprite != null ? UiIcons.Tint : new Color(1f, 0f, 1f, 0.35f);
-            image.raycastTarget = false;
-            return image;
-        }
+        /** 좌우 바깥 여백. 초상과 설정 톱니가 이 선에 선다 */
+        private const float SideMargin = 32f;
 
-        /** 상단 바 둘째 줄의 세로 위치와 높이. 골드/스테이지 줄(46~118) 바로 아래다 */
-        private const float ExpRowTop = 126f;
-        private const float ExpRowHeight = 60f;
+        /** 1행(트레이·설정)의 윗선과 행 높이 */
+        private const float RowTop = 32f;
+        private const float RowHeight2b = 64f;
+
+        /** 2행(스테이지 칩)의 윗선. 1행 + 간격 16 */
+        private const float Row2Top = RowTop + RowHeight2b + 16f;
+        private const float StageChipHeight = 56f;
 
         /**
-         * @brief 레벨 라벨과 레벨업 버튼의 폭.
+         * @brief 초상 액자. 두 행(64+16+56=136) 높이에 맞춘 1.5행짜리 정사각이다.
          *
-         * 16단계에서 한 번 줄였는데 그 계산이 틀렸다. **글자 폭을 28px로 어림했고,
-         * 실측은 33.7px이었다.** 그래서 레벨 41에서 경험치 숫자가 다시 잘렸고
-         * ("248.4K/496.…"), 더 나쁘게는 "레벨 999"(실측 236)가 상자 200을 이미
-         * 넘고 있었다 - 3자리 레벨에 닿는 순간 터질 예정이었다.
-         *
-         * 어림은 두 번 틀렸으므로 이번 폭은 전부 TMP 실측값이다:
-         *
-         *   레벨 라벨   "레벨 999"      236  ->  240
-         *   레벨업 버튼 "레벨업 99"     254  ->  260
-         *   경험치 라벨 "999aa/999aa"   378  ->  382 (막대 402 - 안쪽 여백 20)
-         *
-         * 합이 1080에 4~6px 여유로 들어간다. 여유가 이만큼밖에 없다는 것은
-         * 55pt 네 요소가 1080의 한계라는 뜻이고, 그래서 경험치 숫자에서 소수
-         * 자리를 뗐다(LevelHud). 다시 틀리지 않도록 VerifyExpRowFits가 빌드에서
-         * 최악의 문자열을 직접 재서 검사한다 - 어림은 더 쓰지 않는다.
+         * 상단 바 컨텐츠는 이 액자가 세로 기준이다 - 옛 2행(레벨 칩 줄)이
+         * 빠지면서 남은 성김을 초상이 채우고, 바의 컨텐츠 높이가 192에서
+         * 176(배지 끝)으로 조여진다.
          */
-        private const float LevelLabelWidth = 240f;
-        private const float LevelUpWidth = 260f;
+        private const float PortraitSize = 144f;
+        private const float PortraitTop = 24f;
+        private const float PortraitBorder = 4f;
 
-        /** 경험치 숫자를 막대 테두리 안쪽으로 미는 좌우 여백. 9-슬라이스 테두리 두께 */
-        private const float ExpLabelInset = 10f;
-
-        private static readonly Color ExpTrackColor = new Color32(0x2A, 0x25, 0x3C, 0xFF);
-        private static readonly Color ExpFillColor = new Color32(0x7C, 0xC5, 0x9A, 0xFF);
-        private static readonly Color LevelUpColor = new Color32(0x4E, 0x7A, 0x5C, 0xFF);
+        /** 초상 원본 1픽셀 = 캔버스 3픽셀. 탭(2배)보다 칸이 두 배라 한 단 키운다 */
+        private const float TopBarPortraitScale = 3f;
+        private const float TopBarPortraitTopInset = 8f;
 
         /**
-         * @brief 상단 바 둘째 줄: 레벨, 경험치 바, 레벨업 버튼.
+         * @brief Lv 배지. "Lv.999"(캡션) 빌드 실측 118px + 안쪽 여백. 108로
+         * 어림했다가 걸려 넓혔다. VerifyExpRowFits가 계속 실측한다.
+         * 초상 모서리에서 8px 내민다.
+         */
+        private const float LevelBadgeWidth = 132f;
+        private const float LevelBadgeHeight = 44f;
+        private const float LevelBadgeOverhang = 8f;
+
+        /** 재화 트레이가 초상 오른쪽에서 시작하는 x. 초상 끝 + 32 */
+        private const float ContentLeft = SideMargin + PortraitSize + 32f;
+
+        /** 트레이 안쪽 여백과 전체 폭. 폭은 내용물 산수의 합이다 */
+        private const float TrayPad = 16f;
+        private const float CurrencyTrayWidth =
+            TrayPad + BarIconSize + 10f + GoldLabelWidth + 14f
+            + BarIconSize + 8f + GemLabelWidth + TrayPad;
+
+        /** 스테이지 칩. 폭은 "지역 4 · 10/10"(캡션) 실측 + 글리프 자리다 */
+        private const float StageChipWidth = 330f;
+        private const float StageChipIconSize = 40f;
+        private const float StageChipIconLeft = 16f;
+
+        /** 설정 톱니 칩. 정사각에 가까운 한 칸 */
+        private const float SettingsSize = 64f;
+
+        /** 전투와의 경계에 긋는 먹선. 하단 UI의 TopEdge와 같은 언어다 */
+        private const float TopBarEdgeHeight = 6f;
+
+        /** 레벨업 버튼(성장 패널 헤더)의 폭. "레벨업 99"가 들어간다 */
+        private const float LevelUpWidth = 210f;
+        private const float LevelUpHeight = 64f;
+
+        /**
+         * @brief 경험치 스트립의 채움색.
          *
-         * 상단 바는 192px뿐이라 두 줄이 한계다. 그래서 레벨업 버튼을 성장 패널이
-         * 아니라 여기에 둔다 - 패널은 스크롤이라 버튼이 화면 밖으로 밀려날 수 있고,
-         * 레벨업은 "지금 누를 수 있다"가 보여야 의미가 있는 조작이다.
+         * 38단계까지의 채움(0x7CC59A)은 채도가 높아 먹빛 위에서 두툼한 초록
+         * 덩어리로 읽혔다 - 그것이 바를 얇게 뺀 이유의 절반이다. 초록의 "경험치"
+         * 연상은 유지하되 채도와 명도를 눌러 옥색으로 - 트랙(PanelEdge, 보라
+         * 회색)과 붙어도 튀지 않고, 맥동(LevelHud)이 밝힐 여유는 남는 값이다.
+         */
+        private static readonly Color ExpStripFillColor = new Color32(0x5F, 0x9C, 0x83, 0xFF);
+
+
+        /**
+         * @brief 경험치 스트립 + 레벨업 버튼(성장 패널 헤더) + LevelHud 배선.
          *
-         * 경험치 바 위에 숫자를 겹쳐 올린다. 바만 있으면 얼마나 남았는지 어림밖에
-         * 안 되고, 숫자만 있으면 방치 중에 늘어나는 것이 눈에 걸리지 않는다.
+         * ## 2b - 레벨업 버튼이 상단 바를 떠났다
+         *
+         * 상단 바는 "상태"(초상·재화·스테이지)만 남고, "행동"(레벨업)은 그 행동의
+         * 결과가 보이는 곳 - 성장 패널 - 으로 갔다. 슬레이어도 레벨업은 패널의
+         * EXP 바 옆이다. 자리는 패널 **헤더**의 EXP 스트립 라인 오른쪽 끝이다:
+         *
+         *   - 서브탭(강화/성장/전직) 어디에서도 보인다. 성장 서브탭 안에 묻으면
+         *     다른 탭을 보다가 레벨업하려고 탭을 옮겨야 한다
+         *   - 스크롤 밖(패널 직속)이라 목록이 움직여도 제자리다
+         *   - 눌리면 스탯 포인트가 생기는데, 그 포인트를 쓰는 성장 탭 배지가
+         *     바로 아래 줄이다 - "레벨업 -> 포인트 쓰기"가 시선 한 줄로 이어진다
+         *
+         * 올릴 수 있을 때만 나타나는 규칙과 스트립 맥동(38b)은 그대로다.
          */
         private static void BuildExpRow(Transform topBar)
         {
-            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(GalmuriFontPath);
+            // 옛 세대의 잔재: 상단 바의 경험치 바(2a 전), 레벨 칩 줄의 레벨업
+            // 버튼(2b 전). 스트립과 패널 헤더 버튼이 각각 물려받았다
+            foreach (var staleName in new[] { "ExpIcon", "ExpTrack", "LevelUpButton" })
+            {
+                var stale = topBar.Find(staleName);
+                if (stale != null) Object.DestroyImmediate(stale.gameObject);
+            }
 
-            var levelLabel = EnsureHudLabel(topBar, "LevelLabel", TMPro.TextAlignmentOptions.Left,
-                                            new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                            new Vector2(48f, -ExpRowTop));
-            ((RectTransform)levelLabel.transform).sizeDelta = new Vector2(LevelLabelWidth, ExpRowHeight);
-            levelLabel.text = "레벨 1";
+            var fill = BuildExpStrip();
 
-            // 바는 왼쪽 레벨 라벨과 오른쪽 버튼 사이를 채운다. 양쪽 앵커를 쓰면
-            // 상단 바 폭이 바뀌어도(태블릿) 가운데가 알아서 늘어난다
-            // 상단 바 전체에 어두운 판을 깐다. 배경 위에 글자만 떠 있으면 벚꽃의
-            // 밝은 부분에서 골드 숫자가 읽히지 않는다
-            var chrome = EnsureImage(topBar, "Chrome", UiSkin.Chrome);
-            var chromeRect = (RectTransform)chrome.transform;
-            chromeRect.anchorMin = Vector2.zero;
-            chromeRect.anchorMax = Vector2.one;
-            chromeRect.offsetMin = Vector2.zero;
-            chromeRect.offsetMax = Vector2.zero;
-            chrome.raycastTarget = false;
-            UiSkin.ApplyPanel(chrome, UiSkin.Chrome);
+            // 초상 배지의 레벨 라벨(BuildPortraitAnchor가 세웠다)
+            var badgeLabelTransform = topBar.Find("PortraitButton/LevelBadge/Label");
+            var levelLabel = badgeLabelTransform != null
+                ? badgeLabelTransform.GetComponent<TMPro.TMP_Text>() : null;
 
-            // 판은 라벨보다 뒤에 있어야 한다. 나중에 만든 자식이 위에 그려지므로
-            // 맨 앞으로 보낸다
-            chrome.transform.SetAsFirstSibling();
+            // 레벨업 버튼. 성장 패널 직속이라 PanelChildNames 화이트리스트에
+            // 올라 있어야 패널 재빌드가 지우지 않는다
+            var panel = MainSceneBuilder.FindBand("GrowthPanel");
+            UnityEngine.UI.Image levelUpRoot = null;
+            UnityEngine.UI.Button button = null;
+            TMPro.TMP_Text levelUpLabel = null;
+            if (panel != null)
+            {
+                levelUpRoot = EnsureImage(panel, "LevelUpButton", UiSkin.Danger);
+                var buttonRect = (RectTransform)levelUpRoot.transform;
+                buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(1f, 1f);
+                buttonRect.pivot = new Vector2(1f, 1f);
+                buttonRect.sizeDelta = new Vector2(LevelUpWidth, LevelUpHeight);
 
-            // 경험치 별. 바 바로 왼쪽에 붙여 이 바가 무엇의 바인지 말한다
-            float expIconX = 48f + LevelLabelWidth + 8f;
-            EnsureBarIcon(topBar, "ExpIcon", UiIcons.Load(UiIcons.ExpIcon),
-                          new Vector2(expIconX, -(ExpRowTop + (ExpRowHeight - BarIconSize) * 0.5f)));
+                // 스트립 **위에 올라선다** (41단계 재배치). 그전에는 라인에
+                // 걸쳐 아래로 10px 내려왔는데, 그 10px이 스트립을 덮고 탭
+                // 줄과의 여백을 2px까지 좁혀 "삐져나온 상자"로 읽혔다.
+                // 이제 밑변이 스트립 윗변(패널 상단)과 정확히 맞닿는다 -
+                // 버튼이 스트립에서 자라난 손잡이가 되고, 패널 안(스트립·탭
+                // 줄)은 아무것도 덮지 않는다. 위쪽 공간은 전투 화면의 지면
+                // 띠라 몬스터도 숫자도 오지 않는 죽은 영역이다
+                buttonRect.anchoredPosition = new Vector2(-SideMargin, LevelUpHeight);
 
-            var track = EnsureImage(topBar, "ExpTrack", ExpTrackColor);
-            // 안쪽으로 파인 판. "여기는 눌리지 않는다"가 모양으로 읽힌다
-            UiSkin.ApplyPanel(track, UiSkin.Inlay, UiSkin.InlayTint);
-            var trackRect = (RectTransform)track.transform;
-            trackRect.anchorMin = new Vector2(0f, 1f);
-            trackRect.anchorMax = new Vector2(1f, 1f);
-            trackRect.pivot = new Vector2(0.5f, 1f);
-            trackRect.offsetMin = new Vector2(expIconX + BarIconSize + 10f, -(ExpRowTop + ExpRowHeight));
-            trackRect.offsetMax = new Vector2(-(48f + LevelUpWidth + 16f), -ExpRowTop);
+                // 동작 버튼이므로 Ancient 판 그대로다. 민짜로 바꾼 것은 상단
+                // 바의 "상태" 칩들이지 행동 버튼이 아니다. 틴트는 초록(Good)
+                // 대신 붉은색 - 밝은 초록은 판의 질감을 다 눌러 "기본 초록
+                // 상자"로 보였고, 이 화면에서 붉은색은 이미 "네 차례"다(성장
+                // 탭의 남은 포인트 배지가 같은 UiSkin.Danger를 쓰고, 레벨업이
+                // 만드는 것이 정확히 그 포인트다)
+                UiSkin.ApplyPanel(levelUpRoot, UiSkin.Panel, UiSkin.Danger);
 
-            var fill = EnsureImage(track.transform, "Fill", ExpFillColor);
-            var fillRect = (RectTransform)fill.transform;
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.one;
-            fillRect.offsetMin = Vector2.zero;
-            fillRect.offsetMax = Vector2.zero;
-            fill.type = UnityEngine.UI.Image.Type.Filled;
-            fill.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
-            fill.fillAmount = 0f;
+                button = levelUpRoot.GetComponent<UnityEngine.UI.Button>();
+                if (button == null)
+                    button = levelUpRoot.gameObject.AddComponent<UnityEngine.UI.Button>();
+                UiSkin.ApplyButton(button, levelUpRoot);
 
-            var expLabel = EnsureHudLabel(track.transform, "ExpLabel", TMPro.TextAlignmentOptions.Center,
-                                          new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero);
-            var expRect = (RectTransform)expLabel.transform;
-            expRect.anchorMin = Vector2.zero;
-            expRect.anchorMax = Vector2.one;
-            // 가로는 테두리 안쪽으로 밀고, **세로는 오히려 넓힌다.**
-            //
-            // Ellipsis는 가로뿐 아니라 세로가 모자라도 잘라내는데, 잘릴 것이
-            // 한 줄뿐이면 통째로 사라진다. 처음에 세로를 막대 높이(60)에
-            // 맞췄다가 55pt 글자의 라인 높이가 그것을 넘어 **숫자가 화면에서
-            // 아예 안 보였다.** 세로로 넘치는 것은 문제가 아니므로 풀어준다
-            expRect.offsetMin = new Vector2(ExpLabelInset, -14f);
-            expRect.offsetMax = new Vector2(-ExpLabelInset, 14f);
-            expLabel.fontSize = Onikiri.UI.PixelFontSizes.GalmuriSmall;
-
-            // 가로로 넘치면 막대 밖으로 새는 대신 안에서 잘린다. 위에서 폭을
-            // 넉넉히 잡았지만 숫자는 자릿수가 계속 늘어나는 값이라(999.9aa)
-            // 언젠가 다시 넘친다 - 그때 레벨업 버튼을 덮는 것보다 잘리는 편이 낫다
-            expLabel.overflowMode = TMPro.TextOverflowModes.Ellipsis;
-            expLabel.text = "0/30";
-
-            // 레벨업 버튼은 올릴 수 있을 때만 켜진다. 루트를 따로 두는 이유는
-            // 버튼과 라벨을 한 번에 껐다 켜기 위해서다
-            var levelUpRoot = EnsureImage(topBar, "LevelUpButton", LevelUpColor);
-            var buttonRect = (RectTransform)levelUpRoot.transform;
-            buttonRect.anchorMin = new Vector2(1f, 1f);
-            buttonRect.anchorMax = new Vector2(1f, 1f);
-            buttonRect.pivot = new Vector2(1f, 1f);
-            buttonRect.sizeDelta = new Vector2(LevelUpWidth, ExpRowHeight);
-            buttonRect.anchoredPosition = new Vector2(-48f, -ExpRowTop);
-
-            UiSkin.ApplyPanel(levelUpRoot, UiSkin.Panel, UiSkin.Good);
-
-            var button = levelUpRoot.GetComponent<UnityEngine.UI.Button>();
-            if (button == null) button = levelUpRoot.gameObject.AddComponent<UnityEngine.UI.Button>();
-            UiSkin.ApplyButton(button, levelUpRoot);
-
-            var levelUpLabel = EnsureHudLabel(levelUpRoot.transform, "Label",
+                levelUpLabel = EnsureHudLabel(levelUpRoot.transform, "Label",
                                               TMPro.TextAlignmentOptions.Center,
                                               new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero);
-            var levelUpRect = (RectTransform)levelUpLabel.transform;
-            levelUpRect.anchorMin = Vector2.zero;
-            levelUpRect.anchorMax = Vector2.one;
-            levelUpRect.offsetMin = Vector2.zero;
-            levelUpRect.offsetMax = Vector2.zero;
-            levelUpLabel.text = "레벨업";
+                var levelUpRect = (RectTransform)levelUpLabel.transform;
+                levelUpRect.anchorMin = Vector2.zero;
+                levelUpRect.anchorMax = Vector2.one;
+                levelUpRect.offsetMin = Vector2.zero;
+                levelUpRect.offsetMax = Vector2.zero;
+                levelUpLabel.text = "레벨업";
 
-            levelUpRoot.gameObject.SetActive(false);
+                // 목록·탭보다 위에 그려져야 한다. 형제 순서가 곧 그리기 순서다
+                levelUpRoot.transform.SetAsLastSibling();
+                levelUpRoot.gameObject.SetActive(false);
+            }
 
             var hud = topBar.GetComponent<Onikiri.UI.LevelHud>();
             if (hud == null) hud = topBar.gameObject.AddComponent<Onikiri.UI.LevelHud>();
@@ -1757,12 +2546,62 @@ namespace Onikiri.EditorTools
             var so = new SerializedObject(hud);
             so.FindProperty("levelLabel").objectReferenceValue = levelLabel;
             so.FindProperty("expFill").objectReferenceValue = fill;
-            so.FindProperty("expLabel").objectReferenceValue = expLabel;
-            so.FindProperty("levelUpRoot").objectReferenceValue = levelUpRoot.gameObject;
+            so.FindProperty("levelUpRoot").objectReferenceValue =
+                levelUpRoot != null ? levelUpRoot.gameObject : null;
             so.FindProperty("levelUpButton").objectReferenceValue = button;
             so.FindProperty("levelUpLabel").objectReferenceValue = levelUpLabel;
-            so.FindProperty("levelPrefix").stringValue = "레벨 ";
+            so.FindProperty("levelPrefix").stringValue = "Lv.";
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /**
+         * @brief 경험치 스트립 (2a 후속). 성장 패널 최상단, 전투 화면과의 경계.
+         *
+         * 풀폭 몇 px - 구분선이 곧 진행 바다. 트랙을 바탕의 경계선(TopEdge)과
+         * 같은 색으로 깔아서, 채움이 없으면 그냥 경계로 읽히고 채움이 차오르면
+         * 경계가 옥색으로 물든다. 숫자는 없다 - 필요한 사람은 레벨 칩으로
+         * 스탯 창을 연다.
+         *
+         * 자리 계산(탭 줄·뷰포트 내려앉음)은 UpgradePanelBuilder가 상수로 안다.
+         * 패널 직속 자식 화이트리스트(PanelChildNames)에도 올라 있어 패널
+         * 재빌드가 지우지 않는다.
+         */
+        private static UnityEngine.UI.Image BuildExpStrip()
+        {
+            var panel = MainSceneBuilder.FindBand("GrowthPanel");
+            if (panel == null)
+            {
+                Debug.LogError("[Onikiri] GrowthPanel band missing - the exp strip has nowhere to go.");
+                return null;
+            }
+
+            var strip = EnsureImage(panel, UpgradePanelBuilder.ExpStripName, UiSkin.PanelEdge);
+            var stripRect = (RectTransform)strip.transform;
+            stripRect.anchorMin = new Vector2(0f, 1f);
+            stripRect.anchorMax = new Vector2(1f, 1f);
+            stripRect.pivot = new Vector2(0.5f, 1f);
+            stripRect.sizeDelta = new Vector2(0f, UpgradePanelBuilder.ExpStripHeight);
+            stripRect.anchoredPosition = Vector2.zero;
+            strip.raycastTarget = false;
+
+            // 채움은 Image.Filled가 아니라 **앵커 폭**으로 그린다(LevelHud가
+            // anchorMax.x = 진행률). Filled는 스프라이트가 있어야 도는데
+            // (null이면 조용히 통짜 - 보스 체력 바에서 물린 함정), 내장
+            // UISprite를 물렸더니 이번엔 둥근 소프트 가장자리가 10px 줄에서
+            // 세로 그라데이션으로 읽혔다. 스프라이트 없는 민짜 사각형이
+            // 픽셀 아트 위에서 가장 깨끗하고, 흉내낼 것도 없다
+            var fill = EnsureImage(strip.transform, "Fill", ExpStripFillColor);
+            var fillRect = (RectTransform)fill.transform;
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = new Vector2(0f, 1f);   // 폭 0 = 빈 바. 런타임이 늘린다
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            fillRect.pivot = new Vector2(0f, 0.5f);
+            fill.type = UnityEngine.UI.Image.Type.Simple;
+            fill.sprite = null;
+            fill.raycastTarget = false;
+
+            return fill;
         }
 
         private static UnityEngine.UI.Image EnsureImage(Transform parent, string name, Color color)
@@ -1830,6 +2669,40 @@ namespace Onikiri.EditorTools
 
             /** 열렸을 때 켤 화면. 비어 있으면 예전처럼 눌리지 않는다 */
             public string ScreenName;
+
+            /**
+             * @brief 홈 탭 (38단계 층위 분리). 화면을 토글하지 않고 다른
+             * 화면들만 닫는다 - 바탕(GrowthPanel)이 드러나는 것이 곧 홈이다.
+             */
+            public bool HomeTab;
+        }
+
+        /**
+         * @brief 하단 탭의 심볼 (38단계 아이콘화).
+         *
+         * 출처가 셋으로 갈린다: KURAI(스킬 - 오의와 같은 심볼), Kyrise(장비·
+         * 퀘스트 - 그 화면이 이미 쓰는 아이콘), 코드 생성 글리프(캐릭터·동료 -
+         * 팩에 인물·발자국 계열이 없다. UiGlyphBuilder 참고).
+         * 탭과 화면이 같은 심볼을 써야 "이 탭이 그 화면"이 형태로 읽힌다.
+         */
+        private static Sprite TabIcon(string name)
+        {
+            switch (name)
+            {
+                case "캐릭터": return UiGlyphBuilder.Load(UiGlyphBuilder.Person);
+                case "스킬": return UiIcons.Load("Icon076");
+                case "장비": return UiIcons.LoadItem(Onikiri.Progression.UiSprites.WeaponSprite);
+                case "동료": return UiGlyphBuilder.Load(UiGlyphBuilder.Paw);
+                case "퀘스트": return UiIcons.LoadItem(UiIcons.QuestSprite);
+
+                // 상점은 보석이다(46단계). 이 화면이 파는 것이 전부 보석으로
+                // 사는 것이라, 탭과 상품이 같은 심볼을 쓰면 "저기 가면 보석을
+                // 쓴다"가 형태로 읽힌다 - 다른 탭들이 자기 화면의 아이콘을
+                // 쓰는 것과 같은 규칙이다
+                case "상점": return UiIcons.LoadItem(UiIcons.GemSprite);
+
+                default: return null;
+            }
         }
 
         /**
@@ -1850,22 +2723,20 @@ namespace Onikiri.EditorTools
          */
         private static readonly LockedTabSpec[] LockedTabs =
         {
+            // 38단계의 캐릭터 홈 탭. 강화·성장·전직은 이 화면(GrowthPanel)의
+            // **서브탭**이고, 하단 탭은 화면 전환만 한다 - 두 층위가 한 줄에
+            // 섞여 보이던 것을 여기서 가른다. 조건 없음(첫 화면이 이곳이다)
+            new LockedTabSpec {
+                Name = "캐릭터",
+                RequiredLevel = 1,
+                ScreenName = "GrowthPanel",
+                HomeTab = true
+            },
+
             new LockedTabSpec {
                 Name = "스킬",
                 RequiredLevel = Onikiri.Progression.SkillCatalog.PanelUnlockLevel,
                 ScreenName = SkillPanelBuilder.PanelName
-            },
-
-            // 31단계의 퀘스트. **해금 레벨이 1이다** - 잠그지 않는다.
-            //
-            // 다른 탭은 "앞으로 무엇이 열리는가"를 보여주려고 잠가 뒀지만
-            // 퀘스트는 반대다. 신규 플레이어에게 **다음에 무엇을 할지 알려주는
-            // 것**이 이 화면의 목적이고, 그것이 필요한 시점은 레벨 10이 아니라
-            // 첫 화면이다.
-            new LockedTabSpec {
-                Name = "퀘스트",
-                RequiredLevel = 1,
-                ScreenName = QuestPanelBuilder.PanelName
             },
 
             // 32단계의 장비(대장간). **조건이 스테이지다** - 이 탭만 그렇다.
@@ -1881,8 +2752,74 @@ namespace Onikiri.EditorTools
                 RequiredLevel = 1,
                 RequiredStage = Onikiri.Progression.EquipmentCurve.UnlockStage,
                 ScreenName = EquipmentPanelBuilder.PanelName
+            },
+
+            // 동료. **조건이 스테이지다** - 장비와 같은 결이다. 동료는
+            // 캐릭터 자신의 성장(전직 Lv.30)이 아니라 여정에서 만나는 존재이고,
+            // 지역 3 피날레(st30)를 넘긴 다음 칸(st31)에서 합류한다.
+            //
+            // st31은 가속 구간의 첫 칸이기도 하다 - 코리더(1~30)에 동료가
+            // 구조적으로 없어야 기존 밴드가 무사하다(PetCurve.UnlockStage).
+            new LockedTabSpec {
+                Name = "동료",
+                RequiredLevel = 1,
+                RequiredStage = Onikiri.Progression.PetCurve.UnlockStage,
+                ScreenName = PetPanelBuilder.PanelName
+            },
+
+            // 31단계의 퀘스트. **해금 레벨이 1이다** - 잠그지 않는다.
+            //
+            // 다른 탭은 "앞으로 무엇이 열리는가"를 보여주려고 잠가 뒀지만
+            // 퀘스트는 반대다. 신규 플레이어에게 **다음에 무엇을 할지 알려주는
+            // 것**이 이 화면의 목적이고, 그것이 필요한 시점은 레벨 10이 아니라
+            // 첫 화면이다.
+            new LockedTabSpec {
+                Name = "퀘스트",
+                RequiredLevel = 1,
+                ScreenName = QuestPanelBuilder.PanelName
+            },
+
+            // 46단계의 상점. **조건이 스테이지다** - 장비·동료와 같은 결이고
+            // 값도 코드에서 끌어온다(GachaCurve.UnlockStage = 요도 해금과
+            // 같은 칸). 여기 41을 손으로 적으면 곡선과 갈릴 수 있고, 그러면
+            // 탭은 밝은데 배너가 잠긴 화면이 나온다.
+            //
+            // **여섯째 칸이 된다.** 탭 하나가 216에서 180px로 좁아지는데,
+            // 아이콘 48 + 캡션 두 글자("상점")는 그 폭에서도 남는다 -
+            // 38단계가 "동료 31스테이지"를 크램하다 아이콘+캡션 2층으로
+            // 바꾼 뒤로 탭의 글자는 언제나 두세 글자다.
+            //
+            // 잠긴 채로도 들어가진다(41단계 미리보기). 상점은 그 규칙이
+            // 가장 필요한 화면이다 - 사용자가 "상점이 어디에도 안 보인다"고
+            // 지적한 것이 이 스텝의 출발점이고, st41까지 자물쇠만 보여주는
+            // 것은 그 지적에 절반만 답하는 것이다
+            new LockedTabSpec {
+                Name = "상점",
+                RequiredLevel = 1,
+                RequiredStage = Onikiri.Progression.GachaCurve.UnlockStage,
+                ScreenName = ShopPanelBuilder.PanelName
             }
         };
+
+        /**
+         * @brief 하단 탭 심볼 크기. 16px 아트의 정수배 (48 = 16 x 3).
+         *
+         * 41단계에 64에서 한 단 줄였다. 밴드가 10%에서 7.5%로 얇아지면서
+         * (DisplayConfig.BottomTabBarTop) 64는 캡션과 합쳐 칸을 꽉 채웠고,
+         * 아이콘은 눌리는 영역이 아니라 이름표라 크기가 가독의 전부가
+         * 아니다. 정수배 규칙은 그대로다 - 3배가 아닌 값은 픽셀이 운다.
+         */
+        private const float TabIconSize = 48f;
+
+        /** 탭 판의 안쪽 여백. 밴드가 얇아진 만큼 여백도 한 단 줄인다 */
+        private const float TabInset = 10f;
+
+        /** 아이콘 윗변이 탭 판 위에서 내려오는 거리 */
+        private const float TabIconTop = 12f;
+
+        /** 캡션 줄의 바닥 여백과 높이. 캡션(33px)에 아래위 숨 쉴 자리다 */
+        private const float TabLabelBottom = 6f;
+        private const float TabLabelHeight = 40f;
 
         /**
          * @brief 탭이 하나만 남아도 반쪽 너비를 유지하기 위한 최소 칸 수.
@@ -1942,24 +2879,37 @@ namespace Onikiri.EditorTools
                 float groupLeft = (1f - slice * LockedTabs.Length) * 0.5f;
                 rect.anchorMin = new Vector2(groupLeft + i * slice, 0f);
                 rect.anchorMax = new Vector2(groupLeft + (i + 1) * slice, 1f);
-                rect.offsetMin = new Vector2(12f, 12f);
-                rect.offsetMax = new Vector2(-12f, -12f);
+                rect.offsetMin = new Vector2(TabInset, TabInset);
+                rect.offsetMax = new Vector2(-TabInset, -TabInset);
 
                 var button = background.GetComponent<UnityEngine.UI.Button>();
                 if (button == null) button = background.gameObject.AddComponent<UnityEngine.UI.Button>();
                 UiSkin.ApplyButton(button, background);
 
+                // 아이콘 + 라벨의 2층 구성(38단계). 심볼이 위에서 말하고 글자는
+                // 아래에서 캡션 크기로 받친다 - "동료 31스테이지"를 한 줄에
+                // 욱여넣던 시절의 넘침이 여기서 사라진다
+                var tabIcon = EnsureImage(background.transform, "Icon", Color.white);
+                var tabIconRect = (RectTransform)tabIcon.transform;
+                tabIconRect.anchorMin = tabIconRect.anchorMax = new Vector2(0.5f, 1f);
+                tabIconRect.pivot = new Vector2(0.5f, 1f);
+                tabIconRect.sizeDelta = new Vector2(TabIconSize, TabIconSize);
+                tabIconRect.anchoredPosition = new Vector2(0f, -TabIconTop);
+                tabIcon.raycastTarget = false;
+                tabIcon.type = UnityEngine.UI.Image.Type.Simple;
+
                 var label = EnsureHudLabel(background.transform, "Label",
                                            TMPro.TextAlignmentOptions.Center,
                                            new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero);
+                UiFonts.Demote(label);
                 var labelRect = (RectTransform)label.transform;
-                labelRect.anchorMin = Vector2.zero;
-                labelRect.anchorMax = Vector2.one;
-                labelRect.offsetMin = Vector2.zero;
-                labelRect.offsetMax = Vector2.zero;
-                label.text = spec.RequiredStage > 0
-                    ? spec.Name + " " + spec.RequiredStage + "스테이지"
-                    : spec.Name + " Lv." + spec.RequiredLevel;
+                labelRect.anchorMin = new Vector2(0f, 0f);
+                labelRect.anchorMax = new Vector2(1f, 0f);
+                labelRect.pivot = new Vector2(0.5f, 0f);
+                labelRect.offsetMin = new Vector2(0f, TabLabelBottom);
+                labelRect.offsetMax = new Vector2(0f, TabLabelBottom + TabLabelHeight);
+                label.overflowMode = TMPro.TextOverflowModes.Overflow;
+                label.text = spec.Name;
 
                 var tab = background.GetComponent<Onikiri.UI.LockedTab>();
                 if (tab == null) tab = background.gameObject.AddComponent<Onikiri.UI.LockedTab>();
@@ -1971,6 +2921,11 @@ namespace Onikiri.EditorTools
                 so.FindProperty("button").objectReferenceValue = button;
                 so.FindProperty("label").objectReferenceValue = label;
                 so.FindProperty("background").objectReferenceValue = background;
+                so.FindProperty("icon").objectReferenceValue = tabIcon;
+                so.FindProperty("normalIcon").objectReferenceValue = TabIcon(spec.Name);
+                so.FindProperty("lockedIcon").objectReferenceValue =
+                    UiGlyphBuilder.Load(UiGlyphBuilder.Lock);
+                so.FindProperty("homeTab").boolValue = spec.HomeTab;
 
                 // 켤 화면. 없으면 null이 들어가고 탭은 예전처럼 잠긴 표시만 한다 -
                 // 화면을 안 만들고 잠금만 푸는 실수가 성립하지 않는 것이 요점이다
@@ -1989,6 +2944,27 @@ namespace Onikiri.EditorTools
                 so.FindProperty("lockedBackground").colorValue = UiSkin.InlayTint * 0.7f;
                 so.FindProperty("unlockedBackground").colorValue = UiSkin.InlayTint;
                 so.ApplyModifiedPropertiesWithoutUndo();
+
+                // 잔재 청소가 먼저다. 탭 배치가 바뀐 세대의 배지 컴포넌트가
+                // 남아 있으면 엉뚱한 탭이 남의 수를 센다 - 실제로 스킬 탭이
+                // 옛 QuestTabBadge를 물고 퀘스트 수령 가능 수를 표기했다.
+                // 빌더는 그동안 추가만 하고 지운 적이 없었다
+                bool wantsQuestBadge = spec.ScreenName == QuestPanelBuilder.PanelName;
+                bool wantsEquipBadge = spec.ScreenName == EquipmentPanelBuilder.PanelName;
+                bool wantsPetBadge = spec.ScreenName == PetPanelBuilder.PanelName;
+
+                var staleQuest = background.GetComponent<Onikiri.UI.QuestTabBadge>();
+                if (staleQuest != null && !wantsQuestBadge) Object.DestroyImmediate(staleQuest);
+                var staleEquip = background.GetComponent<Onikiri.UI.EquipmentTabBadge>();
+                if (staleEquip != null && !wantsEquipBadge) Object.DestroyImmediate(staleEquip);
+                var stalePet = background.GetComponent<Onikiri.UI.PetTabBadge>();
+                if (stalePet != null && !wantsPetBadge) Object.DestroyImmediate(stalePet);
+
+                if (!wantsQuestBadge && !wantsEquipBadge && !wantsPetBadge)
+                {
+                    var staleBadge = background.transform.Find("Badge");
+                    if (staleBadge != null) Object.DestroyImmediate(staleBadge.gameObject);
+                }
 
                 // 배지는 **퀘스트와 장비** 둘에 붙는다. 세는 것이 다르다 -
                 // 퀘스트는 "받을 것", 장비는 "살 수 있는 것"이다. 규칙은 같다:
@@ -2021,7 +2997,243 @@ namespace Onikiri.EditorTools
                         badge.GetComponentInChildren<TMPro.TMP_Text>(true);
                     badgeSo.ApplyModifiedPropertiesWithoutUndo();
                 }
+                else if (spec.ScreenName == PetPanelBuilder.PanelName)
+                {
+                    // 동료 배지. 세는 것은 "누를 수 있는 버튼"(해금·레벨) -
+                    // 장비 배지와 같은 자다(PetSystem.AffordableCount)
+                    var badge = QuestPanelBuilder.BuildBadge(background.transform, font);
+
+                    var badgeComponent = background.GetComponent<Onikiri.UI.PetTabBadge>();
+                    if (badgeComponent == null)
+                        badgeComponent = background.gameObject.AddComponent<Onikiri.UI.PetTabBadge>();
+
+                    var badgeSo = new SerializedObject(badgeComponent);
+                    badgeSo.FindProperty("badge").objectReferenceValue = badge.gameObject;
+                    badgeSo.FindProperty("label").objectReferenceValue =
+                        badge.GetComponentInChildren<TMPro.TMP_Text>(true);
+                    badgeSo.ApplyModifiedPropertiesWithoutUndo();
+                }
+
+                if (spec.HomeTab) WireCharacterTabPortrait(background, tabIcon, so);
             }
+        }
+
+        /**
+         * @brief 캐릭터 탭의 심볼을 현재 경지 초상으로 (39단계).
+         *
+         * 인물 글리프는 교체 1순위로 적어둔 자리였다(UiGlyphBuilder) - 경지가
+         * 올라 사무라이의 모습이 바뀌면 탭의 "나"도 함께 바뀌어야 한다.
+         *
+         * LockedTab의 글리프 이미지를 뺏지 않고 **전용 이미지를 마스크 안에**
+         * 따로 세운다 - 한 이미지를 두 컴포넌트가 서로 덮어쓰는 싸움을 구조로
+         * 피한다(CharacterTabPortrait 주석). 글리프는 normalIcon을 비워 끈다.
+         * 초상이 아직 안 구워진 씬(Build Evolution Content 전)에서는 글리프를
+         * 그대로 둔다 - 심볼 없는 탭보다 낫다.
+         */
+        private static void WireCharacterTabPortrait(UnityEngine.UI.Image background,
+                                                     UnityEngine.UI.Image glyphIcon,
+                                                     SerializedObject lockedTabSo)
+        {
+            var appearance = Object.FindFirstObjectByType<Onikiri.Battle.EvolutionAppearance>(
+                FindObjectsInactive.Include);
+
+            // 잔재 정리는 먼저 - 초상이 없어 글리프로 남는 경우에도 옛 마스크가
+            // 남아 있으면 안 된다
+            var stale = background.transform.Find("PortraitMask");
+            if (stale != null) Object.DestroyImmediate(stale.gameObject);
+
+            if (appearance == null || appearance.TierCount == 0)
+            {
+                Debug.LogWarning("[Onikiri] Character tab keeps the person glyph"
+                                 + " - run Build Evolution Content first for the portrait.");
+                return;
+            }
+
+            // 글리프를 끈다. LockedTab.Refresh는 normalIcon이 null이면 이미지를
+            // 비활성화한다 - 캐릭터 탭은 잠기지 않으므로 자물쇠로 돌아올 일도 없다
+            lockedTabSo.FindProperty("normalIcon").objectReferenceValue = null;
+            lockedTabSo.ApplyModifiedPropertiesWithoutUndo();
+
+            // 글리프 아이콘과 같은 자리의 마스크 칸. 초상의 다리가 여기서 잘린다
+            var maskObject = new GameObject("PortraitMask", typeof(RectTransform));
+            maskObject.transform.SetParent(background.transform, false);
+
+            var glyphRect = (RectTransform)glyphIcon.transform;
+            var maskRect = (RectTransform)maskObject.transform;
+            maskRect.anchorMin = glyphRect.anchorMin;
+            maskRect.anchorMax = glyphRect.anchorMax;
+            maskRect.pivot = glyphRect.pivot;
+            maskRect.sizeDelta = glyphRect.sizeDelta;
+            maskRect.anchoredPosition = glyphRect.anchoredPosition;
+            maskObject.AddComponent<UnityEngine.UI.RectMask2D>();
+
+            var portraitObject = new GameObject("TierPortrait", typeof(RectTransform));
+            portraitObject.transform.SetParent(maskObject.transform, false);
+
+            var portraitRect = (RectTransform)portraitObject.transform;
+            portraitRect.anchorMin = Vector2.zero;
+            portraitRect.anchorMax = Vector2.one;
+            portraitRect.pivot = new Vector2(0.5f, 1f);
+            portraitRect.offsetMin = Vector2.zero;
+            portraitRect.offsetMax = Vector2.zero;
+
+            var portraitImage = portraitObject.AddComponent<UnityEngine.UI.Image>();
+            portraitImage.preserveAspect = true;
+            portraitImage.raycastTarget = false;
+
+            var component = background.GetComponent<Onikiri.UI.CharacterTabPortrait>();
+            if (component == null)
+                component = background.gameObject.AddComponent<Onikiri.UI.CharacterTabPortrait>();
+
+            var so = new SerializedObject(component);
+            so.FindProperty("portrait").objectReferenceValue = portraitImage;
+            so.FindProperty("pixelScale").floatValue = 2f;
+            so.FindProperty("topInset").floatValue = 4f;
+
+            var portraits = so.FindProperty("tierPortraits");
+            var tops = so.FindProperty("tierInkTop");
+            var centers = so.FindProperty("tierInkCenter");
+            portraits.arraySize = appearance.TierCount;
+            tops.arraySize = appearance.TierCount;
+            centers.arraySize = appearance.TierCount;
+
+            for (int t = 0; t < appearance.TierCount; t++)
+            {
+                var frames = appearance.GetTier(t);
+                var portrait = frames != null && frames.idle != null && frames.idle.Length > 0
+                    ? frames.idle[0] : null;
+
+                portraits.GetArrayElementAtIndex(t).objectReferenceValue = portrait;
+
+                // 정렬 기준은 전직 카드와 같은 실측(그려진 픽셀)이다. 측정이
+                // 두 벌이면 두 화면이 따로 논다 - 그쪽 헬퍼를 그대로 쓴다
+                var bounds = UpgradePanelBuilder.MeasurePortraitBounds(portrait);
+                tops.GetArrayElementAtIndex(t).floatValue = bounds.z;
+                centers.GetArrayElementAtIndex(t).floatValue = bounds.y;
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /**
+         * @brief 하단 탭이 켜는 화면을 다시 물린다. **판을 새로 만든 쪽이 부른다.**
+         *
+         * ## 조용히 잠기는 탭
+         *
+         * 화면 판을 세우는 빌더들(대장간·동료·퀘스트·오의)은 자기 판을 지우고
+         * 다시 만든다. 그러면 그 판을 가리키던 하단 탭의 참조가 끊기는데,
+         * LockedTab은 참조가 없으면 **"아직 구현되지 않았다"로 읽고 탭을 잠근다**
+         * (LockedTab.screen 주석 - 화면을 안 만들고 잠금만 푸는 실수를 막으려고
+         * 일부러 그렇게 판정한다).
+         *
+         * 그래서 증상이 "빌더를 돌렸더니 장비 탭이 안 눌린다"로 나온다. 콘솔은
+         * 조용하다 - 빌더 입장에서는 판을 세운 것이 성공이고, 끊어진 것은 남의
+         * 참조다. 실제로 45c에 물렸다: Build Combat Content로 하단 바를 세운 뒤
+         * Build Equipment Panel이 판을 새로 만들자 장비 탭이 잠긴 채 남았다.
+         *
+         * 판을 만든 쪽이 끝에서 이것을 부르면 **빌더 실행 순서에 대한 의존이
+         * 사라진다.** 어느 것을 먼저 돌리든 마지막에 참조가 맞는다.
+         *
+         * 상호 배타(otherScreens)도 같은 이유로 함께 다시 쓴다 - 새로 만든 판은
+         * 남들의 목록에도 없다.
+         */
+        public static void RelinkScreenTabs()
+        {
+            var bar = MainSceneBuilder.FindBand("BottomTabBar");
+            if (bar == null) return;
+
+            var tabs = bar.GetComponentsInChildren<Onikiri.UI.LockedTab>(true);
+
+            // 표의 순서가 곧 탭의 순서다(BuildBottomTabs가 이 표로 만든다).
+            // 수가 어긋나면 짝이 밀리므로 손대지 않고 알린다
+            if (tabs.Length != LockedTabs.Length)
+            {
+                Debug.LogWarning(string.Format(
+                    "[Onikiri] BottomTabBar has {0} tabs but the table has {1} - "
+                    + "cannot relink screens. Run Build Combat Content.",
+                    tabs.Length, LockedTabs.Length));
+                return;
+            }
+
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                var spec = LockedTabs[i];
+                if (string.IsNullOrEmpty(spec.ScreenName)) continue;
+
+                var screen = MainSceneBuilder.FindBand(spec.ScreenName);
+                if (screen == null) continue;
+
+                var so = new SerializedObject(tabs[i]);
+                so.FindProperty("screen").objectReferenceValue = screen.gameObject;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            WireScreenExclusivity();
+        }
+
+        /**
+         * @brief 같은 띠를 쓰는 화면들의 상호 배타를 배선한다 (38단계).
+         *
+         * 하단 탭 4화면 + 상단 바 3화면이 전부 성장 띠를 덮는다. 그전에는
+         * 여럿이 동시에 켜질 수 있었고 형제 순서로 위의 것만 보였다 - 보이는
+         * 상태와 켜진 상태가 달랐다. 이제 어느 하나를 열면 나머지를 닫는다.
+         * GrowthPanel은 목록에 없다 - 바탕층이라 항상 켜져 있고, 모두 닫힌
+         * 상태가 곧 "캐릭터 화면"이다.
+         */
+        private static void WireScreenExclusivity()
+        {
+            var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+            var bar = MainSceneBuilder.FindBand("BottomTabBar");
+            var topBar = MainSceneBuilder.FindBand("TopBar");
+            if (safeArea == null) return;
+
+            // ⚠️ **새 화면을 이 표에 넣는 것을 잊지 말 것.** 46단계에 상점을
+            // 빼먹고 실기에서 물렸다 - 증상이 "상점을 연 뒤 다른 탭이 안
+            // 눌린다"였는데, 실제로는 눌렸고 켜진 화면이 상점 **뒤에**
+            // 있었다(상점이 마지막에 만들어져 형제 순서상 위에 그려진다).
+            // 38단계 주석이 경고한 "보이는 상태와 켜진 상태가 다르다"가
+            // 정확히 재현된 것이고, 화면을 만든 빌더가 여기에 이름을 더하지
+            // 않으면 그 화면만 영원히 안 닫힌다
+            string[] names =
+            {
+                SkillPanelBuilder.PanelName, EquipmentPanelBuilder.PanelName,
+                PetPanelBuilder.PanelName, QuestPanelBuilder.PanelName,
+                ShopPanelBuilder.PanelName,
+                HudScreensBuilder.StatsPanelName, HudScreensBuilder.RegionSelectPanelName,
+                HudScreensBuilder.SettingsPanelName
+            };
+
+            var screens = new List<GameObject>();
+            foreach (var name in names)
+            {
+                var found = safeArea.Find(name);
+                if (found != null) screens.Add(found.gameObject);
+            }
+
+            if (bar != null)
+                foreach (var tab in bar.GetComponentsInChildren<Onikiri.UI.LockedTab>(true))
+                    FillOtherScreens(new SerializedObject(tab), screens);
+
+            if (topBar != null)
+                foreach (var hudButton in topBar.GetComponentsInChildren<Onikiri.UI.HudScreenButton>(true))
+                    FillOtherScreens(new SerializedObject(hudButton), screens);
+        }
+
+        /** own screen을 뺀 나머지를 otherScreens 배열에 적는다 */
+        private static void FillOtherScreens(SerializedObject so, List<GameObject> screens)
+        {
+            var own = so.FindProperty("screen").objectReferenceValue as GameObject;
+
+            var others = new List<GameObject>();
+            foreach (var screen in screens)
+                if (screen != own) others.Add(screen);
+
+            var array = so.FindProperty("otherScreens");
+            array.arraySize = others.Count;
+            for (int i = 0; i < others.Count; i++)
+                array.GetArrayElementAtIndex(i).objectReferenceValue = others[i];
+
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /** 상단 바 라벨 하나. 위 기준 앵커라 상단 바 높이가 바뀌어도 위치가 유지된다 */

@@ -49,7 +49,7 @@ namespace Onikiri.Tests
             Assert.IsTrue(SaveData.Migrate(data));
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(9, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
+            Assert.AreEqual(16, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
 
             Assert.AreEqual(SkillCatalog.Count, data.skillIds.Length,
                 "v6 -> v7이 오의 칸을 다 만들지 않았다");
@@ -160,11 +160,31 @@ namespace Onikiri.Tests
         public void V6_LeavesTheExistingProgressAlone()
         {
             var data = V6Save();
-            var before = (int[])data.upgradeLevels.Clone();
 
             SaveData.Migrate(data);
 
-            Assert.AreEqual(before, data.upgradeLevels, "강화 레벨이 바뀌었다");
+            // 43단계부터 심화 축 두 칸이 **뒤에 붙고**, 기존 레벨은 미세화
+            // 격자로 **가치 등가 환산**된다(새 = (옛-1) x 계수 + 1). 숫자가
+            // 바뀌는 것이 맞다 - 안 바뀌면 공격력 Lv.52의 배수가 x1.0143^51로
+            // 쪼그라들어 진행이 무너진다. 공격속도(아트 상한)와 골드 획득
+            // (밴드 손잡이)만 곡선이 그대로라 환산도 없다
+            Assert.AreEqual(9, data.upgradeLevels.Length,
+                "마이그레이션 뒤 칸 수가 기존 7 + 심화 2가 아니다");
+
+            Assert.AreEqual(409, data.upgradeLevels[0], "공격력 52 -> (51x8)+1");
+            Assert.AreEqual(32, data.upgradeLevels[1], "공격속도는 환산 없음");
+            Assert.AreEqual(336, data.upgradeLevels[2], "치명타 확률 60 -> round(59x5.676)+1");
+            Assert.AreEqual(449, data.upgradeLevels[3], "치명타 피해 57 -> (56x8)+1");
+            Assert.AreEqual(233, data.upgradeLevels[4], "체력 30 -> (29x8)+1");
+            Assert.AreEqual(153, data.upgradeLevels[5], "회복 20 -> (19x8)+1");
+            Assert.AreEqual(13, data.upgradeLevels[6], "골드 획득은 환산 없음");
+
+            // 환산이 실제로 가치 등가인지 - 옛 Lv.52 공격력 배수와 새 Lv.409의
+            // 배수가 같아야 한다 (반 칸 오차 허용)
+            double oldValue = 5d * System.Math.Pow(1.12d, 51);
+            double newValue = AttackPowerCurve.ValueAtLevel(409);
+            Assert.AreEqual(1d, newValue / oldValue, 0.02d, "환산이 가치를 보존하지 않는다");
+
             Assert.AreEqual(12, data.stage);
             Assert.AreEqual(18, data.characterLevel);
         }
@@ -273,7 +293,252 @@ namespace Onikiri.Tests
             Assert.AreEqual(8, data.equipmentLevels[index], "두 번째 마이그레이션이 단련 레벨을 되돌렸다");
         }
 
+        // ---------------------------------------------------------------- v9 -> v10
+
+        /** 33단계 이전의 세이브. 전직 칸이 아예 없다 (JsonUtility 기본값 0) */
+        static SaveData V9Save()
+        {
+            var data = V8Save();
+            data.version = 9;
+            data.equipmentIds = new[] { EquipmentCatalog.WeaponId, EquipmentCatalog.ArmorId };
+            data.equipmentGrades = new[] { 4, 3 };
+            data.equipmentLevels = new[] { 8, 5 };
+            data.characterLevel = 74;
+            return data;
+        }
+
+        /**
+         * @brief v9이 **0티어(로닌)**로 올라온다.
+         *
+         * 티어 0의 배수가 정확히 1배라 이 마이그레이션은 예전 플레이어의 스탯을
+         * 바꾸지 않는다. 장비 v8 -> v9와 같은 성질이다.
+         *
+         * **레벨을 넘겼어도 소급하지 않는다.** V9Save가 Lv.74인 것이 그 검사다 -
+         * 해금 조건(Lv.30)을 오래전에 넘긴 플레이어도 티어는 0에서 시작한다.
+         * 진화는 재화를 내고 오르는 사다리이지 레벨의 부록이 아니다.
+         */
+        [Test]
+        public void V9_MigratesToV10AtTierZero()
+        {
+            var data = V9Save();
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+            Assert.AreEqual(0, data.evolutionTier, "v9 -> v10이 티어를 소급해 줬다");
+
+            // **0티어의 배수가 1배여야 마이그레이션이 무해하다**
+            Assert.AreEqual(1d, EvolutionCurve.AttackMultiplierAt(0), 1e-12d,
+                "0티어의 공격 배수가 1배가 아니다 - 마이그레이션이 밸런스를 바꾼다");
+            Assert.AreEqual(1d, EvolutionCurve.HealthMultiplierAt(0), 1e-12d,
+                "0티어의 체력 배수가 1배가 아니다");
+        }
+
+        /** 장비·보석·퀘스트 진행은 그대로 남는다 */
+        [Test]
+        public void V9_KeepsEquipmentAndGems()
+        {
+            var data = V9Save();
+            SaveData.Migrate(data);
+
+            Assert.AreEqual(260L, data.gems, "v9 -> v10이 보석을 지웠다");
+            Assert.AreEqual(4, data.equipmentGrades[0], "v9 -> v10이 장비 등급을 지웠다");
+            Assert.AreEqual(74, data.characterLevel, "v9 -> v10이 레벨을 지웠다");
+        }
+
+        /**
+         * @brief 두 번 돌려도 티어가 되돌아가지 않는다.
+         *
+         * 장비 멱등성과 같은 이유로 손해가 크다 - 티어는 보석 최대 1,200개짜리
+         * 구매다. 저장 실패 후 재시도 한 번에 그것이 사라지면 안 된다.
+         */
+        [Test]
+        public void V9_MigrationIsIdempotent()
+        {
+            var data = V9Save();
+            SaveData.Migrate(data);
+
+            data.evolutionTier = 4;
+            SaveData.Migrate(data);
+
+            Assert.AreEqual(4, data.evolutionTier, "두 번째 마이그레이션이 티어를 되돌렸다");
+        }
+
+        // ---------------------------------------------------------------- v10 -> v11
+
+        /** 펫 스텝 이전의 세이브. 펫 칸이 아예 없다 */
+        static SaveData V10Save()
+        {
+            var data = V9Save();
+            data.version = 10;
+            data.evolutionTier = 3;
+            data.stage = 41;
+            return data;
+        }
+
+        /**
+         * @brief v10이 **세 마리 전부 잠금 + Lv.1, 액티브 없음**으로 올라온다.
+         *
+         * 잠긴 펫의 기여가 정확히 0이라 이 마이그레이션은 예전 플레이어의
+         * DPS를 바꾸지 않는다. 장비 1등급(배수 1배)·전직 0티어와 같은 성질이다.
+         *
+         * **스테이지를 넘겼어도 소급하지 않는다.** V10Save가 st41인 것이 그
+         * 검사다 - 해금 게이트(st31)를 오래전에 넘긴 플레이어도 펫은 잠금에서
+         * 시작한다. 동료는 보석을 내고 여는 문이지 스테이지의 부록이 아니다.
+         */
+        [Test]
+        public void V10_MigratesToV11WithAllPetsLocked()
+        {
+            var data = V10Save();
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+            Assert.AreEqual(PetCatalog.Count, data.petIds.Length,
+                "v10 -> v11이 펫 칸을 다 만들지 않았다");
+            Assert.AreEqual("", data.activePetId, "v10 -> v11이 액티브 펫을 세워줬다");
+
+            foreach (var pet in PetCatalog.Pets)
+            {
+                int index = System.Array.IndexOf(data.petIds, pet.Id);
+                Assert.GreaterOrEqual(index, 0, "'" + pet.Name + "'이 세이브에 없다");
+                Assert.AreEqual(0, data.petUnlocked[index], "'" + pet.Name + "'이 해금돼 있다 - 소급이다");
+                Assert.AreEqual(1, data.petLevels[index], "'" + pet.Name + "'이 Lv.1이 아니다");
+            }
+        }
+
+        /** 전직·장비·보석은 그대로 남는다 */
+        [Test]
+        public void V10_KeepsEvolutionAndGems()
+        {
+            var data = V10Save();
+            SaveData.Migrate(data);
+
+            Assert.AreEqual(260L, data.gems, "v10 -> v11이 보석을 지웠다");
+            Assert.AreEqual(3, data.evolutionTier, "v10 -> v11이 전직 티어를 지웠다");
+            Assert.AreEqual(4, data.equipmentGrades[0], "v10 -> v11이 장비 등급을 지웠다");
+        }
+
+        /**
+         * @brief 두 번 돌려도 해금이 되돌아가지 않는다.
+         *
+         * 장비·전직 멱등성과 같은 이유로 손해가 크다 - 해금은 보석 최대
+         * 400개짜리 구매다. 저장 실패 후 재시도 한 번에 사라지면 안 된다.
+         */
+        [Test]
+        public void V10_MigrationIsIdempotent()
+        {
+            var data = V10Save();
+            SaveData.Migrate(data);
+
+            int wolf = System.Array.IndexOf(data.petIds, PetCatalog.WolfId);
+            data.petUnlocked[wolf] = 1;
+            data.petLevels[wolf] = 12;
+            data.activePetId = PetCatalog.WolfId;
+
+            SaveData.Migrate(data);
+
+            Assert.AreEqual(PetCatalog.Count, data.petIds.Length, "두 번째 마이그레이션이 칸을 늘렸다");
+            Assert.AreEqual(1, data.petUnlocked[wolf], "두 번째 마이그레이션이 해금을 되돌렸다");
+            Assert.AreEqual(12, data.petLevels[wolf], "두 번째 마이그레이션이 레벨을 되돌렸다");
+            Assert.AreEqual(PetCatalog.WolfId, data.activePetId, "두 번째 마이그레이션이 액티브를 비웠다");
+        }
+
         /** 미래 버전은 거부한다. 모르는 형식을 억지로 읽으면 조용히 망가진다 */
+        // ---------------------------------------------------------------- v11 -> v12
+
+        /** 재선택 이전의 세이브. 최전선 칸이 없다 */
+        static SaveData V11Save()
+        {
+            var data = V10Save();
+            data.version = 11;
+            return data;
+        }
+
+        /**
+         * @brief 최전선은 지금 서 있는 스테이지다.
+         *
+         * v11까지는 스테이지가 내려가는 경로가 없었으므로 "현재 위치 = 최고
+         * 도달"이 참이다. 이 마이그레이션은 아무 상태도 지어내지 않고, 해금
+         * 판정(장비 st11·동료 st31)은 마이그레이션 전후로 같은 답을 낸다.
+         */
+        [Test]
+        public void V11_MigratesToV12WithFrontierAtCurrentStage()
+        {
+            var data = V11Save();
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+            Assert.AreEqual(data.stage, data.maxStageReached,
+                "v11 -> v12의 최전선은 현재 스테이지여야 한다 - 다른 값은 지어낸 상태다");
+            Assert.GreaterOrEqual(data.maxStageReached, 1);
+        }
+
+        /**
+         * @brief 재선택으로 내려간 상태를 다시 마이그레이션해도 최전선이 안 깎인다.
+         *
+         * 마이그레이션이 두 번 돌 때(저장 실패 후 재시도) stage로 최전선을
+         * 덮어쓰면, 클리어한 지역에서 파밍하다 재시도가 난 플레이어의 도달
+         * 기록이 사라지고 장비·동료가 다시 잠긴다.
+         */
+        [Test]
+        public void V11_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+
+            // 재선택으로 내려가 있는 v12 상태를 흉내낸다
+            int frontier = data.maxStageReached;
+            data.stage = 3;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(frontier, data.maxStageReached,
+                "두 번째 마이그레이션이 최전선을 현재 스테이지로 되돌렸다");
+        }
+
+        // ---------------------------------------------------------------- v12 -> v13
+
+        /**
+         * @brief 심화 축 둘이 Lv.1(배수 1 / 확률 0)로 생긴다 - 무보정 승격.
+         *
+         * 해금 상태는 저장하지 않는다. 치명타 확률 트랙의 상한 도달에서
+         * 유도되는 값이라, 구세이브의 치명타가 60% 상한(옛 Lv.97)에 서
+         * 있으면 새 상한(100%) 기준으로는 잠긴 것이 맞고 실제로 그렇게
+         * 판정된다 - 지어내는 상태가 없다.
+         */
+        [Test]
+        public void V12_MigratesToV13WithMasteryAtLevelOne()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+
+            int transcend = System.Array.IndexOf(data.upgradeIds, UpgradeSystem.TranscendId);
+            int combo = System.Array.IndexOf(data.upgradeIds, UpgradeSystem.ComboId);
+            Assert.GreaterOrEqual(transcend, 0, "초월 치명타 칸이 안 생겼다");
+            Assert.GreaterOrEqual(combo, 0, "연격 칸이 안 생겼다");
+            Assert.AreEqual(1, data.upgradeLevels[transcend], "레벨 1이 아니면 밸런스가 움직인다");
+            Assert.AreEqual(1, data.upgradeLevels[combo]);
+
+            // 레벨 1의 값이 실제로 무보정인지 - 곡선 쪽 사실도 함께 못 박는다
+            Assert.AreEqual(1d, TranscendCurve.MultiplierAtLevel(1), 1e-12d);
+            Assert.AreEqual(0d, ComboCurve.ChanceAtLevel(1), 1e-12d);
+        }
+
+        [Test]
+        public void V12_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+
+            // 심화 축을 올려둔 v13 상태를 흉내낸다
+            int transcend = System.Array.IndexOf(data.upgradeIds, UpgradeSystem.TranscendId);
+            data.upgradeLevels[transcend] = 9;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(9, data.upgradeLevels[transcend],
+                "두 번째 마이그레이션이 심화 축 레벨을 되돌렸다");
+        }
+
         [Test]
         public void FutureVersion_IsRejected()
         {
@@ -306,9 +571,217 @@ namespace Onikiri.Tests
             Assert.IsTrue(data.skillAutoCast);
             Assert.AreEqual(EquipmentCatalog.Count, data.equipmentIds.Length,
                 "사슬이 v8 -> v9에서 끊겼다 - v1 플레이어만 장비 없이 남는다");
+            Assert.AreEqual(0, data.evolutionTier,
+                "사슬이 v9 -> v10에서 끊겼거나 티어를 소급해 줬다");
+            Assert.AreEqual(PetCatalog.Count, data.petIds.Length,
+                "사슬이 v10 -> v11에서 끊겼다 - v1 플레이어만 펫 없이 남는다");
+            Assert.AreEqual(YodoCatalog.Count, data.yodoIds.Length,
+                "사슬이 v13 -> v14에서 끊겼다 - v1 플레이어만 요도 없이 남는다");
+            Assert.AreEqual(0, data.gachaPity,
+                "사슬이 v14 -> v15에서 끊겼다 - v1 플레이어만 뽑기 없이 남는다");
+            Assert.AreEqual(LegendaryYodoCatalog.Count, data.legendaryYodoIds.Length,
+                "사슬이 v15 -> v16에서 끊겼다 - v1 플레이어만 전설 칸 없이 남는다");
 
             // v1에는 보스가 없었다. 지나온 스테이지 수를 보스 처치 수로 친다
             Assert.AreEqual(3, data.bossKillCount);
+        }
+
+        // ---------------------------------------------------------------- v13 -> v14
+
+        /**
+         * @brief 요도 넷이 미봉인(티어 0)으로 생긴다 - 무보정 승격.
+         *
+         * **소급하지 않는 것이 이 마이그레이션의 전부다.** 이미 st200인
+         * 플레이어는 지나온 순환에서 대요괴를 열 번 넘게 벴지만, 그 처치를
+         * 혼으로 쳐주면 접속하자마자 오니키리가 완성된다 - 도감이 채워지는
+         * 과정 전체가 사라지고, 그것이 이 스텝이 만든 것의 전부다.
+         */
+        [Test]
+        public void V13_MigratesToV14WithEveryBladeUnsealed()
+        {
+            var data = V11Save();
+            data.stage = 200;
+            data.maxStageReached = 200;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+
+            Assert.AreEqual(YodoCatalog.Count, data.yodoIds.Length, "요도 칸이 안 생겼다");
+            Assert.AreEqual(YodoCatalog.Count, data.yodoSouls.Length);
+            Assert.AreEqual(YodoCatalog.Count, data.yodoTiers.Length);
+            Assert.AreEqual(YodoCatalog.Count, data.yodoDiscovered.Length);
+
+            foreach (var blade in YodoCatalog.Blades)
+            {
+                int index = System.Array.IndexOf(data.yodoIds, blade.Id);
+                Assert.GreaterOrEqual(index, 0, "'" + blade.BladeName + "'이 세이브에 없다");
+                Assert.AreEqual(0, data.yodoTiers[index],
+                    "티어를 소급해 줬다 - 도감이 채워지는 과정이 통째로 사라진다");
+                Assert.AreEqual(0L, data.yodoSouls[index]);
+                Assert.AreEqual(0, data.yodoDiscovered[index]);
+            }
+
+            Assert.AreEqual(0L, data.yodoShards);
+
+            // 승격이 밸런스를 안 바꾼다는 것도 함께 못 박는다 - 티어 0의
+            // 배수와 0자루 세트 보너스가 정확히 1이어야 한다
+            Assert.AreEqual(1d, YodoCurve.TierValue(0), 1e-12d);
+            Assert.AreEqual(1d, YodoCurve.SetBonusAt(0), 1e-12d);
+        }
+
+        [Test]
+        public void V13_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+
+            // 한 바퀴 돌아 등롱도를 3티어까지 올린 v14 상태를 흉내낸다
+            int lantern = System.Array.IndexOf(data.yodoIds, YodoCatalog.LanternId);
+            data.yodoTiers[lantern] = 3;
+            data.yodoSouls[lantern] = 2L;
+            data.yodoDiscovered[lantern] = 1;
+            data.yodoShards = 77L;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            Assert.AreEqual(3, data.yodoTiers[lantern],
+                "두 번째 마이그레이션이 요도 티어를 되돌렸다 - 한 바퀴가 통째로 사라진다");
+            Assert.AreEqual(2L, data.yodoSouls[lantern]);
+            Assert.AreEqual(1, data.yodoDiscovered[lantern]);
+            Assert.AreEqual(77L, data.yodoShards);
+        }
+
+        // ---------------------------------------------------------------- v14 -> v15
+
+        /**
+         * @brief 뽑기가 **미사용** 상태로 생긴다 - 무보정 승격.
+         *
+         * 소급하지 않는 것이 여기서도 전부다. 지나온 날수만큼 무료 뽑기를
+         * 쌓아주면 접속하자마자 200회가 돌아가고, 그것은 천장을 여섯 번
+         * 지나는 양이라 요도가 통째로 리드 상한까지 올라간다.
+         *
+         * 대신 **오늘치 하나**는 곧바로 쓸 수 있다. 날짜가 0이면 "아직 한
+         * 번도 안 썼다"이므로 마이그레이션이 아무것도 안 하는 것만으로
+         * 그렇게 된다 - v7 -> v8 업적이 "곧바로 받을 수 있는 상태로 열린다"
+         * 였던 것과 같은 결이다.
+         */
+        [Test]
+        public void V14_MigratesToV15WithTheGachaUntouched()
+        {
+            var data = V11Save();
+            data.stage = 200;
+            data.maxStageReached = 200;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+            Assert.AreEqual(16, SaveData.CurrentVersion, "세이브 버전이 v16이 아니다");
+
+            Assert.AreEqual(0, data.gachaPity, "천장 카운터를 소급해 줬다");
+            Assert.AreEqual(0, data.gachaTotalPulls);
+            Assert.AreEqual(0L, data.gachaFreePullDayTicks,
+                "무료 뽑기 날짜가 채워졌다 - 승격 직후 무료 뽑기를 못 쓴다");
+        }
+
+        [Test]
+        public void V14_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+
+            // 천장 직전까지 돌린 v15 상태를 흉내낸다
+            data.gachaPity = GachaCurve.PityPulls - 1;
+            data.gachaTotalPulls = 137;
+            data.gachaFreePullDayTicks = 638000000000000000L;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            Assert.AreEqual(GachaCurve.PityPulls - 1, data.gachaPity,
+                "두 번째 마이그레이션이 천장 카운터를 되돌렸다 - 플레이어가 지불한 "
+                + (GachaCurve.PityPulls - 1) + "회가 몰수된다");
+            Assert.AreEqual(137, data.gachaTotalPulls);
+            Assert.AreEqual(638000000000000000L, data.gachaFreePullDayTicks,
+                "무료 뽑기 쿨이 초기화됐다 - 같은 날 두 번 뽑힌다");
+        }
+
+        // ---------------------------------------------------------------- v15 -> v16
+
+        /**
+         * @brief 희귀도 사다리가 **빈 채로** 생긴다 - 무보정 승격.
+         *
+         * 소급하지 않는 것이 여기서도 전부다. 이미 뽑기를 200회 돌린
+         * 플레이어에게 그 회수만큼 ★4·★5를 나눠 주면 접속 즉시 혼격이
+         * 상한까지 차오르고, 그것은 이 스텝이 판 재고를 통째로 지우는
+         * 일이다 - 지나온 뽑기는 그때의 표로 이미 값을 받았다.
+         *
+         * **천장 카운터는 그대로 둔다.** 지키는 대상이 ★3에서 ★4+로
+         * 승격했지만 카운터의 뜻("마지막 보장 뒤로 몇 번 돌렸는가")은 같고,
+         * 0으로 되돌리면 29회에서 승격을 맞은 플레이어의 지불이 몰수된다.
+         */
+        [Test]
+        public void V15_MigratesToV16WithAnEmptyLadder()
+        {
+            var data = V11Save();
+            data.stage = 300;
+            data.maxStageReached = 300;
+
+            // 뽑기를 한참 돌린 v15 상태를 흉내낸다
+            SaveData.Migrate(data);
+            data.version = 15;
+            data.gachaPity = 17;
+            data.gachaTotalPulls = 240;
+            data.yodoRarities = new int[0];
+            data.legendaryYodoIds = new string[0];
+            data.legendaryYodoCopies = new int[0];
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+
+            Assert.AreEqual(data.yodoIds.Length, data.yodoRarities.Length,
+                "혼격 칸이 요도 칸과 갈렸다");
+            foreach (int rarity in data.yodoRarities)
+                Assert.AreEqual(0, rarity, "혼격을 소급해 줬다 - 재고가 통째로 사라진다");
+
+            Assert.AreEqual(LegendaryYodoCatalog.Count, data.legendaryYodoIds.Length,
+                "전설 칸이 안 생겼다");
+            foreach (int copies in data.legendaryYodoCopies)
+                Assert.AreEqual(0, copies, "240회를 돌렸다고 전설을 나눠 줬다");
+
+            Assert.AreEqual(17, data.gachaPity,
+                "천장 카운터가 0으로 돌아갔다 - 승격이 몰수가 됐다");
+            Assert.AreEqual(240, data.gachaTotalPulls);
+        }
+
+        [Test]
+        public void V15_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+
+            // 사다리를 실제로 올린 v16 상태를 흉내낸다
+            for (int i = 0; i < data.yodoRarities.Length; i++) data.yodoRarities[i] = 2;
+            data.legendaryYodoCopies[0] = 3;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            foreach (int rarity in data.yodoRarities)
+                Assert.AreEqual(2, rarity,
+                    "두 번째 마이그레이션이 혼격을 지웠다 - 뽑은 ★4가 몰수된다");
+            Assert.AreEqual(3, data.legendaryYodoCopies[0],
+                "두 번째 마이그레이션이 전설 사본을 지웠다 - 200회에 한 번이 사라진다");
+            Assert.AreEqual(LegendaryYodoCatalog.Count, data.legendaryYodoIds.Length,
+                "전설 칸이 두 번 생겼다");
+        }
+
+        /**
+         * @brief 미래 버전은 거부한다. 사슬의 반대쪽 끝이다.
+         */
+        [Test]
+        public void FutureVersion_IsRejectedAtV16()
+        {
+            var data = V11Save();
+            data.version = SaveData.CurrentVersion + 1;
+            Assert.IsFalse(SaveData.Migrate(data),
+                "모르는 버전의 세이브를 그대로 읽는다 - 부분 마이그레이션이 된다");
         }
     }
 }

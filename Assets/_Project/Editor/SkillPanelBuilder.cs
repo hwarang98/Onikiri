@@ -66,8 +66,9 @@ namespace Onikiri.EditorTools
         private const float HeaderHeight = 76f;
         private const float HeaderGap = 14f;
 
-        private static readonly Color TextColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
-        private static readonly Color DimColor = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
+        // 39단계 톤 통일: 자기 색을 갖지 않는다. 팔레트의 단일 출처는 UiSkin이다
+        private static readonly Color TextColor = UiSkin.Text;
+        private static readonly Color DimColor = UiSkin.TextDim;
 
         /**
          * @brief 화면과 시스템을 세우고 SkillSystem을 돌려준다.
@@ -787,8 +788,14 @@ namespace Onikiri.EditorTools
          *
          * 이름을 `Slash3_color2_00` 처럼 0을 채워 붙이는 이유는 정렬 때문이다 -
          * `_1`, `_10`, `_2` 순으로 읽히면 애니가 뒤섞인다.
+         *
+         * 45b에 요도 빌더에게도 열었다. 영체가 같은 팩 시트를 쓰는데
+         * (YodoPanelBuilder의 시그니처 연출) 자르는 코드를 한 벌 더 두면
+         * 피벗 계산이 두 곳에 살고, 두 곳이 갈리는 날 참격이 영체 옆에서
+         * 어긋난다. 같은 시트를 두 번 자르는 것도 아니다 - 임포터 설정을
+         * 고치는 일이라 두 번째부터는 그대로 읽는다.
          */
-        private static Sprite[] SliceSlashSheet(string shape, int color)
+        public static Sprite[] SliceSlashSheet(string shape, int color)
         {
             string path = SlashPackFolder + "Slash_128x128_" + shape + "_color" + color + ".png";
 
@@ -1175,6 +1182,9 @@ namespace Onikiri.EditorTools
             // 먹지 않으면 스킬 화면 위에서 끈 손가락이 뒤의 강화 목록을 스크롤한다
             backdrop.raycastTarget = true;
 
+            // 화지 위의 벚가지 (39단계). 행이 덮는 부분은 안 보이고, 여백에만 남는다
+            BackdropTextureBuilder.AddSakuraBranch(rect);
+
             return rect;
         }
 
@@ -1185,6 +1195,7 @@ namespace Onikiri.EditorTools
             {
                 var child = panel.GetChild(i);
                 if (child.name == "Header") continue;
+                if (child.name == BackdropTextureBuilder.BranchName) continue;
                 if (child.name.StartsWith("Skill")) continue;
                 Object.DestroyImmediate(child.gameObject);
             }
@@ -1248,6 +1259,13 @@ namespace Onikiri.EditorTools
             toggleLabelRect.offsetMax = new Vector2(0f, 10f);
             toggleLabel.text = "자동 시전  ON";
 
+            // 잠긴 미리보기의 해금 조건 배너(41단계). 헤더를 덮으므로 자동
+            // 시전 토글도 잠긴 동안 함께 막힌다 - 토글은 상태 변경이다.
+            // 조건은 탭(LockedTab)과 같은 출처에서 끌어온다
+            LockBannerBuilder.Build(go.transform, font,
+                                    "Lv." + SkillCatalog.PanelUnlockLevel + " 도달 시 해금",
+                                    SkillCatalog.PanelUnlockLevel, 0);
+
             var toggle = toggleObject.AddComponent<Onikiri.UI.SkillAutoCastToggle>();
             var so = new SerializedObject(toggle);
             so.FindProperty("system").objectReferenceValue = system;
@@ -1285,16 +1303,21 @@ namespace Onikiri.EditorTools
 
             var icon = CreateIcon(go.transform, UiIcons.For(spec.Id));
 
+            // 행 글자는 전부 캡션 크기(39단계 - 캐릭터 화면과 같은 위계). 이
+            // 화면에서 44pt로 남는 것은 머리글("발도 오의")과 자동 시전 버튼뿐이다
             var nameLabel = CreateLabel(go.transform, font, "Name", TextAlignmentOptions.Left);
+            UiFonts.Demote(nameLabel);
             PlaceStretched((RectTransform)nameLabel.transform, TextLeft, CostWidth + 24f, 10f, LineHeight);
             nameLabel.text = spec.DisplayName;
 
             var costLabel = CreateLabel(go.transform, font, "Cost", TextAlignmentOptions.Right);
+            UiFonts.Demote(costLabel);
             PlaceRight((RectTransform)costLabel.transform, 24f, 10f, LineHeight);
             costLabel.color = DimColor;
             costLabel.text = "Lv." + spec.UnlockLevel;
 
             var valueLabel = CreateLabel(go.transform, font, "Value", TextAlignmentOptions.Left);
+            UiFonts.Demote(valueLabel);
             PlaceStretched((RectTransform)valueLabel.transform, TextLeft, 24f, 10f + LineHeight, LineHeight);
             valueLabel.color = DimColor;
             valueLabel.text = spec.CooldownSeconds.ToString("F1") + "초";

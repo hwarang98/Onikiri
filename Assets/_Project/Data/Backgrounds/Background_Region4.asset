@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb1b43b0a40a30f4bb1e4f4f68ea3b2c, type: 3}
+  m_Name: Background_Region4
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.RegionBackgroundSet
+  displayName: "\uC9C0\uC5ED 4 \xB7 \uC694\uAD34 \uC18C\uAD74"
+  layers:
+  - name: Sky_Fill
+    sprite: {fileID: 21300000, guid: 2ded06b632477c3478980b0b51a64b15, type: 3}
+    scrollSpeed: 0
+    tint: {r: 0.15294118, g: 0.11372549, b: 0.2, a: 1}
+    isSkyFill: 1
+    isGroundCover: 0
+    sitsOnGround: 0
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 0
+  - name: Mist_Far_Scroll
+    sprite: {fileID: 21300000, guid: a6dcab1800c5a6b4c9ee6ba48d4e84e6, type: 3}
+    scrollSpeed: 0.18
+    tint: {r: 0.5411765, g: 0.28235295, b: 0.30588236, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 0
+  - name: Mist_Mid
+    sprite: {fileID: 21300000, guid: cad4320e4c137f34298b2672864cd299, type: 3}
+    scrollSpeed: 0.4
+    tint: {r: 0.4392157, g: 0.22745098, b: 0.27450982, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 0
+  - name: Silhouette
+    sprite: {fileID: 21300000, guid: 064f2f65392267b41a6e9baaf1cbe531, type: 3}
+    scrollSpeed: 0.66
+    tint: {r: 0.9098039, g: 0.65882355, b: 0.65882355, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 0
+  - name: Shrine
+    sprite: {fileID: 21300000, guid: 371017af66ffe2b488f7684728072108, type: 3}
+    scrollSpeed: 0.22
+    tint: {r: 0.5176471, g: 0.27450982, b: 0.32156864, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 110
+  - name: Maples
+    sprite: {fileID: 21300000, guid: 56a9b4b0ed574ab479cd668f82b11c09, type: 3}
+    scrollSpeed: 0.88
+    tint: {r: 0.54901963, g: 0.24313726, b: 0.28235295, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 1
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 0
+  - name: Ground
+    sprite: {fileID: 21300000, guid: ef0a55f00432b6a4da2a16ffb103e7cf, type: 3}
+    scrollSpeed: 1
+    tint: {r: 0.54901963, g: 0.24313726, b: 0.28235295, a: 1}
+    isSkyFill: 0
+    isGroundCover: 0
+    sitsOnGround: 0
+    artBottomPixels: 0
+    landmarkRepeatSeconds: 0
+  clearColor: {r: 0.1254902, g: 0.0627451, b: 0.08627451, a: 1}
+  groundSurfacePixels: 48
+  backgroundPixelHeight: 180

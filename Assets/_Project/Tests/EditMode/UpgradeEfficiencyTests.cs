@@ -41,13 +41,15 @@ namespace Onikiri.Tests
          */
         const double MaxRatio = 5d;
 
-        // UpgradePanelBuilder가 실제로 기록하는 값
+        /** 곡선 값은 AttackPowerCurve에서 가져온다. 43단계 미세화 때 하드코딩이 어긋나 고쳤다 */
         static UpgradeTrack AttackPower()
         {
             return new UpgradeTrack(UpgradeSystem.AttackPowerId, "공격력 강화",
-                                    BigDouble.FromDouble(10d), 1.15d,
+                                    BigDouble.FromDouble(AttackPowerCurve.BaseCost),
+                                    AttackPowerCurve.CostGrowth,
                                     UpgradeTrack.Curve.Multiplicative,
-                                    BigDouble.FromDouble(5d), 1.12d);
+                                    BigDouble.FromDouble(AttackPowerCurve.BaseValue),
+                                    AttackPowerCurve.Step);
         }
 
         /** 곡선 값은 AttackSpeedCurve에서 가져온다. 여기 숫자를 복사해두면 언젠가 어긋난다 */
@@ -106,7 +108,28 @@ namespace Onikiri.Tests
             return new[] { AttackPower(), AttackSpeed(), CritRate(), CritDamage() };
         }
 
-        /** 구간 전체에서 두 축이 가장 크게 벌어지는 지점 */
+        /**
+         * @brief 축의 격자 밀도 (43단계 미세화). 옛 한 레벨이 새 몇 칸인가.
+         *
+         * 같은 "레벨 번호"는 이제 축마다 다른 지출 지점이다 - 공격력 Lv.200은
+         * 옛 Lv.26의 지출이고 공격속도 Lv.200은 옛 그대로다. 효율 비교는
+         * **같은 지출 지점**에서 해야 하므로, 옛 격자의 레벨을 각 축의
+         * 새 격자로 옮겨 잰다. 매핑은 마이그레이션(SaveData.ConvertLevel)과
+         * 같은 식이다.
+         */
+        static double GridDensity(UpgradeTrack track)
+        {
+            if (track.Id == UpgradeSystem.AttackSpeedId) return 1d;      // 아트 상한, 미세화 없음
+            if (track.Id == UpgradeSystem.CritRateId) return 0.005d / CritRateCurve.Step;
+            return 8d;
+        }
+
+        static int G(UpgradeTrack track, int oldLevel)
+        {
+            return (int)System.Math.Round((oldLevel - 1) * GridDensity(track)) + 1;
+        }
+
+        /** 구간 전체에서 두 축이 가장 크게 벌어지는 지점. 옛 격자 기준으로 훑는다 */
         static void WorstRatio(UpgradeTrack a, UpgradeTrack b, out double worst, out int atLevel)
         {
             worst = 0d;
@@ -114,7 +137,11 @@ namespace Onikiri.Tests
 
             for (int level = 1; level <= MaxLevelChecked; level++)
             {
-                double ratio = UpgradeEfficiency.Ratio(a, b, level);
+                double ga = UpgradeEfficiency.GainPerGold(a, G(a, level));
+                double gb = UpgradeEfficiency.GainPerGold(b, G(b, level));
+                if (ga <= 0d || gb <= 0d) continue;
+
+                double ratio = ga > gb ? ga / gb : gb / ga;
                 if (ratio <= worst) continue;
                 worst = ratio;
                 atLevel = level;
@@ -163,11 +190,19 @@ namespace Onikiri.Tests
             var power = AttackPower();
             var speed = AttackSpeed();
 
-            double atOne = UpgradeEfficiency.Ratio(power, speed, 1);
-            double atTop = UpgradeEfficiency.Ratio(power, speed, MaxLevelChecked);
+            // 지출-등가 지점끼리 잰다 (미세화 격자 매핑, GridDensity 주석).
+            //
+            // 기점이 1이 아니라 30인 이유는 정수화(E-3 수정)다. 첫 칸(5골드)은
+            // 반올림 한 번이 비용의 6%라 비율에 그대로 실리는데, 그것은 구조적
+            // 드리프트가 아니라 격자 노이즈다. 옛 격자 Lv.30(비용 300골드대)
+            // 부터는 반올림이 0.2% 아래로 내려가 1% 허용으로 형태를 잴 수 있다
+            double atBase = UpgradeEfficiency.GainPerGold(power, G(power, 30))
+                          / UpgradeEfficiency.GainPerGold(speed, G(speed, 30));
+            double atTop = UpgradeEfficiency.GainPerGold(power, G(power, MaxLevelChecked))
+                         / UpgradeEfficiency.GainPerGold(speed, G(speed, MaxLevelChecked));
 
-            Assert.AreEqual(atOne, atTop, atOne * 0.01d,
-                "효율 비율이 레벨에 따라 " + atOne.ToString("F2") + " -> " + atTop.ToString("F2") +
+            Assert.AreEqual(atBase, atTop, atBase * 0.01d,
+                "효율 비율이 레벨에 따라 " + atBase.ToString("F2") + " -> " + atTop.ToString("F2") +
                 " 로 움직임. 두 축의 비용 증가율이 다르면 낮은 쪽은 결국 죽는다");
         }
 
@@ -191,8 +226,9 @@ namespace Onikiri.Tests
             // 곱연산의 정의. 레벨이 아무리 올라도 "DPS가 몇 % 오르는가"는 그대로다.
             // 공격력은 DPS에 직접 곱해지므로 값 증가율이 곧 DPS 증가율이다
             var power = AttackPower();
-            Assert.AreEqual(0.12d, UpgradeEfficiency.RelativeGain(power, 1), 1e-9d);
-            Assert.AreEqual(0.12d, UpgradeEfficiency.RelativeGain(power, MaxLevelChecked), 1e-9d);
+            double step = AttackPowerCurve.Step - 1d;   // 미세화 뒤 +1.43%/칸
+            Assert.AreEqual(step, UpgradeEfficiency.RelativeGain(power, 1), 1e-9d);
+            Assert.AreEqual(step, UpgradeEfficiency.RelativeGain(power, MaxLevelChecked), 1e-9d);
         }
 
         /**
@@ -210,12 +246,14 @@ namespace Onikiri.Tests
         {
             var rate = CritRate();
 
-            double atOne = UpgradeEfficiency.RelativeGain(rate, 1);
-            double atFifty = UpgradeEfficiency.RelativeGain(rate, 50);
-            double atTop = UpgradeEfficiency.RelativeGain(rate, MaxLevelChecked);
+            // 언덕의 좌표는 값(확률)이지 레벨 번호가 아니다 - 옛 격자의
+            // 1/50/200을 새 격자로 옮겨 같은 확률 지점에서 잰다
+            double atOne = UpgradeEfficiency.RelativeGain(rate, G(rate, 1));
+            double atFifty = UpgradeEfficiency.RelativeGain(rate, G(rate, 50));
+            double atTop = UpgradeEfficiency.RelativeGain(rate, G(rate, MaxLevelChecked));
 
             Assert.Greater(atOne, 0d);
-            Assert.IsFalse(UpgradeEfficiency.DecaysStructurally(rate, 1, MaxLevelChecked),
+            Assert.IsFalse(UpgradeEfficiency.DecaysStructurally(rate, 1, G(rate, MaxLevelChecked)),
                 string.Format("치명타율의 DPS 기여가 {0:P2} -> {1:P2} 로 무너졌다. " +
                               "치명타 피해가 함께 자라지 않으면 이 축은 8단계의 공격속도가 된다",
                               atOne, atTop));

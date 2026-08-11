@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4010c342f197d57419207c5c1cb399e2, type: 3}
   m_Name: Boss_DarkSamurai
   m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.BossConfig
-  displayName: "\uB2E4\uD06C \uC0AC\uBB34\uB77C\uC774"
+  displayName: "\uBD89\uC740\uB208 \uC694\uAD34"
   kind: 0
   fullIntro: 1
+  soulId: yodo_redeye
   idleSheet: {fileID: 2800000, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
   walkSheet: {fileID: 2800000, guid: 12411396718817e49bca366e81b057de, type: 3}
   hurtSheet: {fileID: 2800000, guid: e7d673badead6824cace4ff2aafba06f, type: 3}

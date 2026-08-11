@@ -80,7 +80,10 @@ namespace Onikiri.Tests
 
             for (int level = 1; level <= 20; level++)
             {
-                double expected = PowerBaseCost * System.Math.Pow(PowerCostGrowth, level - 1);
+                // 정수화(E-3 수정)를 지난 값이 기대값이다. 곡선 statics와 트랙이
+                // 같은 규칙을 지나는지는 UpgradeCostTests가 따로 잰다
+                double expected = UpgradeCost.Quantize(
+                    PowerBaseCost * System.Math.Pow(PowerCostGrowth, level - 1));
                 Assert.AreEqual(expected, track.Cost.ToDouble(), expected * 1e-6d,
                     "cost wrong at level " + level);
                 Assert.IsTrue(track.TryPurchase(wallet));

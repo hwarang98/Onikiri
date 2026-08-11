@@ -26,6 +26,10 @@ namespace Onikiri.Progression
         [SerializeField] private EnemySpawner spawner;
         [SerializeField] private QuestSystem quests;
         [SerializeField] private EquipmentSystem equipment;
+        [SerializeField] private EvolutionSystem evolution;
+        [SerializeField] private PetSystem petSystem;
+        [SerializeField] private YodoSystem yodo;
+        [SerializeField] private GachaSystem gacha;
         [SerializeField] private Onikiri.UI.OfflineRewardPopup offlinePopup;
 
         [Tooltip("자동 저장 간격 (초). 프로세스가 예고 없이 사라져도 잃는 양을 " +
@@ -79,7 +83,9 @@ namespace Onikiri.Progression
             var wallet = PlayerWallet.Instance;
             if (wallet != null) wallet.SetBalance(data.gold, data.lifetimeGold);
 
-            if (stage != null) stage.SetProgress(data.stage, data.killsThisStage, data.bossKillCount);
+            if (stage != null)
+                stage.SetProgress(data.stage, data.killsThisStage, data.bossKillCount,
+                    data.maxStageReached);
 
             // 레벨은 강화보다 **먼저** 복원한다. 스탯 포인트 증폭이 강화 값에
             // 곱해지므로(UpgradeSystem.Apply), 순서가 뒤바뀌면 강화가 증폭 없는
@@ -103,6 +109,31 @@ namespace Onikiri.Progression
             // 부르는 것도 같다
             if (equipment != null)
                 equipment.Restore(data.equipmentIds, data.equipmentGrades, data.equipmentLevels);
+
+            // 전직도 장비와 같은 자리, 같은 이유다 - 배수가 강화 값에 곱해진다
+            if (evolution != null) evolution.Restore(data.evolutionTier);
+
+            // 요도도 같은 자리, 같은 이유다(44단계). 배수가 강화 값에
+            // 곱해지므로 강화 뒤여야 하고, 복원 끝에 ApplyAll을 다시 부른다
+            // 47단계에 인자 셋이 붙었다(혼격·전설 id·전설 사본). 전부
+            // 기본값이 있어 v15 세이브는 예전 그대로 복원된다
+            if (yodo != null)
+                yodo.Restore(data.yodoIds, data.yodoSouls, data.yodoTiers,
+                             data.yodoDiscovered, data.yodoShards,
+                             data.yodoRarities, data.legendaryYodoIds, data.legendaryYodoCopies);
+
+            // 뽑기는 요도 **다음**이다(46단계). 순서가 있는 이유는 복원
+            // 자체가 아니라 계약이다 - 뽑기가 요도의 상태를 읽어 상한을
+            // 판정하므로(YodoSystem.TryTakeEssence), 요도가 아직 0인
+            // 프레임에 뽑기가 도는 경로를 만들지 않는다
+            if (gacha != null)
+                gacha.Restore(data.gachaPity, data.gachaTotalPulls, data.gachaFreePullDayTicks);
+
+            // 펫은 순서 제약이 느슨하다 - 스탯에 곱해지지 않고 PetCombat이
+            // 매 타마다 현재 값을 읽는다. 그래도 퀘스트보다 앞에 두는 것은
+            // 다른 축과 같은 결이다(상태 먼저, 그 상태를 읽는 것은 나중)
+            if (petSystem != null)
+                petSystem.Restore(data.petIds, data.petUnlocked, data.petLevels, data.activePetId);
 
             // 퀘스트는 **맨 마지막**이다. 업적이 스테이지·레벨·강화 총합을 읽으므로
             // 그 셋이 이미 복원돼 있어야 한다 - 먼저 돌면 전부 초기값으로 읽혀서
@@ -181,6 +212,7 @@ namespace Onikiri.Progression
                 data.stage = stage.Stage;
                 data.killsThisStage = stage.KillsThisStage;
                 data.bossKillCount = stage.BossKillCount;
+                data.maxStageReached = stage.MaxStageReached;
             }
 
             if (character != null)
@@ -205,6 +237,37 @@ namespace Onikiri.Progression
                 data.equipmentLevels = equipment.CollectLevels();
             }
 
+            if (evolution != null) data.evolutionTier = evolution.CollectTier();
+
+            if (yodo != null)
+            {
+                data.yodoIds = yodo.CollectIds();
+                data.yodoSouls = yodo.CollectSouls();
+                data.yodoTiers = yodo.CollectTiers();
+                data.yodoDiscovered = yodo.CollectDiscovered();
+                data.yodoShards = yodo.CollectShards();
+
+                data.yodoRarities = yodo.CollectRarities();
+                data.legendaryYodoIds = yodo.CollectLegendaryIds();
+                data.legendaryYodoCopies = yodo.CollectLegendaryCopies();
+            }
+
+            if (gacha != null)
+            {
+                data.gachaPity = gacha.CollectPity();
+                data.gachaTotalPulls = gacha.CollectTotalPulls();
+                data.gachaFreePullDayTicks = gacha.CollectFreePullDay();
+            }
+
+            if (petSystem != null)
+            {
+                data.petIds = petSystem.CollectIds();
+                data.petUnlocked = petSystem.CollectUnlocked();
+                data.petLevels = petSystem.CollectLevels();
+                // activePetId는 레거시(단일 출전 시절)라 더 적지 않는다 -
+                // 남아 있는 값은 그대로 실려 다니고 아무도 읽지 않는다
+            }
+
             // 퀘스트가 보석 잔액까지 함께 적는다. 지갑을 따로 읽지 않는 이유는
             // 둘이 한 시스템이기 때문이다 - 보석은 퀘스트 말고 들어올 곳이 없다
             if (quests != null) quests.Write(data);
@@ -221,7 +284,12 @@ namespace Onikiri.Progression
         {
             if (combat == null || spawner == null) return 0d;
 
-            var multiplierHealth = stage != null ? stage.HealthMultiplier : BigDouble.One;
+            // 체력은 온보딩 완화(st1~5 잡몹 전용)까지 지난 실제 값이다. 방치는
+            // 파밍의 축소판이라, 파밍만 빨라지고 방치 계산이 옛 체력을 쓰면
+            // 온보딩 구간에서 두 벌이 갈린다
+            var mobHealth = stage != null
+                ? StageCurve.MobHealth(spawner.AverageBaseHealth, stage.Stage)
+                : spawner.AverageBaseHealth;
             var multiplierGold = stage != null ? stage.GoldMultiplier : BigDouble.One;
 
             // 획득 축(20단계)이 방치 보상에도 들어온다. 방치는 파밍의 축소판이라
@@ -240,7 +308,7 @@ namespace Onikiri.Progression
             return IdleIncome.GoldPerSecond(
                 combat.Damage,
                 combat.EffectiveAttacksPerSecond,
-                spawner.AverageBaseHealth * multiplierHealth,
+                mobHealth,
                 spawner.AverageBaseGold * multiplierGold * goldGain,
                 spawner.SpawnInterval);
         }
@@ -276,7 +344,11 @@ namespace Onikiri.Progression
             if (goldPerKill <= 0d) return 0d;
 
             double killsPerSecond = goldPerSecond / goldPerKill;
-            return killsPerSecond * ExpCurve.MobExp(stageNumber).ToDouble();
+
+            // 최전선 아래에서 나가면 방치 경험치도 0이다. 파밍이 안 주는 것을
+            // 방치가 주면 "낮은 데서 꺼두는 것"이 경험치 최적이 된다
+            bool atFrontier = stage == null || stage.IsAtFrontier;
+            return killsPerSecond * ExpCurve.MobExp(stageNumber, atFrontier).ToDouble();
         }
 
         /** 테스트 패널이 쓰는 초기화 */

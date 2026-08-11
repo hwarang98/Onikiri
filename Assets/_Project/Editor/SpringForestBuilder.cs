@@ -23,6 +23,7 @@ namespace Onikiri.EditorTools
 
         public const string GroundPath = "Assets/_Project/Art/Backgrounds/SpringGround.png";
         public const string HazePath = "Assets/_Project/Art/Backgrounds/DawnHaze.png";
+        public const string SkyPath = "Assets/_Project/Art/Backgrounds/SpringSky.png";
 
         // ================================================================ 지면 스트립
 
@@ -140,6 +141,7 @@ namespace Onikiri.EditorTools
         {
             BuildGroundStrip();
             BuildDawnHaze();
+            BuildSkySheet();
             SliceBlacksmith();
             AssetDatabase.SaveAssets();
         }
@@ -193,6 +195,18 @@ namespace Onikiri.EditorTools
 
                 for (int i = 0; i < tileCount; i++)
                     WriteColumn(pixels, width, i, (i % 2 == 0) ? tile : mirrored, grassRows, rockRows);
+
+                // 바위를 흙으로 다시 칠한다(41단계). 이 팩의 바위는 거의 검은
+                // 남색이라(위 StripHeight 주석) 두께를 줄이는 것으로 버텼는데,
+                // 남은 24px도 하단 UI 먹빛과 휘도가 겹쳐 한 덩어리 검정으로
+                // 읽혔다. 색은 여명 팔레트의 남보라를 유지하고 밝기만 편다.
+                // 풀 포기 사이의 틈(바위색)도 함께 메운다 - "풀 사이 검은
+                // 구멍"의 정체가 그 틈이었다
+                DirtTextureBaker.Apply(pixels, width, StripHeight, SurfaceFromBottom,
+                                       new Color(0.137f, 0.125f, 0.235f, 1f),   // 어두운 흙 #23203C
+                                       new Color(0.361f, 0.329f, 0.486f, 1f),   // 밝은 흙 #5C547C
+                                       new Color(0.459f, 0.424f, 0.588f, 1f),   // 자갈 #756C96
+                                       true);
 
                 var strip = new Texture2D(width, StripHeight, TextureFormat.RGBA32, false);
                 strip.SetPixels(pixels);
@@ -352,6 +366,99 @@ namespace Onikiri.EditorTools
             ApplyBackgroundImportSettings(HazePath);
 
             Debug.Log("[Onikiri] Dawn haze baked: " + HazeWidth + "x" + HazeHeight + " -> " + HazePath);
+        }
+
+        // ---------------------------------------------------------------- 하늘 시트
+
+        /**
+         * @brief 하늘 장(layer_1)의 미아 줄무늬를 지운 사본을 굽는다 (2b 후속).
+         *
+         * 원본 하늘은 위쪽이 짙은 파랑(#7BDBFF), 40행부터 옅은 파랑(#A1EEFF)인데,
+         * **49~51행 세 줄만 다시 짙은 파랑이다.** 캔버스에서는 눈에 안 띄지만
+         * 화면에서는 5배로 늘어나 15px 띠가 되고, 옅은 하늘 한가운데를 가로지르는
+         * 전폭 가로선이라 "하늘이 중간에 짤린" 이음매로 읽힌다 - 1080x1920에서
+         * 상단 바 바로 아래가 정확히 이 자리다(실측 단차 0.075, 기준 0.05 위).
+         *
+         * 픽셀 수술은 세 줄의 짙은 파랑을 옅은 파랑으로 바꾸는 것뿐이다. 구름
+         * 픽셀은 색이 달라 건드리지 않고, 팔레트가 네 색뿐인 픽셀 아트라 정확
+         * 일치로 안전하다. 원본(ThirdParty)은 손대지 않는다 - 지면 스트립과
+         * 같은 규칙으로 _Project에 사본을 굽고 배경 세트가 그쪽을 문다.
+         *
+         * 40행 경계 자체(짙은 -> 옅은)는 지우지 않는다. 원본이 37~39행에 디더로
+         * 그려 놓은 **의도된 하늘 층**이고, 그것까지 밀면 그림이 밋밋해진다.
+         * 지우는 것은 층이 아니라 층에서 떨어져 나온 세 줄이다.
+         */
+        public static void BuildSkySheet()
+        {
+            const string sourcePath = PackFolder + "/Background/layer_1.png";
+
+            var importer = AssetImporter.GetAtPath(sourcePath) as TextureImporter;
+            if (importer == null)
+            {
+                Debug.LogError("[Onikiri] Spring sky source not found: " + sourcePath);
+                return;
+            }
+
+            bool wasReadable = importer.isReadable;
+            if (!wasReadable) { importer.isReadable = true; importer.SaveAndReimport(); }
+
+            try
+            {
+                var source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+                if (source == null) { Debug.LogError("[Onikiri] Spring sky failed to load."); return; }
+
+                var pixels = source.GetPixels32();
+                int width = source.width, height = source.height;
+
+                // 줄무늬의 짙은 파랑과 그 자리의 원래 하늘색. 값은 팔레트 실측이다
+                var stray = new Color32(123, 219, 255, 255);
+                var sky = new Color32(161, 238, 255, 255);
+
+                // 위에서 센 49~51행. 텍스처 y는 아래가 0이다
+                int replaced = 0;
+                for (int rowFromTop = 49; rowFromTop <= 51; rowFromTop++)
+                {
+                    int y = height - 1 - rowFromTop;
+                    for (int x = 0; x < width; x++)
+                    {
+                        int i = y * width + x;
+                        if (pixels[i].r == stray.r && pixels[i].g == stray.g
+                            && pixels[i].b == stray.b && pixels[i].a == stray.a)
+                        {
+                            pixels[i] = sky;
+                            replaced++;
+                        }
+                    }
+                }
+
+                // 자리를 못 찾으면 원본이 바뀐 것이다 - 조용히 원본 그대로 구우면
+                // 줄무늬가 남은 채로 "고쳤다"가 되므로 에러로 말한다
+                if (replaced == 0)
+                {
+                    Debug.LogError("[Onikiri] 하늘 줄무늬(49~51행, #7BDBFF)를 못 찾았다 - "
+                                   + "원본이 바뀌었다면 자리를 다시 실측해야 한다.");
+                    return;
+                }
+
+                var baked = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                baked.SetPixels32(pixels);
+                baked.Apply();
+
+                Directory.CreateDirectory(Path.GetDirectoryName(SkyPath));
+                File.WriteAllBytes(SkyPath, baked.EncodeToPNG());
+                Object.DestroyImmediate(baked);
+
+                AssetDatabase.ImportAsset(SkyPath, ImportAssetOptions.ForceUpdate);
+                ApplyBackgroundImportSettings(SkyPath);
+
+                Debug.Log(string.Format(
+                    "[Onikiri] Spring sky baked: {0}x{1}, 줄무늬 픽셀 {2}개 치환 -> {3}",
+                    width, height, replaced, SkyPath));
+            }
+            finally
+            {
+                if (!wasReadable) { importer.isReadable = false; importer.SaveAndReimport(); }
+            }
         }
 
         // ---------------------------------------------------------------- 대장간
