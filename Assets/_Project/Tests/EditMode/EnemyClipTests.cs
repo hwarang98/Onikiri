@@ -90,6 +90,13 @@ namespace Onikiri.Tests
                         BigDouble.One, BigDouble.One);
         }
 
+        /** 보스로 세운다. 슈퍼아머는 이 깃발에 걸려 있다(Enemy.TakeDamage) */
+        static void SpawnBoss(Enemy enemy, EnemyDefinition definition)
+        {
+            enemy.Spawn(definition, 5f, 0f, 0, BigDouble.FromDouble(100d),
+                        BigDouble.One, BigDouble.One, true);
+        }
+
         /**
          * @brief 걸어 들어오는 동안에는 걷기다.
          *
@@ -134,7 +141,7 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 피격은 공격 동작을 끊지 않는다.
+         * @brief 피격은 보스의 공격 동작을 끊지 않는다.
          *
          * **이것이 처형인의 공격이 안 보이던 이유다.** 플레이어 공격속도가
          * 3.88/s면 0.26초마다 피격 클립이 다시 깔리는데 공격 클립은 0.92초짜리라,
@@ -147,7 +154,7 @@ namespace Onikiri.Tests
             var enemy = NewEnemy(out animator);
             var definition = Definition(true, true);
 
-            Spawn(enemy, definition);
+            SpawnBoss(enemy, definition);
             animator.Play(definition.attackFrames, 12f, false);
 
             enemy.TakeDamage(BigDouble.One);
@@ -159,13 +166,43 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 그렇다고 피격 연출이 사라지면 안 된다.
+         * @brief 보스는 **대기 중에도** 피격 클립을 안 탄다 (슈퍼아머).
          *
-         * 위 규칙을 "공격 중이 아닐 때"로 좁혀두지 않으면 반대쪽으로 넘어간다 -
-         * 맞아도 아무 반응이 없는 보스가 된다.
+         * 스윙 보호만으로는 모자랐다. 그쪽은 공격 클립이 이미 돌 때만 걸려서,
+         * 대기와 예비 동작은 0.26초마다 hurt에 덮였다. 공격 그림이 아예 없는
+         * 확대판 보스(외눈 등롱·정예)는 걸릴 스윙조차 없어 평생 hurt만 탔다.
+         *
+         * 48단계 전에는 잡몹 정의의 hurt가 빈 배열이라 덮을 것이 없어 안 보였고,
+         * 팩에 남아 있던 hurt 태그를 채우면서 이 경로가 처음 열렸다.
          */
         [Test]
-        public void BeingHitWhileResting_StillPlaysTheHurtClip()
+        public void BossBeingHitWhileResting_KeepsItsRestingClip()
+        {
+            SpriteAnimator animator;
+            var enemy = NewEnemy(out animator);
+            var definition = Definition(true, true);
+
+            SpawnBoss(enemy, definition);
+            var resting = animator.CurrentClip;
+
+            enemy.TakeDamage(BigDouble.One);
+
+            Assert.AreSame(resting, animator.CurrentClip,
+                "보스가 대기 중에 피격 클립으로 끊겼다 - 공격을 시작해도 매번 덮인다");
+            Assert.AreNotSame(definition.hurtFrames, animator.CurrentClip);
+
+            Object.DestroyImmediate(enemy.gameObject);
+        }
+
+        /**
+         * @brief 잡몹은 **그대로** 피격 연출을 탄다.
+         *
+         * 슈퍼아머는 보스만이다. 잡몹은 두세 대에 죽어서 움찔이 반복될 일이
+         * 없고, 그 짧은 반응이 타격감의 일부다 - 여기까지 꺼버리면 맞아도
+         * 아무 반응이 없는 필드가 된다.
+         */
+        [Test]
+        public void MobBeingHitWhileResting_StillPlaysTheHurtClip()
         {
             SpriteAnimator animator;
             var enemy = NewEnemy(out animator);
@@ -176,9 +213,37 @@ namespace Onikiri.Tests
             enemy.TakeDamage(BigDouble.One);
 
             Assert.AreSame(definition.hurtFrames, animator.CurrentClip,
-                "맞았는데 피격 연출이 없다");
+                "잡몹이 맞았는데 피격 연출이 없다");
 
             Object.DestroyImmediate(enemy.gameObject);
+        }
+
+        /**
+         * @brief 슈퍼아머는 **피해를 막지 않는다.** 애니메이션만 끈다.
+         *
+         * 이름이 흔히 뜻하는 피해 감소·경직 면역이 아니라는 것을 코드로 못박는다.
+         * 여기가 흔들리면 연출 수정이 조용히 밸런스 수정이 된다.
+         */
+        [Test]
+        public void SuperArmor_DoesNotReduceDamage()
+        {
+            SpriteAnimator animator;
+            var boss = NewEnemy(out animator);
+            SpriteAnimator mobAnimator;
+            var mob = NewEnemy(out mobAnimator);
+
+            var definition = Definition(true, true);
+            SpawnBoss(boss, definition);
+            Spawn(mob, definition);
+
+            boss.TakeDamage(BigDouble.FromDouble(30d));
+            mob.TakeDamage(BigDouble.FromDouble(30d));
+
+            Assert.AreEqual(mob.DamageTaken, boss.DamageTaken,
+                "슈퍼아머가 피해량을 바꿨다 - 이것은 연출이지 밸런스가 아니다");
+
+            Object.DestroyImmediate(boss.gameObject);
+            Object.DestroyImmediate(mob.gameObject);
         }
 
         /**

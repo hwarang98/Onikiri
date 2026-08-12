@@ -167,5 +167,127 @@ namespace Onikiri.Progression
         {
             return baseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1));
         }
+
+        // ---------------------------------------------------------------- 49단계: 슬롯
+
+        /**
+         * @brief 장착 슬롯 수. **이것이 밴드가 보는 유일한 오의 예산이다.**
+         *
+         * 풀이 여덟이 되든 스물이 되든 이 수가 그대로면 오의 축의 DPS는 안
+         * 자란다. 다음 스텝의 스킬 뽑기가 풀을 키워도 밴드에 빚이 안 쌓이는
+         * 근거가 이 상수 하나다.
+         *
+         * ## 왜 넷인가 - 셋은 0이고 다섯은 두 칸이다
+         *
+         * 셋으로 두면 이 스텝의 밸런스가 비트 단위로 불변이다. 매력적이지만
+         * 택하지 않았다 - 신규 다섯이 **전부 사이드그레이드**가 되어 "새 오의를
+         * 얻어도 강해지지 않는" 상태가 되고, 그러면 다음 스텝의 뽑기가 파는
+         * 것이 순수한 취향이 된다. 콘텐츠를 늘리려고 하는 스텝이 힘을 한 톨도
+         * 안 주는 것은 정직한 것이 아니라 심심한 것이다.
+         *
+         * 다섯 이상은 반대다. 슬롯 한 칸이 곧 영구적인 밴드 부채이고, 이 스텝은
+         * 그 부채를 **한 칸으로 못 박으려고** 슬롯을 만들었다. 넷이 그 최소값이다.
+         *
+         * ## 슬롯은 절대 팔지 않는다
+         *
+         * 4번 슬롯은 진행(최전선 st51)으로 열린다. 보석으로도 현금으로도 못
+         * 산다. 이유는 f2p 바닥이다 - **풀은 뽑기가 넓히고 슬롯은 진행이 연다**가
+         * 이 축의 과금 경계선이고, 그 선이 흐려지면 뽑기가 파워를 파는 것이 된다.
+         */
+        public const int BaseSlots = 3;
+        public const int ExpandedSlots = 4;
+
+        /**
+         * @brief **자리는 기본 오의를 배울 때마다 하나씩 열린다** (49b).
+         *
+         * ## 왜 3 고정이 아니라 램프인가 - 초반 해금을 공짜로 만드는 유일한 방법
+         *
+         * 49단계는 자리를 코리더 내내 3으로 고정했다. 그 세계에서는 신규 오의를
+         * 일찍 열어 주면 **공짜가 아니다**: st8에는 열린 오의가 연참 하나뿐인데
+         * 자리가 셋이라, 신규 하나를 더 열면 빈 자리에 그냥 들어가 오의 초당
+         * 기여가 두 배가 된다(0.18 -> 0.36). 코리더는 비트 불변이어야 하므로
+         * 그것은 못 한다.
+         *
+         * 그런데 **49단계 이전의 게임이 실제로 하던 일**이 곧 이 램프다. 그때는
+         * 장착이라는 개념 없이 "열린 오의가 전부 나간다"였고, 열린 수는 Lv.10/15/20에
+         * 하나씩 늘었다. 자리 수를 그 수로 정의하면 옛 세계가 **정의상** 재현된다.
+         *
+         * 그리고 그 정의 위에서는 신규 오의를 st1에 열어도 공짜다 - 자리가 이미
+         * 차 있으므로 들어가려면 무언가를 빼야 하고, 다섯이 동률이라(ExpansionRate)
+         * 빼고 넣은 결과가 같기 때문이다.
+         *
+         * 설정으로도 말이 된다: **자리는 오의를 배울 때 함께 열린다.** 연참을
+         * 배우면 한 자세, 일섬에 둘, 귀참에 셋, 그리고 심층이 넷째를 연다.
+         *
+         * @param characterLevel 기본 오의 셋의 게이트를 재는 값
+         * @param frontierStage  4번 자리의 게이트
+         */
+        public static int SlotsFor(int characterLevel, int frontierStage)
+        {
+            int slots = 0;
+            for (int i = 0; i < SkillCatalog.Count; i++)
+            {
+                // 스테이지 게이트의 오의(49단계 신규)는 자리를 안 연다. 열면
+                // "새 오의 하나 = 자리 하나"가 되어 슬롯이 아무것도 안 막는다
+                if (SkillCatalog.Skills[i].StageGated) continue;
+                if (characterLevel >= SkillCatalog.Skills[i].UnlockLevel) slots++;
+            }
+
+            if (slots > BaseSlots) slots = BaseSlots;
+            if (frontierStage >= ExpansionStage) slots++;
+            return slots;
+        }
+
+        /**
+         * @brief 이 자리가 열리는 조건을 사람이 읽는 말로. 잠긴 칩이 적는다.
+         *
+         * @param slot 0부터. 앞의 셋은 기본 오의의 레벨 게이트, 넷째는 스테이지
+         */
+        public static string GateTextFor(int slot)
+        {
+            if (slot >= BaseSlots) return ExpansionStage + "스테이지";
+
+            int seen = 0;
+            for (int i = 0; i < SkillCatalog.Count; i++)
+            {
+                if (SkillCatalog.Skills[i].StageGated) continue;
+                if (seen == slot) return "Lv." + SkillCatalog.Skills[i].UnlockLevel;
+                seen++;
+            }
+            return string.Empty;
+        }
+
+        /** 배열을 짓는 쪽이 쓰는 상한 */
+        public const int MaxSlots = ExpandedSlots;
+
+        /**
+         * @brief 4번 슬롯과 신규 오의 다섯이 함께 열리는 최전선 스테이지.
+         *
+         * ## 왜 51인가 - 두 신성한 구간의 바로 뒤
+         *
+         * 33단계의 밴드는 두 구간으로 서 있다: 조율 코리더 st1~30과 가속 구간
+         * st31~50. 둘 다 이미 여러 번 재유도된 자리라 새 힘이 그 안에 들어오면
+         * 곡선 전체를 다시 잡아야 한다.
+         *
+         * 51은 그 둘의 **바로 다음 칸**이자 45단계 상성이 처음 값을 갖는 자리다
+         * (요도는 st41에 첫 혼이 떨어지고 힘은 st51부터). 새 힘 둘이 같은 문을
+         * 쓰면 재기준이 한 번으로 끝난다.
+         *
+         * 44단계가 요도를 st41에 건 것과 같은 수법이고 같은 이유다 - 게이트를
+         * 구간 경계에 걸면 그 앞이 **부동소수점까지** 불변이다.
+         */
+        public const int ExpansionStage = 51;
+
+        /**
+         * @brief 이 최전선에서 열려 있는 자리 수. **레벨은 다 올랐다고 본다.**
+         *
+         * 심층을 묻는 쪽(기대 곡선·장착 구성 캐시)이 쓴다 - 그 구간에서는 기본
+         * 셋이 이미 다 열려 있으므로 램프의 결과가 상수다. 코리더를 묻는
+         * 쪽은 반드시 SlotsFor를 써야 한다.
+         */
+        public static int SlotsAtStage(int frontierStage)
+        {
+            return SlotsFor(int.MaxValue, frontierStage);
+        }
     }
 }

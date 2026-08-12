@@ -58,6 +58,7 @@ namespace Onikiri.EditorTools
         private SkillSystem skills;
         private SkillPerformer performer;
         private CharacterLevel character;
+        private VfxBurst attackVfx;
 
         /** 방치 보상 확인용. 몇 시간 전에 종료한 것으로 꾸밀지 */
         private float offlineHours = 3f;
@@ -95,6 +96,7 @@ namespace Onikiri.EditorTools
                 combat = null; spawner = null; upgrades = null;
                 damageNumbers = null; hitAudio = null; stage = null; session = null; boss = null;
                 mobSwitcher = null; skills = null; performer = null; character = null;
+                attackVfx = null;
                 measuredRate = 0f; measuredFps = 0f; audioPeak = 0f;
 
                 // 측정 창도 함께 비운다. 이 창은 도메인 리로드를 넘어 살아남는데,
@@ -119,6 +121,7 @@ namespace Onikiri.EditorTools
             if (skills == null) skills = Object.FindFirstObjectByType<SkillSystem>();
             if (performer == null) performer = Object.FindFirstObjectByType<SkillPerformer>();
             if (character == null) character = Object.FindFirstObjectByType<CharacterLevel>();
+            if (attackVfx == null) attackVfx = Object.FindFirstObjectByType<VfxBurst>();
 
             SampleAttackRate();
             SampleFps();
@@ -471,11 +474,22 @@ namespace Onikiri.EditorTools
             }
 
             DrawSkillTools();
+
+            // 오의 바로 다음이다. 둘 다 참격을 PackSlash 풀에서 꺼내 쓰므로,
+            // 두 절이 붙어 있으면 사무라이의 참격과 요괴의 참격을 한 화면에서
+            // 번갈아 터뜨려 크기와 톤을 비교할 수 있다
+            DrawEnemyAnimationTools();
+
             DrawQuestTools();
 
             // 장비는 퀘스트 바로 다음이다. 보석이 그쪽에서 나와 이쪽으로
             // 들어가므로, 두 절이 붙어 있으면 루프 전체를 한 화면에서 돌린다
             DrawEquipmentTools();
+
+            // 무기 참격 티어는 장비 바로 다음이다 (51단계). 티어의 구동값이
+            // 위 절의 무기 등급이라, 두 절이 붙어 있으면 "등급을 올린다 ->
+            // 참격이 달라진다"를 한 화면에서 돌린다
+            DrawWeaponVfxTierTools();
 
             // 요도는 장비 바로 다음이다. **같은 화면(대장간)의 옆 탭**이고,
             // 보석 소비처(파편 조달)도 하나 더 여기 있다 - 퀘스트 -> 장비 ->
@@ -486,6 +500,11 @@ namespace Onikiri.EditorTools
             // 재료(파편·혼 정수)라, 위 절의 자루 목록이 곧 이 절의 결과판이다 -
             // 뽑고 나서 눈을 옮기지 않고 티어가 오르는 것을 본다
             DrawGachaTools();
+
+            // 오의 뽑기는 요도 뽑기 **바로 다음**이다 (50단계). 같은 상점의
+            // 두 배너이고 같은 사다리를 쓰므로, 확률표 두 벌이 나란히 서면
+            // "무엇이 갈렸는가"가 한눈에 읽힌다 - 갈리는 것은 결과의 이름뿐이다
+            DrawSkillGachaTools();
 
             // 전직도 보석 소비처라 장비 바로 다음이다 (33단계)
             DrawEvolutionTools();
@@ -647,6 +666,75 @@ namespace Onikiri.EditorTools
                                 equipment.DebugAdvance(index);
                     }
                 }
+            }
+        }
+
+        /**
+         * @brief 무기 참격 티어 (51단계). **연출만 강제하는 스위치가 이 절의 이유다.**
+         *
+         * 위 장비 절의 "한 칸 올리기"로도 티어는 바뀌지만 그쪽은 스탯까지
+         * 바꾼다 - 등급 1과 5의 참격을 나란히 비교하려고 장비를 다섯 번
+         * 올렸다 되돌리면, 되돌리는 것을 잊는 순간 밸런스 확인이 오염된다.
+         * WeaponVfxTier.DebugForcedTier는 연출 코드만 읽는 값이라 안전하다.
+         *
+         * 참격을 실제로 터뜨리는 버튼은 발도 오의 절(지금 시전)에 있다 -
+         * 여기서 티어를 강제하고 그쪽에서 귀참을 쏘는 것이 확인 루프다.
+         */
+        private void DrawWeaponVfxTierTools()
+        {
+            EditorGUILayout.LabelField("무기 참격 티어 (연출)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                int tier = Onikiri.Battle.WeaponVfxTier.CurrentTier();
+                bool premium = Onikiri.Battle.WeaponVfxTier.IsPremium();
+                bool forced = Onikiri.Battle.WeaponVfxTier.DebugForcedTier != 0
+                              || Onikiri.Battle.WeaponVfxTier.DebugForcedPremium != -1;
+
+                EditorGUILayout.LabelField(string.Format(
+                    "지금 티어 {0} · 스파크 {1}겹 · 평타 오라 α{2:F2} · 오니키리 {3}{4}",
+                    tier,
+                    Onikiri.Battle.WeaponVfxTier.SparkLayers(tier, premium),
+                    Onikiri.Battle.WeaponVfxTier.GlowAlpha(tier, premium),
+                    premium ? "완성" : "미완성",
+                    forced ? "  (강제 중)" : ""));
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("티어 강제", GUILayout.Width(70f));
+
+                    for (int t = Onikiri.Battle.WeaponVfxTier.MinTier;
+                         t <= Onikiri.Battle.WeaponVfxTier.MaxTier; t++)
+                    {
+                        bool on = Onikiri.Battle.WeaponVfxTier.DebugForcedTier == t;
+                        if (GUILayout.Toggle(on, t.ToString(), "Button", GUILayout.Width(28f)) != on)
+                            Onikiri.Battle.WeaponVfxTier.DebugForcedTier = on ? 0 : t;
+                    }
+
+                    if (GUILayout.Button("해제", GUILayout.Width(50f)))
+                    {
+                        Onikiri.Battle.WeaponVfxTier.DebugForcedTier = 0;
+                        Onikiri.Battle.WeaponVfxTier.DebugForcedPremium = -1;
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("오니키리 강제", GUILayout.Width(90f));
+
+                    bool forcedOn = Onikiri.Battle.WeaponVfxTier.DebugForcedPremium == 1;
+                    if (GUILayout.Toggle(forcedOn, "완성", "Button", GUILayout.Width(50f)) != forcedOn)
+                        Onikiri.Battle.WeaponVfxTier.DebugForcedPremium = forcedOn ? -1 : 1;
+
+                    bool forcedOff = Onikiri.Battle.WeaponVfxTier.DebugForcedPremium == 0;
+                    if (GUILayout.Toggle(forcedOff, "미완성", "Button", GUILayout.Width(60f)) != forcedOff)
+                        Onikiri.Battle.WeaponVfxTier.DebugForcedPremium = forcedOff ? -1 : 0;
+                }
+
+                EditorGUILayout.LabelField(
+                    "참격은 발도 오의 절의 '지금 시전'으로, 평타 오라는 그냥 두면 뜬다. "
+                    + "강제는 연출만 바꾼다 - 스탯·데미지는 실제 등급 그대로다.",
+                    EditorStyles.miniLabel);
             }
         }
 
@@ -907,6 +995,224 @@ namespace Onikiri.EditorTools
                     / Onikiri.Progression.YodoCurve.ShardPackGems));
 
             return lines.ToArray();
+        }
+
+        /**
+         * @brief 오의 뽑기 (50단계). **이 절이 답하는 질문은 "왜 안 나오는가"다.**
+         *
+         * 이 배너의 결과는 화면에서 **거의 안 보인다.** 스킬 XP는 게이지 안으로
+         * 사라지고, 해금은 목록에 줄 하나가 늘 뿐이며, 개안은 레벨 숫자가
+         * 바뀌는 것이 전부다. 그래서 "뽑았는데 아무 일도 안 일어난다"가 이
+         * 배너의 기본 증상이고, 그 원인이 넷이나 된다:
+         *
+         *   재고 소진   장착이 전부 상한 + 둘 다 해금 -> 배너가 닫힌다
+         *   벤치로 감   장착이 전부 상한이면 XP가 안 끼운 오의로 흐른다
+         *   미끄러짐    ★5가 ★4로, ★4가 ★3으로 내려간다
+         *   상한        XP가 아무리 쌓여도 MaxLevel에서 멈춘다 (**이것이 설계다**)
+         *
+         * 넷 중 마지막만 정상이고 앞의 셋은 상황에 따라 정상이거나 버그다.
+         * 그것을 가를 수 있는 곳이 여기뿐이라, 47단계가 혼격 상한 표를 놓은
+         * 것과 같은 자리에 **XP 목적지 표**를 놓는다.
+         */
+        private void DrawSkillGachaTools()
+        {
+            EditorGUILayout.LabelField("오의 뽑기", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                var gacha = Onikiri.Progression.SkillGachaSystem.Instance;
+                if (gacha == null)
+                {
+                    gacha = Object.FindFirstObjectByType<Onikiri.Progression.SkillGachaSystem>(
+                        FindObjectsInactive.Include);
+                }
+
+                if (gacha == null)
+                {
+                    EditorGUILayout.HelpBox(
+                        "씬에 SkillGachaSystem이 없습니다. Onikiri/Build Shop Panel 을 실행하세요.",
+                        MessageType.Warning);
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(string.Format(
+                        "{0}  ·  천장까지 {1}회  ·  누적 {2}회  ·  무료 {3}",
+                        !gacha.IsUnlocked
+                            ? "잠김 (st" + Onikiri.Progression.SkillGachaCurve.UnlockStage + " 필요)"
+                            : gacha.HasStock ? "개방" : "재고 소진",
+                        gacha.PullsUntilPity, gacha.TotalPulls,
+                        gacha.HasFreePull ? "가능" : "오늘 씀"), GUILayout.Width(330f));
+
+                    using (new EditorGUI.DisabledScope(!gacha.CanPull(1)))
+                        if (GUILayout.Button("단연(보석 " + gacha.CostFor(1) + ")",
+                                             GUILayout.Width(112f)))
+                            gacha.TryPull(1);
+
+                    int ten = Onikiri.Progression.SkillGachaCurve.TenPullCount;
+                    using (new EditorGUI.DisabledScope(!gacha.CanPull(ten)))
+                        if (GUILayout.Button(ten + "연(보석 " + gacha.CostFor(ten) + ")",
+                                             GUILayout.Width(112f)))
+                            gacha.TryPull(ten);
+
+                    using (new EditorGUI.DisabledScope(!gacha.HasFreePull))
+                        if (GUILayout.Button("무료 뽑기", GUILayout.Width(84f)))
+                            gacha.TryFreePull();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("치트", GUILayout.Width(40f));
+
+                    // **재고를 안 본다.** 재고 판정이 맞는지를 확인하려면 재고가
+                    // 없는 상태에서도 굴려 볼 수 있어야 하고, 그때 결과가
+                    // 사다리를 어떻게 미끄러지는지가 이 배너의 유일한 볼거리다
+                    if (GUILayout.Button("공짜 1회", GUILayout.Width(72f))) gacha.DebugPull(1);
+                    if (GUILayout.Button("공짜 10회", GUILayout.Width(80f)))
+                        gacha.DebugPull(Onikiri.Progression.SkillGachaCurve.TenPullCount);
+
+                    if (GUILayout.Button("천장 직전", GUILayout.Width(80f)))
+                        gacha.DebugPushToPity();
+
+                    if (GUILayout.Button("무료 쿨 리셋", GUILayout.Width(96f)))
+                        gacha.DebugResetFreePull();
+
+                    if (GUILayout.Button("뽑기 초기화", GUILayout.Width(96f)))
+                    {
+                        gacha.DebugReset();
+                        Debug.Log("[Onikiri] 오의 뽑기를 천장 0 · 누적 0 · 무료 미사용으로 "
+                                  + "되돌렸다. 이미 열린 오의와 들어간 XP는 그대로다 - "
+                                  + "그쪽은 '발도 오의' 절의 초기화가 되돌린다.");
+                    }
+                }
+
+                foreach (string line in SkillGachaTableLines()) EditorGUILayout.LabelField(line);
+
+                DrawSkillXpTools();
+            }
+        }
+
+        /**
+         * @brief 오의 뽑기 확률표. **표의 값과 실효 값을 두 줄로 적는다.**
+         *
+         * 47단계가 요도 표에서 한 것과 같은 처리다 - 화면(상점 배너)은 표만
+         * 공개하고 여기서는 천장에 눌린 실효 값도 함께 본다. 두 값이 갈리는
+         * 이유는 천장이 "★4+가 아닌 굴림"을 덮어쓰기 때문이고, 그 사실을
+         * 모르면 "표에 3%인데 왜 이만큼 나오나"를 답할 수 없다.
+         */
+        private static string[] SkillGachaTableLines()
+        {
+            var lines = new System.Collections.Generic.List<string>();
+
+            for (int i = 0; i < Onikiri.Progression.SkillGachaCurve.OutcomeCount; i++)
+            {
+                var grade = Onikiri.Progression.GachaCurve.GradeOf[i];
+                var outcome = (Onikiri.Progression.SkillGachaCurve.Outcome)i;
+
+                lines.Add(string.Format("  {0}  {1,-14} {2,5:F1}%",
+                    Onikiri.Progression.GachaCurve.StarsFor(grade),
+                    Onikiri.UI.GachaResultPopup.NameOfOutcome(outcome),
+                    Onikiri.Progression.SkillGachaCurve.Chances[i] * 100d));
+            }
+
+            lines.Add(string.Format(
+                "  실효(천장 눌림)  XP {0:F2}/회  ·  해금 {1:F3}%  ·  개안 {2:F3}%",
+                Onikiri.Progression.SkillGachaCurve.ExpectedXpPerPull,
+                Onikiri.Progression.SkillGachaCurve.EffectiveUnlockChance * 100d,
+                Onikiri.Progression.SkillGachaCurve.EffectiveAwakenChance * 100d));
+
+            lines.Add(string.Format(
+                "  ★4+ 하나에 {0:F1}회  ·  오의 하나 상한까지 {1} XP = {2:F1}회 "
+                + "(천장 {3}회)",
+                Onikiri.Progression.SkillGachaCurve.ExpectedPullsPerUnlock,
+                Onikiri.Progression.SkillGachaCurve.TotalXpToCap,
+                Onikiri.Progression.SkillGachaCurve.TotalXpToCap
+                    / Onikiri.Progression.SkillGachaCurve.ExpectedXpPerPull,
+                Onikiri.Progression.SkillGachaCurve.PityPulls));
+
+            return lines.ToArray();
+        }
+
+        /**
+         * @brief XP가 **지금 어디로 가는가**. 이 표가 이 절의 이유다.
+         *
+         * 뽑은 XP는 풀에 들어갔다가 규칙 하나로 흘러간다: 장착 중 최저 레벨,
+         * 없으면 벤치 중 최저 레벨(SkillSystem.SpendXp). 화면에는 레벨 숫자가
+         * 바뀌는 것만 보이므로, **어느 오의가 다음 목적지인지**를 볼 수 있는
+         * 곳이 여기뿐이다 - "XP가 안 들어온다"와 "XP가 다른 데로 갔다"가
+         * 화면에서 구분되지 않는다.
+         *
+         * 치트는 XP 덩어리 하나와 개안이다. 둘 다 **상한을 지킨다** - 지키지
+         * 않으면 이 패널이 오의 몫 계약을 깨는 유일한 경로가 되고, 그러면
+         * 여기서 본 값이 게임의 값이라고 말할 수 없다. 47단계가 혼격 치트에서
+         * 반대 판단을 한 것과 갈리는 자리이고, 이유는 그쪽 상한이 재고이지
+         * 계약이 아니었기 때문이다.
+         */
+        private void DrawSkillXpTools()
+        {
+            var system = skills;
+            if (system == null)
+                system = Object.FindFirstObjectByType<Onikiri.Progression.SkillSystem>(
+                    FindObjectsInactive.Include);
+            if (system == null) return;
+
+            int target = system.XpTargetIndex;
+            long need = system.XpToNextLevel;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(target >= 0
+                    ? string.Format("스킬 XP {0} / {1}  ->  {2} Lv.{3} {4}",
+                        system.SkillXp, need,
+                        system.GetSlot(target).displayName, system.GetSlot(target).level,
+                        system.IsEquipped(target) ? "(장착)" : "(벤치)")
+                    : string.Format("스킬 XP {0}  ->  갈 곳 없음 (전부 상한)", system.SkillXp),
+                    GUILayout.Width(330f));
+
+                if (GUILayout.Button("XP +240", GUILayout.Width(72f)))
+                {
+                    int gained = system.GrantXp(
+                        Onikiri.Progression.SkillGachaCurve.XpFor(
+                            Onikiri.Progression.SkillGachaCurve.Outcome.XpSurge));
+                    Debug.Log("[Onikiri] 스킬 XP 240을 넣었다 - 레벨 +" + gained + ". "
+                              + "상한(Lv." + Onikiri.Progression.SkillCurve.MaxLevel
+                              + ")을 넘지 않는다.");
+                }
+
+                if (GUILayout.Button("개안", GUILayout.Width(56f)))
+                {
+                    int index = system.AwakenEquipped();
+                    Debug.Log(index >= 0
+                        ? "[Onikiri] " + system.GetSlot(index).displayName + "을 상한까지 밀었다."
+                        : "[Onikiri] 개안할 오의가 없다 - 장착이 전부 상한이다. "
+                          + "게임에서는 이때 사다리를 미끄러져 해금 -> XP가 된다.");
+                }
+            }
+
+            // 가챠 몫 둘의 보유. 배너의 재고가 이 두 줄에서 나온다
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("가챠 몫", GUILayout.Width(56f));
+
+                foreach (var id in Onikiri.Progression.SkillGachaCurve.UnlockOrder)
+                {
+                    int index = system.IndexOf(id);
+                    if (index < 0) continue;
+
+                    var slot = system.GetSlot(index);
+                    bool owned = system.IsUnlocked(index);
+
+                    using (new EditorGUI.DisabledScope(owned))
+                        if (GUILayout.Button(
+                                slot.displayName + (owned ? " ✓" : " 해금"), GUILayout.Width(90f)))
+                            system.GrantGachaSkill(index);
+                }
+
+                EditorGUILayout.LabelField(
+                    "재고 " + (system.HasStock ? "있음" : "없음 - 배너가 닫힌다"),
+                    GUILayout.Width(180f));
+            }
         }
 
         /**
@@ -1489,6 +1795,17 @@ namespace Onikiri.EditorTools
          *   시전 횟수    실제로 나갔는가        (타이머는 도는데 0이면 CastSkill이 거절 중)
          *   초당 환산    DPS에 얼마나 들어가는가
          *
+         * ## 49단계에 넷째가 붙었다 - **장착**
+         *
+         * 오의가 여덟이 되고 자리가 넷이 되면서 새로운 실패가 하나 생겼다:
+         * **"쿨다운이 아예 안 도는" 오의.** 안 끼운 오의는 타이머가 멈춰 있는
+         * 것이 정상인데, 화면에서는 "쿨다운 표시가 없는 오의"와 구분되지 않는다.
+         *
+         * 그래서 줄마다 자리 번호를 적고, 자리를 여기서 직접 바꿀 수 있게 한다.
+         * 최전선 게이트(st51)는 위쪽 스테이지 절에서 넘길 수 있으므로 여기에
+         * 다시 두지 않는다 - 같은 치트를 두 곳에 두면 어느 쪽이 실제 경로인지
+         * 흐려진다.
+         *
          * "지금 시전"은 **실제 시전 경로를 그대로 태운다.** 상태를 직접 바꾸면
          * 이 버튼으로 본 화면이 실제 플레이의 화면과 다르다는 의심이 남는다.
          */
@@ -1509,9 +1826,10 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField(
-                        string.Format("자동 시전 {0}   환산 {1:F2}회/초",
-                            skills.AutoCast ? "ON" : "OFF", skills.CastRate),
-                        GUILayout.Width(190f));
+                        string.Format("자동 시전 {0}   환산 {1:F2}회/초   자리 {2}/{3}",
+                            skills.AutoCast ? "ON" : "OFF", skills.CastRate,
+                            skills.SlotCapacity, Onikiri.Progression.SkillCurve.MaxSlots),
+                        GUILayout.Width(290f));
 
                     if (GUILayout.Button(skills.AutoCast ? "끄기" : "켜기", GUILayout.Width(60f)))
                         skills.AutoCast = !skills.AutoCast;
@@ -1532,6 +1850,40 @@ namespace Onikiri.EditorTools
                     }
                 }
 
+                // 장착 자리. 실제 조작 경로(SkillSlotChip / SkillButton)와 **같은
+                // 함수**를 지난다 - 여기서 본 결과가 화면의 결과와 같아야 한다
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("장착", GUILayout.Width(34f));
+
+                    for (int slotIndex = 0; slotIndex < Onikiri.Progression.SkillCurve.MaxSlots; slotIndex++)
+                    {
+                        int chip = slotIndex;
+                        bool locked = skills.IsSlotLocked(chip);
+                        int equipped = skills.EquippedAt(chip);
+
+                        string label = locked
+                            ? "잠김"
+                            : equipped >= 0 ? skills.GetSlot(equipped).displayName : "비어 있음";
+
+                        using (new EditorGUI.DisabledScope(locked || equipped < 0))
+                        {
+                            // 누르면 뺀다. 칩과 같은 조작이다
+                            if (GUILayout.Button(label, GUILayout.Width(84f)))
+                                skills.Equip(chip, -1);
+                        }
+                    }
+
+                    if (GUILayout.Button("기본 구성", GUILayout.Width(72f)))
+                    {
+                        for (int slotIndex = 0; slotIndex < Onikiri.Progression.SkillCurve.MaxSlots; slotIndex++)
+                            skills.Equip(slotIndex, -1);
+                        skills.FillEmptySlots();
+                        Debug.Log("[Onikiri] 장착을 기준 구성으로 되돌렸다 - "
+                                  + "상한 기여 내림차순, 같으면 표 순서.");
+                    }
+                }
+
                 for (int i = 0; i < skills.SlotCount; i++)
                 {
                     var slot = skills.GetSlot(i);
@@ -1539,14 +1891,25 @@ namespace Onikiri.EditorTools
 
                     bool unlocked = skills.IsUnlocked(i);
                     int index = i;
+                    int seat = skills.SlotOf(i);
 
                     using (new EditorGUILayout.HorizontalScope())
                     {
+                        // 잠긴 줄의 조건은 게이트 종류에 따라 다른 말을 한다.
+                        // 신규 셋은 최전선(49b), 가챠 몫 둘은 뽑기(50단계) -
+                        // 뒤쪽에 "st41 필요"를 적으면 거짓말이 된다. 그 값은
+                        // 게이트가 아니라 골드 비용의 기준점이다
+                        string gate = slot.gachaGated ? "뽑기"
+                            : slot.unlockLevel > 0 ? "Lv." + slot.unlockLevel
+                            : "st" + slot.unlockStage;
+
                         EditorGUILayout.LabelField(
                             unlocked
-                                ? string.Format("{0} Lv.{1}", slot.displayName, slot.level)
-                                : string.Format("{0} (Lv.{1} 필요)", slot.displayName, slot.unlockLevel),
-                            GUILayout.Width(120f));
+                                ? string.Format("{0}{1} Lv.{2}",
+                                    seat >= 0 ? "[" + (seat + 1) + "] " : "     ",
+                                    slot.displayName, slot.level)
+                                : string.Format("     {0} ({1} 필요)", slot.displayName, gate),
+                            GUILayout.Width(160f));
 
                         // 쿨다운을 막대로 그린다. 숫자만 적으면 "도는지"를 두 번
                         // 읽어서 비교해야 하는데, 막대는 한 번 보면 안다
@@ -1557,6 +1920,25 @@ namespace Onikiri.EditorTools
                         EditorGUILayout.LabelField(
                             string.Format("×{0:F2}  시전 {1}회", skills.MultiplierOf(i), skills.CastCountOf(i)),
                             GUILayout.Width(120f));
+
+                        // 빈 자리에만 끼운다 - 화면의 장착 버튼과 같은 규칙이다
+                        // (SkillButton.OnEquip). 자리가 다 차 있으면 안 눌린다
+                        bool hasRoom = false;
+                        for (int open = 0; open < skills.SlotCapacity; open++)
+                            if (skills.EquippedAt(open) < 0) { hasRoom = true; break; }
+
+                        using (new EditorGUI.DisabledScope(!unlocked || seat >= 0 || !hasRoom))
+                        {
+                            if (GUILayout.Button("장착", GUILayout.Width(40f)))
+                            {
+                                for (int open = 0; open < skills.SlotCapacity; open++)
+                                {
+                                    if (skills.EquippedAt(open) >= 0) continue;
+                                    skills.Equip(open, index);
+                                    break;
+                                }
+                            }
+                        }
 
                         using (new EditorGUI.DisabledScope(!unlocked))
                         {
@@ -1618,6 +2000,151 @@ namespace Onikiri.EditorTools
 
             if (boss.Current == BossFight.Phase.Failed && !string.IsNullOrEmpty(boss.FailureMessage))
                 EditorGUILayout.HelpBox(boss.FailureMessage, MessageType.Warning);
+        }
+
+        /**
+         * @brief 요괴 애니 · 참격 (48단계).
+         *
+         * ## 왜 이 절이 필요한가
+         *
+         * 이 스텝이 한 일은 전부 **화면에만 보이는 것**이다. 밴드도 세이브도
+         * 안 움직이므로 테스트가 잡아줄 수 있는 것이 거의 없고, "요괴가 걷는가",
+         * "보스가 휘두르는가"는 결국 눈으로 봐야 한다. 그 눈으로 보는 일을
+         * 화면 앞에서 30분 기다리지 않고 하는 것이 이 절이다.
+         *
+         * ## 표가 문서가 아니라 실물을 읽는다
+         *
+         * 어느 요괴에 어떤 클립이 붙었는지를 주석에서 베껴 적지 않고 생성된
+         * `EnemyDefinition`에서 직접 읽는다. 빌더가 태그를 잘못 집으면 표에
+         * 0으로 뜬다 - 베껴 적은 표는 그 경우에도 여전히 맞다고 우긴다.
+         *
+         * 에디트 모드에서도 보인다. 표는 씬이 아니라 애셋을 읽으므로 플레이를
+         * 누를 이유가 없고, 참격 버튼만 플레이 중에 열린다.
+         */
+        private void DrawEnemyAnimationTools()
+        {
+            EditorGUILayout.LabelField("요괴 애니 · 참격", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                DrawClipTable();
+                EditorGUILayout.Space(4f);
+                DrawVfxLibraryTools();
+            }
+        }
+
+        /** 생성된 정의에 실제로 들어간 프레임 수. 빈 칸이 곧 "팩에 그 태그가 없다" */
+        private void DrawClipTable()
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("요괴", EditorStyles.miniBoldLabel, GUILayout.Width(104f));
+                EditorGUILayout.LabelField("대기", EditorStyles.miniBoldLabel, GUILayout.Width(34f));
+                EditorGUILayout.LabelField("걷기", EditorStyles.miniBoldLabel, GUILayout.Width(34f));
+                EditorGUILayout.LabelField("공격", EditorStyles.miniBoldLabel, GUILayout.Width(34f));
+                EditorGUILayout.LabelField("피격", EditorStyles.miniBoldLabel, GUILayout.Width(34f));
+                EditorGUILayout.LabelField("사망", EditorStyles.miniBoldLabel, GUILayout.Width(34f));
+            }
+
+            int walked = 0, attacked = 0, hurt = 0, total = 0;
+
+            foreach (var guid in AssetDatabase.FindAssets("t:EnemyDefinition"))
+            {
+                var definition = AssetDatabase.LoadAssetAtPath<EnemyDefinition>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (definition == null) continue;
+
+                total++;
+                if (Length(definition.walkFrames) > 0) walked++;
+                if (Length(definition.attackFrames) > 0) attacked++;
+                if (Length(definition.hurtFrames) > 0) hurt++;
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(definition.name.Replace("Enemy_", ""),
+                                               GUILayout.Width(104f));
+                    Count(Length(definition.idleFrames));
+                    Count(Length(definition.walkFrames));
+                    Count(Length(definition.attackFrames));
+                    Count(Length(definition.hurtFrames));
+                    Count(Length(definition.deathFrames));
+                }
+            }
+
+            EditorGUILayout.LabelField(string.Format(
+                "정의 {0}개 중 걷기 {1} · 공격 {2} · 피격 {3}",
+                total, walked, attacked, hurt), EditorStyles.miniLabel);
+        }
+
+        private static int Length(Sprite[] frames) { return frames != null ? frames.Length : 0; }
+
+        /** 0은 흐리게. 빈 칸이 눈에 안 띄면 표를 읽는 의미가 없다 */
+        private static void Count(int value)
+        {
+            using (new EditorGUI.DisabledScope(value == 0))
+                EditorGUILayout.LabelField(value.ToString(), GUILayout.Width(34f));
+        }
+
+        /**
+         * @brief 뜯어낸 참격을 그 자리에서 한 번 터뜨린다.
+         *
+         * 보스가 휘두를 때까지 기다리면 보스전을 열고 2초를 기다려야 하고,
+         * 크기나 높이를 한 번 고칠 때마다 그 왕복이 반복된다. 사무라이 자리에
+         * 바로 띄우면 배율·각도·높이를 화면에서 바로 비교할 수 있다.
+         *
+         * **풀 증가 수를 함께 띄운다.** 참격은 풀에서 나오는데, 조용히 늘어나는
+         * 풀은 프레임 히칭의 원인을 찾을 수 없게 만든다(ObjectPool 주석).
+         */
+        private void DrawVfxLibraryTools()
+        {
+            var library = AssetDatabase.LoadAssetAtPath<VfxLibrary>(YokaiVfxBaker.LibraryPath);
+            if (library == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "참격 라이브러리가 없습니다. Onikiri/Art/Harvest Yokai VFX 를 실행하세요.",
+                    MessageType.Warning);
+                return;
+            }
+
+            for (int i = 0; i < library.Count; i++)
+            {
+                var clip = library.At(i);
+                if (clip == null) continue;
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(clip.id, GUILayout.Width(104f));
+                    EditorGUILayout.LabelField(string.Format(
+                        "{0}장 {1:F0}fps  {2:F2}초  x{3:F0}",
+                        Length(clip.frames), clip.frameRate, clip.Seconds, clip.scale),
+                        GUILayout.Width(150f));
+
+                    // 플레이 중에만. 풀은 Awake에서 만들어지므로 에디트 모드에서는
+                    // 터뜨릴 것이 없다
+                    using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying
+                                                       || attackVfx == null || combat == null))
+                    {
+                        if (GUILayout.Button("터뜨리기", GUILayout.Width(70f)))
+                        {
+                            // 사무라이가 바라보는 쪽(오른쪽)에 띄운다. 보스는
+                            // 반대편에서 왼쪽으로 뿜으므로 반전만 다르다
+                            attackVfx.Play(clip.id, combat.transform.position, false);
+                        }
+                    }
+                }
+            }
+
+            if (attackVfx == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "씬에 VfxBurst가 없습니다. Onikiri/Scene/Build Combat Content 를 실행하세요.",
+                    MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.LabelField(string.Format(
+                "재생 중 {0}장   풀 증가 {1}회",
+                attackVfx.ActiveCount, attackVfx.PoolGrowthCount), EditorStyles.miniLabel);
         }
 
         /**

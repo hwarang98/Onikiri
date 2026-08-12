@@ -87,6 +87,37 @@ namespace Onikiri.Battle
         [SerializeField] private StageAdvance advance;
 
         [Header("연출")]
+        /**
+         * @brief 보스가 휘두를 때 앞에 뜨는 참격. 요괴 팩에서 뜯어낸 조각이다.
+         *
+         * 없어도 보스전은 그대로 돈다 - 이펙트는 전부 이 참조 뒤에 있고, 비어
+         * 있으면 아무것도 뜨지 않는다. 로스터 없는 테스트 씬에서 보스전을 돌릴 때
+         * 이것까지 배선하라고 요구하지 않기 위해서다.
+         */
+        [Tooltip("보스가 휘두를 때 앞에 참격을 띄운다. 비워도 보스전은 그대로 돈다")]
+        [SerializeField] private VfxBurst attackVfx;
+
+        /**
+         * @brief BossConfig가 이펙트를 지정하지 않았을 때 쓰는 이름. **기본은 비어 있다.**
+         *
+         * 한 번 `crescent`를 기본값으로 두었다가 곧바로 되돌렸다. 그 순간
+         * **다섯 보스가 전부 같은 참격을 뿜었다** - 등롱도 처형인도 붉은눈도
+         * 요괴(Inimig 9)의 붉은 초승달을 뿌렸다. 어느 BossConfig도 이 칸을
+         * 채우지 않았으니 전부 기본값을 상속한 것이고, 그것이 기본값을 두는
+         * 일의 실제 결과였다.
+         *
+         * 참격은 **한 요괴의 서명**이지 보스라는 역할에 딸린 장식이 아니다.
+         * 넷이 같은 것을 뿜으면 넷을 구분하던 유일한 신호가 사라진다.
+         *
+         * 그래서 비워 둔다. 이펙트를 쓰는 보스는 자기 BossConfig에 이름을 적고,
+         * 안 적은 보스는 지금까지처럼 자기 시트의 공격 모션만 쓴다. 언젠가
+         * 공용 중립 참격이 필요해지면 그때 이 칸에 그 이름을 적으면 되고,
+         * **그 이름이 요괴의 것이어서는 안 된다.**
+         */
+        [Tooltip("BossConfig가 비어 있을 때 쓸 참격 이름. 비우면 아무것도 안 뜬다. " +
+                 "특정 요괴의 시그니처 참격을 여기 적지 말 것 - 모든 보스가 그것을 뿜는다")]
+        [SerializeField] private string defaultAttackVfxId = string.Empty;
+
         [Tooltip("챕터 보스의 등장 연출 시간. 화면이 어두워지고 이름이 뜬다")]
         [SerializeField] private float introSeconds = 1f;
 
@@ -286,6 +317,28 @@ namespace Onikiri.Battle
             playerHealth.TakeDamage(attacker.AttackDamage);
         }
 
+        /**
+         * @brief 보스가 **동작을 시작했다.** 타격보다 예비 동작만큼 이르다.
+         *
+         * 여기서 하는 일은 그림을 하나 띄우는 것뿐이다. 피해는 위의
+         * `OnBossAttacked`가 넣고, 그쪽은 이 함수가 무엇을 하든 같은 주기로
+         * 같은 양을 넣는다 - 연출을 얹는 자리와 밸런스가 사는 자리를 갈라둔
+         * 것이 `SwingStarted`와 `Attacked`가 다른 사건인 이유다(Enemy 참고).
+         */
+        private void OnBossSwing(Enemy attacker)
+        {
+            if (phase != Phase.Fighting || attackVfx == null || attacker == null) return;
+
+            var config = CurrentBossConfig;
+            string id = config != null && !string.IsNullOrEmpty(config.attackVfxId)
+                ? config.attackVfxId
+                : defaultAttackVfxId;
+
+            // 참격은 보스가 **바라보는 쪽**에 뜬다. 보스는 오른쪽에 서서 왼쪽의
+            // 사무라이를 보므로 대개 왼쪽이고, 그 판단은 요괴가 이미 하고 있다
+            attackVfx.Play(id, attacker.transform.position, attacker.FacingDirection < 0);
+        }
+
         /** 플레이어가 쓰러졌다. 시간 초과와 같은 '스테이지 실패'로 합류한다 */
         private void OnPlayerDied()
         {
@@ -466,7 +519,11 @@ namespace Onikiri.Battle
                 scale, tint, attack,
                 true, approachDistance);
 
-            if (boss != null) boss.Attacked += OnBossAttacked;
+            if (boss != null)
+            {
+                boss.Attacked += OnBossAttacked;
+                boss.SwingStarted += OnBossSwing;
+            }
 
             // 관문을 세운다. 달려가기 구간의 중간쯤에 서므로 플레이어가 먼저
             // 지나고, 그 너머가 보스의 영역이 된다

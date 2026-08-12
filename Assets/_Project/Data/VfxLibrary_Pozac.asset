@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a288edfec86153247903e64e2c1dad86, type: 3}
+  m_Name: VfxLibrary_Pozac
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.VfxLibrary
+  clips:
+  - id: pozac_wave_ring
+    frames:
+    - {fileID: 5520387481850877716, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -682074855699679596, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -5032391596196944101, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -5968059230203547363, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -8187094715762191081, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -1856679916203854519, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -2377403199514319261, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    - {fileID: -2616532477931885510, guid: 9024194e67731b340a733947bc28a84a, type: 3}
+    frameRate: 18
+    scale: 1
+    angle: 0
+    forwardOffset: 0
+    heightOffset: 0.45
+  - id: pozac_burst
+    frames:
+    - {fileID: 7548121656049940800, guid: b326cd273c0a5f041a0c85a090bf0549, type: 3}
+    - {fileID: -6487844841752098885, guid: b326cd273c0a5f041a0c85a090bf0549, type: 3}
+    - {fileID: -3916056329378871681, guid: b326cd273c0a5f041a0c85a090bf0549, type: 3}
+    - {fileID: -1119986707482369396, guid: b326cd273c0a5f041a0c85a090bf0549, type: 3}
+    - {fileID: 4815994082812747203, guid: b326cd273c0a5f041a0c85a090bf0549, type: 3}
+    - {fileID: 2895844477391342019, guid: b326cd273c0a5f041a0c85a090bf0549, type: 3}
+    frameRate: 16
+    scale: 1
+    angle: 0
+    forwardOffset: 1.6
+    heightOffset: 1.05
+  - id: pozac_vortex
+    frames:
+    - {fileID: 8413611392349892529, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: 5203250737034906820, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: 151175610174650805, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: 4484639293566036866, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: -9000113408871973585, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: -9149098677280106505, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: 1536581751715579744, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    - {fileID: 7800798968323162028, guid: 6f758f9042cd35d4c8d4386ae6ea67e4, type: 3}
+    frameRate: 16
+    scale: 1
+    angle: 0
+    forwardOffset: 0
+    heightOffset: 1
+  - id: pozac_spark_burst
+    frames:
+    - {fileID: -5639245999835905475, guid: 12fdd6dc5cd6765419c251366f120265, type: 3}
+    - {fileID: 2541081289410995460, guid: 12fdd6dc5cd6765419c251366f120265, type: 3}
+    - {fileID: -3359336495160304634, guid: 12fdd6dc5cd6765419c251366f120265, type: 3}
+    - {fileID: -1299332124575183128, guid: 12fdd6dc5cd6765419c251366f120265, type: 3}
+    - {fileID: -2575881591681188875, guid: 12fdd6dc5cd6765419c251366f120265, type: 3}
+    - {fileID: 4789877233020337509, guid: 12fdd6dc5cd6765419c251366f120265, type: 3}
+    frameRate: 20
+    scale: 1
+    angle: 0
+    forwardOffset: 0
+    heightOffset: 0
+  - id: pozac_spark_ray
+    frames:
+    - {fileID: -732934623312028207, guid: 7a91dc150a71a80409d06f57166adaec, type: 3}
+    - {fileID: 445135834723454760, guid: 7a91dc150a71a80409d06f57166adaec, type: 3}
+    - {fileID: 5223896834113903598, guid: 7a91dc150a71a80409d06f57166adaec, type: 3}
+    - {fileID: -2817649305297287901, guid: 7a91dc150a71a80409d06f57166adaec, type: 3}
+    - {fileID: -3397456435473595349, guid: 7a91dc150a71a80409d06f57166adaec, type: 3}
+    - {fileID: -3999674743509270838, guid: 7a91dc150a71a80409d06f57166adaec, type: 3}
+    frameRate: 20
+    scale: 1
+    angle: 0
+    forwardOffset: 0
+    heightOffset: 0

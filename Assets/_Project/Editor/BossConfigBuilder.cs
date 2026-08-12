@@ -233,6 +233,7 @@ namespace Onikiri.EditorTools
                 config.hurtSheet = Sheet(YokaiSheetBaker.HurtPath);
                 config.deathSheet = Sheet(YokaiSheetBaker.DeathPath);
                 config.attackSheet = Sheet(YokaiSheetBaker.AttackPath);
+                config.attackSheetVariants = VariantSheets();
 
                 config.cellWidth = YokaiSheetBaker.CellWidth;
                 config.cellHeight = YokaiSheetBaker.CellHeight;
@@ -242,7 +243,51 @@ namespace Onikiri.EditorTools
 
                 config.frameRate = 12f;
                 config.moveSpeed = 0.85f;
+
+                // 참격 오버레이 없음. 아래 주석 참고
+                config.attackVfxId = string.Empty;
             });
+
+            /**
+             * @brief 이 보스는 참격 오버레이를 **쓰지 않는다.** 그림에 이미 있다.
+             *
+             * 한동안 이 칸에 초승달(YokaiVfxBaker.CrescentId)을 못박아 뒀다.
+             * 공격 시트가 Tag_0(내려베기)이라 이펙트가 그려져 있지 않았고,
+             * 그래서 뜯어낸 초승달을 몸 앞에 따로 얹어 보완했다.
+             *
+             * 지금은 공격 시트 자체가 오의 블록에서 잘려 나온다 - **몸과
+             * 초승달이 같은 프레임에 함께 그려져 있다**(YokaiSheetBaker.Bakes).
+             * 그 위에 또 얹으면 초승달이 두 번 뜬다.
+             *
+             * 비워 두는 것을 여기서 못박는 이유는 값이 이미 애셋에 적혀 있기
+             * 때문이다. 씨앗은 새 프로젝트에만 듣고, 기존 애셋은 손으로 지우기
+             * 전까지 옛 값을 들고 있다.
+             *
+             * 뜯어낸 초승달·혈파·채찍 자체는 그대로 둔다 - 플레이어 스킬 스텝의
+             * 재료다(VfxLibrary / VfxBurst / YokaiVfxBaker).
+             */
+            if (yokai != null && !string.IsNullOrEmpty(yokai.attackVfxId))
+            {
+                yokai.attackVfxId = string.Empty;
+                EditorUtility.SetDirty(yokai);
+                Debug.Log("[Onikiri] " + yokai.name + " attack VFX overlay cleared "
+                          + "(the attack sheet draws the crescent itself).");
+            }
+
+            /**
+             * @brief 추가 공격 시트도 못박는다. 셀 크기와 같은 성질이다.
+             *
+             * 네 공격은 **한 aseprite의 한 블록**에서 함께 잘려 나온 생성물이라,
+             * 어느 것을 쓸지는 사람이 정할 취향이 아니라 굽기가 정해둔 사실이다.
+             * 씨앗으로만 두면 이미 존재하는 애셋에는 영원히 안 들어간다.
+             */
+            if (yokai != null && !SameSheets(yokai.attackSheetVariants, VariantSheets()))
+            {
+                yokai.attackSheetVariants = VariantSheets();
+                EditorUtility.SetDirty(yokai);
+                Debug.Log("[Onikiri] " + yokai.name + " attack variants -> "
+                          + YokaiSheetBaker.AttackVariantPaths.Length + " extra sheet(s).");
+            }
 
             /**
              * 셀 크기는 굽기 결과를 따라간다. 다른 config의 셀은 사람이 실측한
@@ -504,6 +549,20 @@ namespace Onikiri.EditorTools
             definition.hurtFrames = OrderedSprites(config.hurtSheet);
             definition.deathFrames = OrderedSprites(config.deathSheet);
             definition.attackFrames = OrderedSprites(config.attackSheet);
+
+            // 추가 공격. 비어 있으면 길이 0이라 Enemy가 attackFrames 하나만 쓴다
+            var variants = new List<EnemyDefinition.AttackVariant>();
+            if (config.attackSheetVariants != null)
+            {
+                foreach (var sheet in config.attackSheetVariants)
+                {
+                    if (sheet == null) continue;
+                    var frames = OrderedSprites(sheet);
+                    if (frames.Length == 0) continue;
+                    variants.Add(new EnemyDefinition.AttackVariant { frames = frames });
+                }
+            }
+            definition.attackVariants = variants.ToArray();
             definition.attackInterval = (float)BossCurve.AttackIntervalSeconds;
             definition.attackImpactPoint = 0.55f;
             definition.frameRate = config.frameRate;
@@ -594,6 +653,23 @@ namespace Onikiri.EditorTools
             return fallback == int.MaxValue ? -1 : fallback;
         }
 
+        /** 요괴의 추가 공격 시트들. 굽기 표(YokaiSheetBaker)가 단일 출처다 */
+        private static Texture2D[] VariantSheets()
+        {
+            var paths = YokaiSheetBaker.AttackVariantPaths;
+            var sheets = new Texture2D[paths.Length];
+            for (int i = 0; i < paths.Length; i++) sheets[i] = Sheet(paths[i]);
+            return sheets;
+        }
+
+        private static bool SameSheets(Texture2D[] a, Texture2D[] b)
+        {
+            if (a == null || b == null) return a == b;
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++) if (a[i] != b[i]) return false;
+            return true;
+        }
+
         private static IEnumerable<Texture2D> Sheets(BossConfig config)
         {
             if (config.idleSheet != null) yield return config.idleSheet;
@@ -603,6 +679,14 @@ namespace Onikiri.EditorTools
             if (config.hurtSheet != null) yield return config.hurtSheet;
             if (config.deathSheet != null) yield return config.deathSheet;
             if (config.attackSheet != null) yield return config.attackSheet;
+
+            // 추가 공격 시트도 같은 피벗으로 잘라야 한다. 빠지면 그 공격만
+            // 발밑이 다른 자리에 찍혀, 고른 클립에 따라 보스가 위아래로 튄다
+            if (config.attackSheetVariants != null)
+            {
+                foreach (var sheet in config.attackSheetVariants)
+                    if (sheet != null) yield return sheet;
+            }
         }
 
         /**

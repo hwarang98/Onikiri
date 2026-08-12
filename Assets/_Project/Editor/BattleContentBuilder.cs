@@ -36,6 +36,27 @@ namespace Onikiri.EditorTools
             public string DeathClip;
 
             /**
+             * @brief 걷기·피격·공격 태그. **없는 요괴는 비운다.**
+             *
+             * 이 세 칸은 48단계에 생겼다. 그전까지는 팩에서 idle과 death만
+             * 꺼내 썼고 나머지 태그는 임포트만 되고 아무도 안 읽었다 - 여덟
+             * 파일에 그런 태그가 열둘이었다.
+             *
+             * "안 쓰던 것을 마저 쓴다"는 것이 이 칸들의 전부다. **어느 것도
+             * 밸런스를 건드리지 않는다** - 이동 속도·체력·골드·공격 주기는
+             * 그대로이고, 바뀌는 것은 같은 시간 동안 화면에 뜨는 그림이다.
+             *
+             * 비어 있어도 되는 칸이다. Enemy는 걷기가 없으면 idle로 걷고,
+             * 피격이 없으면 흰 플래시로 대신하며, 공격이 없으면 자세를 유지한다.
+             */
+            public string WalkClip;
+            public string HurtClip;
+            public string AttackClip;
+
+            /** 태그가 없는 구간을 이름으로 집는 폴백. Idle/Death와 같은 규칙 */
+            public string[] AttackNames;
+
+            /**
              * @brief 클립 대신 스프라이트 이름으로 프레임을 집는 폴백.
              *
              * Inimig (2)는 태그가 하나뿐이라(43프레임 중 12프레임만 태그) 사망이
@@ -82,6 +103,8 @@ namespace Onikiri.EditorTools
         {
             // ---- 지역 1 (봄숲 여명): 밝은 숲의 장난스러운 것들
             new EnemyTier {
+                // 태그가 둘뿐이다(대기 12f, 사망 6f). 걷기·공격·피격은 팩에 없다 -
+                // 이 요괴는 등껍질을 지고 기어다니는 그림 두 벌이 전부다
                 Aseprite = "Inimig (7)", AssetName = "Enemy_Kourin", DisplayName = "Mossback",
                 IdleClip = "Tag", DeathClip = "Tag_0", Region = 1,
                 SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.0f,
@@ -89,15 +112,19 @@ namespace Onikiri.EditorTools
             },
             new EnemyTier {
                 Aseprite = "Inimig (8)", AssetName = "Enemy_Kinoko", DisplayName = "Kinoko-obake",
-                IdleClip = "Tag", DeathClip = "Tag_1", Region = 1,
+                IdleClip = "Tag", WalkClip = "Tag_0", DeathClip = "Tag_1", Region = 1,
                 SpawnWeight = 4f, Health = 17f, MoveSpeed = 1.15f,
                 QueueSpacing = 1.0f, HoverHeight = 0f, Gold = 6d
             },
 
             // ---- 지역 2 (가을숲): 흙빛 장난 요괴
             new EnemyTier {
+                // 팩에서 가장 많이 그려진 개체다 - 다섯 태그가 전부 다른 동작이다.
+                // 공격(Tag_2)은 몸을 둥글게 말았다 터뜨리는 덮치기이고,
+                // 피격(Tag_3)은 납작하게 눌린 자세다. 눈으로 확인해 갈랐다
                 Aseprite = "Inimig (6)", AssetName = "Enemy_Kedama", DisplayName = "Kedama",
-                IdleClip = "Tag", DeathClip = "Tag_0", Region = 2,
+                IdleClip = "Tag", WalkClip = "Tag_1", DeathClip = "Tag_0",
+                AttackClip = "Tag_2", HurtClip = "Tag_3", Region = 2,
                 SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.05f,
                 QueueSpacing = 1.1f, HoverHeight = 0f, Gold = 5d
             },
@@ -110,6 +137,11 @@ namespace Onikiri.EditorTools
                                     "Frame_4", "Frame_5", "Frame_6", "Frame_7" },
                 DeathNames = new[] { "Frame_28", "Frame_29", "Frame_30",
                                      "Frame_31", "Frame_32", "Frame_33" },
+                // **그 하나뿐인 태그가 공격이다.** 12프레임짜리 물어뜯기로,
+                // 입을 벌리고(F41~44) 달려들었다가 제자리로 돌아온다. 지금까지
+                // 이 파일에서 유일하게 태그가 붙은 구간이 아무 데도 안 걸려
+                // 있었다 - 태그가 하나뿐이라 idle일 것이라고 지나쳤던 자리다
+                AttackClip = "Tag",
                 Region = 2,
                 SpawnWeight = 4f, Health = 17f, MoveSpeed = 0.9f,
                 QueueSpacing = 1.1f, HoverHeight = 0f, Gold = 6d
@@ -118,13 +150,14 @@ namespace Onikiri.EditorTools
             // ---- 지역 3 (자줏빛 밤): 유령과 악귀
             new EnemyTier {
                 Aseprite = "Inimig (4)", AssetName = "Enemy_Hitodama", DisplayName = "Hitodama",
-                IdleClip = "Tag", DeathClip = "Tag_1", Region = 3,
+                IdleClip = "Tag", WalkClip = "Tag_0", DeathClip = "Tag_1", Region = 3,
                 SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.25f,
                 QueueSpacing = 1.0f, HoverHeight = 0.35f, Gold = 5d
             },
             new EnemyTier {
                 Aseprite = "Inimig (3)", AssetName = "Enemy_Onigashira", DisplayName = "Onigashira",
-                IdleClip = "Tag", DeathClip = "Tag_2", Region = 3,
+                IdleClip = "Tag", WalkClip = "Tag_0", DeathClip = "Tag_2",
+                HurtClip = "Tag_1", Region = 3,
                 SpawnWeight = 4f, Health = 17f, MoveSpeed = 1.2f,
                 QueueSpacing = 1.0f, HoverHeight = 0.4f, Gold = 6d
             },
@@ -133,13 +166,14 @@ namespace Onikiri.EditorTools
             // 틴트는 걸지 않는다 - 적 틴트 금지는 가독성 규칙이다(배경만 틴트)
             new EnemyTier {
                 Aseprite = "Inimig (3)", AssetName = "Enemy_Onigashira_Den", DisplayName = "Onigashira",
-                IdleClip = "Tag", DeathClip = "Tag_2", Region = 4,
+                IdleClip = "Tag", WalkClip = "Tag_0", DeathClip = "Tag_2",
+                HurtClip = "Tag_1", Region = 4,
                 SpawnWeight = 5f, Health = 12f, MoveSpeed = 1.2f,
                 QueueSpacing = 1.0f, HoverHeight = 0.4f, Gold = 5d
             },
             new EnemyTier {
                 Aseprite = "Inimig (4)", AssetName = "Enemy_Hitodama_Den", DisplayName = "Hitodama",
-                IdleClip = "Tag", DeathClip = "Tag_1", Region = 4,
+                IdleClip = "Tag", WalkClip = "Tag_0", DeathClip = "Tag_1", Region = 4,
                 SpawnWeight = 4f, Health = 17f, MoveSpeed = 1.25f,
                 QueueSpacing = 1.0f, HoverHeight = 0.35f, Gold = 6d
             },
@@ -148,8 +182,17 @@ namespace Onikiri.EditorTools
             // 어느 풀에도, 어느 평균에도 안 들어간다 - 스폰 경로는 잃지만
             // Boss_CyclopsLantern이 baseMob으로 계속 참조한다
             new EnemyTier {
+                // 여섯 태그 중 넷(Tag/Tag_0/Tag_3/Tag_4)이 **거의 같은 대기 루프**다 -
+                // 넷을 나란히 재어보면 폭·픽셀 수·무게중심이 소수점까지 겹친다.
+                // 그래서 걷기 칸은 비워 둔다. 그중 하나를 걷기라고 적으면 표에는
+                // 걷기가 생기지만 화면에서는 아무 일도 일어나지 않고, 다음 사람이
+                // "걷기가 있는데 왜 안 보이지"를 다시 확인하게 된다.
+                // 이 요괴는 다리가 없으니 떠다니는 것이 맞다.
+                //
+                // 진짜로 새로 붙는 것은 피격(Tag_1) 하나다. 확대판 피날레 보스로
+                // 서는 개체라 오래 얻어맞고, 그동안 움찔하는 그림이 생긴다
                 Aseprite = "Inimig (1)", AssetName = "Enemy_Chochin", DisplayName = "Chochin-obake",
-                IdleClip = "Tag", DeathClip = "Tag_2", Region = 0,
+                IdleClip = "Tag", DeathClip = "Tag_2", HurtClip = "Tag_1", Region = 0,
                 SpawnWeight = 0f, Health = 34f, MoveSpeed = 0.8f,
                 QueueSpacing = 1.5f, HoverHeight = 0.1f, Gold = 18d
             }
@@ -460,9 +503,15 @@ namespace Onikiri.EditorTools
 
             definition.displayName = tier.DisplayName;
             definition.idleFrames = Frames(aseprite, tier.IdleClip, tier.IdleNames);
-            // 이 팩들에는 피격 태그가 없다. Enemy가 색 플래시로 대체하며,
-            // 이 스프라이트 크기에서는 충분히 읽힌다
-            definition.hurtFrames = new Sprite[0];
+
+            // 걸어 들어오는 동안 도는 클립. 없는 요괴는 지금까지처럼 idle로 걷는다.
+            // 떠다니는 것들(도깨비불·등롱)에는 애초에 걷기가 없고 있을 이유도 없다
+            definition.walkFrames = Frames(aseprite, tier.WalkClip, null);
+
+            // 피격 태그가 있는 요괴만 채운다. 없으면 Enemy가 흰 플래시로 대체하고,
+            // 이 스프라이트 크기에서는 그것으로도 충분히 읽힌다
+            definition.hurtFrames = Frames(aseprite, tier.HurtClip, null);
+
             definition.deathFrames = Frames(aseprite, tier.DeathClip, tier.DeathNames);
             definition.frameRate = 12f;
 
@@ -472,9 +521,22 @@ namespace Onikiri.EditorTools
             // 잡몹 스폰 경로는 0을 넘긴다. 보스로 스폰될 때만 깨어나는 값이다
             definition.attackInterval = (float)BossCurve.AttackIntervalSeconds;
             definition.attackImpactPoint = 0.5f;
-            // 잡몹 팩에는 공격 태그가 없다. 비워 두면 Enemy가 idle을 유지한 채
-            // 주기만 돌리고, 타격은 피격 플래시와 데미지 숫자로 읽힌다
-            definition.attackFrames = new Sprite[0];
+
+            // 공격 태그가 있는 요괴만 채운다. 여덟 파일 중 둘뿐이다
+            // (케다마의 덮치기, 카사오바케의 물어뜯기).
+            //
+            // 잡몹으로 스폰될 때는 이 배열이 있어도 재생되지 않는다 - Enemy는
+            // 공격력 0을 받으면 주기를 아예 돌리지 않고, 잡몹 스폰 경로는 0을
+            // 넘긴다. 깨어나는 것은 이 정의가 확대판 보스로 설 때뿐이다
+            definition.attackFrames = Frames(aseprite, tier.AttackClip, tier.AttackNames);
+
+            // 공격 그림이 없는 요괴가 확대판 보스로 설 때, 참격 이펙트를 타격보다
+            // 이만큼 먼저 띄운다. **피해량과 주기는 안 움직인다** - 옮기는 것은
+            // 그림이 뜨는 시각뿐이다(Enemy.UpdateAttack).
+            //
+            // 0.35초인 이유는 사람이 "예고"로 읽는 하한이 대략 그 언저리이고,
+            // 2초 주기 안에서 그만큼 먼저 떠도 다음 주기와 겹치지 않기 때문이다
+            definition.attackTelegraphSeconds = 0.35f;
 
             definition.spawnWeight = tier.SpawnWeight;
             definition.maxHealth = BigDouble.FromDouble(tier.Health);
@@ -493,8 +555,11 @@ namespace Onikiri.EditorTools
             EditorUtility.SetDirty(definition);
 
             Debug.Log(string.Format(
-                "[Onikiri] Enemy '{0}': idle={1} death={2} frames, weight={3}, hp={4}, gold={5}, artBottom={6:F4}u",
-                definition.displayName, definition.idleFrames.Length, definition.deathFrames.Length,
+                "[Onikiri] Enemy '{0}': idle={1} walk={2} hurt={3} attack={4} death={5} frames, " +
+                "weight={6}, hp={7}, gold={8}, artBottom={9:F4}u",
+                definition.displayName, definition.idleFrames.Length, definition.walkFrames.Length,
+                definition.hurtFrames.Length, definition.attackFrames.Length,
+                definition.deathFrames.Length,
                 definition.spawnWeight, definition.maxHealth, tier.Gold, definition.artBottomOffset));
 
             return definition;
@@ -1061,11 +1126,28 @@ namespace Onikiri.EditorTools
                         expected > 0 ? hitFrames / (float)expected : 0f));
 
                 // 연참은 참격을 얹지 않는 것이 설계다. 켜지면 23단계가 걷어낸
-                // 이중 참격이 그대로 재발한다 - 클립에 궤적이 이미 세 번 있다
+                // 이중 참격이 그대로 재발한다 - 그 클립에만 궤적이 **세 번**
+                // 있다(ATTACK 1/2/3을 이어 붙였다).
+                //
+                // ## 49단계에 조건을 고쳤다 - Shape가 아니라 이 오의 하나다
+                //
+                // 27단계에는 `Shape == MultiHit`으로 적혀 있었다. 그때는 다타
+                // 오의가 연참 하나뿐이라 두 조건이 구분되지 않았고, 짧은 쪽이
+                // 일반 규칙처럼 보였을 뿐이다. 49단계에 다타가 둘 더 생기면서
+                // 그 일반화가 거짓이라는 것이 드러났다.
+                //
+                // **실측으로 확인했다**: 사무라이의 공격 클립 넷(ATTACK 1/2/3 ·
+                // SPECIAL)은 **전부** 흰 궤적을 한 번씩 그린다. 그래도 귀참은
+                // 27단계부터 SPECIAL 위에 Slash3을 얹고 있고 그것이 이 게임의
+                // 오의 연출이다 - "몸의 칼 궤적 + 그 위의 오의 이펙트"는 겹침이
+                // 아니라 층이다.
+                //
+                // 겹침이 되는 것은 **같은 종류의 그림이 여러 번** 겹칠 때이고,
+                // 그 조건에 걸리는 것은 궤적이 셋인 연참뿐이다.
                 bool usesSlash = element.FindPropertyRelative("usesSlash").boolValue;
-                if (spec.Shape == Onikiri.Progression.SkillShape.MultiHit && usesSlash)
-                    problems.Add("'" + spec.DisplayName + "'이 팩 참격을 쓴다 - 클립의 "
-                                 + "그려진 참격과 겹쳐 23단계의 이중 참격이 된다");
+                if (spec.Id == Onikiri.Progression.SkillCatalog.ChainSlashId && usesSlash)
+                    problems.Add("'" + spec.DisplayName + "'이 팩 참격을 쓴다 - 클립에 이미 "
+                                 + "궤적이 세 번 그려져 있어 23단계의 이중 참격이 된다");
 
                 bool usesStreak = element.FindPropertyRelative("usesStreak").boolValue;
 
@@ -3698,6 +3780,12 @@ namespace Onikiri.EditorTools
             // 필요했지만, 불꽃은 '여기 맞았다'를 찍는 것이라 짧을수록 날카롭다
             so.FindProperty("sparkFrameRate").floatValue = 30f;
             so.FindProperty("sparkBudgetPerSecond").floatValue = 0.45f;
+
+            // 6 -> 12 (51단계). 무기 티어의 평타 오라가 타격마다 불꽃을 한 장 더
+            // 꺼내므로 동시 사용량이 두 배다 - 실측으로 프리웜 6에서 성장이
+            // 8회 잡혔다(SparkPoolGrowthCount). 성장은 한 번뿐이지만 그 한 번이
+            // 전투 중의 Instantiate라, 미리 세워 두는 쪽이 규칙이다
+            so.FindProperty("sparkPrewarm").intValue = 12;
 
             // 요괴 중심에서 앞면 쪽으로 0.22u. 잡몹의 그려진 반너비가 0.27~0.5u쯤이라
             // 몸 안쪽 가장자리에 얹힌다 - 칼이 몸에 박히는 자리다. 부호는 여기서 정하지

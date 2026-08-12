@@ -22,7 +22,15 @@ MonoBehaviour:
   - {fileID: 4935424704474139377, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
   - {fileID: 86722843868414153, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
   - {fileID: 8821116088638318782, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
-  walkFrames: []
+  walkFrames:
+  - {fileID: 1803242692490184990, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 3626753048860686429, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 567792901118992800, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 6660144575897733685, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 4661522552652694704, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 7816398098906275934, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 3435971654160238991, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
+  - {fileID: 1378770737845874582, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
   hurtFrames: []
   deathFrames:
   - {fileID: -8161077547640508618, guid: f513f29437b1bdd43a396ce64fe8f2ef, type: 3}
@@ -42,8 +50,10 @@ MonoBehaviour:
   moveSpeed: 1.15
   queueSpacing: 1
   attackFrames: []
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.5
+  attackTelegraphSeconds: 0.35
   hoverHeight: 0
   artBottomOffset: 0.84375
   artFacesLeft: 0

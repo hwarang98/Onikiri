@@ -41,9 +41,23 @@ MonoBehaviour:
     e: 0
   moveSpeed: 0.9
   queueSpacing: 1.1
-  attackFrames: []
+  attackFrames:
+  - {fileID: 3458311747296886454, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -4475970560838871744, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -1378205114092222010, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 8836256256197207778, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 5576100656471114436, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -7985379606580542603, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -8629620020288592426, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -2375832432559695663, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 2451343481091724002, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 6759574578186777206, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: -3666112655700626463, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  - {fileID: 5703127380119236035, guid: 4722a80c4bd255b448ef44bb5341e5a2, type: 3}
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.5
+  attackTelegraphSeconds: 0.35
   hoverHeight: 0
   artBottomOffset: 0.59375
   artFacesLeft: 0

@@ -555,9 +555,20 @@ namespace Onikiri.Progression
             var tiers = new int[YodoCatalog.Count];
             ExpectedStateAtStage(stage, tiers);
 
+            // 49단계: 그 스테이지에 **실제로 열려 있는 자리**로 잰다. 심층
+            // 구성으로 고정하면 4번 슬롯이 아직 없는 st41~50에서 기대 곡선이
+            // 실측보다 0.83% 높게 나오고, 그 차이가 그대로 보정과 실제의 차가 된다.
+            //
+            // **인자에서 하나를 뺀다.** 이 함수 전체가 "그 스테이지에 들어설
+            // 때의 상태"를 말하고(ExpectedStateAtStage의 티어도 그렇다), 들어설
+            // 때의 최전선은 직전 스테이지다. 빼지 않으면 st51에 들어서는 시점의
+            // 기대값이 이미 넷을 가정해 실측(그때는 셋)과 갈린다 -
+            // ExpectedPowerCurve_TracksTheSimulation이 st50에서 잡았다
+            var loadout = SkillCatalog.LoadoutAtStage(stage - 1);
+
             cachedPowerStage = stage;
-            cachedPowerFactor = YodoAffinityCurve.DpsFactor(tiers)
-                              * YodoSpiritCurve.DpsFactorAfterAffinity(tiers);
+            cachedPowerFactor = YodoAffinityCurve.DpsFactor(tiers, null, null, loadout)
+                              * YodoSpiritCurve.DpsFactorAfterAffinity(tiers, null, null, loadout);
             return cachedPowerFactor;
         }
 

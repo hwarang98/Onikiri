@@ -1,0 +1,382 @@
+fileFormatVersion: 2
+guid: b4cb4e169e3c4a747946857681066753
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 816531642611401881
+    second: WAVE_0
+  - first:
+      213: -7664201581800304881
+    second: WAVE_1
+  - first:
+      213: 3958638349945819065
+    second: WAVE_2
+  - first:
+      213: 5205718827688859455
+    second: WAVE_3
+  - first:
+      213: -741172618624160538
+    second: WAVE_4
+  - first:
+      213: -1240479392071731394
+    second: WAVE_5
+  - first:
+      213: 1737888758062689003
+    second: WAVE_6
+  - first:
+      213: 1138303391017972486
+    second: WAVE_7
+  - first:
+      213: -921824426631802693
+    second: WAVE_8
+  - first:
+      213: 5048239369105596794
+    second: WAVE_9
+  - first:
+      213: 7730769320625417219
+    second: WAVE_10
+  - first:
+      213: 7254341508019656273
+    second: WAVE_11
+  - first:
+      213: -3000842935714117449
+    second: WAVE_12
+  - first:
+      213: 5921596138481045869
+    second: WAVE_13
+  - first:
+      213: 4083811536733298049
+    second: WAVE_14
+  - first:
+      213: -8967532975339288028
+    second: WAVE_15
+  - first:
+      213: -2563792869930743887
+    second: WAVE_16
+  - first:
+      213: 2015315475154464479
+    second: WAVE_17
+  - first:
+      213: -5746430196344024376
+    second: WAVE_18
+  - first:
+      213: -2020291956122242013
+    second: WAVE_19
+  - first:
+      213: -4386933374970576828
+    second: WAVE_20
+  - first:
+      213: -6479018371786182144
+    second: WAVE_21
+  - first:
+      213: 6868127652206853236
+    second: WAVE_22
+  - first:
+      213: 7765771631630919576
+    second: WAVE_23
+  - first:
+      213: 6579230111610400016
+    second: WAVE_24
+  - first:
+      213: 8819200662497049485
+    second: WAVE_25
+  - first:
+      213: -1067979434726737704
+    second: WAVE_26
+  - first:
+      213: -9062074268544415372
+    second: WAVE_27
+  - first:
+      213: 4233827724259166659
+    second: WAVE_28
+  - first:
+      213: -7225025909303736003
+    second: WAVE_29
+  - first:
+      213: -5480488557584975585
+    second: WAVE_30
+  - first:
+      213: -5402955062699101376
+    second: WAVE_31
+  - first:
+      213: 3688145248054665753
+    second: WAVE_32
+  - first:
+      213: 2340370514630251356
+    second: WAVE_33
+  - first:
+      213: 7371836043970274967
+    second: WAVE_34
+  - first:
+      213: 6417663909432727449
+    second: WAVE_35
+  - first:
+      213: -4574030816829227686
+    second: WAVE_36
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 0
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: WAVE_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 79
+        height: 82
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 99408b9e337e45b00800000000000000
+      internalID: 816531642611401881
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_1
+      rect:
+        serializedVersion: 2
+        x: 79
+        y: 0
+        width: 79
+        height: 82
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f0f4ecd944943a590800000000000000
+      internalID: -7664201581800304881
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_2
+      rect:
+        serializedVersion: 2
+        x: 158
+        y: 0
+        width: 79
+        height: 82
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9bf42c20b98efe630800000000000000
+      internalID: 3958638349945819065
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_3
+      rect:
+        serializedVersion: 2
+        x: 237
+        y: 0
+        width: 79
+        height: 82
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f3715f451bd6e3840800000000000000
+      internalID: 5205718827688859455
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_4
+      rect:
+        serializedVersion: 2
+        x: 316
+        y: 0
+        width: 79
+        height: 82
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6ec29a52e63d6b5f0800000000000000
+      internalID: -741172618624160538
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: b1c0049015d1a2340b4bd01173e40d11
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      WAVE_0: 816531642611401881
+      WAVE_1: -7664201581800304881
+      WAVE_2: 3958638349945819065
+      WAVE_3: 5205718827688859455
+      WAVE_4: -741172618624160538
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

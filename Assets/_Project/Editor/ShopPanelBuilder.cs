@@ -103,6 +103,17 @@ namespace Onikiri.EditorTools
         private const float PopupGap = 28f;
 
         /**
+         * @brief 확인 버튼의 높이. **한 줄짜리 동사 버튼이다** (50b).
+         *
+         * 처음에는 BuildSideButton(두 줄 - 동사 + 비용)을 빈 비용으로 세웠고,
+         * 그 결과 "확인"이 위 칸에 몰리고 아래 칸이 비어 **판 안에서 붕 뜬
+         * 버튼**이 됐다(실기 캡처). 비용이 없는 버튼은 애초에 두 줄 틀에
+         * 들어갈 이유가 없다 - 동사 하나(44pt) + 위아래 여백이 이 버튼의
+         * 전부이고, 그것이 2a 위계가 요구하는 크기다.
+         */
+        private const float ConfirmHeight = LineHeight + 32f;
+
+        /**
          * @brief 배너 아래쪽 두 버튼의 높이. 좌우로 반씩 나눈다.
          *
          * **두 줄이 들어가야 한다**(동사 44pt + 비용 33pt, 각자 52px 상자).
@@ -165,13 +176,27 @@ namespace Onikiri.EditorTools
             new PackSpec { Name = "보석 3,500", Price = "33,000원", Gems = 3500 }
         };
 
+        /**
+         * @brief 화면에 서는 순서. **배너마다 무료 줄이 바로 아래 붙는다.**
+         *
+         * 50단계에 배너가 둘이 되면서 자리 계산을 상수에서 **커서**로 바꿨다.
+         * 46·47단계는 "배너 하나 + 줄 N개"라 `BannerHeight + slot * RowHeight`
+         * 한 줄로 충분했는데, 높이가 다른 블록이 번갈아 서면 그 식이 성립하지
+         * 않는다 - 47단계가 배너 높이를 상수에서 식으로 바꾼 것과 같은 자리,
+         * 같은 이유다(손으로 맞추면 칸을 더하는 날 반드시 어긋난다).
+         *
+         * 무료 줄을 자기 배너 **바로 아래** 두는 것이 이 배치의 규칙이다.
+         * 두 무료 줄을 화면 아래에 모으면 "어느 배너의 무료인가"를 줄의
+         * 문구로만 말해야 하고, 두 배너의 확률표가 같아 보이는 화면에서
+         * 그것은 반드시 헷갈린다.
+         */
         private static float ContentHeight
         {
             get
             {
-                // 배너 + 무료 + 광고 + 보석 팩들
-                return BannerHeight + RowGap
-                     + (2 + Packs.Length) * (RowHeight + RowGap);
+                // (배너 + 무료) x 2 + 광고 + 보석 팩들
+                return 2f * (BannerHeight + RowGap + RowHeight + RowGap)
+                     + (1 + Packs.Length) * (RowHeight + RowGap);
             }
         }
 
@@ -213,6 +238,7 @@ namespace Onikiri.EditorTools
             }
 
             var system = EnsureSystem(battle);
+            EnsureSkillSystem(battle);
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath);
 
             VerifyRowsFit();
@@ -225,6 +251,9 @@ namespace Onikiri.EditorTools
             var shop = panel.gameObject.AddComponent<Onikiri.UI.ShopPanel>();
             var so = new SerializedObject(shop);
             so.FindProperty("system").objectReferenceValue = system;
+            so.FindProperty("skillSystem").objectReferenceValue =
+                battle.GetComponent<SkillGachaSystem>();
+            so.FindProperty("skills").objectReferenceValue = FindSkills();
             so.FindProperty("yodo").objectReferenceValue = battle.GetComponent<YodoSystem>();
             so.FindProperty("gems").objectReferenceValue = battle.GetComponent<GemWallet>();
             so.FindProperty("affordableColor").colorValue = TextColor;
@@ -233,10 +262,13 @@ namespace Onikiri.EditorTools
             so.FindProperty("buttonTint").colorValue = GemButtonTint;
             so.FindProperty("freeTint").colorValue = FreeButtonTint;
 
-            BuildBanner(content, font, so);
-            BuildFreeRow(content, font, so, 0);
-            BuildAdRow(content, font, 1);
-            for (int i = 0; i < Packs.Length; i++) BuildPackRow(content, font, 2 + i, Packs[i]);
+            float top = 0f;
+            BuildBanner(content, font, so, ref top);
+            BuildFreeRow(content, font, so, ref top);
+            BuildSkillBanner(content, font, so, ref top);
+            BuildSkillFreeRow(content, font, so, ref top);
+            BuildAdRow(content, font, ref top);
+            foreach (var pack in Packs) BuildPackRow(content, font, ref top, pack);
 
             so.FindProperty("popup").objectReferenceValue = BuildPopup(panel, font);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -251,10 +283,13 @@ namespace Onikiri.EditorTools
             panel.gameObject.SetActive(false);
 
             Debug.Log(string.Format(
-                "[Onikiri] Shop panel built: 배너 + 무료 + 광고 + 보석 팩 {0} = {1:F0}px "
-                + "(뷰포트 {2:F0}px). 단연 {3} · 10연 {4} · 천장 {5}회",
+                "[Onikiri] Shop panel built: 배너 2 + 무료 2 + 광고 + 보석 팩 {0} = {1:F0}px "
+                + "(뷰포트 {2:F0}px). 단연 {3} · 10연 {4} · 천장 {5}회 · "
+                + "오의 상한까지 XP {6} (기대 {7:F1}회)",
                 Packs.Length, ContentHeight, ViewportHeight,
-                GachaCurve.PullCostGems, GachaCurve.TenPullCostGems, GachaCurve.PityPulls));
+                GachaCurve.PullCostGems, GachaCurve.TenPullCostGems, GachaCurve.PityPulls,
+                SkillGachaCurve.TotalXpToCap,
+                SkillGachaCurve.TotalXpToCap / SkillGachaCurve.ExpectedXpPerPull));
 
             BattleContentBuilder.RelinkScreenTabs();
             return system;
@@ -286,6 +321,54 @@ namespace Onikiri.EditorTools
             }
 
             return system;
+        }
+
+        /**
+         * @brief 오의 뽑기 시스템 (50단계). **진행은 덮어쓰지 않는다.**
+         *
+         * EnsureSystem과 같은 규칙이다 - 빌더를 한 번 돌릴 때마다 천장
+         * 카운터가 0으로 돌아가면 플레이어가 지불한 스물아홉 회가 사라진다.
+         *
+         * `skills`를 배선하는 것이 이 함수가 하는 일의 전부에 가깝다. 결과를
+         * 적용하는 곳이 그쪽이고(SkillGachaSystem 머리 주석), 참조가 비면
+         * 뽑기가 돌기는 하는데 아무것도 안 들어오는 상태가 된다 - 49단계가
+         * StageProgress 미배선으로 실기에서 물린 것과 같은 종류의 사고다.
+         */
+        private static SkillGachaSystem EnsureSkillSystem(GameObject battle)
+        {
+            var system = battle.GetComponent<SkillGachaSystem>();
+            if (system == null) system = battle.AddComponent<SkillGachaSystem>();
+
+            var so = new SerializedObject(system);
+            so.FindProperty("gems").objectReferenceValue = battle.GetComponent<GemWallet>();
+            so.FindProperty("skills").objectReferenceValue = FindSkills();
+            so.FindProperty("stage").objectReferenceValue = battle.GetComponent<StageProgress>();
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var session = Object.FindFirstObjectByType<GameSession>(FindObjectsInactive.Include);
+            if (session != null)
+            {
+                var sessionSo = new SerializedObject(session);
+                sessionSo.FindProperty("skillGacha").objectReferenceValue = system;
+                sessionSo.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            return system;
+        }
+
+        /**
+         * @brief SkillSystem을 찾는다. **Battle 루트에 없다.**
+         *
+         * 오의는 사무라이에 붙어 있다(Battle/GroundAnchor/Player/Samurai) -
+         * 시전이 캐릭터의 일이기 때문이다. 나머지 시스템처럼
+         * `battle.GetComponent`로 찾으면 조용히 null이 들어오고, 그러면
+         * 런타임 폴백(SkillSystem.Instance)이 가려서 **실기에서만 늦게**
+         * 드러난다. 49단계가 StageProgress 미배선으로 물린 자리와 같은
+         * 종류의 사고라, 여기서는 찾는 방법을 함수 하나로 못박는다.
+         */
+        private static SkillSystem FindSkills()
+        {
+            return Object.FindFirstObjectByType<SkillSystem>(FindObjectsInactive.Include);
         }
 
         // ---------------------------------------------------------------- 판
@@ -395,11 +478,12 @@ namespace Onikiri.EditorTools
         // ---------------------------------------------------------------- 배너
 
         private static void BuildBanner(RectTransform content, TMP_FontAsset font,
-                                        SerializedObject shop)
+                                        SerializedObject shop, ref float cursor)
         {
             var go = new GameObject("GachaBanner", typeof(RectTransform));
             go.transform.SetParent(content, false);
-            Place(go, 0f, BannerHeight);
+            Place(go, cursor, BannerHeight);
+            cursor += BannerHeight + RowGap;
 
             var background = go.AddComponent<Image>();
             UiSkin.ApplyPanel(background, UiSkin.Chrome);
@@ -433,7 +517,7 @@ namespace Onikiri.EditorTools
             // 사다리를 만든다
             int rows = (GachaCurve.OutcomeCount + 1) / 2;
             for (int i = 0; i < GachaCurve.OutcomeCount; i++)
-                BuildRateCell(go.transform, font, i, i % 2, i / 2);
+                BuildRateCell(go.transform, font, i, i % 2, i / 2, RewardName(i));
 
             var pity = CreateLabel(go.transform, font, "Pity", TextAlignmentOptions.Left);
             UiFonts.Demote(pity);
@@ -470,7 +554,7 @@ namespace Onikiri.EditorTools
          * (VerifyTextFits)에도 정직하다 - 두 조각의 폭을 따로 잴 수 있다.
          */
         private static void BuildRateCell(Transform parent, TMP_FontAsset font,
-                                          int outcome, int column, int row)
+                                          int outcome, int column, int row, string label)
         {
             float cellWidth = (RowWidth - TextLeft - 24f) * 0.5f;
             float left = TextLeft + column * cellWidth;
@@ -482,7 +566,7 @@ namespace Onikiri.EditorTools
             Place((RectTransform)name.transform, left,
                   RowWidth - (left + cellWidth) + RateNumberWidth, top, LineHeight);
             name.color = tint;
-            name.text = RewardName(outcome);
+            name.text = label;
 
             var chance = CreateLabel(parent, font, "Rate" + outcome + "Pct",
                                      TextAlignmentOptions.Right);
@@ -593,15 +677,168 @@ namespace Onikiri.EditorTools
             return button;
         }
 
+        // ------------------------------------------------------- 오의 배너 (50단계)
+
+        /**
+         * @brief 오의 뽑기 배너. **요도 배너와 같은 조각으로 짓는다.**
+         *
+         * 확률표도 천장 줄도 버튼 둘도 같은 함수를 지난다(BuildRateCell ·
+         * BuildBannerButton). 47단계가 등급 색과 소수 한 자리로 세운 눈금이
+         * 두 배너에서 같은 뜻을 갖게 하는 유일한 방법이고, 그 눈금이 갈리면
+         * 플레이어는 사다리를 두 번 배워야 한다.
+         *
+         * 갈리는 것은 **결과의 이름**뿐이다 - 확률도 등급도 같은 배열에서
+         * 온다(SkillGachaCurve 머리 주석).
+         */
+        private static void BuildSkillBanner(RectTransform content, TMP_FontAsset font,
+                                             SerializedObject shop, ref float cursor)
+        {
+            var go = new GameObject("SkillGachaBanner", typeof(RectTransform));
+            go.transform.SetParent(content, false);
+            Place(go, cursor, BannerHeight);
+            cursor += BannerHeight + RowGap;
+
+            var background = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(background, UiSkin.Chrome);
+
+            // 아이콘은 **이 배너가 파는 오의의 아이콘**이다(혈폭). 요도 배너가
+            // 혼 스프라이트를 쓴 것과 같은 규칙 - 상품이 곧 아이콘이다
+            CreateIcon(go.transform, UiIcons.Load(BurstIconFile), Color.white, 18f);
+
+            var title = CreateLabel(go.transform, font, "Title", TextAlignmentOptions.Left);
+            Place((RectTransform)title.transform, TextLeft, 24f, 16f, LineHeight);
+            title.text = SkillBannerTitle;
+
+            var desc = CreateLabel(go.transform, font, "Desc", TextAlignmentOptions.Left);
+            UiFonts.Demote(desc);
+            Place((RectTransform)desc.transform, TextLeft, 24f, 16f + LineHeight, LineHeight);
+            desc.color = DimColor;
+            desc.text = SkillBannerDesc;
+
+            int rows = (SkillGachaCurve.OutcomeCount + 1) / 2;
+            for (int i = 0; i < SkillGachaCurve.OutcomeCount; i++)
+                BuildRateCell(go.transform, font, i, i % 2, i / 2, SkillRewardName(i));
+
+            var pity = CreateLabel(go.transform, font, "Pity", TextAlignmentOptions.Left);
+            UiFonts.Demote(pity);
+            Place((RectTransform)pity.transform, TextLeft, 24f,
+                  16f + LineHeight * (2f + rows), LineHeight);
+            pity.color = DimColor;
+            pity.text = PityText(SkillGachaCurve.PityPulls, 0);
+
+            TMP_Text singleCost, tenCost;
+            Image singleImage, tenImage;
+            var single = BuildBannerButton(go.transform, font, "Single", GemButtonTint,
+                                           "단연", "보석 " + SkillGachaCurve.PullCostGems,
+                                           0, out singleCost, out singleImage);
+            var ten = BuildBannerButton(go.transform, font, "Ten", GemButtonTint,
+                                        SkillGachaCurve.TenPullCount + "연",
+                                        "보석 " + SkillGachaCurve.TenPullCostGems,
+                                        1, out tenCost, out tenImage);
+
+            shop.FindProperty("skillSingleButton").objectReferenceValue = single;
+            shop.FindProperty("skillSingleCost").objectReferenceValue = singleCost;
+            shop.FindProperty("skillSingleBackground").objectReferenceValue = singleImage;
+            shop.FindProperty("skillTenButton").objectReferenceValue = ten;
+            shop.FindProperty("skillTenCost").objectReferenceValue = tenCost;
+            shop.FindProperty("skillTenBackground").objectReferenceValue = tenImage;
+            shop.FindProperty("skillPityLabel").objectReferenceValue = pity;
+        }
+
+        private static void BuildSkillFreeRow(RectTransform content, TMP_FontAsset font,
+                                              SerializedObject shop, ref float cursor)
+        {
+            var row = BuildRow(content, "SkillFreePull", ref cursor);
+
+            CreateIcon(row, UiIcons.LoadItem(UiIcons.QuestSprite), UiIcons.Tint, 20f);
+
+            var title = CreateLabel(row, font, "Title", TextAlignmentOptions.Left);
+            UiFonts.Demote(title);
+            Place((RectTransform)title.transform, TextLeft, TextRight, 20f, LineHeight);
+            title.text = SkillFreeTitle;
+
+            var state = CreateLabel(row, font, "State", TextAlignmentOptions.Left);
+            UiFonts.Demote(state);
+            Place((RectTransform)state.transform, TextLeft, TextRight, 20f + LineHeight, LineHeight);
+            state.color = DimColor;
+            state.text = SkillFreeReady;
+
+            TMP_Text buyTitle, buyCost;
+            Image buyImage;
+            var button = BuildSideButton(row, font, "Claim", FreeButtonTint,
+                                         "뽑기", "무료", out buyTitle, out buyCost, out buyImage);
+
+            shop.FindProperty("skillFreeButton").objectReferenceValue = button;
+            shop.FindProperty("skillFreeTitle").objectReferenceValue = buyTitle;
+            shop.FindProperty("skillFreeCost").objectReferenceValue = buyCost;
+            shop.FindProperty("skillFreeBackground").objectReferenceValue = buyImage;
+            shop.FindProperty("skillFreeStateLabel").objectReferenceValue = state;
+        }
+
+        private const string SkillBannerTitle = "오의 뽑기";
+
+        /**
+         * @brief 오의 배너 한 줄 설명.
+         *
+         * 요도 배너의 문장("파편부터 전설 요도까지 · 다섯 등급")과 **같은
+         * 문법**이다. 두 배너가 같은 사다리를 쓰므로 설명도 같은 모양이어야
+         * 사다리가 하나로 읽힌다 - 갈리는 것은 양 끝의 이름뿐이다.
+         */
+        private const string SkillBannerDesc = "스킬 XP부터 오의 개안까지 · 다섯 등급";
+
+        private const string SkillFreeTitle = "오늘의 무료 오의 뽑기";
+        /**
+         * @brief 무료 줄의 상태 문구. **요도 줄과 같은 문장이다.**
+         *
+         * 처음에 "오늘의 무료 **오의** 뽑기가 남아 있다"로 적었다가 실기
+         * 캡처에서 물렸다 - 두 글자가 늘어난 것만으로 상자(516px)를 넘어
+         * "있다"의 마지막 획이 버튼 밑으로 잘렸다. VerifyTextFits가 재는
+         * 상자와 같은 값인데도 넘친 이유는 이 줄이 **가장 긴 줄**이 아니라고
+         * 가정하고 검산 목록에 늦게 들어갔기 때문이고, 그 사고를 화면이 먼저
+         * 잡았다(25단계의 "실측이 선언을 이긴다").
+         *
+         * 어느 배너의 무료인지는 **바로 위 제목**이 말한다("오늘의 무료 오의
+         * 뽑기"). 같은 말을 두 줄에 다 적으면 긴 쪽이 잘리고, 잘린 줄은
+         * 아무것도 말하지 않는다.
+         */
+        private const string SkillFreeReady = "오늘의 무료 뽑기가 남아 있다";
+
+        /** 다 팔린 배너가 적는 말. 런타임(ShopPanel.SoldOutText)과 같은 문장이어야 한다 */
+        private const string SoldOutText = "해금 완료 · 장착 오의 전부 상한";
+
+        /** 배너 아이콘. 이 뽑기가 파는 첫 오의(혈폭)의 아이콘이다 */
+        private static string BurstIconFile
+        {
+            get
+            {
+                int index = SkillCatalog.IndexOf(SkillCatalog.BloodBurstId);
+                return index >= 0 ? SkillCatalog.Skills[index].IconFile : UiIcons.GoldIcon;
+            }
+        }
+
+        /**
+         * @brief 오의 뽑기 결과의 이름. **등급 이름을 앞에 붙인다** - 요도 표와 같은 규칙.
+         *
+         * 결과 판이 쓰는 이름과 같은 말이어야 한다(GachaResultPopup.
+         * NameOfOutcome) - 표에서 "영웅 오의 해금"으로 읽은 것이 판에서 다른
+         * 이름으로 뜨면 그 둘이 같은 것인지 알 수 없다.
+         */
+        private static string SkillRewardName(int outcome)
+        {
+            string grade = GachaCurve.GradeNames[(int)GachaCurve.GradeOf[outcome]];
+            return grade + " " + Onikiri.UI.GachaResultPopup.NameOfOutcome(
+                (SkillGachaCurve.Outcome)outcome);
+        }
+
         // ---------------------------------------------------------------- 상품 줄
 
-        private static RectTransform BuildRow(RectTransform content, string name, int slot)
+        private static RectTransform BuildRow(RectTransform content, string name, ref float cursor)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(content, false);
 
-            float top = BannerHeight + RowGap + slot * (RowHeight + RowGap);
-            Place(go, top, RowHeight);
+            Place(go, cursor, RowHeight);
+            cursor += RowHeight + RowGap;
 
             var background = go.AddComponent<Image>();
             UiSkin.ApplyPanel(background, UiSkin.Row);
@@ -610,9 +847,9 @@ namespace Onikiri.EditorTools
         }
 
         private static void BuildFreeRow(RectTransform content, TMP_FontAsset font,
-                                         SerializedObject shop, int slot)
+                                         SerializedObject shop, ref float cursor)
         {
-            var row = BuildRow(content, "FreePull", slot);
+            var row = BuildRow(content, "FreePull", ref cursor);
 
             CreateIcon(row, UiIcons.LoadItem(UiIcons.QuestSprite), UiIcons.Tint, 20f);
 
@@ -649,9 +886,9 @@ namespace Onikiri.EditorTools
          * 광고 SDK는 다음 스텝이다. 그때 이 줄의 버튼이 살아나고 나머지는
          * 그대로다 - 자리와 문구를 지금 정해 두면 그 스텝이 배선만 하면 된다.
          */
-        private static void BuildAdRow(RectTransform content, TMP_FontAsset font, int slot)
+        private static void BuildAdRow(RectTransform content, TMP_FontAsset font, ref float cursor)
         {
-            var row = BuildRow(content, "AdPull", slot);
+            var row = BuildRow(content, "AdPull", ref cursor);
             // 버튼 제목이 "광고"인 이유: 보석 팩 줄은 그 자리에 **가격**을 적고
             // (그것이 그 줄의 값이다) 광고 줄에는 가격이 없다. 둘 다 "준비 중"을
             // 적으면 한 판에 같은 말이 두 번 뜬다 - 실기 캡처에서 실제로 그랬다
@@ -660,9 +897,9 @@ namespace Onikiri.EditorTools
         }
 
         private static void BuildPackRow(RectTransform content, TMP_FontAsset font,
-                                         int slot, PackSpec spec)
+                                         ref float cursor, PackSpec spec)
         {
-            var row = BuildRow(content, "Pack" + spec.Gems, slot);
+            var row = BuildRow(content, "Pack" + spec.Gems, ref cursor);
             BuildPlaceholder(row, font, UiIcons.LoadItem(UiIcons.GemSprite),
                              spec.Name, "뽑기 " + (spec.Gems / GachaCurve.PullCostGems) + "회 분량",
                              spec.Price);
@@ -736,9 +973,11 @@ namespace Onikiri.EditorTools
             // 카드로 세우고 가운데에 띄운다 - 처음에 띠를 통째로 덮었더니
             // 결과 열 줄 아래로 250px이 비어 "무언가 더 있어야 하는데 없는
             // 판"으로 읽혔다(실기 캡처)
+            // 초기 높이는 열 줄이 전부 좁은 칸일 때(다섯 줄)다. 실제 높이는
+            // Show가 결과의 줄 수로 다시 계산한다(GachaResultPopup.Render)
             float lineRows = GachaCurve.TenPullCount / 2;
             float cardHeight = PopupTop + LineHeight * (1.4f + lineRows)
-                             + PopupGap + BannerButtonHeight + PopupTop;
+                             + PopupGap + ConfirmHeight + PopupTop;
 
             var visualRect = (RectTransform)visual.transform;
             visualRect.anchorMin = new Vector2(0f, 0.5f);
@@ -777,17 +1016,36 @@ namespace Onikiri.EditorTools
                 lines[i] = label;
             }
 
-            TMP_Text confirmTitle, confirmCost;
-            Image confirmImage;
-            var confirm = BuildSideButton(visualRect, font, "Confirm", UiSkin.Chrome,
-                                          "확인", string.Empty,
-                                          out confirmTitle, out confirmCost, out confirmImage);
-            var confirmRect = (RectTransform)confirm.transform;
+            // 확인 버튼 - **먹빛 판에 금색 동사 하나** (50b). 뽑기 버튼(청)과
+            // 무료(초록)가 "무엇을 산다"의 색이라면 이것은 사는 것이 없는
+            // 버튼이고, 그래서 재화 색을 안 입는다. 먹빛 칩(UiSkin.InkChip)은
+            // 상단 바의 배지들이 쓰는 바로 그 바탕이라 화면에 이미 있는 말이고,
+            // 금색 글자는 "이 판의 일이 끝났다"는 완성의 색이다
+            var confirmGo = new GameObject("Confirm", typeof(RectTransform));
+            confirmGo.transform.SetParent(visualRect, false);
+
+            var confirmRect = (RectTransform)confirmGo.transform;
             confirmRect.anchorMin = new Vector2(0.5f, 0f);
             confirmRect.anchorMax = new Vector2(0.5f, 0f);
             confirmRect.pivot = new Vector2(0.5f, 0f);
-            confirmRect.sizeDelta = new Vector2(ButtonWidth, BannerButtonHeight);
+            confirmRect.sizeDelta = new Vector2(ButtonWidth, ConfirmHeight);
             confirmRect.anchoredPosition = new Vector2(0f, PopupTop);
+
+            var confirmImage = confirmGo.AddComponent<Image>();
+            UiSkin.ApplyPanel(confirmImage, UiSkin.InkChip);
+
+            var confirm = confirmGo.AddComponent<Button>();
+            UiSkin.ApplyButton(confirm, confirmImage);
+
+            var confirmTitle = CreateLabel(confirmGo.transform, font, "Title",
+                                           TextAlignmentOptions.Center);
+            var confirmTitleRect = (RectTransform)confirmTitle.transform;
+            confirmTitleRect.anchorMin = Vector2.zero;
+            confirmTitleRect.anchorMax = Vector2.one;
+            confirmTitleRect.offsetMin = new Vector2(ButtonTextPad, 0f);
+            confirmTitleRect.offsetMax = new Vector2(-ButtonTextPad, 0f);
+            confirmTitle.text = "확인";
+            confirmTitle.color = UiSkin.Gold;
 
             var popup = root.AddComponent<Onikiri.UI.GachaResultPopup>();
             var so = new SerializedObject(popup);
@@ -800,6 +1058,15 @@ namespace Onikiri.EditorTools
             so.FindProperty("cardBackground").objectReferenceValue = image;
             so.FindProperty("cardNormalTint").colorValue = UiSkin.Chrome;
             so.FindProperty("cardLegendaryTint").colorValue = LegendaryCardTint;
+
+            // 판의 치수 (50b). 판이 자리를 스스로 놓으므로(Render) 여기 상수와
+            // 판의 값이 같아야 첫 프레임과 갱신 후가 같은 그림이다
+            so.FindProperty("lineHeight").floatValue = LineHeight;
+            so.FindProperty("topPad").floatValue = PopupTop;
+            so.FindProperty("buttonGap").floatValue = PopupGap;
+            so.FindProperty("confirmHeight").floatValue = ConfirmHeight;
+            so.FindProperty("cardSidePad").floatValue = 24f;
+            so.FindProperty("outerSidePad").floatValue = SidePadding;
 
             var grades = so.FindProperty("gradeColors");
             grades.arraySize = UiSkin.Grades.Length;
@@ -869,6 +1136,7 @@ namespace Onikiri.EditorTools
             {
                 SetFont(text, primary, Onikiri.UI.PixelFontSizes.GalmuriSmall);
                 CheckLine(text, "요괴 봉인 뽑기", TextWidth + TextRight - 24f, "banner title");
+                CheckLine(text, SkillBannerTitle, TextWidth + TextRight - 24f, "banner title");
                 foreach (var title in new[] { "단연", GachaCurve.TenPullCount + "연", "뽑기", "확인" })
                     CheckLine(text, title, ButtonTextWidth, "button title");
                 CheckLine(text, "광고", ButtonTextWidth, "ad button title");
@@ -892,6 +1160,13 @@ namespace Onikiri.EditorTools
 
                 CheckLine(text, PityText(GachaCurve.PityPulls, 8888), bannerWidth, "pity line");
 
+                // 50단계 - 오의 배너. 확률표는 같은 상자를 쓰므로 이름만 다시 잰다
+                CheckLine(text, SkillBannerDesc, bannerWidth, "skill banner desc");
+                for (int i = 0; i < SkillGachaCurve.OutcomeCount; i++)
+                    CheckLine(text, SkillRewardName(i), cellWidth - RateNumberWidth - RateGap,
+                              "skill rate name");
+                CheckLine(text, SoldOutText, bannerWidth, "skill sold out");
+
                 CheckLine(text, "보석 " + GachaCurve.TenPullCostGems, ButtonTextWidth, "cost");
                 foreach (var pack in Packs)
                 {
@@ -899,6 +1174,9 @@ namespace Onikiri.EditorTools
                     CheckLine(text, pack.Price, ButtonTextWidth, "pack price");
                 }
                 CheckLine(text, "오늘의 무료 뽑기", TextWidth, "row name");
+                CheckLine(text, SkillFreeTitle, TextWidth, "row name");
+                CheckLine(text, SkillFreeReady, TextWidth, "free state");
+                CheckLine(text, SoldOutText, TextWidth, "free state");
                 CheckLine(text, "광고 보고 한 번", TextWidth, "row name");
                 CheckLine(text, "오늘의 무료 뽑기가 남아 있다", TextWidth, "free state");
                 CheckLine(text, "새벽 4시에 다시 열린다", TextWidth, "free state");
@@ -909,34 +1187,67 @@ namespace Onikiri.EditorTools
                     CheckLine(text, "뽑기 " + (pack.Gems / GachaCurve.PullCostGems) + "회 분량",
                               TextWidth, "pack note");
 
-                // 결과 줄. 두 칸이라 폭이 절반이다
-                float halfLine = (RowWidth - 48f) * 0.5f;
+                // 결과 줄 (50b). **좁은 칸은 들여쓰기만큼 더 좁다** - 판이
+                // 왼쪽 정렬로 놓으면서 실사용 폭이 반 폭에서 한 칸 줄었고,
+                // 그 값을 여기서 같이 빼지 않으면 검산이 옛 폭을 잰다
+                float halfLine = (RowWidth - 48f) * 0.5f
+                               - Onikiri.UI.GachaResultPopup.NarrowInset;
+                float wideLine = RowWidth - 48f;
+
+                // ★3 이하 = 좁은 칸. ★4가 넓은 줄로 나가면서 남는 최악은
+                // ★3의 미끄러짐 줄이다
                 CheckLine(text, "혼 정수 → 처형인의 혼", halfLine, "result line");
                 CheckLine(text, "혼 정수 → 파편 " + YodoCurve.ShardsPerOverflowSoul,
                           halfLine, "result line");
                 CheckLine(text, "파편 " + GachaCurve.ShardsOf[(int)GachaCurve.Outcome.ShardJackpot],
                           halfLine, "result line");
 
-                // 47단계의 최악 줄들. ★4가 미끄러진 줄이 가장 길다 -
-                // 두 단어를 다 적기 때문이고, 그것이 문구로 지키는 규칙이다
-                CheckLine(text, "천장! 상위 혼 → 혼 정수 → 처형인의 혼", halfLine, "result line");
+                // ★4 이상 = 전 폭 줄. 미끄러짐 사슬이 가장 길다
+                CheckLine(text, "천장! 상위 혼 → 혼 정수 → 처형인의 혼", wideLine, "wide line");
                 CheckLine(text, "천장! 상위 혼 → 파편 " + GachaCurve.ShardsPerOverflowRarity,
-                          halfLine, "result line");
+                          wideLine, "wide line");
                 string fullStars = YodoRarityCurve.Stars(YodoRarityCurve.MaxRarity);
                 foreach (var blade in YodoCatalog.Blades)
                     CheckLine(text, "천장! " + blade.BladeName + " " + fullStars,
-                              halfLine, "result line");
+                              wideLine, "wide line");
 
                 foreach (var blade in LegendaryYodoCatalog.Blades)
                 {
-                    CheckLine(text, blade.BladeName + " 획득!", halfLine, "result line");
+                    CheckLine(text, blade.BladeName + " 획득!", wideLine, "wide line");
                     CheckLine(text, blade.BladeName + " 돌파 "
-                                  + (LegendaryYodoCurve.MaxCopies - 1), halfLine, "result line");
+                                  + (LegendaryYodoCurve.MaxCopies - 1), wideLine, "wide line");
                 }
                 CheckLine(text, "전설 → 파편 " + LegendaryYodoCurve.ShardsPerOverflow,
-                          halfLine, "result line");
+                          wideLine, "wide line");
+
+                // 50b: 줄이 두 종류다. **좁은 줄은 반 폭에, 넓은 줄은 전 폭에**
+                // 든다 - 처음에 긴 줄을 반 폭에 우겨넣었다가 실기에서 판 밖으로
+                // 삐져나왔고, 이 검산이 그것을 빌드에서 잡았어야 했다
+                CheckLine(text, "XP +" + SkillGachaCurve.XpFor(SkillGachaCurve.Outcome.XpSurge)
+                              + " · Lv +" + (SkillCurve.MaxLevel - 1),
+                          halfLine, "skill narrow line");
+
+                float fullLine = wideLine;
+                foreach (var id in SkillGachaCurve.UnlockOrder)
+                {
+                    int index = SkillCatalog.IndexOf(id);
+                    if (index < 0) continue;
+                    CheckLine(text, "천장! 오의 해금 · " + SkillCatalog.Skills[index].DisplayName,
+                              fullLine, "skill wide line");
+                }
+                foreach (var skill in SkillCatalog.Skills)
+                    CheckLine(text, "오의 개안 · " + skill.DisplayName + " Lv." + SkillCurve.MaxLevel,
+                              fullLine, "skill wide line");
+
+                CheckLine(text, "천장! 오의 개안 → 오의 해금 → XP +"
+                              + SkillGachaCurve.XpFor(SkillGachaCurve.Outcome.XpSurge)
+                              + " · Lv +" + (SkillCurve.MaxLevel - 1),
+                          fullLine, "skill wide line");
+                CheckLine(text, "확인", ButtonTextWidth, "confirm");
 
                 CheckLine(text, "파편 8888 · 희귀 8 · 영웅 8 · 전설 8",
+                          RowWidth - 48f, "result title");
+                CheckLine(text, "스킬 XP 8888 · 희귀 8 · 영웅 8 · 전설 8",
                           RowWidth - 48f, "result title");
             }
             finally

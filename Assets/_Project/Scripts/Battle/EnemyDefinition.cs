@@ -62,12 +62,55 @@ namespace Onikiri.Battle
                  "잡몹은 플레이어를 공격하지 않으므로 비워 둔다")]
         public Sprite[] attackFrames;
 
+        /**
+         * @brief 공격 클립 하나. 배열의 배열을 유니티가 직렬화하지 못해 감싼 것이다.
+         */
+        [System.Serializable]
+        public sealed class AttackVariant
+        {
+            [Tooltip("이 공격의 프레임")]
+            public Sprite[] frames;
+        }
+
+        /**
+         * @brief **추가** 공격 동작들. 매 주기에 하나를 무작위로 고른다.
+         *
+         * 비워 두는 것이 기본이고, 비어 있으면 `attackFrames` 하나만 도는
+         * 지금까지의 동작 그대로다. 잡몹과 대부분의 보스가 여기에 해당한다.
+         *
+         * 다크 사무라이(Inimig 9)만 채운다. 그 팩의 오의 블록에는 서로 다른
+         * 공격이 넷 들어 있는데(혈참·혈조·혈륜·혈파) 한 벌만 쓰면 2초마다
+         * 같은 그림이 돌아 금방 벽지가 된다.
+         *
+         * **길이가 서로 달라도 된다.** 예비 동작 시간은 고른 클립에서 그때그때
+         * 유도한다(Enemy.UpdateAttack). 피해량과 주기는 어느 것을 고르든 같다 -
+         * 고르는 것은 그림뿐이다.
+         */
+        [Tooltip("추가 공격 동작. 매 주기에 attackFrames와 함께 무작위로 고른다. " +
+                 "비우면 attackFrames 하나만 쓴다")]
+        public AttackVariant[] attackVariants;
+
         [Tooltip("공격 사이의 간격 (초). 0이면 공격하지 않는다")]
         public float attackInterval;
 
         [Tooltip("칼이 닿기까지 공격 애니메이션에서 지나가는 비율")]
         [Range(0f, 1f)]
         public float attackImpactPoint = 0.55f;
+
+        /**
+         * @brief 공격 그림이 **없을 때** 쓰는 예비 동작 시간 (초).
+         *
+         * 공격 프레임이 있으면 예비 동작 길이는 클립에서 나온다(attackImpactPoint).
+         * 이 값은 클립이 아예 없는 요괴 - 잡몹 팩 대부분이다 - 가 확대판 보스로
+         * 설 때만 쓰인다. 그때 "친다"를 알리는 것은 참격 이펙트뿐이고, 이펙트가
+         * 타격과 같은 순간에 뜨면 이미 맞은 뒤라 예고가 되지 않는다.
+         *
+         * **피해량과 주기는 이 값을 보지 않는다.** 옮기는 것은 그림이 뜨는
+         * 시각뿐이다 (Enemy.UpdateAttack 참고).
+         */
+        [Tooltip("공격 프레임이 없을 때 이펙트를 타격보다 얼마나 먼저 띄울지 (초). " +
+                 "0이면 타격과 동시에 뜬다. 피해량·주기와 무관하다")]
+        public float attackTelegraphSeconds;
 
         [Header("연출")]
         [Tooltip("지면선 위 높이. 걷지 않고 떠다니는 요괴용")]

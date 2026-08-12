@@ -75,14 +75,28 @@ namespace Onikiri.UI
         /** Thaleah 폰트가 그려진 크기. 동봉된 레거시 비트맵 폰트에서 확인 */
         public const int ThaleahDesignSize = 16;
 
-        /** Thaleah 아틀라스를 굽는 정수 배수. Galmuri보다 한 단계 낮다 */
-        public const int ThaleahScale = 3;
+        /**
+         * @brief Thaleah 아틀라스를 굽는 정수 배수.
+         *
+         * 3이었다가 2로 내렸다. 데미지 표기에서 자릿수 상한을 없애면서
+         * (NumberFormatter.FormatFull) 숫자가 길어졌기 때문이다 - 10^16대 타격은
+         * 17자리 + 쉼표 5개 = 22글자이고, 치명타는 그 두 배 크기로 뜬다.
+         *
+         * **비트맵 서체라 크기를 줄이려면 다시 굽는 수밖에 없다.** fontSize만
+         * 낮추면 아틀라스와 1:1이 깨져 글자가 흐려진다 - 이 프로젝트가 폰트를
+         * 정수배로만 쓰는 이유 그대로다. 그래서 상수를 내리고
+         * `Onikiri/Art/Build Pixel Font Assets`로 아틀라스를 다시 굽는다.
+         *
+         * Thaleah는 데미지 팝업 전용이라(SkillNameFlash 주석 - 한글이 없어 다른
+         * 곳에 못 쓴다) 이 값을 내려도 다른 화면은 안 움직인다.
+         */
+        public const int ThaleahScale = 2;
 
         /** Thaleah 아틀라스를 구운 크기 */
-        public const int ThaleahAtlasSize = ThaleahDesignSize * ThaleahScale;   // 48
+        public const int ThaleahAtlasSize = ThaleahDesignSize * ThaleahScale;   // 32
 
         /** 데미지 팝업용. 라틴 디스플레이 서체, 아틀라스와 1:1 */
-        public const float ThaleahDamage = ThaleahAtlasSize;       // 48
+        public const float ThaleahDamage = ThaleahAtlasSize;       // 32
 
         /** desired 이하에서 가장 가까운 허용 크기 */
         public static float SnapToMultiple(float desired, int baseSize)

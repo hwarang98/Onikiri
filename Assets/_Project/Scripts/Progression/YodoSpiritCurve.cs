@@ -252,18 +252,22 @@ namespace Onikiri.Progression
          * 상수 몫(YodoAffinityCurve.ReferenceSkillShare 주석)을 쓰는 근거도
          * 저쪽과 같다 - 심층 구간에서 공격속도와 오의 배율이 둘 다 상한이다.
          */
+        /** @param loadout 장착 구성 (49단계). YodoAffinityCurve.DpsFactor와 같은 규칙 */
         public static double DpsFactorAfterAffinity(int[] tiers, int[] rarities = null,
-                                                    int[] legends = null)
+                                                    int[] legends = null, int[] loadout = null)
         {
             double attack = YodoAffinityCurve.CappedAttackRate;
 
+            // 49단계: 풀이 아니라 장착 구성만 센다. YodoAffinityCurve.CappedSkillRate와
+            // **같은 집합**이어야 두 배수의 곱이 전체와 정확히 같아진다
             double boosted = 0d;
-            for (int i = 0; i < SkillCatalog.Count; i++)
+            if (loadout == null) loadout = SkillCatalog.DeepLoadout;
+            for (int slot = 0; slot < loadout.Length; slot++)
             {
-                var spec = SkillCatalog.Skills[i];
-                if (spec.CooldownSeconds <= 0d) continue;
+                int i = loadout[slot];
+                double rate = SkillCatalog.CeilingRateOf(i);
+                if (rate <= 0d) continue;
 
-                double rate = SkillCurve.CeilingFor(spec.BaseMultiplier) / spec.CooldownSeconds;
                 boosted += rate * YodoAffinityCurve.FactorForSkill(i, tiers, rarities, legends);
             }
 

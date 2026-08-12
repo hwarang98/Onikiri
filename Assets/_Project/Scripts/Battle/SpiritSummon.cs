@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Onikiri.Core;
 using Onikiri.Progression;
 using UnityEngine;
@@ -105,7 +106,9 @@ namespace Onikiri.Battle
             [Tooltip("영체 기준 참격 중심의 전방 거리 (월드 단위)")]
             public float slashForwardOffset = 1.2f;
 
-            [Tooltip("참격 중심의 높이 보정. 영체의 그려진 중심에서")]
+            [Tooltip("참격 중심의 높이. **영체 발밑에서** 잰다. " +
+                     "스프라이트 칸 한가운데가 아니다 - 칸은 요괴마다 여백이 달라 " +
+                     "기준이 못 된다(SpawnSlash 주석)")]
             public float slashHeightOffset;
 
             [Tooltip("마지막 타격에만 벤다. 처형인의 '한 번에 끝낸다'")]
@@ -321,7 +324,10 @@ namespace Onikiri.Battle
             double multiplier = yodo.SpiritMultiplierOf(index);
             if (multiplier <= 0d) return false;
 
-            var frames = FramesFor(index);
+            // 강림할 때마다 새로 고른다. 로테이션이라 직전 영체가 남긴 값이
+            // 다음 자루로 넘어가면 안 된다
+            lastAttack = null;
+            var frames = PickAttackFor(index);
             if (frames == null || frames.Length == 0) return false;
 
             SummonCount++;
@@ -476,9 +482,25 @@ namespace Onikiri.Battle
             var target = combat.FindTarget();
             bool mirror = target != null && target.FacingDirection > 0;
 
-            float originY = spiritRenderer != null
-                ? spiritRenderer.bounds.center.y
-                : transform.position.y;
+            /**
+             * 원점은 영체의 **발밑**이다. 한때 `spiritRenderer.bounds.center.y`,
+             * 즉 스프라이트 칸의 한가운데를 썼는데 그것이 틀린 자리였다.
+             *
+             * 칸은 그려진 그림이 아니라 **여백까지 포함한 상자**다. 시트마다
+             * 여백이 다르므로 칸 한가운데는 요괴마다 아무 데나 찍힌다:
+             *
+             *   처형인   (92/2 - 16)/32 x 1.00 = 발밑 +0.94u   <- 몸통쯤
+             *   붉은눈   (108/2 - 12)/32 x 1.00 = 발밑 +1.31u   <- 몸통쯤
+             *   흑야     (192/2 -  0)/32 x 1.25 = 발밑 +3.75u   <- **머리 위 하늘**
+             *
+             * 흑야만 튄 이유는 그 시트를 굽는 칸이 다섯 클립의 합집합이고
+             * (YokaiSheetBaker), 그중 소멸이 옆으로 크게 흩어져 칸이 192px까지
+             * 커졌기 때문이다. 그려진 요괴는 104px뿐인데 칸이 그 두 배다.
+             *
+             * 발밑은 여백과 무관하다 - 시트를 다시 굽든 클립을 더하든 안 움직인다.
+             * 높이는 시그니처가 "발밑에서 칼날까지"로 들고 있다.
+             */
+            float originY = transform.position.y;
 
             // 전방 오프셋은 바라보는 쪽으로 간다. 부호를 안 뒤집으면 왼쪽을
             // 벨 때 참격이 등 뒤에 뜬다
@@ -563,6 +585,12 @@ namespace Onikiri.Battle
             var signature = SignatureFor(bladeIndex);
             bool last = hitIndex == YodoSpiritCurve.SummonHits - 1;
 
+            // 이번 타격의 그림으로 넘어간다. 첫 타격은 강림 때 고른 것을
+            // 그대로 쓰지 않고 여기서 한 번 더 고른다 - 솟는 0.35초 동안
+            // 이미 그 그림이 돌았으므로, 벨 때 같은 것이 또 오면 "베었다"가
+            // 아니라 "계속 같은 자세"로 읽힌다
+            AdvanceAttackClip();
+
             double share = YodoSpiritCurve.HitShare(hitIndex, totalMultiplier);
 
             // **전방 일렬을 벤다** (45c). 45단계에는 FindTarget으로 한 마리만
@@ -637,6 +665,70 @@ namespace Onikiri.Battle
             if (definition.attackFrames != null && definition.attackFrames.Length > 0)
                 return definition.attackFrames;
             return definition.idleFrames;
+        }
+
+        /** 직전에 쓴 공격. 연속으로 같은 것이 나오지 않게 하는 데만 쓴다 */
+        private Sprite[] lastAttack;
+
+        /**
+         * @brief 이 영체의 공격 그림 하나를 고른다.
+         *
+         * 원본 보스가 공격을 여러 벌 들고 있으면(다크 사무라이) 그중 하나다.
+         * 한 벌뿐인 영체는 늘 같은 것이 나오고, 그것이 지금까지의 동작이다.
+         *
+         * 고르는 규칙은 보스와 같다 - **직전 것은 후보에서 뺀다**(Enemy 주석).
+         */
+        private Sprite[] PickAttackFor(int index)
+        {
+            var config = ConfigFor(index);
+            var definition = config != null ? config.Definition : null;
+            if (definition == null) return null;
+
+            var clips = new List<Sprite[]>();
+            if (definition.attackFrames != null && definition.attackFrames.Length > 0)
+                clips.Add(definition.attackFrames);
+
+            if (definition.attackVariants != null)
+            {
+                foreach (var variant in definition.attackVariants)
+                    if (variant != null && variant.frames != null && variant.frames.Length > 0)
+                        clips.Add(variant.frames);
+            }
+
+            if (clips.Count == 0) return FramesFor(index);
+            if (clips.Count == 1) { lastAttack = clips[0]; return clips[0]; }
+
+            // 직전 것을 뺀 나머지에서
+            var pool = new List<Sprite[]>();
+            foreach (var clip in clips) if (clip != lastAttack) pool.Add(clip);
+            if (pool.Count == 0) pool = clips;
+
+            var picked = pool[UnityEngine.Random.Range(0, pool.Count)];
+            lastAttack = picked;
+            return picked;
+        }
+
+        /**
+         * @brief 타격마다 다음 공격 그림으로 넘어간다.
+         *
+         * 한 소환에 네 번 베는데(YodoSpiritCurve.SummonHits) 타격 간격이
+         * 0.93초이고 공격 클립은 0.5~0.67초다 - 한 번씩 끝까지 돌고 다음으로
+         * 넘어갈 여유가 있다. 그래서 다크 사무라이 영체는 **한 번 강림에
+         * 서로 다른 공격 넷**을 보여준다.
+         *
+         * 공격이 한 벌뿐인 영체(등롱·처형인·적안)에서는 고른 것이 지금 도는
+         * 것과 같으므로 아무 일도 하지 않는다 - 같은 클립을 다시 걸면 루프가
+         * 처음으로 튀어 멀쩡하던 연출이 끊긴다.
+         */
+        private void AdvanceAttackClip()
+        {
+            if (animator == null) return;
+
+            var next = PickAttackFor(bladeIndex);
+            if (next == null || next.Length == 0) return;
+            if (next == animator.CurrentClip) return;
+
+            animator.Play(next, FrameRateFor(bladeIndex), true);
         }
 
         private float FrameRateFor(int index)

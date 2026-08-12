@@ -21,6 +21,7 @@ MonoBehaviour:
   hurtSheet: {fileID: 2800000, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
   deathSheet: {fileID: 2800000, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
   attackSheet: {fileID: 2800000, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  attackSheetVariants: []
   cellWidth: 130
   cellHeight: 92
   feetPadding: 16
@@ -28,6 +29,7 @@ MonoBehaviour:
   moveSpeed: 0.85
   artFacesLeft: 1
   generatedDefinition: {fileID: 11400000, guid: 079daeab270acbe40b762feb2f7439e9, type: 2}
+  attackVfxId: 
   baseMob: {fileID: 0}
   scale: 2
   tint: {r: 1, g: 0.7529412, b: 0.78431374, a: 1}

@@ -1407,9 +1407,43 @@ namespace Onikiri.Tests
          * 0이고, 0의 기여가 정확히 1이다. f2p 바닥 실측이 45·46단계와
          * **부동소수점까지** 같다.
          */
-        const double DeepCeiling = 24.6d;
-        const double DeepChapterCeiling = 17.7d;
-        const double DeepFinaleCeiling = 14.0d;
+        /**
+         * ## 49단계(장착 슬롯)에 네 번째로 재기준했다
+         *
+         * 4번 슬롯이 st51에 열리며 오의 초당 환산 상한이 2.400 -> 2.976이 되고
+         * (+24%), 그것이 괄호 안에서 DPS x1.092가 된다. 하네스 실측(st51~200,
+         * 가속 플레이어, **상성 최적 구성**):
+         *
+         *   48단계 세계(슬롯 3)  22.78 / 16.37 / 12.99
+         *   49단계 기준 구성      24.56 / 17.64 / 14.00   <- 이 값에 헤드룸을 얹었다
+         *   49단계 가족 몰아주기  24.19 / 17.32 / 13.79
+         *
+         * **기준 구성이 곧 최선이다.** 가족 상성을 얕은 곡선으로 눌렀기
+         * 때문이다(YodoAffinityCurve.MatchOf) - 전담 상성 x3.13이 가족 x1.47보다
+         * 크므로, 4번 자리에 무엇을 끼우든 전담 셋(귀참·일섬·연참)이 먼저
+         * 자리를 채운다. 그래서 천장을 한 구성으로만 재도 "잘 고른 플레이어"가
+         * 밴드 밖에 서지 않는다. 아래 검사는 그래도 두 구성을 다 돌린다 -
+         * 그 부등식이 뒤집히는 날 검사가 먼저 알아야 한다.
+         *
+         * 세 등급이 거의 같은 비(+7.8% / +7.7% / +7.8%)로 올랐다. 슬롯은
+         * 스테이지에 무관한 상수라 전 구간에 균일하게 얹히기 때문이고, 그래서
+         * 이번에도 재기준은 등급별 판단이 아니라 **한 번의 평행이동**이다 -
+         * 수렴비가 0.095로 46·47단계와 같은 자리에 있는 것이 그 증거다.
+         *
+         * 새 값은 실측에 **9.1~9.3% 헤드룸**이다. 45·46·47단계와 같은 크기다.
+         *
+         * **그리고 이 재기준은 다음 스텝에 반복되지 않는다.** 밴드가 보는 것이
+         * 슬롯 예산 하나이므로(SkillCurve.BaseSlots 주석), 스킬 뽑기가 풀을
+         * 스물로 늘려도 이 상수는 안 움직인다. 47단계가 "+28%를 두어 번 더
+         * 쌓으면 밴드가 무의미"라고 남긴 경고에 대한 이 스텝의 답이 그것이다.
+         *
+         * **바닥은 네 번째로 안 움직인다.** 4번 슬롯은 진행으로 열리므로
+         * 무과금도 그대로 받고, 실측 f2p 바닥이 1.94/1.60/1.30에서
+         * 2.01/1.69/1.36으로 **올랐다** - 바닥 상수는 하한이라 그대로 둔다.
+         */
+        const double DeepCeiling = 26.8d;
+        const double DeepChapterCeiling = 19.2d;
+        const double DeepFinaleCeiling = 15.3d;
 
         [Test]
         public void DeepZone_F2pFloorClearsForever()
@@ -1437,14 +1471,21 @@ namespace Onikiri.Tests
             }
         }
 
+        /**
+         * 49단계부터 **구성 둘**을 돌린다. 기준 구성(기본 정책)과 상성 최적
+         * 구성이고, 천장은 둘 다 담아야 한다 - 위 상수 주석 참고.
+         */
         [Test]
         public void DeepZone_CeilingHolds()
         {
-            var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets());
+            var results = new List<StageSimulation.StageResult>();
+            results.AddRange(StageSimulation.Run(DeepZoneTo, FieldFromAssets()));
+            results.AddRange(StageSimulation.Run(DeepZoneTo, FieldFromAssets(),
+                new StageSimulation.Policy { ForceLoadout = AffinityOptimalLoadout() }));
 
-            for (int i = DeepZoneFrom - 1; i < results.Count; i++)
+            foreach (var row in results)
             {
-                var row = results[i];
+                if (row.Stage < DeepZoneFrom) continue;
                 var tier = BossCurve.TierOf(row.Stage);
 
                 double ceiling = tier == BossCurve.Tier.Finale ? DeepFinaleCeiling
@@ -1457,6 +1498,28 @@ namespace Onikiri.Tests
                     + "42단계 이전(램프 1.130 고정)에는 st200에서 8.4까지 발산했다",
                     row.Stage, row.BossMargin));
             }
+        }
+
+        /**
+         * @brief 가족 둘에 몰아준 구성. 천장 검사의 두 번째 구성이다.
+         *
+         * 등롱 가족(귀참·혈파동)과 처형인 가족(일섬·낙혈)이다. 한 바퀴 안에서
+         * 혼이 등롱 -> 처형인 -> 적안 -> 흑야 순으로 들어오므로(YodoCatalog 표
+         * 순서) 앞의 둘이 언제나 티어가 높다.
+         *
+         * 지금은 기준 구성보다 **낮다**(24.19 대 24.56). 가족 상성이 얕기
+         * 때문이고, 그래서 이 구성은 "천장을 미는 구성"이 아니라 **부등호를
+         * 지키는 증인**이다 - 가족 곡선을 깊게 만드는 날 이 줄이 먼저 넘친다.
+         */
+        static int[] AffinityOptimalLoadout()
+        {
+            return new[]
+            {
+                SkillCatalog.IndexOf(SkillCatalog.OniCleaveId),
+                SkillCatalog.IndexOf(SkillCatalog.FlashId),
+                SkillCatalog.IndexOf(SkillCatalog.BloodWaveId),
+                SkillCatalog.IndexOf(SkillCatalog.BloodFallId)
+            };
         }
 
         /**

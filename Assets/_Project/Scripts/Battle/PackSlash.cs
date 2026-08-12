@@ -79,6 +79,20 @@ namespace Onikiri.Battle
         public void Play(Sprite[] clip, float fps, Vector3 position, float angle,
                          float scale, bool flip, Action<PackSlash> onFinished)
         {
+            Play(clip, fps, position, angle, scale, flip, Color.white, onFinished);
+        }
+
+        /**
+         * @brief 틴트를 지정해 재생한다 (51단계).
+         *
+         * 참격 시트는 색이 구워져 있어 언제나 흰색으로 재생했는데, 무기 티어의
+         * 스파크 겹은 **은백으로 구운 시트**(PozacVfxBaker의 실버 굽기)를
+         * 티어 색으로 물들여 쓴다 - 곱연산 틴트가 임의 색을 내려면 바탕이
+         * 은색이어야 한다는 47단계 규칙 그대로다.
+         */
+        public void Play(Sprite[] clip, float fps, Vector3 position, float angle,
+                         float scale, bool flip, Color tint, Action<PackSlash> onFinished)
+        {
             if (clip == null || clip.Length == 0)
             {
                 if (onFinished != null) onFinished(this);
@@ -96,7 +110,7 @@ namespace Onikiri.Battle
 
             spriteRenderer.sprite = frames[0];
             spriteRenderer.flipX = flip;
-            spriteRenderer.color = Color.white;
+            spriteRenderer.color = tint;
             spriteRenderer.sortingOrder = SortingOrders.Vfx;
             spriteRenderer.enabled = true;
 

@@ -86,31 +86,87 @@ namespace Onikiri.Core
          * 타격이 291,461,230인지 291,549,880인지 말해주지 않고, 강화를 세 번 눌러도
          * 같은 "291.5M"이 뜰 수 있다. 축약이 숨기는 것이 하필 사람이 보려던 것이다.
          *
-         * ## 12자리에서 멈추는 이유
+         * ## 자릿수 상한은 **없다** (사용자 지시)
          *
-         * 전체 표기는 자릿수가 곧 화면 폭이다. 팝업은 정수배 크기만 쓸 수 있고(비트맵
-         * 폰트) 치명타는 그 두 배라, 자릿수가 늘면 다른 수단으로 줄일 방법이 없다.
-         * 12자리 + 쉼표 3개 = 15글자가 치명타 크기로 1080 폭에 들어가는 한계다.
+         * 한때 12자리에서 멈추고 그 위는 축약으로 되돌렸다. 화면 폭 때문이었는데,
+         * 그 폴백이 실제로 한 일은 **후반에 이 기능을 통째로 끄는 것**이었다 -
+         * 강화가 쌓이면 타격은 금방 10^16을 넘고, 그때부터는 전체 표기를 켠 적이
+         * 없는 것과 같아진다. 정확히 그 지점에서 "왜 축약되냐"가 나왔다.
          *
-         * 그 위는 애초에 읽는 숫자가 아니기도 하다. 1,284,003,551,209는 세어야 크기를
-         * 알 수 있고, 그 시점에는 1.28T가 더 정직하다. 상한을 넘으면 조용히 축약으로
-         * 돌아간다 - 넘는 순간이 후반이라 눈에 띄는 전환도 아니다.
+         * 그래서 상한을 없앴다. 폭은 폰트로 푼다 - 데미지 아틀라스를 48에서 32로
+         * 다시 구웠다(PixelFontSizes.ThaleahScale). 자릿수가 더 늘면 그때도
+         * 폰트나 배수로 풀 일이지, 숫자를 감춰서 풀 일이 아니다.
+         *
+         * ⚠️ 자릿수는 이제 값이 정하므로 **문자열 길이에 상한이 없다.** 10^100이면
+         * 133글자다(숫자 101 + 쉼표 33 - 1). 지금 곡선에서 닿을 자리는 아니지만,
+         * 닿으면 화면을 가로지른다.
+         *
+         * ## double 범위 밖도 찍는다
+         *
+         * `ToDouble()`은 10^308에서 무한대가 된다. BigDouble은 그보다 훨씬 위까지
+         * 가므로(10^2042) 큰 값은 double을 거치지 않고 **가수부 유효자리 + 0**으로
+         * 자릿수를 짓는다. 어차피 double의 유효자리가 15~17개라, 그 아래는 원래
+         * 정보가 없는 자리다.
          */
-        public const int FullDigitLimit = 12;
-
         public static string FormatFull(BigDouble value)
         {
             if (value.IsZero) return "0";
 
-            // Exponent는 10의 거듭제곱 자리수라, 12면 이미 13자리다
-            if (value.Abs().Exponent >= FullDigitLimit) return Format(value);
+            string sign = value.IsNegative ? "-" : string.Empty;
+            BigDouble abs = value.Abs();
 
-            double plain = Math.Round(value.ToDouble());
+            // double이 정확히 표현하는 구간은 그대로 반올림해 찍는다.
+            // 유효자리 15개 안이라 마지막 자리까지 진짜 값이다
+            if (abs.Exponent < SignificantDigits)
+            {
+                double plain = Math.Round(abs.ToDouble());
+                return sign + plain.ToString("N0", CultureInfo.InvariantCulture);
+            }
 
-            // 반올림이 상한을 넘길 수 있다 (999,999,999,999.7 -> 1e12)
-            if (Math.Abs(plain) >= 1e12) return Format(value);
+            return sign + GroupDigits(DigitsOf(abs));
+        }
 
-            return plain.ToString("N0", CultureInfo.InvariantCulture);
+        /** double이 믿을 수 있는 유효자리. 그 아래는 0으로 채운다 */
+        private const int SignificantDigits = 15;
+
+        /**
+         * @brief 정규화된 값(1 <= 가수부 < 10)을 쉼표 없는 자릿수 문자열로.
+         *
+         * 값은 가수부 x 10^지수이므로 정수 자릿수는 지수+1개다. 앞의 15자리는
+         * 가수부에서 나오고 나머지는 0이다.
+         */
+        private static string DigitsOf(BigDouble abs)
+        {
+            long totalDigits = abs.Exponent + 1L;
+
+            // 가수부를 15자리 정수로 편다. 1.2345... -> 123450000000000
+            double scaled = Math.Round(abs.Mantissa * Math.Pow(10d, SignificantDigits - 1));
+            string head = scaled.ToString("F0", CultureInfo.InvariantCulture);
+
+            // 9.999...가 10.0으로 올라가면 자리가 하나 늘어난다
+            if (head.Length > SignificantDigits) totalDigits++;
+
+            if (head.Length >= totalDigits) return head.Substring(0, (int)totalDigits);
+            return head.PadRight((int)totalDigits, '0');
+        }
+
+        /** 뒤에서 세 자리마다 쉼표. "1234567" -> "1,234,567" */
+        private static string GroupDigits(string digits)
+        {
+            int commas = (digits.Length - 1) / 3;
+            if (commas <= 0) return digits;
+
+            var chars = new char[digits.Length + commas];
+            int write = chars.Length - 1;
+            int run = 0;
+
+            for (int read = digits.Length - 1; read >= 0; read--)
+            {
+                if (run == 3) { chars[write--] = ','; run = 0; }
+                chars[write--] = digits[read];
+                run++;
+            }
+            return new string(chars);
         }
 
         /**

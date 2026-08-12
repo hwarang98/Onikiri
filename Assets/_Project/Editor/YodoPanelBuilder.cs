@@ -353,43 +353,114 @@ namespace Onikiri.EditorTools
         {
             array.arraySize = YodoCatalog.Count;
 
-            // 흑야: 제일 묵직한 시트(Slash3)의 흑+적 변형. 다크 사무라이는
-            // 넷 중 유일하게 자기도 검을 쓰는 요괴라 발도가 거짓말이 아니다
-            var heavy = SkillPanelBuilder.SliceSlashSheet("Slash3", 2);
+            /**
+             * @brief 흑야는 **참격 오버레이를 안 쓴다.** 몸 그림에 이미 있다.
+             *
+             * 46단계에는 이 자리가 팩의 제일 묵직한 시트(Slash3)였다. 몸은
+             * 요괴인데 참격만 팩 것이라 서 있는 보스와 불러낸 영체가 화면에서
+             * 서로 다른 놈으로 읽혔다. 한 번은 뜯어낸 초승달로 바꿔 봤지만,
+             * 그것도 결국 **그림 위에 그림을 겹치는** 방식이라 크기와 자리를
+             * 계속 손으로 맞춰야 했다.
+             *
+             * 지금은 겹칠 필요가 없다. 영체의 몸은 보스의 공격 클립을 그대로
+             * 쓰는데(SpiritSummon.FramesFor가 로스터에서 꺼낸다), 그 클립이
+             * 오의 블록에서 잘려 나오면서 **초승달이 프레임에 함께 그려져
+             * 있다**(YokaiSheetBaker.Bakes).
+             *
+             * 그래서 오버레이를 뗀다. 보스가 공격할 때 나오는 그 그림이 영체의
+             * 공격 그림이고, 둘이 어긋날 방법이 없다.
+             */
 
             // 처형인·적안: 날카로운 갈고리 모양(Slash1)의 같은 흑+적. 굳이
             // 색을 나누지 않는 이유는 요도 넷이 한 팔레트 안에 있어야 하기
             // 때문이다 - 갈리는 것은 색이 아니라 **크기와 횟수**다
             var sharp = SkillPanelBuilder.SliceSlashSheet("Slash1", 2);
 
+            /**
+             * @brief 참격 높이는 **발밑에서** 잰다 (SpiritSummon.SpawnSlash).
+             *
+             * 옛 기준(스프라이트 칸 한가운데 + -0.1)이 요괴마다 아무 데나
+             * 찍혀서 바꿨다. 아래 둘은 **화면에서 한 픽셀도 안 움직이도록**
+             * 옛 자리를 그대로 계산해 옮겨 적은 값이다:
+             *
+             *   처형인  (92/2 - 16)/32 x 1.00 - 0.10 = 0.84
+             *   붉은눈  (108/2 - 12)/32 x 1.00 - 0.10 = 1.21
+             *
+             * 등롱은 참격이 없어서(빛무리만) 값이 쓰이지 않는다.
+             */
             WriteSignature(array, YodoCatalog.LanternId,
                            bodyScale: 1f,
-                           slash: null, slashScale: 0f, slashAngle: 0f, lastHitOnly: false,
+                           slash: null, slashScale: 0f, slashAngle: 0f, slashHeight: 0f,
+                           lastHitOnly: false,
                            flash: true, flashTint: new Color(1f, 0.93f, 0.72f, 1f),
                            spark: true, ghosts: 0,
                            hitStop: 0f, shake: 0.5f, perHitShake: 0.25f);
 
             WriteSignature(array, YodoCatalog.ExecutionerId,
                            bodyScale: 1f,
-                           slash: sharp, slashScale: 2f, slashAngle: -70f, lastHitOnly: true,
+                           slash: sharp, slashScale: 2f, slashAngle: -70f, slashHeight: 0.84f,
+                           lastHitOnly: true,
                            flash: false, flashTint: Color.white,
                            spark: false, ghosts: 0,
                            hitStop: 1.1f, shake: 1.0f, perHitShake: 0.3f);
 
             WriteSignature(array, YodoCatalog.RedEyeId,
                            bodyScale: 1f,
-                           slash: sharp, slashScale: 1f, slashAngle: -25f, lastHitOnly: false,
+                           slash: sharp, slashScale: 1f, slashAngle: -25f, slashHeight: 1.21f,
+                           lastHitOnly: false,
                            flash: false, flashTint: Color.white,
                            spark: false, ghosts: 0,
                            hitStop: 0.8f, shake: 0.9f, perHitShake: 0.45f);
 
-            // ★ 쇼피스. 넷 중 유일하게 강림 셋을 다 켜고 몸도 크다
+            /**
+             * ★ 쇼피스. 넷 중 유일하게 강림 셋을 다 켜고 몸도 크다.
+             *
+             * **배율과 각도만 보스 값으로 옮겼다(3 -> 1, -55도 -> 0도).**
+             * 나머지(몸 크기·히트스톱·흔들림·잔상·번쩍·타수)는 46단계 그대로다.
+             *
+             * 배율을 그대로 둘 수 없었던 이유는 그림이 바뀌었기 때문이다.
+             * 팩 참격은 64px 셀이라 3배가 6.00u인데, 초승달은 그려진 폭이
+             * 114px이라 3배면 **10.69u** - 화면 폭(6.75u)의 1.6배다. 같은 숫자가
+             * 같은 크기를 뜻하지 않는다.
+             *
+             * `slash: null`이라 배율·각도·높이는 읽히지 않는다. 강림 연출
+             * (번쩍·불꽃·잔상 둘)과 무게(히트스톱 1.6)는 46단계 그대로다 -
+             * 뗀 것은 겹쳐 그리던 참격 한 장뿐이다.
+             */
             WriteSignature(array, YodoCatalog.DarkSamuraiId,
                            bodyScale: DarkSamuraiBodyScale,
-                           slash: heavy, slashScale: 3f, slashAngle: -55f, lastHitOnly: false,
+                           slash: null, slashScale: 0f, slashAngle: 0f, slashHeight: 0f,
+                           lastHitOnly: false,
                            flash: true, flashTint: DarkSamuraiFlash,
                            spark: true, ghosts: 2,
                            hitStop: 1.6f, shake: 1.6f, perHitShake: 0.5f);
+        }
+
+        /**
+         * @brief 요괴 이펙트 라이브러리에서 클립 하나를 꺼낸다.
+         *
+         * 라이브러리가 아직 안 구워졌으면 여기서 굽는다. 없다고 조용히 null을
+         * 돌려주면 흑야 시그니처의 참격 칸이 빈 채로 굳고, 그 상태는 영체를
+         * 실제로 소환해 봐야 드러난다 - 요도 최상위 티어라 한참 뒤의 일이다.
+         */
+        private static Sprite[] LoadYokaiClip(string id)
+        {
+            var library = AssetDatabase.LoadAssetAtPath<Onikiri.Battle.VfxLibrary>(
+                YokaiVfxBaker.LibraryPath);
+
+            if (library == null)
+            {
+                if (YokaiVfxBaker.BakeAll()) library = YokaiVfxBaker.BuildLibrary();
+            }
+
+            var clip = library != null ? library.Find(id) : null;
+            if (clip == null || clip.frames == null || clip.frames.Length == 0)
+            {
+                Debug.LogError("[Onikiri] Yokai VFX clip '" + id + "' missing - "
+                               + "run Onikiri/Art/Harvest Yokai VFX.");
+                return null;
+            }
+            return clip.frames;
         }
 
         /**
@@ -402,6 +473,7 @@ namespace Onikiri.EditorTools
          */
         private static void WriteSignature(SerializedProperty array, string id, float bodyScale,
                                            Sprite[] slash, float slashScale, float slashAngle,
+                                           float slashHeight,
                                            bool lastHitOnly, bool flash, Color flashTint,
                                            bool spark, int ghosts,
                                            float hitStop, float shake, float perHitShake)
@@ -426,7 +498,7 @@ namespace Onikiri.EditorTools
             // 영체 기준의 앞이다. 로닌 기준이 아니다 - 영체는 어깨 뒤 위쪽에
             // 따로 서 있어서, 로닌 값을 그대로 쓰면 참격이 몸에서 떨어진다
             element.FindPropertyRelative("slashForwardOffset").floatValue = 1.1f;
-            element.FindPropertyRelative("slashHeightOffset").floatValue = -0.1f;
+            element.FindPropertyRelative("slashHeightOffset").floatValue = slashHeight;
             element.FindPropertyRelative("slashOnLastHitOnly").boolValue = lastHitOnly;
 
             element.FindPropertyRelative("summonFlash").boolValue = flash;

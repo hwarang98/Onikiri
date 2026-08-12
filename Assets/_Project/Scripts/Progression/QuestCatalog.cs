@@ -31,7 +31,13 @@ namespace Onikiri.Progression
         /** 강화 레벨 총합 (일곱 축) */
         UpgradeLevelTotal,
 
-        /** 오의 레벨 총합 (셋) */
+        /**
+         * @brief 오의에 **산 칸**의 합 (49단계에 "레벨 총합"에서 바뀌었다).
+         *
+         * 풀 크기와 무관한 값이어야 한다 - 오의가 여덟이 되면 레벨 총합의
+         * 시작값도 여덟이라 같은 목표가 저절로 싸진다. 자세한 이유는
+         * SkillSystem.TotalLevels 주석에 있다.
+         */
         SkillLevelTotal
     }
 
@@ -240,8 +246,12 @@ namespace Onikiri.Progression
             new QuestSpec { Id = "ach_upgrade150", Kind = QuestKind.Achievement, Metric = QuestMetric.UpgradeLevelTotal,
                             Title = "강화 총합 1200", Target = 1200d, Gems = 50, GoldMobs = 1.5d, ExpBosses = 0d },
 
+            // 49단계에 자가 바뀌었다(레벨 총합 -> 산 칸의 합). **구매 횟수는
+            // 그대로 아홉 번**이라 무과금 보석 일정이 안 움직인다 - 3에서 12까지
+            // 아홉 번이던 것이 0에서 9까지 아홉 번이 됐다. id를 그대로 두는
+            // 이유는 이미 이 업적을 받은 세이브가 다시 열리면 안 되기 때문이다
             new QuestSpec { Id = "ach_skill12", Kind = QuestKind.Achievement, Metric = QuestMetric.SkillLevelTotal,
-                            Title = "오의 총 레벨 12", Target = 12d, Gems = 50, GoldMobs = 1.5d, ExpBosses = 0d }
+                            Title = "오의 강화 9회", Target = 9d, Gems = 50, GoldMobs = 1.5d, ExpBosses = 0d }
         };
 
         public static int DailyCount { get { return Daily.Length; } }

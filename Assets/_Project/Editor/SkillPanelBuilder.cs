@@ -35,7 +35,8 @@ namespace Onikiri.EditorTools
     {
         private const string GalmuriFontPath = "Assets/_Project/Art/Fonts/Galmuri11 SDF.asset";
         private const string PrefabFolder = "Assets/_Project/Prefabs";
-        private const string SlashPrefabPath = PrefabFolder + "/PackSlash.prefab";
+        /** 참격 재생 프리팹. 요괴 이펙트(VfxBurst)도 같은 것을 돌려 쓴다 */
+        public const string SlashPrefabPath = PrefabFolder + "/PackSlash.prefab";
         private const string StreakPrefabPath = PrefabFolder + "/DashStreak.prefab";
         private const string AfterimagePrefabPath = PrefabFolder + "/Afterimage.prefab";
         private const string StreakTexturePath = "Assets/_Project/Art/VFX/DashStreak.png";
@@ -65,6 +66,30 @@ namespace Onikiri.EditorTools
         /** 머리글(제목 + 자동 시전) 한 줄. 행보다 얇다 */
         private const float HeaderHeight = 76f;
         private const float HeaderGap = 14f;
+
+        // ------------------------------------------------------------ 49단계: 장착
+
+        /**
+         * @brief 장착 슬롯 줄. **스크롤 밖에 고정된다.**
+         *
+         * 대장간의 서브탭 줄과 같은 처리다(EquipmentPanelBuilder.BuildTabs) -
+         * 목록이 움직여도 네 자리는 제자리에 있어야 한다. 이 화면에서 "지금
+         * 나가는 것이 무엇인가"는 목록을 어디까지 굴렸는지와 무관한 사실이고,
+         * 그것이 함께 굴러가면 여덟 줄 중 넷을 눈으로 찾아야 한다.
+         */
+        private const float SlotRowHeight = 138f;
+        private const float SlotRowGap = 14f;
+        private const float SlotGap = 12f;
+
+        /** 칩 아이콘. 16px 아트의 정수배여야 한다(UiIcons.Size와 같은 규칙) */
+        private const float SlotIconSize = 80f;
+
+        /** 목록 아래 여백. 마지막 줄이 띠 끝에 붙어 잘린 것처럼 보이지 않게 */
+        private const float BottomPadding = 12f;
+
+        public const string SlotRowName = "Slots";
+        public const string ViewportName = "Viewport";
+        public const string ContentName = "Content";
 
         // 39단계 톤 통일: 자기 색을 갖지 않는다. 팔레트의 단일 출처는 UiSkin이다
         private static readonly Color TextColor = UiSkin.Text;
@@ -99,7 +124,10 @@ namespace Onikiri.EditorTools
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath);
 
             BuildHeader(panel, system, font);
-            for (int i = 0; i < SkillCatalog.Count; i++) BuildRow(panel, system, font, i);
+            BuildSlotRow(panel, system, font);
+
+            var content = BuildScroll(panel);
+            for (int i = 0; i < SkillCatalog.Count; i++) BuildRow(content, system, font, i);
 
             PruneStrays(panel);
             VerifyPanelFits();
@@ -116,8 +144,10 @@ namespace Onikiri.EditorTools
             WriteSlots(system, combat, performer);
 
             Debug.Log(string.Format(
-                "[Onikiri] Skill panel built: {0} skills, panel {1:F0}px in a {2:F0}px band.",
-                SkillCatalog.Count, PanelContentHeight, BandHeight));
+                "[Onikiri] Skill panel built: {0} skills / {1} slots, list {2:F0}px scrolling in "
+                + "a {3:F0}px viewport (band {4:F0}px).",
+                SkillCatalog.Count, SkillCurve.MaxSlots, PanelContentHeight, ViewportHeight,
+                BandHeight));
 
             return system;
         }
@@ -374,6 +404,15 @@ namespace Onikiri.EditorTools
             so.FindProperty("combat").objectReferenceValue = combat;
             so.FindProperty("performer").objectReferenceValue = performer;
 
+            // **최전선.** 4번 자리와 신규 오의의 게이트라, 이 참조가 비면 시스템이
+            // 최전선을 1로 보고(SkillSystem.FrontierNow의 폴백) 다섯이 영원히
+            // 잠긴다 - 실기에서 실제로 그랬다. 게이트가 없는 것이 아니라 게이트가
+            // 늘 닫혀 있는 상태라 화면에는 "st51에 갔는데 아무 일도 안 일어난다"로
+            // 나온다. EquipmentPanelBuilder가 같은 참조를 같은 방식으로 넘긴다
+            var battle = GameObject.Find("Battle");
+            so.FindProperty("stage").objectReferenceValue =
+                battle != null ? battle.GetComponent<StageProgress>() : null;
+
             var slots = so.FindProperty("slots");
             int previousCount = slots.arraySize;
             slots.arraySize = SkillCatalog.Count;
@@ -388,6 +427,13 @@ namespace Onikiri.EditorTools
                 element.FindPropertyRelative("baseMultiplier").doubleValue = spec.BaseMultiplier;
                 element.FindPropertyRelative("cooldownSeconds").floatValue = (float)spec.CooldownSeconds;
                 element.FindPropertyRelative("unlockLevel").intValue = spec.UnlockLevel;
+                element.FindPropertyRelative("unlockStage").intValue = spec.UnlockStage;
+
+                // 50단계: 게이트의 **종류**도 옮겨 적는다. 이 플래그가 없으면
+                // 가챠 몫이 unlockStage(비용 기준점 st41)를 게이트로 읽어
+                // 상점 해금과 함께 열린다 - 뽑지 않은 오의가 공짜로 열리는
+                // 것이고, 그 사고는 밸런스가 어긋난 뒤에야 드러난다
+                element.FindPropertyRelative("gachaGated").boolValue = spec.GachaGated;
                 element.FindPropertyRelative("baseCost").doubleValue = spec.BaseCost;
                 element.FindPropertyRelative("slashTint").colorValue = RgbaToColor(spec.SlashRgba);
 
@@ -493,7 +539,16 @@ namespace Onikiri.EditorTools
             so.FindProperty("afterimagePrefab").objectReferenceValue = afterimagePrefab;
             so.FindProperty("nameFlash").objectReferenceValue = nameFlash;
             so.FindProperty("screenFlash").objectReferenceValue = screenFlash;
-            so.FindProperty("slashPrewarm").intValue = 3;
+
+            // 무기 티어 스파크가 든 라이브러리 (51단계). 은백 굽기는
+            // PozacVfxBaker가 같은 애셋에 넣는다
+            so.FindProperty("glowLibrary").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<VfxLibrary>(PozacVfxBaker.LibraryPath);
+
+            // 3 -> 6 (51단계). 참격 한 장 위에 티어 스파크가 최대 세 겹
+            // 얹히므로, 귀참 클립(0.42초)과 스파크(0.4초 안팎)가 겹치는 순간
+            // 넷이 동시에 떠 있다. 남은 둘은 오의가 겹칠 때의 여유다
+            so.FindProperty("slashPrewarm").intValue = 6;
             so.FindProperty("streakPrewarm").intValue = 2;
             so.FindProperty("afterimagePrewarm").intValue = 4;
             // 알파 0.5로 뒀더니 실측에서 첫 장이 0.17까지 내려가 화면에 안 보였다.
@@ -524,7 +579,7 @@ namespace Onikiri.EditorTools
             var special = OrderedSprites(SamuraiSprites + "SPECIAL ATTACK.png");
 
             var list = so.FindProperty("choreographies");
-            list.arraySize = 3;
+            list.arraySize = SkillCatalog.Count;
 
             // 연참 - 제자리 연속 베기. **참격을 얹지 않는다. 27/28/29단계 모두 그대로다.**
             //
@@ -640,15 +695,187 @@ namespace Onikiri.EditorTools
                 hitStop: 3.0f, shake: 2.8f, perHitShake: 0f,
                 numberSize: 2, flash: true);
 
+            // 귀참의 무기 티어 변형 (51단계). 팩의 5색이 이미 있으므로 같은
+            // Slash3 시트를 색만 바꿔 다섯 벌 자른다 - slashFrames(위의
+            // color2)는 티어 배선이 빠진 씬의 폴백으로 남는다
+            WriteTierSlashes(list.GetArrayElementAtIndex(2), "Slash3");
+
+            // ------------------------------------------------------------ 49단계: 신규 다섯
+            //
+            // ## 몸은 있는 클립을 돌려 쓰고, 갈리는 것은 이펙트다
+            //
+            // 사무라이에게 있는 공격 클립은 다섯 벌(ATTACK 1/2/3 · DASH ·
+            // SPECIAL)뿐이고, 오의는 이제 여덟이다. 새 몸 애니를 그리지 않는 것이
+            // 이 스텝의 전제이므로(값싼 콘텐츠 원칙 - 35단계 지역 4와 같은 판단)
+            // 몸은 겹칠 수밖에 없다.
+            //
+            // 겹쳐도 되는 이유는 **화면에서 읽히는 것이 몸이 아니기 때문**이다.
+            // 23단계 이후 오의를 가르는 신호는 이펙트·이름 플래시·데미지 숫자
+            // 셋이고, 사무라이의 팔 각도를 보고 오의를 구분하는 사람은 없다.
+            // 실제로 그것이 27단계가 "색만 다른 같은 아크"를 문제 삼은 이유이기도
+            // 하다 - 그때 같았던 것은 몸이 아니라 **이펙트**였다.
+            //
+            // 자리와 배율은 여기서 정하지 않는다. VfxLibrary가 클립마다 들고
+            // 있고(굽는 시점에 정해진 값), 이 아래는 그것을 그대로 읽는다 -
+            // 같은 조각이 부르는 곳마다 다른 크기로 뜨는 것을 막는 장치다.
+
+            // 혈파동 - 발밑에서 퍼지는 지면 파동. 화면 전체(Screen).
+            // 귀참과 같은 SPECIAL 몸을 쓰지만 그림이 정반대다 - 저쪽은 앞을
+            // 가르는 초승달이고 이쪽은 발밑에서 사방으로 퍼지는 고리다
+            WriteChoreography(list.GetArrayElementAtIndex(3), SkillCatalog.BloodWaveId,
+                special, 24f, new[] { SpecialImpactFrame },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.WaveRing),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 2.0f, shake: 2.2f, perHitShake: 0f,
+                numberSize: 2, flash: false);
+
+            // 낙혈 - 전방 일렬 관통. 48단계 하베스트의 핏빛 파도가 앞으로 솟는다.
+            // 일섬과 같은 Pierce지만 **돌진이 없다** - 저쪽은 지나가며 베고
+            // 이쪽은 서서 앞으로 밀어낸다. 사거리도 조금 짧다
+            WriteChoreography(list.GetArrayElementAtIndex(4), SkillCatalog.BloodFallId,
+                attack2, 22f, new[] { Attack2ImpactFrame },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.Wave),
+                pierceRange: 4.0f, pierceHeight: 2.6f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 1.6f, shake: 1.6f, perHitShake: 0f,
+                numberSize: 2, flash: false);
+
+            // 혈륜 - 플레이어를 감고 도는 회오리. 다섯 번 때린다.
+            //
+            // **타격 프레임을 회오리에 맞춘다.** 다른 오의는 몸 클립의 그려진
+            // 참격에 맞추는데(23단계 규칙), 이 오의는 화면에 그려진 것이 몸이
+            // 아니라 회오리다 - 여덟 프레임이 두 겹으로 감기고, 그 감김마다
+            // 한 대씩이다. chain 클립(20f @40fps = 0.50초)이 회오리(8f @16fps
+            // = 0.50초)와 길이가 같아서 프레임을 그대로 나눠 걸 수 있다
+            WriteChoreography(list.GetArrayElementAtIndex(5), SkillCatalog.BloodWheelId,
+                chain, 40f, new[] { 2, 6, 10, 14, 18 },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.Vortex),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 1.3f, shake: 1.0f, perHitShake: 0.45f,
+                numberSize: 1, flash: false);
+
+            // 혈폭 - 단발 최대. 요괴 몸통에서 터진다.
+            //
+            // 셋 중 가장 무겁다(무게 2, 귀참과 같은 등급). 광역이 아니라
+            // 단일 대상이므로 보스전에서 가장 크게 뜨는 숫자가 이것이고,
+            // 화면 번쩍임도 준다 - 귀참 말고 번쩍이는 유일한 오의다
+            WriteChoreography(list.GetArrayElementAtIndex(6), SkillCatalog.BloodBurstId,
+                special, 24f, new[] { SpecialImpactFrame },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.Burst),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 3.0f, shake: 2.6f, perHitShake: 0f,
+                numberSize: 2, flash: true);
+
+            // 혈조 - 멀리 뻗는 채찍. 여덟 중 쿨이 가장 짧다(6초).
+            //
+            // 낙혈과 같은 Pierce인데 **사거리가 더 길고 세로가 얇다.** 채찍은
+            // 한 줄로 뻗는 그림이라 그 얇음이 곧 거동이고, 그래서 지면의 요괴는
+            // 다 걸리지만 높이 뜬 도깨비불은 놓친다 - 6초 쿨의 대가다
+            WriteChoreography(list.GetArrayElementAtIndex(7), SkillCatalog.BloodWhipId,
+                attack3, 24f, new[] { Attack3ImpactFrame },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.Whip),
+                pierceRange: 5.4f, pierceHeight: 1.6f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 1.0f, shake: 0.9f, perHitShake: 0f,
+                numberSize: 1, flash: false);
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             Debug.Log(string.Format(
                 "[Onikiri] Skill choreography: 연참 chain {0}f hits [{1}] (참격 없음) / "
-                + "일섬 DASH {2}f + 돌진 섬광 4.2u (타격 f6) / 귀참 SPECIAL {3}f + Slash3_color2 x2.",
+                + "일섬 DASH {2}f + 돌진 섬광 4.2u (타격 f6) / 귀참 SPECIAL {3}f + Slash3_color2 x2 / "
+                + "49단계 다섯: 혈파동·낙혈·혈륜·혈폭·혈조 (VfxLibrary 클립).",
                 chain.Count, string.Join(",", System.Array.ConvertAll(chainHits, h => h.ToString())),
                 dash.Count, special.Count));
 
             return performer;
+        }
+
+        /**
+         * @brief VfxLibrary의 클립 하나를 안무의 참격 칸으로 옮긴다.
+         *
+         * **배율·각도·자리를 여기서 다시 적지 않는다.** 라이브러리가 굽는
+         * 시점에 정한 값을 들고 있고(VfxLibrary 머리 주석), 부르는 쪽마다
+         * 값을 다시 적으면 같은 조각이 화면마다 다른 크기로 뜬다 - 그것을
+         * 막으려고 라이브러리를 애셋으로 만든 것이다.
+         *
+         * 두 라이브러리를 차례로 본다. 48단계 하베스트(요괴에게서 뜯은 것)와
+         * 49단계 Pozac(팩에서 구운 것)이고, 이름은 둘을 합쳐 유일하다
+         * (SkillShapeTests.EverySkillEffect_BelongsToExactlyOneSkill).
+         */
+        private static SlashSpec VfxSlash(string clipId)
+        {
+            var clip = FindVfxClip(clipId);
+            if (clip == null)
+            {
+                Debug.LogError("[Onikiri] VFX clip '" + clipId + "' missing - run "
+                               + "Onikiri/Art/Harvest Yokai VFX and Onikiri/Art/Bake Pozac VFX.");
+                return new SlashSpec();
+            }
+
+            return new SlashSpec
+            {
+                frames = clip.frames,
+                frameRate = clip.frameRate,
+                scale = clip.scale,
+                angle = clip.angle,
+                forward = clip.forwardOffset,
+
+                // **라이브러리의 높이는 발밑 기준이고 안무의 높이는 그려진 중심
+                // 기준이다.** 두 원점이 다르다 - 48d가 "스프라이트 칸은 위치
+                // 기준이 못 된다"로 정리한 자리에서 요괴 쪽은 발밑으로 옮겼는데,
+                // 플레이어 안무(SkillPerformer.SpawnSlash)는 27단계부터
+                // samuraiRenderer.bounds.center를 쓴다.
+                //
+                // 사무라이의 그려진 중심은 발밑에서 약 0.85u다(96px 셀에 그려진
+                // 키가 약 54px, 32 PPU). 그만큼 빼야 라이브러리가 말하는 높이에
+                // 실제로 놓인다
+                height = clip.heightOffset - SamuraiCenterHeight
+            };
+        }
+
+        /**
+         * @brief 사무라이 스프라이트의 **중심이 발보다 얼마나 위인가** (월드 단위).
+         *
+         * ## 상수로 안 적고 스프라이트에서 잰다
+         *
+         * 눈대중으로 0.85를 적었다가 실기에서 0.18u 어긋났다 - 48c가 초승달에서
+         * 두 번 틀린 자리를 그대로 반복할 뻔한 자리다. 실측값은 1.031이고,
+         * 그 값은 어림이 아니라 **피벗에서 나온다**:
+         *
+         *     중심 - 발 = (칸 높이 / 2 - 피벗 y) / PPU
+         *              = (96 / 2 - 15) / 32 = 1.031
+         *
+         * 피벗은 슬라이서가 그려진 발선을 실측해 넣은 값이므로(CharacterSpriteSlicer),
+         * 여기서 다시 재면 아트가 바뀌어도 따라간다. 상수로 박으면 그때 조용히 어긋난다.
+         */
+        private static float SamuraiCenterHeight
+        {
+            get
+            {
+                var idle = AssetDatabase.LoadAssetAtPath<Sprite>(SamuraiSprites + "IDLE.png");
+                if (idle == null) return 1.031f;   // 아트가 없으면 실측값으로 떨어진다
+
+                return (idle.rect.height * 0.5f - idle.pivot.y) / idle.pixelsPerUnit;
+            }
+        }
+
+        private static VfxLibrary.Clip FindVfxClip(string clipId)
+        {
+            string[] libraries = { YokaiVfxBaker.LibraryPath, PozacVfxBaker.LibraryPath };
+
+            foreach (var path in libraries)
+            {
+                var library = AssetDatabase.LoadAssetAtPath<VfxLibrary>(path);
+                if (library == null) continue;
+
+                var clip = library.Find(clipId);
+                if (clip != null && clip.frames != null && clip.frames.Length > 0) return clip;
+            }
+            return null;
         }
 
         /** 참격 값 묶음. 인자 목록이 스물을 넘어가 읽을 수 없어서 뽑았다 */
@@ -701,6 +928,10 @@ namespace Onikiri.EditorTools
             for (int i = 0; i < frameCount; i++)
                 slashFrames.GetArrayElementAtIndex(i).objectReferenceValue = slash.frames[i];
 
+            // 티어 변형은 기본 0이다. 쓰는 안무(귀참)만 WriteTierSlashes가
+            // 뒤에서 채운다 - 여기서 지워둬야 다시 돌릴 때 옛 배선이 안 남는다
+            element.FindPropertyRelative("slashTierFrames").arraySize = 0;
+
             element.FindPropertyRelative("slashFrameRate").floatValue = slash.frameRate;
             element.FindPropertyRelative("slashScale").floatValue = slash.scale;
             element.FindPropertyRelative("slashAngle").floatValue = slash.angle;
@@ -725,6 +956,30 @@ namespace Onikiri.EditorTools
             element.FindPropertyRelative("perHitShakeMultiplier").floatValue = perHitShake;
             element.FindPropertyRelative("numberSizeMultiple").intValue = numberSize;
             element.FindPropertyRelative("screenFlash").boolValue = flash;
+        }
+
+        /**
+         * @brief 안무 하나에 무기 티어(1~5)별 참격 프레임을 채운다 (51단계).
+         *
+         * 색 번호는 여기서 정하지 않는다 - WeaponVfxTier.SlashColorOf가 단일
+         * 출처다(청 -> 보라 -> 주황 -> 흑적 x2). 빌더가 색을 따로 적으면
+         * 런타임의 스파크 램프와 참격 램프가 갈리는 날이 온다.
+         */
+        private static void WriteTierSlashes(SerializedProperty element, string shape)
+        {
+            var tiers = element.FindPropertyRelative("slashTierFrames");
+            tiers.arraySize = WeaponVfxTier.MaxTier;
+
+            for (int tier = WeaponVfxTier.MinTier; tier <= WeaponVfxTier.MaxTier; tier++)
+            {
+                var frames = SliceSlashSheet(shape, WeaponVfxTier.SlashColorOf(tier));
+                var slot = tiers.GetArrayElementAtIndex(tier - 1)
+                                .FindPropertyRelative("frames");
+
+                slot.arraySize = frames.Length;
+                for (int i = 0; i < frames.Length; i++)
+                    slot.GetArrayElementAtIndex(i).objectReferenceValue = frames[i];
+            }
         }
 
         private static void AssignSprites(SerializedProperty array, List<Sprite> sprites)
@@ -1125,35 +1380,214 @@ namespace Onikiri.EditorTools
             }
         }
 
+        /** 스크롤 안쪽 목록의 높이. 여덟 줄이라 뷰포트보다 길다 */
         private static float PanelContentHeight
+        {
+            get { return SkillCatalog.Count * (RowHeight + RowGap); }
+        }
+
+        /** 스크롤 창의 높이. 띠에서 머리글과 슬롯 줄을 뺀 나머지 */
+        private static float ViewportHeight
         {
             get
             {
-                return TopPadding + HeaderHeight + HeaderGap
-                       + SkillCatalog.Count * (RowHeight + RowGap);
+                return BandHeight - TopPadding - HeaderHeight - HeaderGap
+                       - SlotRowHeight - SlotRowGap - BottomPadding;
             }
         }
 
         /**
-         * @brief 목록이 띠 안에 들어가는지 빌드가 검산한다.
+         * @brief 고정 부분(머리글 + 슬롯 줄)이 띠를 넘지 않는지 빌드가 검산한다.
          *
-         * 이 화면에는 스크롤을 두지 않았다. 셋뿐이라 필요가 없고, 스크롤이 있으면
-         * "더 있나?" 하고 끌어보게 된다 - 없는 것을 찾게 만드는 UI다. 대신 넷째
-         * 오의가 생기는 순간 여기서 걸린다.
+         * ## 49단계에 스크롤이 생겼다
          *
-         * 어림하지 않고 빌더가 쓰는 상수로 계산한다. 17~18단계에서 글자 폭 어림이
-         * 세 번 틀린 뒤로 이 프로젝트는 화면 크기 주장을 빌드가 검산한다.
+         * 26단계 주석은 "스크롤이 있으면 '더 있나?' 하고 끌어보게 된다 - 없는
+         * 것을 찾게 만드는 UI다"라고 스크롤을 거부했고, 그 판단은 **오의가
+         * 셋일 때** 옳았다. 여덟이 되면 목록이 1264px이라 720px 띠에 어떤
+         * 배치로도 안 들어간다.
+         *
+         * 그리고 이제는 끌어볼 것이 실제로 있다 - 스크롤이 거짓말을 하지 않는다.
+         * 대장간이 44단계에 같은 자리에서 같은 판단을 했다.
+         *
+         * 검산 대상이 바뀌었다: 목록 길이가 아니라 **뷰포트가 남는가**다.
+         * 머리글과 슬롯 줄은 스크롤 밖에 고정되므로 그 둘이 띠를 다 먹으면
+         * 목록이 0px가 되고, 그것은 화면에서 "스킬 탭이 비어 있다"로 나온다.
          */
         private static void VerifyPanelFits()
         {
-            if (PanelContentHeight <= BandHeight) return;
+            // 두 줄(행 하나 + 다음 행의 머리)은 보여야 목록으로 읽힌다.
+            // 한 줄만 보이면 스크롤이 아니라 '한 칸짜리 창'이다
+            float minimum = RowHeight + RowGap + RowHeight * 0.4f;
+            if (ViewportHeight >= minimum) return;
 
             Debug.LogWarning(string.Format(
-                "[Onikiri] Skill panel needs {0:F0}px but the band is {1:F0}px - the last row is "
-                + "cut off. Either add a ScrollRect (and accept that the list looks longer than "
-                + "it is) or drop a skill. {2} skills x {3:F0}px + header {4:F0}px.",
-                PanelContentHeight, BandHeight, SkillCatalog.Count, RowHeight + RowGap,
-                HeaderHeight + HeaderGap));
+                "[Onikiri] Skill list viewport is only {0:F0}px (needs {1:F0}px). The header "
+                + "({2:F0}px) and the slot row ({3:F0}px) have eaten the {4:F0}px band - "
+                + "shrink one of them.",
+                ViewportHeight, minimum, HeaderHeight, SlotRowHeight, BandHeight));
+        }
+
+        // ---------------------------------------------------------------- 스크롤
+
+        /**
+         * @brief 뷰포트와 목록을 세우고 목록의 RectTransform을 돌려준다.
+         *
+         * 대장간(EquipmentPanelBuilder)과 같은 값이다. 스크롤 감각은 화면마다
+         * 다르면 안 되는 것 중 하나라 - 같은 손가락이 같은 속도로 움직여야 한다.
+         */
+        private static RectTransform BuildScroll(RectTransform panel)
+        {
+            var viewportObject = new GameObject(ViewportName, typeof(RectTransform));
+            viewportObject.transform.SetParent(panel, false);
+
+            var viewport = (RectTransform)viewportObject.transform;
+            viewport.anchorMin = new Vector2(0f, 1f);
+            viewport.anchorMax = new Vector2(1f, 1f);
+            viewport.pivot = new Vector2(0.5f, 1f);
+            viewport.offsetMin = Vector2.zero;
+            viewport.offsetMax = Vector2.zero;
+            viewport.sizeDelta = new Vector2(0f, ViewportHeight);
+            viewport.anchoredPosition = new Vector2(0f,
+                -(TopPadding + HeaderHeight + HeaderGap + SlotRowHeight + SlotRowGap));
+
+            // 마스크가 있어야 목록이 슬롯 줄 위로 삐져 나오지 않는다.
+            // RectMask2D는 이미지를 요구하지 않아 바탕을 한 겹 덜 그린다
+            viewportObject.AddComponent<RectMask2D>();
+
+            var contentObject = new GameObject(ContentName, typeof(RectTransform));
+            contentObject.transform.SetParent(viewport, false);
+
+            var content = (RectTransform)contentObject.transform;
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.offsetMin = Vector2.zero;
+            content.offsetMax = Vector2.zero;
+            content.sizeDelta = new Vector2(0f, PanelContentHeight);
+            content.anchoredPosition = Vector2.zero;
+
+            var scroll = panel.gameObject.GetComponent<ScrollRect>();
+            if (scroll == null) scroll = panel.gameObject.AddComponent<ScrollRect>();
+            scroll.content = content;
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.elasticity = 0.1f;
+            scroll.inertia = true;
+            scroll.decelerationRate = 0.135f;
+            scroll.scrollSensitivity = 30f;
+
+            return content;
+        }
+
+        // ---------------------------------------------------------------- 장착 슬롯 줄
+
+        /**
+         * @brief 네 칸. 지금 나가는 오의가 무엇인지 말하는 유일한 자리다.
+         *
+         * 칸 수는 SkillCurve.MaxSlots이고 그중 몇 개가 열려 있는지는 런타임이
+         * 정한다(SkillSlotChip이 잠긴 칸을 자물쇠로 그린다). 빌더가 열린 수만큼만
+         * 세우지 않는 이유는 41단계의 잠긴 미리보기 규칙이다 - 열릴 것이
+         * 있다는 사실 자체가 진행의 이유이므로 감추지 않는다.
+         */
+        private static void BuildSlotRow(RectTransform panel, SkillSystem system, TMP_FontAsset font)
+        {
+            var existing = panel.Find(SlotRowName);
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+
+            var go = new GameObject(SlotRowName, typeof(RectTransform));
+            go.transform.SetParent(panel, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(SidePadding, 0f);
+            rect.offsetMax = new Vector2(-SidePadding, 0f);
+            rect.sizeDelta = new Vector2(-SidePadding * 2f, SlotRowHeight);
+            rect.anchoredPosition = new Vector2(0f, -(TopPadding + HeaderHeight + HeaderGap));
+
+            var icons = SkillIcons();
+            var lockGlyph = UiGlyphBuilder.Load(UiGlyphBuilder.Lock);
+
+            float width = (DisplayConfig.DesignWidth - SidePadding * 2f
+                           - SlotGap * (SkillCurve.MaxSlots - 1)) / SkillCurve.MaxSlots;
+
+            for (int slot = 0; slot < SkillCurve.MaxSlots; slot++)
+                BuildSlotChip(rect, system, font, slot, width, icons, lockGlyph);
+        }
+
+        private static void BuildSlotChip(RectTransform row, SkillSystem system, TMP_FontAsset font,
+                                          int slot, float width, Sprite[] icons, Sprite lockGlyph)
+        {
+            var go = new GameObject("Slot" + slot, typeof(RectTransform));
+            go.transform.SetParent(row, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.sizeDelta = new Vector2(width, 0f);
+            rect.anchoredPosition = new Vector2(slot * (width + SlotGap), 0f);
+
+            var image = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Row);
+
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, image);
+
+            var icon = CreateIcon(go.transform, null);
+            var iconRect = (RectTransform)icon.transform;
+            iconRect.anchorMin = new Vector2(0.5f, 1f);
+            iconRect.anchorMax = new Vector2(0.5f, 1f);
+            iconRect.pivot = new Vector2(0.5f, 1f);
+            iconRect.sizeDelta = new Vector2(SlotIconSize, SlotIconSize);
+            iconRect.anchoredPosition = new Vector2(0f, -10f);
+
+            var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(label);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = new Vector2(0f, 0f);
+            labelRect.anchorMax = new Vector2(1f, 0f);
+            labelRect.pivot = new Vector2(0.5f, 0f);
+            labelRect.sizeDelta = new Vector2(0f, 44f);
+            labelRect.anchoredPosition = Vector2.zero;
+
+            var chip = go.AddComponent<Onikiri.UI.SkillSlotChip>();
+            var so = new SerializedObject(chip);
+            so.FindProperty("system").objectReferenceValue = system;
+            so.FindProperty("slot").intValue = slot;
+            so.FindProperty("button").objectReferenceValue = button;
+            so.FindProperty("background").objectReferenceValue = image;
+            so.FindProperty("icon").objectReferenceValue = icon;
+            so.FindProperty("label").objectReferenceValue = label;
+            so.FindProperty("filledTint").colorValue = UiSkin.Row;
+            so.FindProperty("textColor").colorValue = TextColor;
+            so.FindProperty("dimColor").colorValue = DimColor;
+            so.FindProperty("iconTint").colorValue = UiIcons.Tint;
+            so.FindProperty("lockGlyph").objectReferenceValue = lockGlyph;
+
+            // 빈 칸에는 그림을 안 넣는다. 자물쇠를 재활용하면 "잠김"과 "비었음"이
+            // 같은 그림이 되는데, 하나는 못 쓰는 것이고 하나는 지금 쓸 수 있는
+            // 자리라 뜻이 정반대다. SkillSlotChip이 null이면 아이콘을 끈다
+            so.FindProperty("emptyGlyph").objectReferenceValue = null;
+
+            var iconList = so.FindProperty("skillIcons");
+            iconList.arraySize = icons.Length;
+            for (int i = 0; i < icons.Length; i++)
+                iconList.GetArrayElementAtIndex(i).objectReferenceValue = icons[i];
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /** 카탈로그 순서의 오의 아이콘. 칩이 인덱스로 꺼내 쓴다 */
+        private static Sprite[] SkillIcons()
+        {
+            var icons = new Sprite[SkillCatalog.Count];
+            for (int i = 0; i < icons.Length; i++)
+                icons[i] = UiIcons.For(SkillCatalog.Skills[i].Id);
+            return icons;
         }
 
         private static RectTransform EnsurePanel(Transform safeArea)
@@ -1195,6 +1629,8 @@ namespace Onikiri.EditorTools
             {
                 var child = panel.GetChild(i);
                 if (child.name == "Header") continue;
+                if (child.name == SlotRowName) continue;
+                if (child.name == ViewportName) continue;
                 if (child.name == BackdropTextureBuilder.BranchName) continue;
                 if (child.name.StartsWith("Skill")) continue;
                 Object.DestroyImmediate(child.gameObject);
@@ -1229,7 +1665,8 @@ namespace Onikiri.EditorTools
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = new Vector2(0f, 0f);
             titleRect.anchorMax = new Vector2(0.5f, 1f);
-            titleRect.offsetMin = new Vector2(24f, 0f);
+            // 아래 22px은 예고 줄(49b) 자리다
+            titleRect.offsetMin = new Vector2(24f, 22f);
             titleRect.offsetMax = Vector2.zero;
             title.text = "발도 오의";
             title.color = DimColor;
@@ -1266,6 +1703,26 @@ namespace Onikiri.EditorTools
                                     "Lv." + SkillCatalog.PanelUnlockLevel + " 도달 시 해금",
                                     SkillCatalog.PanelUnlockLevel, 0);
 
+            // 다음 해금 예고 (49b). 제목 아래 한 줄 - 제목이 "발도 오의"라는
+            // 사실을 말하고 이 줄이 "다음에 무엇이 오는가"를 말한다
+            var next = CreateLabel(go.transform, font, "NextUnlock", TextAlignmentOptions.Left);
+            UiFonts.Demote(next);
+            var nextRect = (RectTransform)next.transform;
+            nextRect.anchorMin = new Vector2(0f, 0f);
+            nextRect.anchorMax = new Vector2(0.44f, 0f);
+            nextRect.pivot = new Vector2(0f, 0f);
+            nextRect.offsetMin = new Vector2(24f, -6f);
+            nextRect.offsetMax = new Vector2(0f, 0f);
+            nextRect.sizeDelta = new Vector2(nextRect.sizeDelta.x, 40f);
+            next.color = DimColor;
+            next.text = "다음  혈파동  12스테이지";
+
+            var preview = go.AddComponent<Onikiri.UI.SkillNextUnlock>();
+            var previewSo = new SerializedObject(preview);
+            previewSo.FindProperty("system").objectReferenceValue = system;
+            previewSo.FindProperty("label").objectReferenceValue = next;
+            previewSo.ApplyModifiedPropertiesWithoutUndo();
+
             var toggle = toggleObject.AddComponent<Onikiri.UI.SkillAutoCastToggle>();
             var so = new SerializedObject(toggle);
             so.FindProperty("system").objectReferenceValue = system;
@@ -1274,17 +1731,19 @@ namespace Onikiri.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void BuildRow(RectTransform panel, SkillSystem system, TMP_FontAsset font, int index)
+        private static void BuildRow(RectTransform content, SkillSystem system, TMP_FontAsset font, int index)
         {
             var spec = SkillCatalog.Skills[index];
             string rowName = "Skill" + index;
 
-            var existing = panel.Find(rowName);
+            var existing = content.Find(rowName);
             if (existing != null) Object.DestroyImmediate(existing.gameObject);
 
             var go = new GameObject(rowName, typeof(RectTransform));
-            go.transform.SetParent(panel, false);
+            go.transform.SetParent(content, false);
 
+            // 목록 안이라 자리는 스크롤 원점 기준이다. 머리글·슬롯 줄은 스크롤
+            // 밖에 있으므로 여기 계산에 안 들어간다
             var rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
@@ -1292,8 +1751,7 @@ namespace Onikiri.EditorTools
             rect.offsetMin = new Vector2(SidePadding, 0f);
             rect.offsetMax = new Vector2(-SidePadding, 0f);
             rect.sizeDelta = new Vector2(-SidePadding * 2f, RowHeight);
-            rect.anchoredPosition = new Vector2(0f,
-                -(TopPadding + HeaderHeight + HeaderGap + index * (RowHeight + RowGap)));
+            rect.anchoredPosition = new Vector2(0f, -(index * (RowHeight + RowGap)));
 
             var image = go.AddComponent<Image>();
             UiSkin.ApplyPanel(image, UiSkin.Row);
@@ -1314,11 +1772,16 @@ namespace Onikiri.EditorTools
             UiFonts.Demote(costLabel);
             PlaceRight((RectTransform)costLabel.transform, 24f, 10f, LineHeight);
             costLabel.color = DimColor;
-            costLabel.text = "Lv." + spec.UnlockLevel;
+            costLabel.text = spec.StageGated ? spec.UnlockStage + "스테이지" : "Lv." + spec.UnlockLevel;
+
+            // 장착 버튼. 아랫줄 오른쪽 - 비용(윗줄 오른쪽) 아래이고, 둘 다
+            // 오른쪽 끝에 서므로 "이 줄에서 누를 수 있는 것"이 한 열에 모인다
+            var equipButton = BuildEquipButton(go.transform, font);
 
             var valueLabel = CreateLabel(go.transform, font, "Value", TextAlignmentOptions.Left);
             UiFonts.Demote(valueLabel);
-            PlaceStretched((RectTransform)valueLabel.transform, TextLeft, 24f, 10f + LineHeight, LineHeight);
+            PlaceStretched((RectTransform)valueLabel.transform, TextLeft,
+                           24f + EquipWidth + 16f, 10f + LineHeight, LineHeight);
             valueLabel.color = DimColor;
             valueLabel.text = spec.CooldownSeconds.ToString("F1") + "초";
 
@@ -1332,12 +1795,63 @@ namespace Onikiri.EditorTools
             so.FindProperty("costLabel").objectReferenceValue = costLabel;
             so.FindProperty("rowBackground").objectReferenceValue = image;
             so.FindProperty("icon").objectReferenceValue = icon;
+            so.FindProperty("equipButton").objectReferenceValue = equipButton;
+            so.FindProperty("equipLabel").objectReferenceValue =
+                equipButton.GetComponentInChildren<TMP_Text>();
+            so.FindProperty("equippedRowTint").colorValue = EquippedRowTint;
             so.FindProperty("affordableColor").colorValue = TextColor;
             so.FindProperty("unaffordableColor").colorValue = DimColor;
             so.FindProperty("normalRowTint").colorValue = UiSkin.Row;
             so.FindProperty("iconTint").colorValue = UiIcons.Tint;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
+
+        /** 장착 버튼 하나. 값은 SkillButton이 매 갱신마다 다시 쓴다 */
+        private static Button BuildEquipButton(Transform parent, TMP_FontAsset font)
+        {
+            var go = new GameObject("Equip", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.sizeDelta = new Vector2(EquipWidth, LineHeight);
+            rect.anchoredPosition = new Vector2(-24f, -(10f + LineHeight));
+
+            var image = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Chrome);
+
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, image);
+
+            var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(label);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            label.text = "장착";
+
+            return button;
+        }
+
+        /** 장착 버튼의 폭. 두 글자 + 여백 */
+        private const float EquipWidth = 168f;
+
+        /**
+         * @brief 장착된 줄의 바탕. **새 색이 아니라 행 색을 밝힌 것이다.**
+         *
+         * UiSkin의 강조색 셋(GemAction·Gold·Danger) 규칙을 지키려면 여기에
+         * 넷째 색을 만들면 안 된다. 같은 색의 밝기만 올리면 "같은 줄인데
+         * 켜져 있다"로 읽히고, 그것이 정확히 말하려는 바다.
+         *
+         * **RGB만 곱한다.** Color에 스칼라를 곱하면 알파도 함께 눌리는 것이
+         * 41단계에서 물린 함정이다
+         */
+        private static readonly Color EquippedRowTint =
+            new Color(UiSkin.Row.r * 1.34f, UiSkin.Row.g * 1.30f, UiSkin.Row.b * 1.02f, 1f);
 
         // ---------------------------------------------------------------- 조각
 

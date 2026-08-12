@@ -58,8 +58,50 @@ namespace Onikiri.Progression
          */
         public double CooldownSeconds;
 
-        /** 이 캐릭터 레벨부터 목록에 열린다 */
+        /**
+         * @brief 이 캐릭터 레벨부터 목록에 열린다. **0이면 스테이지 게이트다.**
+         *
+         * 49단계에 두 번째 게이트가 생겼다. 신규 오의 다섯은 레벨이 아니라
+         * **최전선 스테이지**로 열린다(UnlockStage). 이유는 이 스텝 전체의
+         * 기둥이고 44단계 요도가 st41을 고른 것과 같은 이유다 - 코리더(st1~30)와
+         * 가속 구간(st31~50)의 밸런스를 **비트 단위로** 지키려면 새 힘이 그
+         * 구간 밖에서만 들어와야 하는데, 레벨 게이트는 그것을 보증하지 못한다.
+         * 레벨은 스테이지와 느슨하게만 묶여 있어서(경험치·재선택·방치) "Lv.55는
+         * 언제나 st51 이후"라고 말할 수 없다.
+         *
+         * 기존 셋은 레벨 게이트 그대로다. 그 셋의 해금 순간이 곧 26단계에
+         * 정해진 리듬이고, 여기서 게이트 종류를 바꾸면 코리더가 움직인다.
+         */
         public int UnlockLevel;
+
+        /** 레벨이 아니라 최전선 스테이지로 열리는가 */
+        public bool StageGated { get { return UnlockLevel <= 0; } }
+
+        /**
+         * @brief 진행이 아니라 **뽑기**로 열리는가 (50단계).
+         *
+         * 49단계는 가챠 몫 둘(혈폭·혈조)을 다른 신규 셋과 같은 문(st51)에
+         * 걸어 두고 "다음 스텝의 뽑기가 그 자리"라고 적었다. 50단계가 그
+         * 자리를 채우면서 게이트의 **출처**가 바뀐다 - 최전선이 아니라
+         * 보유(SkillGachaSystem)가 연다.
+         *
+         * `StageGated`를 끄지 않고 그 위에 얹는 이유는 자리 수 때문이다.
+         * `SkillCurve.SlotsFor`는 "레벨 게이트가 아닌 오의는 자리를 안 연다"로
+         * 적혀 있고(StageGated), 가챠 몫도 자리를 열면 안 된다 - 뽑을 때마다
+         * 자리가 늘면 슬롯 예산이 아무것도 안 막게 되고 49단계가 밴드에
+         * 못 박아 둔 한 칸이 통째로 풀린다.
+         *
+         * 그래서 두 플래그의 관계가 이렇게 갈린다:
+         *
+         *     StageGated   자리를 여는가          (아니오 - 둘 다)
+         *     GachaGated   무엇이 이 오의를 여는가 (최전선 / 보유)
+         *
+         * UnlockStage는 그대로 남는다. 열리는 자리가 아니라 **골드 비용의
+         * 기준점**이 되는데(SkillSpec.UnlockStage 주석), 뽑기로 열리는 오의의
+         * "열리는 스테이지"는 확률이라 정해지지 않으므로 **가장 이른 획득
+         * 가능 시점**인 상점 해금 칸을 쓴다.
+         */
+        public bool GachaGated;
 
         /**
          * @brief 위 레벨에 실제로 닿는 스테이지. **실측값이고 비용의 기준점이다.**
@@ -76,6 +118,20 @@ namespace Onikiri.Progression
 
         /** 아이콘 파일명 (KURAI 팩). 에디터 빌더만 쓴다 */
         public string IconFile;
+
+        /**
+         * @brief 이 오의가 뿌리는 이펙트 클립의 이름 (VfxLibrary). 비면 팩 참격이다.
+         *
+         * 49단계에 생겼다. 기존 셋은 팩 참격(Slashes)과 클립 자체의 궤적을 쓰므로
+         * 비어 있고, 신규 다섯은 48단계 하베스트(혈조·혈파)와 Pozac 팩에서 구운
+         * 조각을 가리킨다.
+         *
+         * **이 값이 오의마다 유일해야 한다.** 색이 유일한 구분자였던 27단계와
+         * 달리, 여덟 오의는 혈(血) 한 계열을 나눠 쓰므로 색만으로는 못 가른다 -
+         * 그림이 두 번째 구분자이고, 그림까지 같으면 두 오의가 화면에서 한
+         * 사건으로 읽힌다. SkillShapeTests가 유일성을 못 박는다.
+         */
+        public string VfxId;
 
         // ------------------------------------------------------------ 27단계: 거동
 
@@ -174,12 +230,63 @@ namespace Onikiri.Progression
     }
 
     /**
-     * @brief 발도 오의 셋. 자동 시전이고 골드로 레벨을 올린다.
+     * @brief 발도 오의 여덟. 자동 시전이고 골드로 레벨을 올린다.
+     *        **그중 장착한 것만 나간다**(49단계).
      *
-     * ## 왜 셋인가, 왜 전부 공격형인가
+     * ## 49단계 - 셋에서 여덟으로, 그리고 슬롯
      *
-     * 셋이면 패널 한 화면에 들어가고(스크롤 없음), 짧은/중간/긴 쿨다운으로
-     * 리듬의 세 자리가 채워진다. 넷째부터는 리듬이 아니라 목록이 된다.
+     * 26단계에 셋이었던 이유("셋이면 한 화면에 들어가고 리듬의 세 자리가
+     * 채워진다")는 여전히 맞다. 그래서 넷째를 그냥 더하지 않았다 - **장착
+     * 슬롯**을 만들고, 화면에서 도는 것은 여전히 서너 개로 묶었다.
+     *
+     * 슬롯이 있어야 하는 진짜 이유는 화면이 아니라 밸런스다. 신규 오의를 전부
+     * 상시 발동으로 더하면 DPS가 오의 수에 **선형으로** 불어난다. 다음 스텝의
+     * 스킬 뽑기가 풀을 계속 키울 예정이므로, 그것은 뽑을 때마다 밴드 천장을
+     * 미는 구조 - 47단계가 "+28%를 두어 번 더 쌓으면 밴드가 무의미"라고 적어둔
+     * 그 부채다.
+     *
+     * 슬롯이면 **밴드가 보는 것이 슬롯 예산 하나**다. 풀이 여덟이 되든 스물이
+     * 되든 장착 수가 그대로면 DPS가 안 자란다. 이 스텝이 지는 빚은 슬롯이
+     * 셋에서 넷이 되는 **한 칸뿐이고, 그 한 칸은 여기서 끝난다.**
+     *
+     * ## 신규 다섯의 초당 기여가 전부 같은 이유 - 두 마리 토끼
+     *
+     * 다섯 다 `배율/쿨 = 0.180`이다(연참과 같은 값). 우연이 아니라 두 가지를
+     * 동시에 얻으려고 맞춘 값이다.
+     *
+     * **하나. 밴드가 닫힌 식으로 적힌다.** 4번째 슬롯에 무엇을 끼우든 상한
+     * 기여 합이 같으므로, 기대 곡선이 "플레이어가 무엇을 골랐는가"를 몰라도
+     * 된다. 고르는 것이 밴드를 움직이면 밴드는 최댓값을 가정할 수밖에 없고,
+     * 그러면 나머지 선택지는 전부 함정이 된다.
+     *
+     * **둘. 뽑기가 파워를 못 판다.** 다섯이 동률이면 "더 센 오의"라는 상품이
+     * 존재하지 않는다. 뽑기가 파는 것은 거동과 상성 집이지 숫자가 아니고,
+     * 그것이 f2p 바닥을 구조로 지킨다 - 45단계가 상성을 "새 축이 아니라 이미
+     * 있는 티어의 두 번째 읽는 법"으로 만든 것과 같은 수법이다.
+     *
+     * 그럼 무엇이 갈리는가: **쿨다운 리듬(6~19초)·거동·상성 집**이다. 배율이
+     * 쿨다운에 비례해 따라오므로 긴 쿨은 한 방이 크고 짧은 쿨은 자주 터진다.
+     *
+     * ## 상성 집 - 세 혼이 각자 가족을 얻는다
+     *
+     * 45단계는 혼 셋이 오의 셋을 하나씩 물었다. 49단계는 그 셋을 **가족**으로
+     * 넓힌다 - 거동이 같은 신규 오의가 같은 혼에 든다:
+     *
+     *     등롱(Screen)    귀참 · 혈파동
+     *     처형인(Pierce)  일섬 · 낙혈
+     *     적안(MultiHit)  연참 · 혈륜
+     *     흑야·백면       전 오의 (구조상 신규도 자동으로 받는다)
+     *
+     * 한 혼에 오의 둘을 묶는 것은 45단계가 **거부한** 반대 방향과 다르다.
+     * 저쪽이 거부한 것은 "두 혼이 같은 오의를 문다"이고(그러면 그 오의만
+     * 두 배로 자라 나머지를 고를 이유가 사라진다), 이쪽은 한 혼을 밀면
+     * **슬롯 두 자리가 함께 값을 갖는다** - 몰아주기가 빌드의 모양을 정한다.
+     *
+     * 가챠 몫으로 예약한 둘(혈폭·혈조)에는 전담 혼이 없다. 결함이 아니라
+     * 값이다: 몰아주기 빌드에서는 언제나 진행 해금 오의가 4번 슬롯의 답이고,
+     * **뽑기로 얻는 것이 진행으로 얻는 것보다 세지 않다.**
+     *
+     * ## 왜 전부 공격형인가
      *
      * 버프나 생존기를 하나 섞는 안도 있었지만 택하지 않았다. 이유는 **자**다 -
      * 공격형은 전부 초당 환산 기여 하나로 잴 수 있어서 여섯 축과 같은 저울에
@@ -211,6 +318,63 @@ namespace Onikiri.Progression
         public const string ChainSlashId = "skill_chain";
         public const string FlashId = "skill_flash";
         public const string OniCleaveId = "skill_oni";
+
+        // ------------------------------------------------------------ 49단계
+
+        /** 진행 해금 셋 */
+        public const string BloodWaveId = "skill_bloodwave";
+        public const string BloodFallId = "skill_bloodfall";
+        public const string BloodWheelId = "skill_bloodwheel";
+
+        /**
+         * @brief 뽑기가 여는 둘 (50단계). 전담 혼이 없다 - 위 머리 주석 참고.
+         *
+         * 49단계에는 "가챠 몫으로 예약"이었고 게이트는 st51이었다. 50단계가
+         * 그 예약을 실제 게이트로 바꾼다(GachaGated) - 진행으로는 영원히
+         * 안 열리는 것이 이 둘의 정의다.
+         */
+        public const string BloodBurstId = "skill_bloodburst";
+        public const string BloodWhipId = "skill_bloodwhip";
+
+        /**
+         * @brief 신규 다섯이 공유하는 초당 환산 기여.
+         *
+         * 연참과 같은 값이다. 왜 다섯이 동률인지는 머리 주석의 "두 마리 토끼"에
+         * 있고, 이 상수를 두는 이유는 **표에서 눈으로 확인할 수 없기 때문**이다 -
+         * 표에는 배율과 쿨다운만 적히고 그 비는 계산해야 나온다. 테스트가 이
+         * 값과 대조한다(SkillAxisTests.NewSkills_ShareOneRate).
+         */
+        public const double ExpansionRate = 0.180d;
+
+        /**
+         * @brief 진행 해금 셋이 열리는 최전선 (49b).
+         *
+         * ## 왜 코리더 안인가 - 49단계는 셋 다 st51이었다
+         *
+         * 49단계는 다섯을 전부 4번 자리와 같은 문(st51)에 걸었다. 재기준이 한
+         * 번으로 끝나는 대신 **코리더 서른 스테이지가 오의 셋 그대로**였고,
+         * "새 오의를 배운다"는 비트가 게임의 절반이 지나서야 왔다.
+         *
+         * 자리를 램프로 바꾸면서(SkillCurve.SlotsFor) 그 제약이 사라졌다 -
+         * 코리더의 자리는 언제나 차 있으므로 새 오의는 **바꿔 끼우는 것**이고,
+         * 다섯이 동률이라 바꾼 결과가 같다. 파워가 아니라 **선택**만 온다.
+         *
+         * ## 자리를 고른 방식 - 기본 셋 사이에 끼운다
+         *
+         *     st8  연참(기본)   st12 혈파동   st15 일섬(기본)
+         *     st18 낙혈         st21 귀참(기본)  st27 혈륜
+         *
+         * 기본 오의의 해금(8/15/21)은 **자리가 하나 늘어나는 순간**이고 신규의
+         * 해금은 **고를 것이 하나 늘어나는 순간**이다. 둘을 번갈아 두면 서로
+         * 다른 종류의 사건이 3~6스테이지마다 온다. 같은 스테이지에 겹치지
+         * 않게 한 칸씩 띄웠다 - 겹치면 둘 중 하나는 안 읽힌다.
+         *
+         * 가챠 몫 둘(혈폭·혈조)은 여기 없다. 진행으로 안 열리는 것이 그 둘의
+         * 정의이고, 다음 스텝의 뽑기가 그 자리다.
+         */
+        public const int BloodWaveStage = 12;
+        public const int BloodFallStage = 18;
+        public const int BloodWheelStage = 27;
 
         /**
          * 배율과 쿨다운의 크기를 고른 근거.
@@ -256,8 +420,93 @@ namespace Onikiri.Progression
                 IconFile = "Icon118",           // 오니 뿔
                 SlashRgba = 0xFF9500FFu,        // 깊은 호박빛 금 (치명타 #FFD34D 과 거리 0.39)
                 Shape = SkillShape.Screen, HitCount = 1, Weight = 2
+            },
+
+            // ---------------------------------------------------------- 49단계
+            //
+            // 다섯 다 `배율/쿨 = 0.180`이다. 표에서는 안 보이므로 옆에 적어 둔다.
+            //
+            //   혈파동  2.88/16 = 0.180   지면 파동 (Screen)     등롱 가족
+            //   낙혈    1.98/11 = 0.180   전방 관통 (Pierce)     처형인 가족
+            //   혈륜    1.62/ 9 = 0.180   회전 다타 (MultiHit)   적안 가족
+            //   혈폭    3.42/19 = 0.180   단발 버스트            가챠 몫
+            //   혈조    1.08/ 6 = 0.180   원거리 단타            가챠 몫
+            //
+            // 쿨다운이 6·9·11·16·19초라 기존 셋(7·13·22)의 사이를 메운다.
+            // 해금은 앞의 셋이 **코리더 안**(st12/18/27, 49b)이고 뒤의 둘은
+            // **뽑기**다(50단계, GachaGated). 어느 쪽도 레벨 게이트가 아니라
+            // 자리를 열지 않는다 - 코리더와 가속 구간을 비트 단위로 지키는
+            // 것이 그 두 스텝의 공통된 기둥이다.
+
+            new SkillSpec {
+                Id = BloodWaveId, DisplayName = "혈파동",
+                BaseMultiplier = 2.88d, CooldownSeconds = 16d,
+                UnlockLevel = 0, UnlockStage = BloodWaveStage,
+                IconFile = "Icon058",           // 붉은 타일 + 사방으로 퍼지는 방사
+                SlashRgba = 0xE8446EFFu,        // 선명한 로즈
+                Shape = SkillShape.Screen, HitCount = 1, Weight = 1,
+                VfxId = SkillVfx.WaveRing
+            },
+            new SkillSpec {
+                Id = BloodFallId, DisplayName = "낙혈",
+                BaseMultiplier = 1.98d, CooldownSeconds = 11d,
+                UnlockLevel = 0, UnlockStage = BloodFallStage,
+                IconFile = "Icon056",           // 위에서 떨어지는 핏줄기
+                SlashRgba = 0xB02060FFu,        // 짙은 자적
+                Shape = SkillShape.Pierce, HitCount = 1, Weight = 1,
+                VfxId = SkillVfx.Wave
+            },
+            new SkillSpec {
+                Id = BloodWheelId, DisplayName = "혈륜",
+                BaseMultiplier = 1.62d, CooldownSeconds = 9d,
+                UnlockLevel = 0, UnlockStage = BloodWheelStage,
+                IconFile = "Icon062",           // 회전하는 톱니 고리
+                SlashRgba = 0xC8304CFFu,        // 하베스트의 중심색
+                Shape = SkillShape.MultiHit, HitCount = 5, Weight = 0,
+                VfxId = SkillVfx.Vortex
+            },
+            // 아래 둘은 **뽑기가 연다**(50단계). UnlockStage가 st41인 것은
+            // 열리는 자리가 아니라 골드 비용의 기준점이고, 뽑기로만 열리는
+            // 오의의 "가장 이른 획득 가능 시점"이 곧 상점이 열리는 칸이다
+            // (SkillSpec.GachaGated 주석).
+            new SkillSpec {
+                Id = BloodBurstId, DisplayName = "혈폭",
+                BaseMultiplier = 3.42d, CooldownSeconds = 19d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon083",           // 터져 오르는 폭발 기둥
+                SlashRgba = 0xD81E7AFFu,        // 자홍
+                Shape = SkillShape.MultiHit, HitCount = 1, Weight = 2,
+                VfxId = SkillVfx.Burst
+            },
+            new SkillSpec {
+                Id = BloodWhipId, DisplayName = "혈조",
+                BaseMultiplier = 1.08d, CooldownSeconds = 6d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon082",           // 휘어 감기는 갈고리
+                SlashRgba = 0x96285EFFu,        // 어두운 자적
+                Shape = SkillShape.Pierce, HitCount = 1, Weight = 0,
+                VfxId = SkillVfx.Whip
             }
         };
+
+        /**
+         * @brief 신규 오의가 가리키는 이펙트 클립의 이름.
+         *
+         * **런타임 어셈블리에 둔다.** YodoSprites·UiSprites와 같은 자리, 같은
+         * 이유다 - 에디터 타입(PozacVfxBaker·YokaiVfxBaker)을 참조하면 카탈로그가
+         * 빌드에서 빠진다. 굽는 쪽의 상수와 갈리면 테스트가 잡는다.
+         */
+        public static class SkillVfx
+        {
+            /** 48단계 하베스트 (Inimig 9 colo 2의 오의 블록) */
+            public const string Wave = "wave";
+            public const string Whip = "whip";
+
+            /** 49단계 Pozac 팩에서 구운 것 */
+            public const string WaveRing = "pozac_wave_ring";
+            public const string Burst = "pozac_burst";
+            public const string Vortex = "pozac_vortex";
+        }
 
         /**
          * @brief MultiHit에서 index번째 타격이 받는 배율.
@@ -302,21 +551,71 @@ namespace Onikiri.Progression
             return -1;
         }
 
-        /** 이 캐릭터 레벨에서 열려 있는가 */
+        /**
+         * @brief 이 캐릭터 레벨에서 열려 있는가. **스테이지 게이트는 잠긴 것으로 센다.**
+         *
+         * 최전선을 안 받는 옛 호출부가 신규 오의를 열지 않게 하려는 것이다.
+         * 조용히 여는 쪽이 아니라 조용히 잠그는 쪽으로 떨어뜨린다 - 잠긴 것은
+         * 화면에서 곧바로 보이지만, 열려서는 안 될 것이 열린 것은 밸런스가
+         * 어긋난 뒤에야 드러난다.
+         */
         public static bool IsUnlockedAt(int index, int characterLevel)
         {
-            if (index < 0 || index >= Skills.Length) return false;
-            return characterLevel >= Skills[index].UnlockLevel;
+            return IsUnlockedAt(index, characterLevel, 0);
         }
 
-        /** 첫 스킬이 열리는 레벨. 하단 "스킬" 버튼이 켜지는 조건이다 */
+        /**
+         * @brief 이 레벨·최전선에서 열려 있는가.
+         *
+         * @param frontierStage 최전선 스테이지(37단계 maxStageReached). 지금
+         *                      서 있는 스테이지가 아니다 - 아래로 되돌아가서
+         *                      오의가 잠기면 그것은 해금이 아니라 벌이다
+         */
+        public static bool IsUnlockedAt(int index, int characterLevel, int frontierStage)
+        {
+            return IsUnlockedAt(index, characterLevel, frontierStage, 0);
+        }
+
+        /**
+         * @brief 이 레벨·최전선·**보유 상태**에서 열려 있는가 (50단계).
+         *
+         * @param gachaOwned 카탈로그 인덱스 비트마스크. 뽑기로 얻은 오의의
+         *                   비트가 서 있다. **0이 기본값이고 그것이 계약이다** -
+         *                   마스크를 안 넘긴 호출부에서는 가챠 몫이 잠겨 보인다.
+         *
+         * 조용히 잠그는 쪽으로 떨어뜨리는 것은 49단계가 스테이지 게이트에서
+         * 내린 판단 그대로다 - 잠긴 것은 화면에서 곧바로 보이지만, 열려서는
+         * 안 될 것이 열린 것은 밸런스가 어긋난 뒤에야 드러난다.
+         *
+         * 그리고 이 기본값이 **밴드의 불변을 구조로 지킨다.** 기준 구성
+         * (ReferenceLoadout)과 심층 구성(DeepLoadout)이 마스크 0으로 지어지므로
+         * 가챠 몫은 밴드가 가정하는 세계에 아예 없고, 49단계가 잰 오의 몫
+         * 49.0%가 한 비트도 안 움직인다.
+         */
+        public static bool IsUnlockedAt(int index, int characterLevel, int frontierStage,
+                                        int gachaOwned)
+        {
+            if (index < 0 || index >= Skills.Length) return false;
+
+            var spec = Skills[index];
+            if (spec.GachaGated) return (gachaOwned & (1 << index)) != 0;
+            if (spec.StageGated) return frontierStage >= spec.UnlockStage;
+            return characterLevel >= spec.UnlockLevel;
+        }
+
+        /**
+         * @brief 첫 스킬이 열리는 레벨. 하단 "스킬" 버튼이 켜지는 조건이다.
+         *
+         * **레벨 게이트만 센다.** 스테이지 게이트의 UnlockLevel은 0이라, 같이
+         * 세면 이 값이 0이 되고 하단 탭이 처음부터 열린다
+         */
         public static int PanelUnlockLevel
         {
             get
             {
                 int lowest = int.MaxValue;
                 foreach (var skill in Skills)
-                    if (skill.UnlockLevel < lowest) lowest = skill.UnlockLevel;
+                    if (!skill.StageGated && skill.UnlockLevel < lowest) lowest = skill.UnlockLevel;
                 return lowest == int.MaxValue ? 1 : lowest;
             }
         }
@@ -324,13 +623,226 @@ namespace Onikiri.Progression
         /** 이 레벨에서 이 스킬의 초당 환산 기여. 잠겨 있으면 0 */
         public static double RateAt(int index, int skillLevel, int characterLevel)
         {
-            if (!IsUnlockedAt(index, characterLevel)) return 0d;
+            return RateAt(index, skillLevel, characterLevel, 0);
+        }
+
+        public static double RateAt(int index, int skillLevel, int characterLevel, int frontierStage)
+        {
+            return RateAt(index, skillLevel, characterLevel, frontierStage, 0);
+        }
+
+        public static double RateAt(int index, int skillLevel, int characterLevel,
+                                    int frontierStage, int gachaOwned)
+        {
+            if (!IsUnlockedAt(index, characterLevel, frontierStage, gachaOwned)) return 0d;
 
             var spec = Skills[index];
             if (spec.CooldownSeconds <= 0d) return 0d;
 
             return SkillCurve.CappedMultiplierAtLevel(spec.BaseMultiplier, skillLevel)
                    / spec.CooldownSeconds;
+        }
+
+        /** 상한까지 올린 이 오의의 초당 환산 기여. 장착 순서를 정하는 값이다 */
+        public static double CeilingRateOf(int index)
+        {
+            if (index < 0 || index >= Skills.Length) return 0d;
+
+            var spec = Skills[index];
+            if (spec.CooldownSeconds <= 0d) return 0d;
+            return SkillCurve.CeilingFor(spec.BaseMultiplier) / spec.CooldownSeconds;
+        }
+
+        // ---------------------------------------------------------------- 장착 (49단계)
+
+        /**
+         * @brief **밴드가 보는 장착 구성.** 기대 곡선과 시뮬레이션이 함께 읽는다.
+         *
+         * ## 왜 "고르는 것"이 여기 상수처럼 적히는가
+         *
+         * 장착은 플레이어의 선택인데 밴드는 하나의 곡선을 지켜야 한다. 보통
+         * 이런 자리는 "최댓값을 가정"으로 풀리고, 그러면 나머지 선택지가 전부
+         * 함정이 된다(20단계 골드 축의 교훈).
+         *
+         * 여기서는 그 문제가 **없다**. 신규 다섯의 상한 기여가 전부 같으므로
+         * (ExpansionRate) 4번 슬롯에 무엇을 끼우든 이 함수가 내는 기여 합이
+         * 같다. 고르는 것이 밴드를 안 움직이고, 그것이 슬롯 설계의 배당금이다.
+         *
+         * 순서는 **상한 기여 내림차순, 같으면 표 순서**다. 실제 레벨이 아니라
+         * 상한을 보는 이유는 순서가 흔들리면 안 되기 때문이다 - 지금 레벨로
+         * 정렬하면 아직 안 산 오의가 영원히 장착되지 않고(비장착에는 골드를
+         * 안 쓰므로) 레벨이 안 올라 영원히 순서가 안 바뀐다.
+         *
+         * @param characterLevel 레벨 게이트를 재는 값
+         * @param frontierStage  스테이지 게이트와 슬롯 수를 정하는 값
+         * @param equipped       채워 줄 배열. 길이는 SkillCurve.MaxSlots 이상
+         * @return 실제로 채워진 슬롯 수
+         */
+        /**
+         * @brief 초당 기여가 "같다"고 볼 상대 오차.
+         *
+         * 1e-9는 double의 정밀도(1e-16)보다 일곱 자리 크고, 이 게임에서 뜻이
+         * 있는 차이(가장 가까운 두 오의가 0.180 대 0.250)보다 여덟 자리 작다.
+         * 그 사이 아무 값이나 같은 결과를 낸다.
+         */
+        private const double TieEpsilon = 1e-9d;
+
+        /**
+         * @brief 이 기여가 지금까지의 최선보다 **뜻이 있게** 큰가.
+         *
+         * 게임 쪽(SkillSystem.FillEmptySlots)이 같은 함수를 지난다. 두 곳이
+         * 각자 부등호를 쓰면 화면의 기본 구성과 밴드가 가정하는 구성이
+         * 부동소수점 잡음으로 갈릴 수 있고, 그 갈림은 화면에도 로그에도
+         * 안 남는다.
+         */
+        public static bool IsBetterRate(double rate, double best)
+        {
+            return rate > best * (1d + TieEpsilon);
+        }
+
+        public static int ReferenceLoadout(int characterLevel, int frontierStage, int[] equipped)
+        {
+            return ReferenceLoadout(characterLevel, frontierStage, equipped,
+                                    SkillCurve.SlotsAtStage(frontierStage));
+        }
+
+        /**
+         * @param maxSlots 열린 자리 수를 밖에서 정한다. 4번 슬롯이 없는 비교군
+         *                 (죽은 버튼 검사)이 셋으로 눌러 부른다
+         */
+        public static int ReferenceLoadout(int characterLevel, int frontierStage,
+                                           int[] equipped, int maxSlots)
+        {
+            return ReferenceLoadout(characterLevel, frontierStage, equipped, maxSlots, 0);
+        }
+
+        /**
+         * @param gachaOwned 뽑기로 얻은 오의의 비트마스크 (50단계).
+         *
+         * **기본값 0이 밴드가 보는 세계다.** 가챠 몫 둘은 초당 기여가 신규
+         * 셋과 동률이고(ExpansionRate) 동률은 표 순서로 갈리므로, 마스크를
+         * 켜도 기준 구성은 안 바뀐다 - 표에서 뒤에 서 있기 때문이다. 그래도
+         * 마스크를 받는 이유는 **화면 쪽 기본 구성**(SkillSystem.FillEmptySlots)이
+         * 같은 함수를 지나야 하기 때문이고, 그 두 곳이 갈리면 아무것도 안
+         * 만진 플레이어가 밴드 밖에 선다.
+         */
+        public static int ReferenceLoadout(int characterLevel, int frontierStage,
+                                           int[] equipped, int maxSlots, int gachaOwned)
+        {
+            if (equipped == null) return 0;
+
+            int slots = Math.Min(maxSlots, equipped.Length);
+            if (slots < 0) slots = 0;
+            int filled = 0;
+
+            for (int slot = 0; slot < slots; slot++)
+            {
+                int best = -1;
+                double bestRate = 0d;
+
+                for (int i = 0; i < Skills.Length; i++)
+                {
+                    if (!IsUnlockedAt(i, characterLevel, frontierStage, gachaOwned)) continue;
+
+                    bool taken = false;
+                    for (int f = 0; f < filled; f++)
+                        if (equipped[f] == i) { taken = true; break; }
+                    if (taken) continue;
+
+                    double rate = CeilingRateOf(i);
+
+                    // **동률 판정에 여유를 둔다.** 신규 다섯의 초당 기여는
+                    // 설계상 정확히 같은 값이지만(ExpansionRate), 배율과
+                    // 쿨다운을 따로 적어 나눈 결과라 부동소수점에서 마지막
+                    // 비트가 갈린다 - 2.88/16과 1.98/11이 정확히 같은 double이
+                    // 아니다. 맨 부등호로 두면 그 잡음이 장착 순서를 정하게
+                    // 되고, 실제로 그렇게 나왔다(혈파동 대신 낙혈이 뽑혔다).
+                    //
+                    // 여유를 두면 동률은 표 순서로 갈린다 - 뜻이 있는 규칙이
+                    // 뜻이 없는 잡음을 이긴다
+                    if (!IsBetterRate(rate, bestRate)) continue;
+
+                    best = i;
+                    bestRate = rate;
+                }
+
+                if (best < 0) break;
+                equipped[filled++] = best;
+            }
+
+            for (int i = filled; i < equipped.Length; i++) equipped[i] = -1;
+            return filled;
+        }
+
+        /**
+         * @brief 심층(모든 오의 해금 + 슬롯 4)의 장착 구성. 기대 곡선이 읽는다.
+         *
+         * 캐시해 두는 이유는 이 값이 상수이기 때문이다 - 심층에서는 레벨도
+         * 최전선도 게이트를 이미 지났다. YodoAffinityCurve가 매 호출마다 다시
+         * 정렬하지 않도록 한 번만 짓는다.
+         */
+        public static readonly int[] DeepLoadout = BuildDeepLoadout();
+
+        /**
+         * @brief 4번 슬롯이 열리기 **전**의 구성. 기존 셋이다.
+         *
+         * 기대 곡선이 st41~50 구간을 물을 때 쓴다 - 요도는 st41에 봉인되기
+         * 시작하는데 4번 슬롯은 st51에 열리므로, 그 열 스테이지 동안 상성은
+         * 존재하고 자리는 셋이다. 두 값이 겹치는 이 구간을 놓치면 기대 곡선이
+         * 실측과 0.25% 갈리고(실제로 갈렸다), 그 차이가 그대로 보정과 실제의
+         * 차가 된다.
+         */
+        public static readonly int[] BaseLoadout = BuildBaseLoadout();
+
+        private static int[] BuildBaseLoadout()
+        {
+            var slots = new int[SkillCurve.MaxSlots];
+            int count = ReferenceLoadout(int.MaxValue, SkillCurve.ExpansionStage - 1,
+                                         slots, SkillCurve.BaseSlots);
+
+            var trimmed = new int[count];
+            Array.Copy(slots, trimmed, count);
+            return trimmed;
+        }
+
+        /**
+         * @brief 이 최전선에서 밴드가 가정하는 구성.
+         *
+         * 기대 곡선(YodoCurve.ExpectedPowerFactorAtStage)과 시뮬레이션이
+         * **같은 집합**을 봐야 둘이 안 갈린다.
+         */
+        public static int[] LoadoutAtStage(int frontierStage)
+        {
+            return frontierStage >= SkillCurve.ExpansionStage ? DeepLoadout : BaseLoadout;
+        }
+
+        /** 이 구성이 상한에서 내는 초당 환산 기여의 합 */
+        public static double CeilingRateOf(int[] loadout)
+        {
+            if (loadout == null) return 0d;
+
+            double rate = 0d;
+            for (int slot = 0; slot < loadout.Length; slot++) rate += CeilingRateOf(loadout[slot]);
+            return rate;
+        }
+
+        private static int[] BuildDeepLoadout()
+        {
+            var slots = new int[SkillCurve.MaxSlots];
+            int count = ReferenceLoadout(int.MaxValue, int.MaxValue, slots);
+
+            var trimmed = new int[count];
+            Array.Copy(slots, trimmed, count);
+            return trimmed;
+        }
+
+        /** 이 구성에 이 오의가 들어 있는가 */
+        public static bool IsEquipped(int[] equipped, int index)
+        {
+            if (equipped == null) return false;
+            for (int i = 0; i < equipped.Length; i++)
+                if (equipped[i] == index) return true;
+            return false;
         }
 
         /**

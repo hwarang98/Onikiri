@@ -31,7 +31,9 @@ MonoBehaviour:
   - {fileID: -5775657986390419533, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   - {fileID: -2546484541383549571, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   walkFrames: []
-  hurtFrames: []
+  hurtFrames:
+  - {fileID: -2502528449307828137, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
+  - {fileID: 9033700185936325543, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   deathFrames:
   - {fileID: 5851640218161731370, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
   - {fileID: 3398260029828185443, guid: 37eb7d9cfd1936e48900908d33c1b1ba, type: 3}
@@ -50,8 +52,10 @@ MonoBehaviour:
   moveSpeed: 0.8
   queueSpacing: 1.5
   attackFrames: []
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.5
+  attackTelegraphSeconds: 0.35
   hoverHeight: 0.1
   artBottomOffset: 0.65625
   artFacesLeft: 0

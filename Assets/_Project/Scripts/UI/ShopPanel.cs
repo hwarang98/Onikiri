@@ -58,6 +58,36 @@ namespace Onikiri.UI
         [SerializeField] private Image freeBackground;
         [SerializeField] private TMP_Text freeStateLabel;
 
+        /**
+         * @brief 오의 뽑기 배너 (50단계). **요도 배너와 같은 조각, 다른 시스템.**
+         *
+         * 필드를 따로 두고 그리는 함수를 공유하지 않은 이유는 두 시스템이
+         * 다른 타입이기 때문이다(GachaSystem / SkillGachaSystem). 인터페이스를
+         * 하나 세워 묶을 수도 있지만, 그러면 "두 배너가 같은 물건"이라는
+         * 말을 코드가 하게 된다 - 천장도 무료 쿨도 재고도 갈려 있는 것이
+         * 이 스텝의 설계이므로(SkillGachaSystem 머리 주석) 화면도 그것을
+         * 두 벌로 적는 편이 정직하다.
+         */
+        [Header("오의 뽑기 배너")]
+        [SerializeField] private SkillGachaSystem skillSystem;
+        [SerializeField] private SkillSystem skills;
+        [SerializeField] private Button skillSingleButton;
+        [SerializeField] private TMP_Text skillSingleCost;
+        [SerializeField] private Image skillSingleBackground;
+        [SerializeField] private Button skillTenButton;
+        [SerializeField] private TMP_Text skillTenCost;
+        [SerializeField] private Image skillTenBackground;
+
+        [Tooltip("천장까지 남은 횟수 + 누적. 재고가 없으면 그 사실을 적는다")]
+        [SerializeField] private TMP_Text skillPityLabel;
+
+        [Header("오의 일일 무료")]
+        [SerializeField] private Button skillFreeButton;
+        [SerializeField] private TMP_Text skillFreeTitle;
+        [SerializeField] private TMP_Text skillFreeCost;
+        [SerializeField] private Image skillFreeBackground;
+        [SerializeField] private TMP_Text skillFreeStateLabel;
+
         [Header("결과")]
         [SerializeField] private GachaResultPopup popup;
 
@@ -84,6 +114,8 @@ namespace Onikiri.UI
             if (system == null) system = GachaSystem.Instance;
             if (yodo == null) yodo = YodoSystem.Instance;
             if (gems == null) gems = GemWallet.Instance;
+            if (skillSystem == null) skillSystem = SkillGachaSystem.Instance;
+            if (skills == null) skills = SkillSystem.Instance;
 
             Refresh();
         }
@@ -92,17 +124,28 @@ namespace Onikiri.UI
         {
             if (system == null) system = GachaSystem.Instance;
             if (gems == null) gems = GemWallet.Instance;
+            if (skillSystem == null) skillSystem = SkillGachaSystem.Instance;
+            if (skills == null) skills = SkillSystem.Instance;
 
             if (system != null)
             {
                 system.Changed += Refresh;
                 system.Pulled += ShowResults;
             }
+            if (skillSystem != null)
+            {
+                skillSystem.Changed += Refresh;
+                skillSystem.Pulled += ShowSkillResults;
+            }
             if (gems != null) gems.GemsChanged += OnGemsChanged;
 
             if (singleButton != null) singleButton.onClick.AddListener(PullOnce);
             if (tenButton != null) tenButton.onClick.AddListener(PullTen);
             if (freeButton != null) freeButton.onClick.AddListener(PullFree);
+
+            if (skillSingleButton != null) skillSingleButton.onClick.AddListener(SkillPullOnce);
+            if (skillTenButton != null) skillTenButton.onClick.AddListener(SkillPullTen);
+            if (skillFreeButton != null) skillFreeButton.onClick.AddListener(SkillPullFree);
 
             Refresh();
         }
@@ -114,11 +157,20 @@ namespace Onikiri.UI
                 system.Changed -= Refresh;
                 system.Pulled -= ShowResults;
             }
+            if (skillSystem != null)
+            {
+                skillSystem.Changed -= Refresh;
+                skillSystem.Pulled -= ShowSkillResults;
+            }
             if (gems != null) gems.GemsChanged -= OnGemsChanged;
 
             if (singleButton != null) singleButton.onClick.RemoveListener(PullOnce);
             if (tenButton != null) tenButton.onClick.RemoveListener(PullTen);
             if (freeButton != null) freeButton.onClick.RemoveListener(PullFree);
+
+            if (skillSingleButton != null) skillSingleButton.onClick.RemoveListener(SkillPullOnce);
+            if (skillTenButton != null) skillTenButton.onClick.RemoveListener(SkillPullTen);
+            if (skillFreeButton != null) skillFreeButton.onClick.RemoveListener(SkillPullFree);
         }
 
         private void Update()
@@ -128,6 +180,7 @@ namespace Onikiri.UI
             if (clock < ClockInterval) return;
             clock = 0f;
             RefreshFree();
+            RefreshSkillFree();
         }
 
         private void OnGemsChanged(long value) { Refresh(); }
@@ -147,6 +200,34 @@ namespace Onikiri.UI
         private void PullFree()
         {
             if (system != null) system.TryFreePull();
+        }
+
+        private void SkillPullOnce()
+        {
+            if (skillSystem != null) skillSystem.TryPull(1);
+        }
+
+        private void SkillPullTen()
+        {
+            if (skillSystem != null) skillSystem.TryPull(SkillGachaCurve.TenPullCount);
+        }
+
+        private void SkillPullFree()
+        {
+            if (skillSystem != null) skillSystem.TryFreePull();
+        }
+
+        /**
+         * @brief 오의 뽑기 결과. **같은 판을 쓴다** - GachaResultPopup 주석 참고.
+         *
+         * 두 배너가 같은 팝업을 나눠 쓰므로 한 번에 하나만 뜬다. 그것이
+         * 맞는 이유는 뽑기가 동시에 두 번 돌 수 없기 때문이고(버튼이 하나씩
+         * 눌린다), 판이 스스로 안 닫히므로 확인을 누르기 전에는 다음 뽑기가
+         * 그 위를 덮지 않는다.
+         */
+        private void ShowSkillResults(System.Collections.Generic.List<SkillGachaSystem.PullResult> list)
+        {
+            if (popup != null) popup.Show(list, skills);
         }
 
         private void ShowResults(System.Collections.Generic.List<GachaSystem.PullResult> list)
@@ -188,6 +269,131 @@ namespace Onikiri.UI
             }
 
             RefreshFree();
+            RefreshSkill();
+        }
+
+        /**
+         * @brief 오의 배너. **재고가 이 배너의 두 번째 게이트다.**
+         *
+         * 해금(st41) 위에 재고가 얹힌다 - 팔 것이 없으면 버튼이 죽고 줄이
+         * 그 사실을 적는다. 41단계의 "눌리는데 아무 일도 안 일어나는 것보다
+         * 안 눌리는 편이 정직하다"이고, 잠긴 것과 다 팔린 것을 **다른
+         * 문장으로** 적는 이유는 조건이 다르기 때문이다: 앞의 것은 가면
+         * 열리고 뒤의 것은 다시 안 열린다.
+         */
+        private void RefreshSkill()
+        {
+            bool unlocked = skillSystem != null && skillSystem.IsUnlocked;
+            bool stock = skillSystem != null && skillSystem.HasStock;
+
+            DrawSkillButton(skillSingleButton, skillSingleBackground, skillSingleCost, 1);
+            DrawSkillButton(skillTenButton, skillTenBackground, skillTenCost,
+                            SkillGachaCurve.TenPullCount);
+
+            if (skillPityLabel != null)
+            {
+                if (!unlocked)
+                {
+                    skillPityLabel.text = SkillGachaCurve.UnlockStage + "스테이지부터";
+                    skillPityLabel.color = unaffordableColor;
+                }
+                else if (!stock)
+                {
+                    skillPityLabel.text = SoldOutText;
+                    skillPityLabel.color = unaffordableColor;
+                }
+                else
+                {
+                    int left = skillSystem.PullsUntilPity;
+                    skillPityLabel.text = GachaCurve.PityText(left, skillSystem.TotalPulls);
+                    skillPityLabel.color = left <= SkillGachaCurve.TenPullCount
+                        ? goldColor : unaffordableColor;
+                }
+            }
+
+            RefreshSkillFree();
+        }
+
+        /**
+         * @brief 다 팔린 배너가 적는 말.
+         *
+         * "품절"이 아니라 이유를 적는다. 재고가 없는 상태는 **플레이어가
+         * 다 이룬 상태**이고(오의 둘을 열었고 장착이 전부 상한), 그 사실을
+         * 말하지 않으면 화면이 고장난 것처럼 읽힌다 - 44단계가 넘침을
+         * 문구로 지킨 것과 같은 자리다.
+         */
+        private const string SoldOutText = "해금 완료 · 장착 오의 전부 상한";
+
+        private void DrawSkillButton(Button button, Image background, TMP_Text cost, int count)
+        {
+            if (button == null) return;
+
+            int price = skillSystem != null ? skillSystem.CostFor(count) : 0;
+            bool affordable = skillSystem != null && skillSystem.CanPull(count);
+
+            button.interactable = affordable;
+
+            if (cost != null)
+            {
+                cost.text = "보석 " + price;
+                cost.color = affordable ? affordableColor : unaffordableColor;
+            }
+
+            if (background != null)
+            {
+                var tint = buttonTint;
+                if (!affordable)
+                {
+                    tint.r *= 0.55f; tint.g *= 0.55f; tint.b *= 0.55f;
+                    tint.a = 1f;
+                }
+                background.color = tint;
+            }
+        }
+
+        private void RefreshSkillFree()
+        {
+            if (skillSystem == null) return;
+
+            var now = DateTime.UtcNow;
+            bool ready = skillSystem.HasFreePullAt(now);
+            bool unlocked = skillSystem.IsUnlocked;
+            bool stock = skillSystem.HasStock;
+
+            if (skillFreeButton != null) skillFreeButton.interactable = ready;
+
+            if (skillFreeTitle != null)
+                skillFreeTitle.color = ready ? affordableColor : unaffordableColor;
+
+            if (skillFreeCost != null)
+            {
+                if (!unlocked) skillFreeCost.text = SkillGachaCurve.UnlockStage + "스테이지부터";
+                else if (!stock) skillFreeCost.text = "완료";
+                else if (ready) skillFreeCost.text = "무료";
+                else skillFreeCost.text = Clock(skillSystem.UntilFreePull(now));
+                skillFreeCost.color = ready ? affordableColor : unaffordableColor;
+            }
+
+            if (skillFreeStateLabel != null)
+            {
+                skillFreeStateLabel.text = !unlocked
+                    ? SkillGachaCurve.UnlockStage + "스테이지 도달 시 해금"
+                    : !stock ? SoldOutText
+                    : ready ? "오늘의 무료 뽑기가 남아 있다"
+                            : "새벽 4시에 다시 열린다";
+                skillFreeStateLabel.color = ready ? goldColor : unaffordableColor;
+            }
+
+            if (skillFreeBackground != null)
+            {
+                var tint = freeTint;
+                if (!ready)
+                {
+                    tint.r *= 0.55f; tint.g *= 0.55f; tint.b *= 0.55f;
+                    tint.a = 1f;
+                }
+                skillFreeBackground.color = tint;
+            }
         }
 
         private void DrawPullButton(Button button, Image background, TMP_Text cost,

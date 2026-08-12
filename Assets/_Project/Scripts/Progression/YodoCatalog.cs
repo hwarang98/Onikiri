@@ -101,6 +101,29 @@ namespace Onikiri.Progression
         public string AffinitySkillId;
 
         /**
+         * @brief 같은 혼의 **가족**에 드는 두 번째 오의 (49단계). 비면 없다.
+         *
+         * ## 왜 한 혼이 둘을 무는가
+         *
+         * 45단계는 "두 혼이 같은 오의를 물면 안 된다"고 적었다 - 그 오의만
+         * 두 배로 자라고 나머지 혼을 고를 이유가 사라지기 때문이다. 이쪽은
+         * **반대 방향**이라 그 함정에 안 걸린다.
+         *
+         * 49단계에 장착 슬롯이 생기면서 질문이 하나 늘었다: "네 자리에 무엇을
+         * 끼우는가." 한 혼이 오의 둘을 밀면 그 혼을 민 플레이어에게는 **두
+         * 자리의 답이 함께 정해진다** - 몰아주기가 슬롯 구성의 모양까지 바꾼다.
+         * 고르게 미는 플레이어(f2p 기대 곡선)에게는 신규 다섯이 여전히 동률이라
+         * 아무것도 안 바뀐다.
+         *
+         * 가족은 **거동으로** 묶는다. 등롱이 귀참을 문 이유가 "사방을 비추는
+         * 눈 = 화면 전체"였으므로, 같은 Screen인 혈파동이 같은 이유로 든다.
+         * 설정이 값과 같은 말을 하는 것이 45단계의 규칙이고 그대로 따른다.
+         *
+         * 흑야는 비어 있다 - 전 오의를 미는 혼에는 가족이 따로 없다.
+         */
+        public string AffinityFamilyId;
+
+        /**
          * @brief 소환됐을 때 화면에 뜨는 이름. "등롱의 영체"
          *
          * 혼 이름과 따로 두는 이유는 둘이 다른 물건이기 때문이다 - 혼은
@@ -171,6 +194,9 @@ namespace Onikiri.Progression
                 // 화면 전체를 한 번에 벤다(SkillShape.Screen) - 같은 모양의
                 // 사건이라 상성이 설정에서 나온다
                 AffinitySkillId = SkillCatalog.OniCleaveId,
+
+                // 49단계: 같은 Screen 거동인 혈파동이 같은 이유로 이 혼의 가족이다
+                AffinityFamilyId = SkillCatalog.BloodWaveId,
                 SpiritName = "등롱의 영체",
 
                 IconSprite = YodoSprites.LanternSprite,
@@ -186,6 +212,9 @@ namespace Onikiri.Progression
                 // 처형은 **한 번에 끝내는 일**이다. 일섬은 단발 관통이고
                 // (SkillShape.Pierce) 셋 중 유일하게 돌진이 붙는다
                 AffinitySkillId = SkillCatalog.FlashId,
+
+                // 49단계: 낙혈도 전방 관통(Pierce)이다 - 한 줄로 끝내는 쪽
+                AffinityFamilyId = SkillCatalog.BloodFallId,
                 SpiritName = "처형인의 영체",
 
                 IconSprite = YodoSprites.ExecutionerSprite,
@@ -207,6 +236,9 @@ namespace Onikiri.Progression
                 // 붉은 눈은 광분이다. 연참은 셋 중 유일한 다타
                 // (SkillShape.MultiHit, 세 번) - 몰아치는 쪽에 붙는다
                 AffinitySkillId = SkillCatalog.ChainSlashId,
+
+                // 49단계: 혈륜은 다섯 번 도는 다타다 - 광분의 가족
+                AffinityFamilyId = SkillCatalog.BloodWheelId,
                 SpiritName = "적안의 영체",
 
                 IconSprite = YodoSprites.RedEyeSprite,
@@ -223,6 +255,10 @@ namespace Onikiri.Progression
                 // 요괴라 발도 전체가 그의 것이다. 넷 대 셋의 불일치를 여기서
                 // 푸는 이유는 YodoSpec.AffinitySkillId 주석에 있다
                 AffinitySkillId = null,
+
+                // 전 오의를 미는 혼에는 가족이 따로 없다. 신규 다섯도 구조상
+                // 자동으로 받는다(FactorForSkill이 빈 대상을 전부로 읽는다)
+                AffinityFamilyId = null,
                 SpiritName = "흑야의 영체",
 
                 IconSprite = YodoSprites.DarkSamuraiSprite,

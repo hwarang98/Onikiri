@@ -76,6 +76,17 @@ namespace Onikiri.EditorTools
             { SkillCatalog.ChainSlashId,    "Icon076" },  // 흰 삼연 참격  (붉은 타일)
             { SkillCatalog.FlashId,         "Icon140" },  // 붉은 단발 참격 (검은 타일)
             { SkillCatalog.OniCleaveId,     "Icon118" },  // 오니 뿔        (금빛)
+
+            // 49단계의 신규 오의 다섯. **전부 붉은 타일**이다 - 팩의 타일 색이
+            // 계열을 말하고(위 주석), 이 다섯은 혈(血) 한 계열이라 색이 같아야
+            // 목록에서 "같은 무리"로 읽힌다. 심볼은 다섯이 서로 다르다 -
+            // 전투 중에 어느 것이 터졌는지 알아봐야 하는 축이라는 점은 셋일 때와
+            // 같고, 여덟이 되면서 오히려 더 중요해졌다
+            { SkillCatalog.BloodWaveId,     "Icon058" },  // 사방으로 퍼지는 방사
+            { SkillCatalog.BloodFallId,     "Icon056" },  // 떨어지는 핏줄기
+            { SkillCatalog.BloodWheelId,    "Icon062" },  // 회전하는 톱니 고리
+            { SkillCatalog.BloodBurstId,    "Icon083" },  // 터져 오르는 폭발 기둥
+            { SkillCatalog.BloodWhipId,     "Icon082" },  // 휘어 감기는 갈고리
         };
 
         public const string GoldIcon = "Icon114";   // 금화

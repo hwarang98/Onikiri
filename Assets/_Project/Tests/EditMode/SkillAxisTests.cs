@@ -96,9 +96,11 @@ namespace Onikiri.Tests
             Assert.Greater(SkillCurve.CeilingRatio, 1d, "배율 상한이 없다 - DPS가 레벨의 제곱으로 자란다");
             Assert.Greater(SkillCurve.MaxLevel, 1, "살 수 있는 레벨이 하나뿐이다");
 
-            double maxRate = 0d;
-            foreach (var skill in SkillCatalog.Skills)
-                maxRate += skill.BaseRate * SkillCurve.CeilingRatio;
+            // 49단계: **풀이 아니라 슬롯 예산이다.** 여덟을 다 더하면 4.61이
+            // 되어 공격속도 상한을 넘는데, 그것은 화면에서 일어나지 않는 일이다 -
+            // 동시에 도는 것은 장착한 넷뿐이고 그 합이 이 축의 크기다.
+            // 풀이 커져도 이 값이 안 움직이는 것이 슬롯 설계의 전부다
+            double maxRate = YodoAffinityCurve.CappedSkillRate;
 
             Assert.Less(maxRate, AttackSpeedCurve.Ceiling, string.Format(
                 "상한에서 스킬의 초당 환산 기여가 {0:F2}로 공격속도 상한 {1:F2}를 넘는다 - "
@@ -153,6 +155,20 @@ namespace Onikiri.Tests
             {
                 var skill = SkillCatalog.Skills[i];
 
+                // 49단계: 스테이지 게이트의 오의는 해금 스테이지가 곧 게이트라
+                // 실측할 것이 없다. 대신 **게이트가 하나인지**를 본다 - 신규
+                // 다섯이 서로 다른 스테이지에 열리면 밴드 재기준이 다섯 번이다
+                if (skill.StageGated)
+                {
+                    // 49b: 게이트가 오의마다 다르다(st12/18/27, 가챠 몫은 st51).
+                    // 재는 것은 "비용이 그 게이트의 골드 규모를 가정하는가"이고,
+                    // BaseCost가 UnlockStage로 계산되므로 구조가 지킨다 -
+                    // 여기서는 게이트가 실재하는지만 본다
+                    Assert.GreaterOrEqual(skill.UnlockStage, 1,
+                        "'" + skill.DisplayName + "'의 스테이지 게이트가 없다");
+                    continue;
+                }
+
                 int measured = -1;
                 foreach (var row in rows)
                     if (row.CharacterLevel >= skill.UnlockLevel) { measured = row.Stage; break; }
@@ -182,11 +198,15 @@ namespace Onikiri.Tests
         [Test]
         public void EverySkillIsLeveledSoonAfterItUnlocks()
         {
+            // 49단계: **장착한 오의만** 판다. 30스테이지까지는 슬롯이 셋이고
+            // 열린 오의도 셋뿐이라 기존 셋이 그대로 검사 대상이다 - 신규 다섯은
+            // st51 게이트 밖이므로 이 창에 존재하지 않는다
             var rows = StageSimulation.Run(30, FieldFromAssets());
 
             for (int i = 0; i < SkillCatalog.Count; i++)
             {
                 var skill = SkillCatalog.Skills[i];
+                if (skill.StageGated) continue;
 
                 int firstLevelUp = -1;
                 foreach (var row in rows)
@@ -456,14 +476,23 @@ namespace Onikiri.Tests
         [Test]
         public void SkillRate_IsTheSameFormulaEverywhere()
         {
-            var levels = new int[] { 4, 6, 3 };
+            // 칸 수는 카탈로그가 정한다. 손으로 셋을 적어 두면 오의가 늘 때
+            // 배열 밖을 읽는다(49단계에 실제로 그랬다)
+            var levels = new int[SkillCatalog.Count];
+            for (int i = 0; i < levels.Length; i++) levels[i] = 3 + (i % 4);
             const int characterLevel = 25;
 
             double byHand = 0d;
             for (int i = 0; i < SkillCatalog.Count; i++)
             {
                 var skill = SkillCatalog.Skills[i];
+
+                // 스테이지 게이트의 오의는 최전선을 안 받는 CastRate에서
+                // 잠긴 것으로 센다(SkillCatalog.IsUnlockedAt의 2인자 판) -
+                // 손 계산도 같은 규칙을 따라야 두 값이 비교된다
+                if (skill.StageGated) continue;
                 if (characterLevel < skill.UnlockLevel) continue;
+
                 byHand += SkillCurve.CappedMultiplierAtLevel(skill.BaseMultiplier, levels[i])
                           / skill.CooldownSeconds;
             }

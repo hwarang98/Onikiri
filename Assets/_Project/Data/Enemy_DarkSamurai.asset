@@ -79,8 +79,10 @@ MonoBehaviour:
   - {fileID: 972919314, guid: 5c2bca8dae7926648a55d4121b209f96, type: 3}
   - {fileID: -1899984673, guid: 5c2bca8dae7926648a55d4121b209f96, type: 3}
   - {fileID: -2046381885, guid: 5c2bca8dae7926648a55d4121b209f96, type: 3}
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.55
+  attackTelegraphSeconds: 0
   hoverHeight: 0
   artBottomOffset: 0
   artFacesLeft: 0

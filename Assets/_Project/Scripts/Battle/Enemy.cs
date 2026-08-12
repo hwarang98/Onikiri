@@ -47,26 +47,15 @@ namespace Onikiri.Battle
         private float attackTimer;
         private bool swingStarted;
 
-        /**
-         * @brief 지금 공격 동작이 화면에 떠 있는가.
-         *
-         * `swingStarted`로는 알 수 없다. 그쪽은 "이번 주기의 스윙을 시작했는가"라서
-         * **타격이 들어가는 순간 꺼진다** - 공격 동작의 뒤쪽 45%가 아직 남아
-         * 있는데도 꺼져 있다.
-         *
-         * 별도 bool을 두지 않고 애니메이터에게 묻는다. 기억해둔 플래그는 반드시
-         * 어딘가에서 낡고(사무라이가 idle로 달려간 버그가 그것이었다), 여기서
-         * 낡으면 보스가 영원히 피격 자세로 굳는다.
-         */
-        private bool IsSwinging
-        {
-            get
-            {
-                return definition != null
-                    && animator.IsOneShot
-                    && animator.CurrentClip == definition.attackFrames;
-            }
-        }
+        /** 이번 주기에 고른 공격 그림. 주기가 끝나면 비워 다시 고른다 */
+        private Sprite[] currentAttack;
+
+        /** 직전 주기에 쓴 것. 연속으로 같은 것이 나오지 않게 하는 데만 쓴다 */
+        private Sprite[] lastAttack;
+
+        // `IsSwinging`("지금 공격 클립이 도는가")이 여기 있었다. 피격이 공격
+        // 동작을 덮지 않게 막는 데만 쓰였는데, 그 자리가 보스 전체를 덮는
+        // 슈퍼아머로 넓어지면서(TakeDamage) 물어볼 일이 없어졌다.
 
         /**
          * @brief 한 번 때릴 때의 피해량. 0이면 공격하지 않는다.
@@ -77,6 +66,16 @@ namespace Onikiri.Battle
 
         /** 이 요괴가 플레이어를 때렸다. 사거리 안이고 주기가 찼을 때 발생 */
         public event Action<Enemy> Attacked;
+
+        /**
+         * @brief 공격 **동작이 시작되는** 순간. 타격보다 예비 동작만큼 이르다.
+         *
+         * `Attacked`와 갈라놓는 이유는 둘이 다른 사건이기 때문이다. `Attacked`는
+         * 피해가 들어가는 순간이고 밸런스가 그 주기 위에 서 있다. 이쪽은 화면에
+         * 그림이 뜨기 시작하는 순간이고, 앞당기든 미루든 피해량과 주기는 한 치도
+         * 안 움직인다 - 연출을 얹는 자리가 밸런스를 건드리지 않게 갈라둔 것이다.
+         */
+        public event Action<Enemy> SwingStarted;
 
         public State CurrentState { get; private set; }
         public bool IsAlive { get { return CurrentState == State.Approaching || CurrentState == State.Engaged; } }
@@ -171,6 +170,12 @@ namespace Onikiri.Battle
             attackTimer = 0f;
             swingStarted = false;
 
+            // 고른 공격 그림은 정의에 딸린 것이라 반드시 함께 비운다. 풀에서
+            // 돌아온 인스턴스가 옛 정의의 배열을 들고 있으면 다른 요괴의
+            // 공격이 재생된다
+            currentAttack = null;
+            lastAttack = null;
+
             // 잡몹 확대판 보스용. 정수 배율만 쓴다 - 픽셀 격자가 어긋나는 이유는
             // BossContentBuilder에 적어뒀다
             transform.localScale = new Vector3(scale, scale, 1f);
@@ -260,11 +265,39 @@ namespace Onikiri.Battle
             hurtFlashRemaining = 0.08f;
             spriteRenderer.color = Color.white;
 
-            // 공격 동작은 끊지 않는다. 플레이어가 초당 네 번 때리는데 0.92초짜리
-            // 공격 클립을 매번 덮어쓰면 보스는 **한 번도 도끼를 끝까지 들지
-            // 못한다** - 처형인이 계속 얻어맞기만 하는 것으로 보였던 이유다.
-            // 흰 플래시는 위에서 이미 켰으므로 "맞았다"는 신호는 남는다
-            if (IsSwinging) return;
+            /**
+             * @brief 보스는 **슈퍼아머**다 - 피격 애니를 아예 타지 않는다.
+             *
+             * ## 왜 스윙 보호만으로는 모자랐는가
+             *
+             * 오래 전부터 "스윙 중에는 hurt로 덮지 않는다"는 보호가 있었다.
+             * 0.92초짜리 공격 클립이 초당 네 번의 타격에 매번 지워져서 처형인이
+             * 도끼를 끝까지 들지 못했던 것이 그 보호가 생긴 이유다.
+             *
+             * 그런데 그 보호는 **공격 클립이 이미 돌고 있을 때만** 걸린다.
+             * 대기와 예비 동작은 무방비라 0.26초마다 hurt가 덮고, 그동안 보스는
+             * 계속 움찔하기만 한다. 공격 그림이 아예 없는 확대판 보스
+             * (외눈 등롱·정예)는 걸릴 스윙조차 없어서 **평생 hurt만 탄다.**
+             *
+             * ## 왜 이제 와서 드러났는가
+             *
+             * 48단계 전까지 잡몹 정의에는 hurt 프레임이 없었다(빈 배열). 확대판
+             * 보스는 잡몹 정의를 그대로 쓰므로 덮을 것이 없었고, 피격 신호는
+             * 흰 플래시뿐이었다. 그 단계에서 팩에 남아 있던 hurt 태그를 채우면서
+             * 이 경로가 처음으로 열렸다 - 없던 그림이 생긴 것이 아니라, 없어서
+             * 안 보이던 결함이 보이게 된 것이다.
+             *
+             * ## 무엇을 끄는가
+             *
+             * **애니메이션만 끈다.** 위에서 흰 플래시는 이미 켰고 피해는 이미
+             * 깎였다. 보스는 같은 피해를 받고 같은 시각에 죽는다 - 슈퍼아머라는
+             * 이름이 흔히 뜻하는 피해 감소나 경직 면역이 아니라, 말 그대로
+             * 피격 클립을 안 거는 것뿐이다.
+             *
+             * 잡몹은 그대로 hurt를 탄다. 두세 대에 죽어서 움찔이 반복될 일이
+             * 없고, 그 짧은 반응이 타격감의 일부다.
+             */
+            if (IsBoss) return;
 
             if (definition.hurtFrames != null && definition.hurtFrames.Length > 0)
                 animator.Play(definition.hurtFrames, definition.frameRate, false, PlayResting);
@@ -377,6 +410,74 @@ namespace Onikiri.Battle
         }
 
         /**
+         * @brief 이번 주기에 쓸 공격 그림을 고른다.
+         *
+         * 후보는 `attackFrames` 하나와 `attackVariants`의 나머지다. 변형이
+         * 없으면 후보가 하나뿐이라 지금까지와 똑같이 같은 그림이 돈다 -
+         * 잡몹과 대부분의 보스가 그 경우다.
+         *
+         * **직전 것은 피한다.** 균등 추첨만 하면 넷 중에서도 같은 것이 두 번
+         * 세 번 이어지는 구간이 반드시 생기고, 2초 주기에서 그것은 "변형이
+         * 있다"가 아니라 "가끔 바뀐다"로 읽힌다. 사람이 무작위에서 기대하는
+         * 것은 균등 분포가 아니라 **겹치지 않음**이다.
+         */
+        private Sprite[] PickAttackClip()
+        {
+            var primary = definition.attackFrames;
+            var variants = definition.attackVariants;
+
+            int extra = 0;
+            if (variants != null)
+            {
+                foreach (var variant in variants)
+                    if (variant != null && variant.frames != null && variant.frames.Length > 0) extra++;
+            }
+
+            bool hasPrimary = primary != null && primary.Length > 0;
+            int total = extra + (hasPrimary ? 1 : 0);
+            if (total == 0) return primary;
+            if (total == 1) return hasPrimary ? primary : FirstVariant(variants);
+
+            // 직전 것을 뺀 나머지에서 고른다
+            int pick = UnityEngine.Random.Range(0, total - 1);
+            int seen = 0;
+
+            if (hasPrimary)
+            {
+                if (primary != lastAttack)
+                {
+                    if (seen == pick) return Remember(primary);
+                    seen++;
+                }
+            }
+
+            foreach (var variant in variants)
+            {
+                if (variant == null || variant.frames == null || variant.frames.Length == 0) continue;
+                if (variant.frames == lastAttack) continue;
+                if (seen == pick) return Remember(variant.frames);
+                seen++;
+            }
+
+            // 직전 것이 후보에 없었다면(첫 주기) 하나가 남는다
+            return Remember(hasPrimary ? primary : FirstVariant(variants));
+        }
+
+        private Sprite[] Remember(Sprite[] clip)
+        {
+            lastAttack = clip;
+            return clip;
+        }
+
+        private static Sprite[] FirstVariant(EnemyDefinition.AttackVariant[] variants)
+        {
+            if (variants == null) return null;
+            foreach (var variant in variants)
+                if (variant != null && variant.frames != null && variant.frames.Length > 0) return variant.frames;
+            return null;
+        }
+
+        /**
          * @brief 보스의 공격 주기.
          *
          * 큐 앞줄에 도착한 뒤에만 돈다(Engaged). 걸어 들어오는 동안 때리면
@@ -393,28 +494,52 @@ namespace Onikiri.Battle
             float interval = definition.attackInterval;
             attackTimer += Time.deltaTime;
 
+            // 이번 주기에 쓸 공격 그림. **주기가 바뀔 때 한 번만** 고른다.
+            //
+            // 매 프레임 고르면 예비 동작 길이가 프레임마다 달라져 스윙이
+            // 시작되는 시각이 흔들린다 - 클립마다 길이가 다르기 때문이다.
+            if (currentAttack == null) currentAttack = PickAttackClip();
+
             // 애니메이션은 타격보다 lead 시간만큼 먼저 시작한다. 플레이어의
             // PlayerCombat과 같은 규칙이다 - 칼이 닿는 프레임과 피해가 들어가는
             // 순간이 겹쳐야 한 사건으로 읽힌다
-            float swingDuration = definition.attackFrames != null && definition.attackFrames.Length > 0
-                ? Mathf.Min(definition.attackFrames.Length / definition.frameRate, interval)
+            float swingDuration = currentAttack != null && currentAttack.Length > 0
+                ? Mathf.Min(currentAttack.Length / definition.frameRate, interval)
                 : 0f;
-            float lead = swingDuration * definition.attackImpactPoint;
+
+            // 공격 그림이 없는 요괴도 예비 동작 시간을 갖는다.
+            //
+            // 잡몹 팩에는 공격 태그가 없는 것이 대부분인데, 그 잡몹이 확대판
+            // 보스로 서면(외눈 등롱, 정예) 선 자세 그대로 플레이어의 체력을
+            // 깎는다. 그때 알릴 수 있는 것은 이펙트뿐이고, 이펙트도 타격보다
+            // 먼저 떠야 "지금 친다"가 된다 - 동시에 뜨면 이미 맞은 뒤다.
+            //
+            // 이 값은 **그림이 뜨는 시각만** 옮긴다. 피해는 아래에서 주기가
+            // 찰 때 들어가고, 그 판정은 이 값을 보지 않는다
+            float lead = swingDuration > 0f
+                ? swingDuration * definition.attackImpactPoint
+                : Mathf.Min(definition.attackTelegraphSeconds, interval);
 
             if (!swingStarted && attackTimer >= interval - lead)
             {
                 if (swingDuration > 0f)
                 {
-                    float rate = definition.attackFrames.Length / Mathf.Max(0.0001f, swingDuration);
-                    animator.Play(definition.attackFrames, rate, false, PlayResting);
+                    float rate = currentAttack.Length / Mathf.Max(0.0001f, swingDuration);
+                    animator.Play(currentAttack, rate, false, PlayResting);
                 }
                 swingStarted = true;
+
+                var swing = SwingStarted;
+                if (swing != null) swing(this);
             }
 
             if (attackTimer < interval) return;
 
             attackTimer -= interval;
             swingStarted = false;
+
+            // 다음 주기는 다시 고른다
+            currentAttack = null;
 
             var handler = Attacked;
             if (handler != null) handler(this);
@@ -441,6 +566,7 @@ namespace Onikiri.Battle
             Died = null;
             Killed = null;
             Attacked = null;
+            SwingStarted = null;
 
             // 풀로 돌아가는 인스턴스는 확대판 보스였을 수 있다. 배율과 틴트를
             // 되돌리지 않으면 다음에 잡몹으로 재사용될 때 두 배 크기의 물든
@@ -449,6 +575,8 @@ namespace Onikiri.Battle
             baseTint = Color.white;
             AttackDamage = 0d;
             swingStarted = false;
+            currentAttack = null;
+            lastAttack = null;
             transform.localScale = Vector3.one;
             if (spriteRenderer != null) spriteRenderer.color = Color.white;
         }

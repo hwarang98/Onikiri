@@ -118,22 +118,40 @@ namespace Onikiri.Tests
          * 히트스톱과 셰이크는 숫자보다 강한 신호라, 어긋나면 숫자가 아니라 무게가
          * 믿긴다.
          */
+        /**
+         * ## 49단계에 재서술했다 - "표 순서"에서 "짝 비교"로
+         *
+         * 27단계에는 오의가 셋이고 무게 등급도 셋이라 "표 순서 = 배율 순서 =
+         * 무게 순서"가 한 줄로 성립했다. 여덟이 되면 그 셋이 갈라진다:
+         *
+         *   표 순서    기존 셋의 인덱스를 지켜야 한다(세이브·시뮬 칸이 물려 있다)
+         *              -> 신규는 뒤에 붙으므로 배율 순서가 아니다
+         *   무게 등급  히트스톱·셰이크·숫자 크기의 **세 단계**다
+         *              -> 여덟에 여덟 등급을 주면 그것은 등급이 아니라 값이다
+         *
+         * 남는 참말은 하나다: **더 센 오의가 더 가볍게 느껴지면 안 된다.**
+         * 그것을 짝 비교로 적으면 표 순서에도 등급 수에도 매이지 않는다.
+         *
+         * 배율이 무게의 자인 이유는 여덟이 같은 초당 기여를 나눠 갖기 때문이다 -
+         * 배율이 크다는 것은 곧 쿨다운이 길다는 것이고, 한 번에 큰 것이 온다.
+         */
         [Test]
-        public void Weights_FollowTheMultiplierOrder()
+        public void Weights_NeverContradictTheMultiplierOrder()
         {
-            for (int i = 1; i < SkillCatalog.Count; i++)
+            for (int a = 0; a < SkillCatalog.Count; a++)
             {
-                var previous = SkillCatalog.Skills[i - 1];
-                var current = SkillCatalog.Skills[i];
+                for (int b = 0; b < SkillCatalog.Count; b++)
+                {
+                    var heavier = SkillCatalog.Skills[a];
+                    var lighter = SkillCatalog.Skills[b];
+                    if (heavier.BaseMultiplier <= lighter.BaseMultiplier) continue;
 
-                Assert.Greater(current.BaseMultiplier, previous.BaseMultiplier,
-                    "표의 순서가 배율 순서와 다르다 - 아래 무게 검사의 전제가 깨진다");
-
-                Assert.Greater(current.Weight, previous.Weight, string.Format(
-                    "'{0}'(배율 x{1})의 무게가 {2}인데 '{3}'(배율 x{4})은 {5}다 - "
-                    + "더 센 오의가 더 가볍게 느껴진다",
-                    current.DisplayName, current.BaseMultiplier, current.Weight,
-                    previous.DisplayName, previous.BaseMultiplier, previous.Weight));
+                    Assert.GreaterOrEqual(heavier.Weight, lighter.Weight, string.Format(
+                        "'{0}'(배율 x{1})의 무게가 {2}인데 더 약한 '{3}'(배율 x{4})은 {5}다 - "
+                        + "더 센 오의가 더 가볍게 느껴진다",
+                        heavier.DisplayName, heavier.BaseMultiplier, heavier.Weight,
+                        lighter.DisplayName, lighter.BaseMultiplier, lighter.Weight));
+                }
             }
         }
 
@@ -190,10 +208,26 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 세 오의끼리도 갈려야 한다.
+         * @brief 오의끼리는 **색이 갈리거나 그림이 갈리거나** 해야 한다.
          *
-         * 색이 유일한 구분자인 신호가 둘 있다(아크·숫자). 오의 사이가 가까우면
-         * 그 둘이 아무것도 가리키지 않는다.
+         * ## 49단계에 전제가 바뀌었다
+         *
+         * 27단계의 전제는 "색이 유일한 구분자"였다. 그때는 셋이 **같은 아크
+         * 그림**을 색만 바꿔 썼기 때문이고, 그래서 세 색이 서로 0.25 이상
+         * 떨어져야 했다.
+         *
+         * 여덟이 되면서 그 전제가 둘 다 깨진다. 신규 다섯은 혈(血) 한 계열을
+         * 나눠 쓰므로 여덟 색을 0.25씩 벌릴 수가 없고(RGB 정육면체에
+         * 스물여덟 쌍이 들어가지 않는다), 대신 **각자 다른 그림**을 쓴다 -
+         * 퍼지는 링, 터지는 구름, 감기는 소용돌이, 솟는 파도, 휘는 채찍.
+         *
+         * 그래서 자를 둘로 나눈다:
+         *
+         *   같은 그림을 쓰는 두 오의  색이 유일한 구분자다 -> 0.25
+         *   다른 그림을 쓰는 두 오의  그림이 이미 가른다   -> 0.08 (같은 색 금지)
+         *
+         * 데미지 팔레트와의 거리는 **여덟 다 0.25 그대로**다(위 검사). 숫자는
+         * 그림이 없어서 색이 여전히 유일한 구분자이기 때문이다.
          */
         [Test]
         public void SkillColors_AreDistinctFromEachOther()
@@ -205,11 +239,47 @@ namespace Onikiri.Tests
                     var first = SkillCatalog.Skills[a];
                     var second = SkillCatalog.Skills[b];
 
+                    bool sameArt = first.VfxId == second.VfxId;
+                    float limit = sameArt ? MinimumColorDistance : MinimumFamilyDistance;
+
                     float distance = Distance(Rgba(first.SlashRgba), Rgba(second.SlashRgba));
 
-                    Assert.Greater(distance, MinimumColorDistance, string.Format(
-                        "'{0}'과 '{1}'의 색이 너무 가깝다 (거리 {2:F3})",
-                        first.DisplayName, second.DisplayName, distance));
+                    Assert.Greater(distance, limit, string.Format(
+                        "'{0}'과 '{1}'의 색이 너무 가깝다 (거리 {2:F3}, 한계 {3:F2}). {4}",
+                        first.DisplayName, second.DisplayName, distance, limit,
+                        sameArt ? "그림도 같아서 화면에서 한 사건으로 읽힌다"
+                                : "같은 계열이라도 같은 색을 두 뜻에 쓰면 안 된다"));
+                }
+            }
+        }
+
+        /**
+         * @brief 그림이 오의마다 유일한가. **위 검사의 두 번째 자가 성립하는 근거다.**
+         *
+         * 색 한계를 0.08까지 내린 유일한 이유가 "그림이 다르다"이므로, 그림이
+         * 겹치는 순간 그 완화가 근거를 잃는다. 그때 위 검사가 자동으로 0.25로
+         * 올라가지만(sameArt), 그것은 색으로 못 가르는 두 오의를 만들어 놓고
+         * 뒤늦게 막는 것이다 - 굽는 조각이 하나 모자랄 때 같은 클립을 두 번
+         * 가리키고 싶어지는 유혹이 실재한다.
+         *
+         * 기존 셋은 VfxId가 비어 있다(팩 참격과 클립 자체의 궤적을 쓴다).
+         * 빈 것끼리는 세지 않는다 - 그 셋은 27단계가 이미 색으로 갈라 뒀고,
+         * 그 거리(최소 0.36)가 위 검사에서 그대로 확인된다.
+         */
+        [Test]
+        public void EverySkillEffect_BelongsToExactlyOneSkill()
+        {
+            for (int a = 0; a < SkillCatalog.Count; a++)
+            {
+                string id = SkillCatalog.Skills[a].VfxId;
+                if (string.IsNullOrEmpty(id)) continue;
+
+                for (int b = a + 1; b < SkillCatalog.Count; b++)
+                {
+                    Assert.AreNotEqual(id, SkillCatalog.Skills[b].VfxId, string.Format(
+                        "'{0}'과 '{1}'이 같은 이펙트 '{2}'를 쓴다 - 두 오의가 화면에서 "
+                        + "한 사건으로 읽힌다", SkillCatalog.Skills[a].DisplayName,
+                        SkillCatalog.Skills[b].DisplayName, id));
                 }
             }
         }
@@ -223,6 +293,16 @@ namespace Onikiri.Tests
          * 않지만, **같은 색을 두 뜻에 쓰는 것**을 잡는 데는 충분하다.
          */
         const float MinimumColorDistance = 0.25f;
+
+        /**
+         * @brief 그림이 다른 두 오의 사이의 최소 거리 (49단계).
+         *
+         * "같은 색을 두 뜻에 쓰지 않는다"만 남긴 값이다. 실측으로 여덟 오의의
+         * 최소 쌍이 0.107(낙혈 #B02060 대 혈조 #96285E)이라 그 아래에 둔다 -
+         * 이 자는 계열 안의 단계를 강제하는 것이 아니라 **두 오의가 같은
+         * 색으로 굳는 것**을 막는다.
+         */
+        const float MinimumFamilyDistance = 0.08f;
 
         static Color Rgba(uint value)
         {

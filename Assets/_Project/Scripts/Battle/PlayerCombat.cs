@@ -832,6 +832,11 @@ namespace Onikiri.Battle
             // 프레임 수를 줄이지 않고 재생 속도만 올린다. 형태는 그대로 두고 화면에
             // 머무는 시간만 줄이는 쪽이 픽셀 아트에서 훨씬 덜 티가 난다.
             SpawnSparkAt(at, facing < 0);
+
+            // 무기 티어의 오라 (51단계)는 **타격 경로에만** 얹는다. SpawnSparkAt
+            // 안에 넣으면 영체의 강림 불꽃(SpiritSummon)까지 무기 오라를 두르는데,
+            // 강림은 요도의 연출이지 칼이 닿은 자리가 아니다
+            SpawnGradeGlow(at, facing < 0, SparkRate());
         }
 
         /**
@@ -854,12 +859,48 @@ namespace Onikiri.Battle
             //
             // 프레임 수를 줄이지 않고 재생 속도만 올린다. 형태는 그대로 두고 화면에
             // 머무는 시간만 줄이는 쪽이 픽셀 아트에서 훨씬 덜 티가 난다.
+            var spark = sparkPool.Get();
+            spark.Play(sparkFrames, SparkRate(), position, mirror, ReleaseSpark);
+        }
+
+        /** 불꽃의 예산 압축 재생 속도. 불꽃과 오라가 같은 값을 써야 함께 꺼진다 */
+        private float SparkRate()
+        {
             float baseDuration = sparkFrames.Length / Mathf.Max(0.0001f, sparkFrameRate);
             float duration = CombatFeel.ScaledDuration(baseDuration, sparkBudgetPerSecond, attacksPerSecond);
-            float rate = sparkFrames.Length / Mathf.Max(0.0001f, duration);
+            return sparkFrames.Length / Mathf.Max(0.0001f, duration);
+        }
 
-            var spark = sparkPool.Get();
-            spark.Play(sparkFrames, rate, position, mirror, ReleaseSpark);
+        /**
+         * @brief 무기 티어의 평타 오라 (51단계). 붉은 불꽃 **뒤**에 티어 색
+         *        오라를 한 장 세운다.
+         *
+         * 같은 흰 시트를 다시 쓴다 - ImpactSparkBuilder가 시트를 흰색으로 굽고
+         * 색은 재생할 때 입히므로(ImpactSpark.tint 주석), 오라에 필요한 것은
+         * 새 그림이 아니라 다른 색·크기·층이다:
+         *
+         *   색    티어 램프 (청 -> 보라 -> 주황 -> 심홍). 알파가 진하기다
+         *   크기  2배 (정수 - 픽셀 격자 규칙). 12px 불꽃 뒤의 24px 판
+         *   층    Vfx - 1. 불꽃보다 뒤에 서야 "불꽃에 오라가 돈다"로 읽힌다
+         *
+         * 티어1은 알파 0이라 아예 안 뜬다 - 지금까지의 화면이 곧 티어1이고,
+         * 그래야 등급업이 "생겼다"로 보인다. 재생 속도는 불꽃과 같은 값을
+         * 받아 함께 압축된다(공격속도 예산 규칙).
+         */
+        private void SpawnGradeGlow(Vector3 position, bool mirror, float rate)
+        {
+            int tier = WeaponVfxTier.CurrentTier();
+            bool premium = WeaponVfxTier.IsPremium();
+
+            float alpha = WeaponVfxTier.GlowAlpha(tier, premium);
+            if (alpha <= 0f) return;
+
+            var tint = WeaponVfxTier.GlowTint(tier, premium);
+            tint.a = alpha;
+
+            var glow = sparkPool.Get();
+            glow.Play(sparkFrames, rate, position, mirror, tint, 2f,
+                      Onikiri.Core.SortingOrders.Vfx - 1, ReleaseSpark);
         }
 
         private void ReleaseSpark(ImpactSpark spark)

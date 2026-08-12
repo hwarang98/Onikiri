@@ -80,8 +80,10 @@ MonoBehaviour:
   - {fileID: -1830818796, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
   - {fileID: 1911828765, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
   - {fileID: -1799208618, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.55
+  attackTelegraphSeconds: 0
   hoverHeight: 0
   artBottomOffset: 0
   artFacesLeft: 1

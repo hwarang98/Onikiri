@@ -48,6 +48,19 @@ namespace Onikiri.EditorTools
         public const string DeathPath = OutputFolder + "/DEATH.png";
         public const string AttackPath = OutputFolder + "/ATTACK.png";
 
+        /**
+         * @brief 추가 공격 셋. 오의 블록에 서로 다른 공격이 넷 들어 있다.
+         *
+         * 한 벌만 쓰면 2초마다 같은 그림이 돌아 금방 벽지가 된다. `Enemy`가
+         * 매 주기에 넷 중 하나를 고른다(EnemyDefinition.attackVariants).
+         */
+        public const string WhipPath = OutputFolder + "/ATTACK_WHIP.png";
+        public const string DiscPath = OutputFolder + "/ATTACK_DISC.png";
+        public const string WavePath = OutputFolder + "/ATTACK_WAVE.png";
+
+        /** 추가 공격의 시트 경로. BossConfigBuilder가 순서대로 물린다 */
+        public static readonly string[] AttackVariantPaths = { WhipPath, DiscPath, WavePath };
+
         /** 정수만. 픽셀 격자 규칙(11단계)은 굽는 배율에도 똑같이 적용된다 */
         public const int Scale = 2;
 
@@ -91,15 +104,72 @@ namespace Onikiri.EditorTools
         {
             public string ClipName;
             public string OutputPath;
+
+            /**
+             * @brief 클립 안에서 잘라 쓸 구간 (양끝 포함). 음수면 클립 전체.
+             *
+             * 오의 블록(Tag_4)만 이 칸을 쓴다. 40프레임 통째는 8초라 2초 주기에
+             * 들어가지 않고, 애초에 **서로 다른 오의 넷을 이어 붙인 것**이라
+             * 통째로 돌리면 한 동작으로 읽히지도 않는다.
+             */
+            public int First;
+            public int Last;
         }
+
+        /**
+         * @brief 공격에 쓰는 구간 (Tag_4 = 원본 52~91 안에서의 번호).
+         *
+         * 원본 프레임 64~71에 해당한다. 눈으로 확인한 내용:
+         *
+         *   64,65  몸이 붉은 줄기로 흩어지기 시작한다 (예비 동작)
+         *   66,67  **붉은 초승달이 나간다.** 이 두 장에는 몸이 아예 없다
+         *   68,69  흩어진 입자
+         *   70,71  칼을 든 몸이 다시 맺힌다 (마무리)
+         *
+         * 몸이 사라졌다 맺히는 것이 이 여덟 장의 요점이다 - 축지법으로 베고
+         * 돌아오는 동작이고, 그래서 초승달이 몸과 겹치지 않는다.
+         */
+        private const int AttackFirstFrame = 12;   // 52 + 12 = 64
+        private const int AttackLastFrame = 19;    // 52 + 19 = 71
 
         private static readonly ClipBake[] Bakes =
         {
-            new ClipBake { ClipName = "Tag",   OutputPath = IdlePath },
-            new ClipBake { ClipName = "Tag_3", OutputPath = WalkPath },
-            new ClipBake { ClipName = "Tag_1", OutputPath = HurtPath },
-            new ClipBake { ClipName = "Tag_2", OutputPath = DeathPath },
-            new ClipBake { ClipName = "Tag_0", OutputPath = AttackPath },
+            new ClipBake { ClipName = "Tag",   OutputPath = IdlePath,  First = -1, Last = -1 },
+            new ClipBake { ClipName = "Tag_3", OutputPath = WalkPath,  First = -1, Last = -1 },
+            new ClipBake { ClipName = "Tag_1", OutputPath = HurtPath,  First = -1, Last = -1 },
+            new ClipBake { ClipName = "Tag_2", OutputPath = DeathPath, First = -1, Last = -1 },
+
+            /**
+             * 공격은 **오의 블록에서 잘라 온다.** Tag_0(내려베기 14장)이 아니다.
+             *
+             * Tag_0도 분명한 공격이다 - 칼을 위로 들었다가 호를 그리며 내려벤다.
+             * 문제는 그 열넷 어디에도 **이펙트가 그려져 있지 않다**는 것이다.
+             * 회색 몸과 붉은 칼날뿐이라 화면에서 "벴다"가 약하고, 그래서 한동안
+             * 참격 이펙트를 따로 얹어 보완했다(VfxBurst) - 그림 위에 그림을
+             * 겹치는 방식이라 크기와 자리를 계속 손으로 맞춰야 했다.
+             *
+             * 오의 블록에는 원화가가 **몸과 이펙트를 같은 프레임에 함께** 그려
+             * 뒀다. 겹칠 것이 없고 어긋날 것도 없다.
+             */
+            new ClipBake
+            {
+                ClipName = "Tag_4", OutputPath = AttackPath,
+                First = AttackFirstFrame, Last = AttackLastFrame
+            },
+
+            /**
+             * 같은 블록의 나머지 셋. 원본 프레임 번호와 그림:
+             *
+             *   72~77  혈조 - 갈고리처럼 휘감는 채찍. 넷 중 가장 크게 휜다
+             *   78~83  혈륜 - 수평으로 쓸고 호를 그린 뒤 칼날이 번쩍인다
+             *   84~90  혈파 - 발밑에서 핏빛 장막이 솟아 방울로 떨어진다
+             *
+             * 혈참과 달리 이 셋은 **몸이 내내 보인다.** 그래서 넷을 섞으면
+             * "사라졌다 나타나는" 혈참이 특별해 보이는 효과도 함께 생긴다.
+             */
+            new ClipBake { ClipName = "Tag_4", OutputPath = WhipPath, First = 20, Last = 25 },
+            new ClipBake { ClipName = "Tag_4", OutputPath = DiscPath, First = 26, Last = 31 },
+            new ClipBake { ClipName = "Tag_4", OutputPath = WavePath, First = 32, Last = 38 },
         };
 
         [MenuItem("Onikiri/Art/Bake Red-Eye Yokai Sheets")]
@@ -132,8 +202,11 @@ namespace Onikiri.EditorTools
                 clips[clip.name] = FramesOf(clip);
             }
 
-            // 셀은 다섯 클립 전체의 합집합이다. 시트마다 셀이 다르면 BossConfig의
-            // 셀 하나로 다섯 장을 자를 수 없다
+            // 셀은 **실제로 굽는 프레임들**의 합집합이다. 오의 블록은 여덟 장만
+            // 잘라 쓰므로 나머지 서른둘을 셀 계산에 넣으면 안 된다 - 넣으면
+            // 안 쓰는 장판기와 파도까지 셀에 들어가 칸이 두 배가 되고, 그 여백이
+            // 위치 기준을 통째로 밀어버린다(SpiritSummon에서 한 번 겪었다)
+            var selected = new Dictionary<string, List<Sprite>>();
             var used = new List<Sprite>();
             foreach (var bake in Bakes)
             {
@@ -143,6 +216,21 @@ namespace Onikiri.EditorTools
                     Debug.LogError("[Onikiri] Yokai clip missing: " + bake.ClipName + " in " + SourcePath);
                     return false;
                 }
+
+                if (bake.First >= 0)
+                {
+                    if (bake.Last >= frames.Count)
+                    {
+                        Debug.LogError(string.Format(
+                            "[Onikiri] Yokai clip '{0}' has {1} frames - cannot slice {2}..{3}. " +
+                            "The aseprite tags changed.",
+                            bake.ClipName, frames.Count, bake.First, bake.Last));
+                        return false;
+                    }
+                    frames = frames.GetRange(bake.First, bake.Last - bake.First + 1);
+                }
+
+                selected[bake.OutputPath] = frames;
                 used.AddRange(frames);
             }
 
@@ -184,7 +272,9 @@ namespace Onikiri.EditorTools
 
             foreach (var bake in Bakes)
             {
-                var frames = clips[bake.ClipName];
+                // 위에서 구간까지 잘라둔 것을 쓴다. clips[..]를 다시 읽으면
+                // 오의 블록이 마흔 장 통째로 구워진다
+                var frames = selected[bake.OutputPath];
 
                 int cols = Mathf.Min(columns, frames.Count);
                 int rows = (frames.Count + cols - 1) / cols;

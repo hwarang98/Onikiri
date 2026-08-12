@@ -93,6 +93,63 @@ namespace Onikiri.Progression
         public const double BroadSealStep = 1.05d;
         public const double BroadTierStep = 1.038d;
 
+        /**
+         * @brief 이 혼이 그 오의를 무는 방식.
+         */
+        public enum Match
+        {
+            /** 안 문다 */
+            None,
+
+            /** 자기 오의. 45단계의 전담 상성 - 가장 깊다 */
+            Primary,
+
+            /** 같은 거동의 신규 오의 (49단계). **얕게 걸린다** - 아래 주석 참고 */
+            Family,
+
+            /** 전 오의를 미는 혼 (흑야·백면). 셋에 걸리므로 얕다 */
+            Broad
+        }
+
+        /**
+         * @brief 이 혼이 그 오의를 어떻게 무는가. **가족은 얕다**(49단계).
+         *
+         * ## 처음에 "가족도 전담과 같은 크기"로 두었다가 실측이 뒤집었다
+         *
+         * 규칙이 하나뿐인 편이 낫다고 생각했다 - 한 혼 아래 x3.13과 x1.47 두
+         * 값이 서면 플레이어가 그 차이를 외워야 하니까. 그런데 하네스로 재보니
+         * **계약 구간의 오의 몫이 50.6%가 되어 계약이 깨졌다**
+         * (Affinity_DoesNotFlipTheAutoAttackWithinTheContract, 한계 50%).
+         *
+         * 45단계 이후 오의 몫은 이미 45.2%였다. 4번 슬롯이 얹히면서 5.4%p가
+         * 더 올라 자동 공격을 뒤집은 것이고, 그 5.4%p의 대부분은 슬롯이 아니라
+         * **그 슬롯에 전담 상성이 곱해진 것**이다 - 신규 오의의 기여를 3분의
+         * 1로 줄여도 몫이 49.2%까지밖에 안 내려간다(하네스 실측). 크기를
+         * 줄이는 것으로는 못 고친다는 뜻이다.
+         *
+         * 그래서 곡선을 나눈다. 가족은 **흑야와 같은 얕은 곡선**을 탄다:
+         *
+         *     전담(Primary)  x1.13 x 1.12^(t-1)  ->  상한 x3.13
+         *     가족(Family)   x1.05 x 1.038^(t-1) ->  상한 x1.47
+         *
+         * 값이 둘로 갈리는 대가는 남는다. 그래도 이쪽이 나은 이유는 **같은
+         * 말을 두 번 하기 때문**이다 - "그 혼의 오의"는 하나이고 가족은
+         * 곁가지라는 설정이, 곡선에서도 그대로 곁가지가 된다. 흑야가 셋에
+         * 걸리므로 얕은 것과 정확히 같은 산수이기도 하다(한 혼이 미는 오의가
+         * 늘면 한 오의당 몫은 줄어야 한다).
+         *
+         * 빌드는 살아 있다. 몰아주기 세계에서 4번 자리의 답은 여전히 그 혼의
+         * 가족 오의이고(하네스 실측 +0.6~0.7%), 달라진 것은 그 답의 크기뿐이다.
+         */
+        public static Match MatchOf(YodoSpec blade, string skillId)
+        {
+            if (string.IsNullOrEmpty(blade.AffinitySkillId)) return Match.Broad;
+            if (blade.AffinitySkillId == skillId) return Match.Primary;
+            if (!string.IsNullOrEmpty(blade.AffinityFamilyId)
+                && blade.AffinityFamilyId == skillId) return Match.Family;
+            return Match.None;
+        }
+
         /** 이 혼이 전 오의를 미는가. 카탈로그의 빈 id가 그 뜻이다 */
         public static bool IsBroad(int bladeIndex)
         {
@@ -117,13 +174,23 @@ namespace Onikiri.Progression
          */
         public static double ValueAt(int bladeIndex, int tier, int rarity = 0)
         {
-            if (tier < 1) return 1d;
+            return ValueAt(bladeIndex, tier, rarity,
+                           IsBroad(bladeIndex) ? Match.Broad : Match.Primary);
+        }
+
+        /**
+         * @param match 무는 방식. 가족(Family)은 전 오의(Broad)와 **같은 곡선**을
+         *              탄다 - 위 MatchOf 주석 참고
+         */
+        public static double ValueAt(int bladeIndex, int tier, int rarity, Match match)
+        {
+            if (tier < 1 || match == Match.None) return 1d;
 
             int t = tier > YodoCurve.MaxTier ? YodoCurve.MaxTier : tier;
-            bool broad = IsBroad(bladeIndex);
+            bool shallow = match != Match.Primary;
 
-            double seal = broad ? BroadSealStep : AffinitySealStep;
-            double step = broad ? BroadTierStep : AffinityTierStep;
+            double seal = shallow ? BroadSealStep : AffinitySealStep;
+            double step = shallow ? BroadTierStep : AffinityTierStep;
             return seal * Math.Pow(step, t - 1) * YodoRarityCurve.ValueAt(rarity);
         }
 
@@ -160,10 +227,10 @@ namespace Onikiri.Progression
             {
                 if (tiers[i] < 1) continue;
 
-                string target = YodoCatalog.Blades[i].AffinitySkillId;
-                if (!string.IsNullOrEmpty(target) && target != skillId) continue;
+                var match = MatchOf(YodoCatalog.Blades[i], skillId);
+                if (match == Match.None) continue;
 
-                factor *= ValueAt(i, tiers[i], YodoRarityCurve.At(rarities, i));
+                factor *= ValueAt(i, tiers[i], YodoRarityCurve.At(rarities, i), match);
             }
 
             // 전설은 봉인한 혼이 아니라 유물이므로 자기 표를 지난다.
@@ -193,19 +260,18 @@ namespace Onikiri.Progression
          * 분자와 분모에 똑같이 곱해져 약분되기 때문이다 - 그것이 오의를
          * 괄호 안에 더한 26단계 설계의 배당금이다.
          */
+        /**
+         * ## 49단계 - 풀이 아니라 **슬롯**을 센다
+         *
+         * 여덟 오의 전부가 아니라 심층 장착 구성(SkillCatalog.DeepLoadout) 넷만
+         * 더한다. 화면에서 나가는 것이 그 넷뿐이기 때문이고, 이 몫이 상수라는
+         * 위 주장이 계속 성립하는 근거이기도 하다 - 풀이 커져도 슬롯 수가
+         * 그대로면 이 값이 안 움직인다. 다음 스텝의 스킬 뽑기가 이 파일을
+         * 다시 안 건드려도 되는 이유다.
+         */
         public static double CappedSkillRate
         {
-            get
-            {
-                double rate = 0d;
-                for (int i = 0; i < SkillCatalog.Count; i++)
-                {
-                    var spec = SkillCatalog.Skills[i];
-                    if (spec.CooldownSeconds <= 0d) continue;
-                    rate += SkillCurve.CeilingFor(spec.BaseMultiplier) / spec.CooldownSeconds;
-                }
-                return rate;
-            }
+            get { return SkillCatalog.CeilingRateOf(SkillCatalog.DeepLoadout); }
         }
 
         /**
@@ -249,17 +315,24 @@ namespace Onikiri.Progression
          * 모양뿐 아니라 크기로도 갈리는 자리이고, 그래서 여기서 오의별로
          * 더한다(평균 상성 하나로 접지 않는다).
          */
-        public static double DpsFactor(int[] tiers, int[] rarities = null, int[] legends = null)
+        /**
+         * @param loadout 장착 구성 (49단계). null이면 심층 구성이다 - 4번 슬롯이
+         *                아직 안 열린 구간(st41~50)을 묻는 쪽은 그 구간의 구성을
+         *                넘겨야 한다(SkillCatalog.LoadoutAtStage)
+         */
+        public static double DpsFactor(int[] tiers, int[] rarities = null, int[] legends = null,
+                                       int[] loadout = null)
         {
             double attack = CappedAttackRate;
 
             double plain = 0d, boosted = 0d;
-            for (int i = 0; i < SkillCatalog.Count; i++)
+            if (loadout == null) loadout = SkillCatalog.DeepLoadout;
+            for (int slot = 0; slot < loadout.Length; slot++)
             {
-                var spec = SkillCatalog.Skills[i];
-                if (spec.CooldownSeconds <= 0d) continue;
+                int i = loadout[slot];
+                double rate = SkillCatalog.CeilingRateOf(i);
+                if (rate <= 0d) continue;
 
-                double rate = SkillCurve.CeilingFor(spec.BaseMultiplier) / spec.CooldownSeconds;
                 plain += rate;
                 boosted += rate * FactorForSkill(i, tiers, rarities, legends);
             }

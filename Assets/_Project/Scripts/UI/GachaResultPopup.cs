@@ -66,6 +66,159 @@ namespace Onikiri.UI
         [SerializeField] private Color cardNormalTint = new Color(0.34f, 0.36f, 0.68f, 1f);
         [SerializeField] private Color cardLegendaryTint = new Color(0.62f, 0.50f, 0.22f, 1f);
 
+        /**
+         * @brief 판의 치수. **빌더가 옮겨 적는다** - 스크립트 기본값이 아니라.
+         *
+         * 50b에 판이 자리를 스스로 놓게 되면서(Render) 빌더의 상수 여섯이
+         * 여기로 들어왔다. 빌더가 초기 배치에 쓰는 값과 판이 다시 놓는 값이
+         * 두 곳에 살면 반드시 갈리고, 그 증상은 "첫 프레임과 갱신 후의 판이
+         * 다르다"다.
+         */
+        [SerializeField] private float lineHeight = 52f;
+        [SerializeField] private float topPad = 16f;
+        [SerializeField] private float buttonGap = 28f;
+        [SerializeField] private float confirmHeight = 84f;
+        [SerializeField] private float cardSidePad = 24f;
+        [SerializeField] private float outerSidePad = 48f;
+
+        /**
+         * @brief 좁은 칸의 들여쓰기. 왼쪽 정렬이 판 가장자리에 붙지 않게.
+         *
+         * public인 이유는 빌더의 검산 때문이다 - 좁은 칸의 실사용 폭이
+         * 이만큼 줄었으므로 VerifyTextFits가 같은 값을 빼고 재야 한다.
+         * 두 곳에 적으면 이 값이 움직이는 날 검산이 옛 폭을 잰다.
+         */
+        public const float NarrowInset = 60f;
+
+        /** 줄 하나의 재료. Show가 채우고 Render가 놓는다 */
+        private string[] rowTexts;
+        private Color[] rowColors;
+        private bool[] rowWide;
+
+        private void EnsureRowScratch()
+        {
+            if (lines == null) return;
+            if (rowTexts != null && rowTexts.Length == lines.Length) return;
+
+            rowTexts = new string[lines.Length];
+            rowColors = new Color[lines.Length];
+            rowWide = new bool[lines.Length];
+        }
+
+        /**
+         * @brief 줄들을 실제로 놓는다. **자리가 상수가 아니라 결과에서 나온다.**
+         *
+         * ## 50b - 두 열 격자가 문자열에 밀렸다
+         *
+         * 처음에는 열 줄이 두 칸 x 다섯 줄 고정이었고, 그 격자에 "오의 해금 →
+         * 스킬 XP 240 → Lv +9" 같은 긴 줄이 들어오자 열 경계를 넘어 판 밖으로
+         * 삐져나왔다(실기 캡처). 44단계의 규칙 그대로다 - **상자를 글자에
+         * 맞추지 그 반대가 아니다**(VerifyRowsFit).
+         *
+         * 그래서 줄이 두 종류가 됐다:
+         *
+         *   좁은 줄   반 폭, 두 칸씩.  짧은 고정 포맷("XP +6")만 들어온다
+         *   넓은 줄   전 폭, 한 줄 통째.  **드문 사건**(해금·개안·전설)이 들어온다
+         *
+         * 넓은 줄은 오버플로 수리이면서 동시에 연출이다 - 200회에 한 번의
+         * 결과가 열 줄 사이에 끼어 있으면 흘깃 볼 때 안 읽히는데, 혼자 한
+         * 줄을 다 쓰면 판의 리듬이 거기서 끊긴다. 47단계가 전설에서만 판을
+         * 금테로 물들인 것과 같은 층의 신호이고, 같은 이유로 드물어야 한다.
+         *
+         * 판의 높이도 여기서 나온다 - 줄 수가 결과마다 다르므로(넓은 줄 하나가
+         * 좁은 칸 둘 몫을 쓴다) 상수로 두면 넓은 줄이 많은 판에서 반드시
+         * 넘친다. 상점 배너 높이를 상수에서 식으로 바꾼 47단계 규칙의 연장이다.
+         */
+        private void Render(int count, string headline, Color headColor, bool legendaryCard)
+        {
+            // 줄 수 먼저. 좁은 칸은 둘씩 접히고 넓은 줄은 혼자 한 줄이다.
+            // 넓은 줄이 중간에 오면 차 있던 왼쪽 칸은 그대로 두고 다음 줄로
+            // 내려간다 - 순서를 지키는 것이 정렬보다 먼저다(뽑기 순서가 곧
+            // 사건의 순서다)
+            int rows = 0, column = 0;
+            for (int i = 0; i < count; i++)
+            {
+                if (rowWide[i]) { if (column > 0) { rows++; column = 0; } rows++; }
+                else { column++; if (column == 2) { rows++; column = 0; } }
+            }
+            if (column > 0) rows++;
+
+            // 판의 폭은 뿌리(패널 전체)에서 유도한다. visual은 이 순간 아직
+            // 꺼져 있을 수 있어 자기 rect가 낡았을 수 있다
+            float cardWidth = ((RectTransform)transform).rect.width - outerSidePad * 2f;
+            float innerWidth = cardWidth - cardSidePad * 2f;
+
+            float cardHeight = topPad + lineHeight * 1.4f + rows * lineHeight
+                             + buttonGap + confirmHeight + topPad;
+
+            var visualRect = (RectTransform)visual.transform;
+            visualRect.offsetMin = new Vector2(outerSidePad, -cardHeight * 0.5f);
+            visualRect.offsetMax = new Vector2(-outerSidePad, cardHeight * 0.5f);
+
+            float half = innerWidth * 0.5f;
+            int row = 0;
+            column = 0;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (lines[i] == null) continue;
+
+                if (i >= count)
+                {
+                    lines[i].text = string.Empty;
+                    continue;
+                }
+
+                var rect = (RectTransform)lines[i].transform;
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+
+                if (rowWide[i])
+                {
+                    if (column > 0) { row++; column = 0; }
+                    rect.sizeDelta = new Vector2(innerWidth, lineHeight);
+                    rect.anchoredPosition = new Vector2(cardSidePad,
+                        -(topPad + lineHeight * (1.4f + row)));
+
+                    // 넓은 줄은 가운데다 - 혼자 한 줄을 쓰는 사건이라 제목과
+                    // 같은 축에 선다
+                    lines[i].alignment = TMPro.TextAlignmentOptions.Center;
+                    row++;
+                }
+                else
+                {
+                    // 좁은 칸은 **왼쪽 정렬**이다 (50b). 가운데로 두면 길이가
+                    // 다른 줄들("XP +6" / "XP +20 · Lv +1")의 시작점이 칸마다
+                    // 흔들려 열이 열로 안 읽힌다 - 확률표가 열을 세운 것과
+                    // 같은 이유이고, 들여쓰기 한 칸이 두 열의 경계를 만든다
+                    rect.sizeDelta = new Vector2(half - NarrowInset, lineHeight);
+                    rect.anchoredPosition = new Vector2(
+                        cardSidePad + column * half + NarrowInset,
+                        -(topPad + lineHeight * (1.4f + row)));
+
+                    lines[i].alignment = TMPro.TextAlignmentOptions.Left;
+                    column++;
+                    if (column == 2) { row++; column = 0; }
+                }
+
+                lines[i].text = rowTexts[i];
+                lines[i].color = rowColors[i];
+            }
+
+            if (titleLabel != null)
+            {
+                titleLabel.text = headline;
+                titleLabel.color = headColor;
+            }
+
+            if (cardBackground != null)
+                cardBackground.color = legendaryCard ? cardLegendaryTint : cardNormalTint;
+
+            visual.SetActive(true);
+            visual.transform.SetAsLastSibling();
+        }
+
         private void Start()
         {
             if (confirmButton != null) confirmButton.onClick.AddListener(Close);
@@ -91,21 +244,15 @@ namespace Onikiri.UI
         public void Show(List<GachaSystem.PullResult> results, YodoSystem yodo)
         {
             if (visual == null || lines == null || results == null) return;
+            EnsureRowScratch();
 
             int shards = 0;
             var best = GachaCurve.Grade.Common;
             var counts = new int[GachaCurve.GradeCount];
+            int count = System.Math.Min(results.Count, lines.Length);
 
-            for (int i = 0; i < lines.Length; i++)
+            for (int i = 0; i < count; i++)
             {
-                if (lines[i] == null) continue;
-
-                if (i >= results.Count)
-                {
-                    lines[i].text = string.Empty;
-                    continue;
-                }
-
                 var result = results[i];
                 shards += result.Shards;
 
@@ -113,25 +260,23 @@ namespace Onikiri.UI
                 counts[(int)grade]++;
                 if (grade > best) best = grade;
 
-                lines[i].text = TextFor(result, yodo);
-                lines[i].color = ColorFor(result);
-            }
+                rowTexts[i] = TextFor(result, yodo);
+                rowColors[i] = ColorOf(grade);
 
-            if (titleLabel != null)
-            {
-                titleLabel.text = Headline(shards, counts);
-                titleLabel.color = ColorOf(best);
+                // ★4 이상이 전 폭 줄이다 - 오의 배너와 **같은 자**다 (50b).
+                // 처음에 전설만 넓혔다가 실기에서 물렸다: ★4의 미끄러짐 줄
+                // ("천장! 상위 혼 → 혼 정수 → 파편 80")이 들여쓰기로 좁아진
+                // 칸을 넘어 오른쪽 칸을 덮었다. 실효 ★4가 4.1%라 10연에
+                // 반 줄꼴 - 천장이 지키는 것이 ★4+인 것과 같은 경계이고,
+                // 넓은 줄 = "천장이 보장하는 것"으로 두 배너가 같은 말을 한다
+                rowWide[i] = grade >= GachaCurve.Grade.Epic;
             }
 
             // 판이 물드는 것은 전설에서만이다. ★4까지는 줄 하나의 색으로
             // 충분하고, 판까지 바뀌면 200회에 한 번의 사건이 20회에 한 번이
             // 된다 - 사건은 드물어야 사건이다
-            if (cardBackground != null)
-                cardBackground.color = best == GachaCurve.Grade.Legendary
-                    ? cardLegendaryTint : cardNormalTint;
-
-            visual.SetActive(true);
-            visual.transform.SetAsLastSibling();
+            Render(count, Headline(shards, counts), ColorOf(best),
+                   best == GachaCurve.Grade.Legendary);
         }
 
         /**
@@ -235,6 +380,150 @@ namespace Onikiri.UI
             return blade.copies <= 1
                 ? blade.bladeName + " 획득!"
                 : blade.bladeName + " 돌파 " + blade.Breakthrough;
+        }
+
+        // ---------------------------------------------------------------- 오의 뽑기 (50단계)
+
+        /**
+         * @brief 오의 뽑기 결과를 **같은 판에** 그린다.
+         *
+         * 판을 따로 만들지 않은 이유는 47단계가 등급 색과 별로 세운 것이
+         * **눈금**이기 때문이다(UiSkin.Grades 주석) - 눈금은 뜻이 하나여야
+         * 하고, 같은 ★4가 두 판에서 다른 색·다른 배치로 뜨면 그 하나가 깨진다.
+         * 갈리는 것은 줄의 문구뿐이고, 그것이 두 배너의 차이 전부다.
+         *
+         * 머리글도 규칙이 같다 - 합계 하나 + ★3 이상만 센다. 저쪽의 합계가
+         * 파편이고 이쪽은 XP다.
+         */
+        public void Show(List<SkillGachaSystem.PullResult> results, SkillSystem skills)
+        {
+            if (visual == null || lines == null || results == null) return;
+            EnsureRowScratch();
+
+            int xp = 0;
+            var best = GachaCurve.Grade.Common;
+            var counts = new int[GachaCurve.GradeCount];
+            int count = System.Math.Min(results.Count, lines.Length);
+
+            for (int i = 0; i < count; i++)
+            {
+                var result = results[i];
+                xp += result.Xp;
+
+                counts[(int)result.Grade]++;
+                if (result.Grade > best) best = result.Grade;
+
+                // **굴린 등급이 넓은 줄을 정한다** - 도착한 등급이 아니라.
+                // ★4·★5는 미끄러져 XP로 떨어져도 그 줄이 사건의 기록이고
+                // ("오의 해금 → XP +240"), 실기에서 삐져나온 것이 정확히
+                // 그 미끄러짐 줄이었다. 요도 쪽과 기준이 다른 이유는 재고다 -
+                // 이 배너의 ★4(해금)는 평생 두 번뿐이라 넓혀도 사건으로
+                // 남지만, 요도의 ★4는 실효 4.1%라 넓히면 판이 넓은 줄투성이가
+                // 된다
+                rowWide[i] = GachaCurve.GradeOf[(int)result.Rolled] >= GachaCurve.Grade.Epic;
+
+                rowTexts[i] = SkillTextFor(result, skills, rowWide[i]);
+
+                // 미끄러진 줄의 색도 굴린 등급이다. 도착한 등급(XP = ★1~★3)
+                // 으로 칠하면 전 폭 줄이 바닥 색을 입어 "넓은데 수수한" 줄이
+                // 되고, 그것은 신호 둘이 서로를 지우는 것이다
+                rowColors[i] = ColorOf(GachaCurve.GradeOf[(int)result.Rolled]);
+            }
+
+            Render(count, SkillHeadline(xp, counts), ColorOf(best),
+                   best == GachaCurve.Grade.Legendary);
+        }
+
+        private static string SkillHeadline(int xp, int[] counts)
+        {
+            string text = "스킬 XP " + xp;
+
+            for (int g = (int)GachaCurve.Grade.Rare; g < counts.Length; g++)
+            {
+                if (counts[g] <= 0) continue;
+                text += " · " + GachaCurve.GradeNames[g] + " " + counts[g];
+            }
+            return text;
+        }
+
+        /**
+         * @brief 오의 뽑기 한 줄. **넓은 줄과 좁은 줄이 다른 문법을 쓴다** (50b).
+         *
+         * 처음에는 한 문법이었다("스킬 XP 240 → Lv +8"). 그 줄이 반 폭 칸을
+         * 넘어 판 밖으로 삐져나왔고, 화살표가 두 가지 뜻(미끄러짐 / 레벨업)
+         * 으로 겹쳐 있기도 했다. 갈랐다:
+         *
+         *   좁은 줄   "XP +6" · "XP +70 · Lv +5"    반 폭에 반드시 든다
+         *   넓은 줄   "천장! 오의 해금 · 혈폭"        화살표는 미끄러짐 전용
+         *
+         * 좁은 줄에서 "스킬"을 뗀 것은 상자 때문이 아니라(그래도 들어간다)
+         * 열 줄이 다 같은 말로 시작하면 눈이 훑을 것이 없어지기 때문이다 -
+         * 헤드라인이 이미 "스킬 XP 360"으로 합계를 말하고 있다.
+         *
+         * **미끄러진 것은 반드시 적는다.** 47단계가 "상위 혼 → 혼 정수"로
+         * 세운 문법 그대로다 - 도착한 곳만 적으면 등급이 내려간 것을 모르고,
+         * 출발한 곳만 적으면 화면과 실제가 갈린다. 미끄러진 줄은 굴린 등급이
+         * ★4+라 언제나 넓은 줄이고, 그래서 긴 사슬이 좁은 칸에 끼일 일이
+         * 없다.
+         *
+         * XP 줄에 **오른 레벨을 함께 적는** 규칙은 그대로다. XP는 게이지
+         * 안으로 사라지는 값이라 수량만 적으면 그 줄이 무슨 일을 했는지
+         * 화면에서 읽히지 않는다.
+         */
+        private static string SkillTextFor(SkillGachaSystem.PullResult result, SkillSystem skills,
+                                           bool wide)
+        {
+            string prefix = result.FromPity ? "천장! " : string.Empty;
+
+            // 미끄러진 칸을 **출발점부터 하나씩** 적는다. ★5가 두 칸 내려간
+            // 줄은 "오의 개안 → 오의 해금 → XP +240"이 되고, 그 줄 하나로
+            // 200회에 한 번의 결과가 무엇이었고 왜 그것이 안 됐는지가 읽힌다
+            for (var at = result.Rolled; at != result.Outcome;
+                 at = SkillGachaCurve.SlideFor(at))
+                prefix += NameOfOutcome(at) + " → ";
+
+            switch (result.Outcome)
+            {
+                case SkillGachaCurve.Outcome.Awakening:
+                    // 도달한 레벨을 함께 적는다. 개안의 사건은 "어디까지 갔는가"
+                    // 이고, 상한이 곧 그 답이다 - 적지 않으면 해금 줄과 같은
+                    // 무게로 읽힌다
+                    return prefix + "오의 개안 · " + NameOf(skills, result.AwakenedIndex)
+                         + " Lv." + Onikiri.Progression.SkillCurve.MaxLevel;
+
+                case SkillGachaCurve.Outcome.SkillUnlock:
+                    return prefix + "오의 해금 · " + NameOf(skills, result.UnlockedIndex);
+
+                default:
+                {
+                    string text = prefix + "XP +" + result.Xp;
+                    if (result.LevelsGained > 0) text += " · Lv +" + result.LevelsGained;
+                    return text;
+                }
+            }
+        }
+
+        /**
+         * @brief 결과의 이름. **확률표와 같은 말을 쓴다.**
+         *
+         * 표에서 "영웅 오의 해금"으로 읽은 것이 결과 판에서 다른 이름으로
+         * 뜨면 플레이어는 그 둘이 같은 것인지 알 수 없다 - 47단계가 확률표와
+         * 결과 판을 같은 배열에서 뽑은 것과 같은 규칙이다.
+         */
+        public static string NameOfOutcome(SkillGachaCurve.Outcome outcome)
+        {
+            switch (outcome)
+            {
+                case SkillGachaCurve.Outcome.Awakening:   return "오의 개안";
+                case SkillGachaCurve.Outcome.SkillUnlock: return "오의 해금";
+                default: return "스킬 XP " + SkillGachaCurve.XpFor(outcome);
+            }
+        }
+
+        private static string NameOf(SkillSystem skills, int index)
+        {
+            var slot = skills != null ? skills.GetSlot(index) : null;
+            return slot != null ? slot.displayName : "오의";
         }
 
         private Color ColorFor(GachaSystem.PullResult result)

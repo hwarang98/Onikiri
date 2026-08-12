@@ -48,6 +48,19 @@ namespace Onikiri.Battle
     public sealed class SkillPerformer : MonoBehaviour
     {
         /**
+         * @brief 무기 티어 하나의 참격 프레임 (51단계).
+         *
+         * Sprite[][]는 유니티가 직렬화하지 못해서 한 겹 싼 것이 전부다.
+         * 배열의 인덱스 + 1이 곧 티어다 - WeaponVfxTier.SlashColorOf의 램프
+         * 순서대로 빌더가 적는다.
+         */
+        [Serializable]
+        public sealed class TierSlash
+        {
+            public Sprite[] frames;
+        }
+
+        /**
          * @brief 오의 하나의 안무. 빌더가 SkillCatalog와 클립 실측에서 적는다.
          *
          * 타격 프레임을 초가 아니라 **클립 프레임 번호**로 두는 것이 요점이다.
@@ -75,6 +88,10 @@ namespace Onikiri.Battle
 
             [Tooltip("팩 시트에서 잘라낸 프레임들. 128x128 열 장")]
             public Sprite[] slashFrames;
+
+            [Tooltip("무기 티어(1~5)별 참격 프레임 (51단계). 비어 있으면 위의 " +
+                     "slashFrames를 티어와 무관하게 쓴다. 순서가 곧 티어다")]
+            public TierSlash[] slashTierFrames;
 
             [Tooltip("참격 재생 속도. 클립 길이 안에서 끝나야 한다")]
             public float slashFrameRate = 30f;
@@ -185,6 +202,10 @@ namespace Onikiri.Battle
 
         [SerializeField] private Onikiri.UI.SkillNameFlash nameFlash;
         [SerializeField] private Onikiri.UI.ScreenFlash screenFlash;
+
+        [Tooltip("무기 티어 스파크가 든 라이브러리 (51단계). 은백으로 구운 " +
+                 "Pozac 스파크 두 조각 - 티어 색은 재생할 때 물든다")]
+        [SerializeField] private VfxLibrary glowLibrary;
 
         [SerializeField] private Choreography[] choreographies;
 
@@ -417,6 +438,10 @@ namespace Onikiri.Battle
 
             if (c.usesSlash) SpawnSlash(cast, c);
 
+            // 무기 티어의 스파크 겹 (51단계). 마지막 타격에만 - 다타의 매
+            // 타격마다 얹으면 연참·혈륜에서 화면이 스파크로 덮인다
+            if (last) SpawnTierSparks(c);
+
             if (c.screenFlash && screenFlash != null) screenFlash.Play();
 
             // 무게는 마지막 타격에만. 다타의 중간 타격에 정지를 주면 0.5초 동안
@@ -486,9 +511,31 @@ namespace Onikiri.Battle
          * 반전은 여전히 요괴에서 끌어온다(23단계 규칙). 대상이 없으면 오른쪽을
          * 기본으로 둔다 - 지금 요괴는 전부 오른쪽에서 온다.
          */
+        /**
+         * @brief 이 안무가 지금 무기 티어에서 재생할 참격 프레임 (51단계).
+         *
+         * 티어 변형이 배선돼 있으면(귀참 - 팩에 5색이 있다) 등급을 따라가고,
+         * 없으면(신규 다섯 - 혈 램프로 한 벌만 구웠다) 기존 프레임 그대로다.
+         * 폴백이 조용한 것이 여기서는 옳다 - 배선이 빠져도 참격 자체는 뜨므로
+         * 화면이 깨지지 않고, 배선 여부는 테스트가 잡는다.
+         */
+        private static Sprite[] SlashFramesFor(Choreography c)
+        {
+            var tiers = c.slashTierFrames;
+            if (tiers == null || tiers.Length == 0) return c.slashFrames;
+
+            int index = Mathf.Clamp(WeaponVfxTier.CurrentTier(), 1, tiers.Length) - 1;
+            var tier = tiers[index];
+            if (tier == null || tier.frames == null || tier.frames.Length == 0)
+                return c.slashFrames;
+
+            return tier.frames;
+        }
+
         private void SpawnSlash(ActiveCast cast, Choreography c)
         {
-            if (slashPool == null || c.slashFrames == null || c.slashFrames.Length == 0) return;
+            var frames = SlashFramesFor(c);
+            if (slashPool == null || frames == null || frames.Length == 0) return;
 
             float originY = samuraiRenderer != null
                 ? samuraiRenderer.bounds.center.y
@@ -506,9 +553,83 @@ namespace Onikiri.Battle
                 originY + c.slashHeightOffset,
                 0f);
 
-            SpawnSlashAt(c.slashFrames, c.slashFrameRate, anchor,
+            SpawnSlashAt(frames, c.slashFrameRate, anchor,
                          c.slashAngle, c.slashScale, mirror);
         }
+
+        // ---------------------------------------------------------------- 티어 스파크
+
+        /**
+         * @brief 무기 티어의 스파크 겹 (51단계). 참격 앵커 언저리에 은백
+         *        스파크를 티어 색으로 물들여 겹친다.
+         *
+         * ## 자리 - 무작위가 아니라 표다
+         *
+         * 겹마다 고정 오프셋이다. 무작위로 뿌리면 같은 오의가 시전마다 다른
+         * 그림이 되고, "등급이 오르면 이렇게 변한다"를 전/후로 비교할 수 없다 -
+         * 이 스텝의 존재 이유가 그 비교다.
+         *
+         * ## 풀은 참격 것을 그대로 쓴다
+         *
+         * 스파크도 PackSlash가 재생한다(프레임 갈아 끼우고 끝나면 꺼지는 일이
+         * 같다 - VfxBurst 주석). 전용 풀을 만들면 화면의 참격 수를 세는 진단
+         * (SlashPoolGrowthCount)이 갈라진다. 최대 겹(3)만큼 프리웜을 늘렸다.
+         */
+        private void SpawnTierSparks(Choreography c)
+        {
+            if (slashPool == null || glowLibrary == null) return;
+
+            int tier = WeaponVfxTier.CurrentTier();
+            bool premium = WeaponVfxTier.IsPremium();
+            int layers = WeaponVfxTier.SparkLayers(tier, premium);
+            if (layers <= 0) return;
+
+            float originY = samuraiRenderer != null
+                ? samuraiRenderer.bounds.center.y
+                : combat.transform.position.y;
+
+            var target = combat.FindTarget();
+            bool mirror = target != null && target.FacingDirection > 0;
+            float sign = mirror ? -1f : 1f;
+
+            // 참격이 있으면 그 앞, 없으면(연참·일섬) 사무라이 바로 앞이다
+            float forward = c.usesSlash ? c.slashForwardOffset : 1.2f;
+            float height = c.usesSlash ? c.slashHeightOffset : 0.2f;
+
+            for (int i = 0; i < layers && i < SparkOffsets.Length; i++)
+            {
+                // 마지막 겹이 프리미엄 자리다 - 오니키리 완성만 이 겹을 가진다
+                bool premiumLayer = premium && i == layers - 1;
+                var tint = WeaponVfxTier.SparkTint(tier, premiumLayer);
+
+                // 두 조각을 번갈아 쓴다. 같은 그림 세 장이 겹치면 겹이 아니라
+                // 한 장이 진해진 것으로 읽힌다
+                var clip = glowLibrary.Find(i % 2 == 0
+                    ? WeaponGlowSparkBurst : WeaponGlowSparkRay);
+                if (clip == null || clip.frames == null || clip.frames.Length == 0) continue;
+
+                var position = new Vector3(
+                    combat.transform.position.x + (forward + SparkOffsets[i].x) * sign,
+                    originY + height + SparkOffsets[i].y,
+                    0f);
+
+                var slash = slashPool.Get();
+                slash.Play(clip.frames, clip.frameRate, position, clip.angle,
+                           clip.scale, mirror, tint, ReleaseSlash);
+            }
+        }
+
+        /** 겹마다 고정 자리 (전방·높이, 월드 단위). 위 주석 참고 */
+        private static readonly Vector2[] SparkOffsets =
+        {
+            new Vector2(0f, 0f),
+            new Vector2(0.55f, 0.5f),
+            new Vector2(-0.4f, 0.75f)
+        };
+
+        /** 은백 스파크 클립의 이름. PozacVfxBaker의 실버 굽기와 같아야 한다 */
+        public const string WeaponGlowSparkBurst = "pozac_spark_burst";
+        public const string WeaponGlowSparkRay = "pozac_spark_ray";
 
         /**
          * @brief 참격 한 장을 **자리를 지정해** 띄운다. 풀은 오의 것을 그대로 쓴다.
@@ -559,9 +680,17 @@ namespace Onikiri.Battle
 
             var origin = new Vector3(cast.baseX, originY + c.streakHeightOffset, 0f);
 
+            // 무기 티어가 섬광을 물들인다 (51단계). 흰 심은 텍스처에 구워져
+            // 있어 살아남고, 곱색만 티어 쪽으로 기운다 - 티어1은 그대로다
+            int tier = WeaponVfxTier.CurrentTier();
+            bool premium = WeaponVfxTier.IsPremium();
+            var color = Color.Lerp(c.streakColor,
+                                   WeaponVfxTier.SparkTint(tier, premium),
+                                   WeaponVfxTier.StreakBlend(tier));
+
             var streak = streakPool.Get();
             streak.Play(origin, mirror ? -1f : 1f, c.lungeDistance, c.streakThickness,
-                        c.streakColor, c.streakRevealSeconds, c.streakHoldSeconds,
+                        color, c.streakRevealSeconds, c.streakHoldSeconds,
                         c.streakFadeSeconds, ReleaseStreak);
         }
 

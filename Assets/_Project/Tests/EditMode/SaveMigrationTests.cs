@@ -49,7 +49,7 @@ namespace Onikiri.Tests
             Assert.IsTrue(SaveData.Migrate(data));
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(16, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
+            Assert.AreEqual(18, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
 
             Assert.AreEqual(SkillCatalog.Count, data.skillIds.Length,
                 "v6 -> v7이 오의 칸을 다 만들지 않았다");
@@ -674,7 +674,7 @@ namespace Onikiri.Tests
 
             Assert.IsTrue(SaveData.Migrate(data));
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(16, SaveData.CurrentVersion, "세이브 버전이 v16이 아니다");
+            Assert.AreEqual(18, SaveData.CurrentVersion, "세이브 버전이 v18이 아니다");
 
             Assert.AreEqual(0, data.gachaPity, "천장 카운터를 소급해 줬다");
             Assert.AreEqual(0, data.gachaTotalPulls);
@@ -749,6 +749,160 @@ namespace Onikiri.Tests
             Assert.AreEqual(17, data.gachaPity,
                 "천장 카운터가 0으로 돌아갔다 - 승격이 몰수가 됐다");
             Assert.AreEqual(240, data.gachaTotalPulls);
+        }
+
+        /**
+         * @brief v16 -> v17. **장착 구성은 지어내지 않고 구조가 낸다.**
+         *
+         * v16에는 장착이라는 개념이 없었다 - 오의 셋이 전부 상시 발동이었고,
+         * 그것은 "셋이 세 자리에 끼워져 있다"와 같은 말이다. 그래서 이
+         * 마이그레이션은 **아무것도 안 적는다**: 빈 배열로 두면 SkillSystem이
+         * 기준 구성으로 메우고, st51 아래에서는 열린 자리도 열린 오의도 그
+         * 셋뿐이라 답이 하나다.
+         *
+         * 값을 지어내지 않는 것이 요점이다. 여기서 id 셋을 적어 두면 표가
+         * 바뀌는 날 마이그레이션이 없는 오의를 가리키게 된다.
+         */
+        [Test]
+        public void V16_MigratesToV17WithTheLoadoutLeftToTheSystem()
+        {
+            var data = V11Save();
+            data.stage = 300;
+            data.maxStageReached = 300;
+
+            SaveData.Migrate(data);
+            data.version = 16;
+            data.skillEquipped = new string[0];
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+
+            Assert.IsNotNull(data.skillEquipped, "장착 칸이 null이다");
+            Assert.AreEqual(0, data.skillEquipped.Length,
+                "마이그레이션이 장착 구성을 지어냈다 - 표가 바뀌는 날 없는 오의를 가리킨다");
+
+            // 신규 오의의 레벨도 소급하지 않는다. v6 -> v7이 만든 칸이 그대로 1이다
+            foreach (var skill in SkillCatalog.Skills)
+            {
+                if (!skill.StageGated) continue;
+
+                int index = System.Array.IndexOf(data.skillIds, skill.Id);
+                Assert.GreaterOrEqual(index, 0, "'" + skill.DisplayName + "'의 칸이 없다");
+                Assert.AreEqual(1, data.skillLevels[index],
+                    "'" + skill.DisplayName + "'을 소급해 올려 줬다 - 심층 플레이어가 "
+                    + "접속 즉시 상한을 받는다");
+            }
+        }
+
+        /** 두 번 돌려도 같다. 저장 실패 후 재시도 같은 경로에서 실제로 두 번 돈다 */
+        [Test]
+        public void V16_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            SaveData.Migrate(data);
+            data.version = 16;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            var once = data.skillEquipped;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreSame(once, data.skillEquipped, "두 번째 마이그레이션이 장착 칸을 다시 만들었다");
+        }
+
+        /**
+         * @brief v17 -> v18. **아무것도 주지 않고, 이미 준 것은 안 뺏는다.**
+         *
+         * 두 규칙이 한 블록에서 갈린다.
+         *
+         * **소급 없음** - XP 0, 천장 0, 무료 뽑기 미사용. 지나온 날수만큼
+         * 무료 뽑기를 쌓아주면 접속 즉시 천장을 여러 번 지나 오의 둘이
+         * 통째로 열리고, 그것은 이 스텝이 판 재고를 지우는 일이다.
+         *
+         * **보존** - 그런데 혈폭·혈조는 v17에서 **최전선 st51의 스테이지
+         * 게이트**였다. 50단계가 그 게이트를 뽑기로 옮기므로, 손대지 않으면
+         * 이미 심층에 있던 플레이어가 갖고 있던 오의 둘을 잃는다. 소급이
+         * 아니라 보존이고, 기준이 st51인 것은 그것이 v17의 게이트 그 자체이기
+         * 때문이다 - 다른 값을 고르면 마이그레이션이 v17 세계의 사실이 아니라
+         * 새 판단을 지어내는 것이 된다.
+         */
+        [Test]
+        public void V17_MigratesToV18WithoutGivingAnythingAway()
+        {
+            var data = V11Save();
+            data.stage = 30;
+            data.maxStageReached = 30;
+
+            SaveData.Migrate(data);
+            data.version = 17;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+            Assert.AreEqual(SaveData.CurrentVersion, data.version);
+
+            Assert.AreEqual(0L, data.skillXp, "마이그레이션이 스킬 XP를 지어냈다");
+            Assert.AreEqual(0, data.skillGachaPity, "천장 카운터가 소급됐다");
+            Assert.AreEqual(0, data.skillGachaTotalPulls, "누적 횟수가 소급됐다");
+            Assert.AreEqual(0L, data.skillGachaFreePullDayTicks,
+                "무료 뽑기가 쓰인 것으로 들어왔다 - 오늘치 하나는 곧바로 쓸 수 있어야 한다");
+
+            Assert.IsNotNull(data.gachaSkillIds, "보유 칸이 null이다");
+            Assert.AreEqual(0, data.gachaSkillIds.Length,
+                "st30 플레이어에게 가챠 몫이 들어왔다 - v17에서도 갖고 있지 않던 것이다");
+        }
+
+        /**
+         * @brief v17에서 **이미 갖고 있던** 가챠 몫은 유지된다.
+         *
+         * st51을 넘긴 세이브는 v17의 규칙대로 혈폭·혈조가 열려 있었다.
+         * 게이트의 출처가 바뀌었다고 그것을 도로 뺏으면 그것은 마이그레이션이
+         * 아니라 몰수다 - 47단계가 천장 카운터를 안 건드린 이유와 같다.
+         */
+        [Test]
+        public void V17_KeepsTheSkillsThatWorldHadAlreadyGiven()
+        {
+            var data = V11Save();
+            data.stage = 300;
+            data.maxStageReached = 300;
+
+            SaveData.Migrate(data);
+            data.version = 17;
+            data.gachaSkillIds = new string[0];
+
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            foreach (var id in SkillGachaCurve.UnlockOrder)
+                Assert.Contains(id, data.gachaSkillIds, string.Format(
+                    "심층(st{0}) 플레이어가 v17에서 갖고 있던 '{1}'을 잃었다", data.maxStageReached, id));
+
+            // 그래도 레벨은 그대로 1이다. 갖고 있던 것을 지키는 것과
+            // 소급해 올려 주는 것은 다른 일이다
+            foreach (var id in SkillGachaCurve.UnlockOrder)
+            {
+                int index = System.Array.IndexOf(data.skillIds, id);
+                Assert.GreaterOrEqual(index, 0, "'" + id + "'의 칸이 없다");
+                Assert.AreEqual(1, data.skillLevels[index], "'" + id + "'을 소급해 올려 줬다");
+            }
+        }
+
+        /** 두 번 돌려도 같다 - 뽑은 오의와 모은 XP가 두 번째에 사라지면 안 된다 */
+        [Test]
+        public void V17_MigrationIsIdempotent()
+        {
+            var data = V11Save();
+            data.stage = 300;
+            data.maxStageReached = 300;
+            SaveData.Migrate(data);
+
+            // 실제로 뽑고 모은 v18 상태를 흉내낸다
+            data.skillXp = 244L;
+            data.skillGachaPity = 19;
+            data.skillGachaTotalPulls = 71;
+
+            Assert.IsTrue(SaveData.Migrate(data));
+
+            Assert.AreEqual(244L, data.skillXp, "두 번째 마이그레이션이 XP를 지웠다");
+            Assert.AreEqual(19, data.skillGachaPity,
+                "두 번째 마이그레이션이 천장을 되돌렸다 - 지불한 열아홉 회가 몰수된다");
+            Assert.AreEqual(71, data.skillGachaTotalPulls, "누적 횟수가 지워졌다");
         }
 
         [Test]

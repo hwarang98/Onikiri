@@ -304,13 +304,31 @@ namespace Onikiri.Tests
          *
          * 깨지면 기대 곡선이 근사가 되고, 보정이 실제를 못 따라간다.
          */
+        /**
+         * @brief 오의 배율이 실제로 상한에 닿는 스테이지.
+         *
+         * ## 49단계에 65로 밀렸다가 49b에 51로 돌아왔다
+         *
+         * 49단계는 신규 오의를 전부 st51에 걸었다. 그러면 4번 자리가 열리는
+         * 그 순간 자리에 들어오는 것이 **레벨 1짜리 오의**이고, 첫 비용이
+         * st51의 골드 규모(16.1T)라 상한까지 열네 스테이지가 걸렸다.
+         *
+         * 49b가 해금을 코리더로 앞당기면서(st12/18/27) 첫 비용도 그 스테이지의
+         * 규모(1.2K)가 됐다 - st51에서는 끝전이라 자리가 열리는 순간 이미
+         * 상한이다(하네스 실측 st51 rate 2.976 = 상한).
+         *
+         * 그래서 심층 전 구간에서 몫이 다시 상수이고, 기대 곡선의 닫힌 식
+         * 가정이 첫 칸부터 참이다. 예외 구간이 사라진 것이 49b의 배당금이다.
+         */
+        const int SkillCapStage = 51;
+
         [Test]
         public void SkillShare_IsFlatAcrossTheDeepZone()
         {
             var rows = StageSimulation.Run(200, Field(),
                 new StageSimulation.Policy { NeutralizeYodoPower = true, SkipGacha = true });
 
-            for (int stage = 51; stage <= 200; stage++)
+            for (int stage = SkillCapStage; stage <= 200; stage++)
             {
                 var row = rows[stage - 1];
 
@@ -384,7 +402,7 @@ namespace Onikiri.Tests
             var rows = StageSimulation.Run(200, Field(),
                 new StageSimulation.Policy { SkipAffinity = true });
 
-            for (int stage = 51; stage <= 200; stage++)
+            for (int stage = SkillCapStage; stage <= 200; stage++)
             {
                 var row = rows[stage - 1];
 
@@ -486,10 +504,16 @@ namespace Onikiri.Tests
         {
             var field = Field();
 
+            // 49단계: 여기도 슬롯을 셋으로 되돌린다. 46단계가 촉매에서 정한
+            // 처방 그대로다 - **그 축이 마지막 층이던 세계**를 기준으로 재야
+            // 한다. 4번 슬롯을 남기면 분모(총 DPS)가 커져 영체의 이득이
+            // 5.31%에서 4.00%로 내려앉고, 그것은 영체가 약해진 것이 아니라
+            // 재는 자가 바뀐 것이다
             var era = StageSimulation.Run(400, field,
-                new StageSimulation.Policy { SkipGacha = true });
+                new StageSimulation.Policy { SkipGacha = true, SkipSkillSlot = true });
             var eraWithout = StageSimulation.Run(400, field,
-                new StageSimulation.Policy { SkipGacha = true, SkipSpirit = true });
+                new StageSimulation.Policy { SkipGacha = true, SkipSkillSlot = true,
+                                             SkipSpirit = true });
 
             double gain = TotalSeconds(eraWithout, 51, 400) / TotalSeconds(era, 51, 400) - 1d;
 
@@ -549,11 +573,17 @@ namespace Onikiri.Tests
         public void YodoPowerNeutralized_ReproducesTheStep44World()
         {
             var field = Field();
+            // 49단계: **4번 슬롯도 걷어낸다.** 이 세계의 정의가 "44단계를 재현한다"인데
+            // 그때는 장착 자리가 셋이었다 - 상성·영체·뽑기만 끄고 슬롯을 남기면
+            // 재현이 아니라 "44단계 + 슬롯 하나"가 되고, 천장이 12.10에서 13.21로
+            // 뜬다. 정책에 한 줄을 더하는 것이 상수를 옮기는 것보다 맞다: 옮기면
+            // 이 검사가 지키던 44단계 앵커 자체가 사라진다
             var pay = StageSimulation.Run(200, field,
-                new StageSimulation.Policy { NeutralizeYodoPower = true, SkipGacha = true });
+                new StageSimulation.Policy { NeutralizeYodoPower = true, SkipGacha = true,
+                                             SkipSkillSlot = true });
             var f2p = StageSimulation.Run(200, field,
                 new StageSimulation.Policy { NeutralizeYodoPower = true, SkipGacha = true,
-                                             GemsFromQuestsOnly = true });
+                                             SkipSkillSlot = true, GemsFromQuestsOnly = true });
 
             // 조율 구간은 애초에 두 축이 없는 구간이라 기본 정책과도 같아야 한다
             var full = StageSimulation.Run(50, field);

@@ -22,8 +22,18 @@ MonoBehaviour:
   - {fileID: 6553803153644058289, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
   - {fileID: 4324813828403386512, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
   - {fileID: 5515489861652910160, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
-  walkFrames: []
-  hurtFrames: []
+  walkFrames:
+  - {fileID: 6706964711629458958, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: -1920217854047795040, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: -4335478486442493431, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: -8104440941009129349, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: 2902919787733871080, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: -4576373191501308013, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: 7602290350223177201, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: -7101589011872990066, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  hurtFrames:
+  - {fileID: -7483930173241589112, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
+  - {fileID: 8892658247554552016, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
   deathFrames:
   - {fileID: -5465974273720179930, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
   - {fileID: -7186335702645407297, guid: bdcc959fbc9924b4f9c2c2212e014965, type: 3}
@@ -42,8 +52,10 @@ MonoBehaviour:
   moveSpeed: 1.2
   queueSpacing: 1
   attackFrames: []
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.5
+  attackTelegraphSeconds: 0.35
   hoverHeight: 0.4
   artBottomOffset: 1
   artFacesLeft: 0

@@ -65,14 +65,35 @@ namespace Onikiri.Battle
         public void Play(Sprite[] frames, float framesPerSecond, Vector3 position,
                          bool mirror, Action<ImpactSpark> onFinished)
         {
+            Play(frames, framesPerSecond, position, mirror, tint, 1f,
+                 SortingOrders.Vfx, onFinished);
+        }
+
+        /**
+         * @brief 색·크기·층을 지정해 터뜨린다 (51단계 무기 티어 글로우).
+         *
+         * 평타 오라는 같은 흰 시트를 티어 색으로 물들여 붉은 불꽃의 **뒤**
+         * (sortingOrder -1)에 2배로 세운다. 프리팹·풀·예산 규칙을 전부
+         * 공유하고 다른 것은 이 세 값뿐이라, 컴포넌트를 한 벌 더 만들지
+         * 않는다 - SpawnSlashAt이 영체에 문을 연 것과 같은 판단이다.
+         *
+         * 크기를 매번 다시 쓰는 것이 요점이다. 풀에서 꺼낸 인스턴스는 앞사람이
+         * 쓰던 크기를 들고 있으므로(SkillPerformer.SpawnAfterimageAt의 함정),
+         * 기본 경로도 이 함수를 지나며 1로 되돌린다.
+         */
+        public void Play(Sprite[] frames, float framesPerSecond, Vector3 position,
+                         bool mirror, Color overrideTint, float scale, int sortingOrder,
+                         Action<ImpactSpark> onFinished)
+        {
             finished = onFinished;
 
             transform.position = position;
             transform.localRotation = Quaternion.identity;
+            transform.localScale = Vector3.one * (scale > 0f ? scale : 1f);
 
             spriteRenderer.flipX = mirror;
-            spriteRenderer.color = tint;
-            spriteRenderer.sortingOrder = SortingOrders.Vfx;
+            spriteRenderer.color = overrideTint;
+            spriteRenderer.sortingOrder = sortingOrder;
             spriteRenderer.enabled = true;
 
             animator.Play(frames, framesPerSecond, false, Complete);

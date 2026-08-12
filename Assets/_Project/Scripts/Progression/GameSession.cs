@@ -30,6 +30,9 @@ namespace Onikiri.Progression
         [SerializeField] private PetSystem petSystem;
         [SerializeField] private YodoSystem yodo;
         [SerializeField] private GachaSystem gacha;
+
+        /** 오의 뽑기 (50단계). 요도 뽑기와 갈라 둔 이유는 SkillGachaSystem 머리 주석 */
+        [SerializeField] private SkillGachaSystem skillGacha;
         [SerializeField] private Onikiri.UI.OfflineRewardPopup offlinePopup;
 
         [Tooltip("자동 저장 간격 (초). 프로세스가 예고 없이 사라져도 잃는 양을 " +
@@ -100,7 +103,22 @@ namespace Onikiri.Progression
             // 오의는 강화 다음이다. 오의 배율이 공격력에 곱해지므로(PlayerCombat.
             // CastSkill), 강화가 먼저 적용돼 있어야 한 프레임이라도 어긋난 값으로
             // 시전하지 않는다
-            if (skills != null) skills.RestoreLevels(data.skillIds, data.skillLevels, data.skillAutoCast);
+            if (skills != null)
+            {
+                skills.RestoreLevels(data.skillIds, data.skillLevels, data.skillAutoCast);
+
+                // **보유는 레벨과 장착 사이다**(50단계). 장착 복원이 빈 자리를
+                // 기준 구성으로 메우는데 그 기준이 해금 상태를 읽으므로, 뽑기로
+                // 얻은 오의가 그 전에 열려 있어야 한다 - 순서가 뒤바뀌면 가챠
+                // 몫을 끼워 둔 플레이어의 자리가 한 프레임 비었다가 다른 오의로
+                // 메워진다
+                skills.RestoreGacha(data.gachaSkillIds, data.skillXp);
+
+                // **레벨 다음에 장착이다.** 구성 복원이 빈 자리를 기준 구성으로
+                // 메우는데(FillEmptySlots), 그 기준이 해금 상태를 읽으므로 레벨과
+                // 최전선이 먼저 제자리에 있어야 한다
+                skills.RestoreEquipped(data.skillEquipped);
+            }
 
             // 장비는 강화 **다음**이다. 장비 배수가 강화 값에 곱해지므로
             // (UpgradeSystem.Apply), 순서가 뒤바뀌면 장비가 배수 없는 값에 한 번
@@ -128,6 +146,13 @@ namespace Onikiri.Progression
             // 프레임에 뽑기가 도는 경로를 만들지 않는다
             if (gacha != null)
                 gacha.Restore(data.gachaPity, data.gachaTotalPulls, data.gachaFreePullDayTicks);
+
+            // 오의 뽑기는 오의 **다음**이다(50단계). 같은 계약이고 같은 이유다 -
+            // 이쪽은 오의의 상태를 읽어 재고를 판정하므로(SkillSystem.HasStock),
+            // 오의가 아직 비어 있는 프레임에 배너가 "재고 없음"으로 서지 않게 한다
+            if (skillGacha != null)
+                skillGacha.Restore(data.skillGachaPity, data.skillGachaTotalPulls,
+                                   data.skillGachaFreePullDayTicks);
 
             // 펫은 순서 제약이 느슨하다 - 스탯에 곱해지지 않고 PetCombat이
             // 매 타마다 현재 값을 읽는다. 그래도 퀘스트보다 앞에 두는 것은
@@ -227,7 +252,11 @@ namespace Onikiri.Progression
             {
                 data.skillIds = skills.CollectIds();
                 data.skillLevels = skills.CollectLevels();
+                data.skillEquipped = skills.CollectEquipped();
                 data.skillAutoCast = skills.AutoCast;
+
+                data.gachaSkillIds = skills.CollectGachaSkillIds();
+                data.skillXp = skills.CollectSkillXp();
             }
 
             if (equipment != null)
@@ -257,6 +286,13 @@ namespace Onikiri.Progression
                 data.gachaPity = gacha.CollectPity();
                 data.gachaTotalPulls = gacha.CollectTotalPulls();
                 data.gachaFreePullDayTicks = gacha.CollectFreePullDay();
+            }
+
+            if (skillGacha != null)
+            {
+                data.skillGachaPity = skillGacha.CollectPity();
+                data.skillGachaTotalPulls = skillGacha.CollectTotalPulls();
+                data.skillGachaFreePullDayTicks = skillGacha.CollectFreePullDay();
             }
 
             if (petSystem != null)

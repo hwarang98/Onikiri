@@ -1,0 +1,702 @@
+fileFormatVersion: 2
+guid: 23bdfdb752f404448862fba90fd225f1
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 4345960453584605912
+    second: Effect (29)6_0
+  - first:
+      213: 4577174415786757679
+    second: Effect (29)6_1
+  - first:
+      213: -5326014157597247838
+    second: Effect (29)6_2
+  - first:
+      213: 5483749093254760432
+    second: Effect (29)6_3
+  - first:
+      213: 8372849814045934165
+    second: Effect (29)6_4
+  - first:
+      213: 2140529428760702909
+    second: Effect (29)6_5
+  - first:
+      213: 8813867453550435965
+    second: Effect (29)6_6
+  - first:
+      213: 2162476435779654749
+    second: Effect (29)6_7
+  - first:
+      213: -8230782529483148545
+    second: Effect (29)6_8
+  - first:
+      213: 1600325787841337293
+    second: Effect (29)6_9
+  - first:
+      213: 6762170673714501368
+    second: Effect (29)6_10
+  - first:
+      213: 8605779515495613173
+    second: Effect (29)6_11
+  - first:
+      213: 6996775286546761810
+    second: Effect (29)6_12
+  - first:
+      213: 275716887105825443
+    second: Effect (29)6_13
+  - first:
+      213: -7159951193907175469
+    second: Effect (29)6_14
+  - first:
+      213: -516404542368005110
+    second: Effect (29)6_15
+  - first:
+      213: 8079895327111820234
+    second: Effect (29)6_16
+  - first:
+      213: 7248106895805258559
+    second: Effect (29)6_17
+  - first:
+      213: 2677403624351801529
+    second: Effect (29)6_18
+  - first:
+      213: -1057944229103443064
+    second: Effect (29)6_19
+  - first:
+      213: -7650072208073505388
+    second: Effect (29)6_20
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 0
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Effect (29)6_0
+      rect:
+        serializedVersion: 2
+        x: 6
+        y: 53
+        width: 48
+        height: 65
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8d25ec3b104ff4c30800000000000000
+      internalID: 4345960453584605912
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_1
+      rect:
+        serializedVersion: 2
+        x: 32
+        y: 23
+        width: 68
+        height: 74
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2ec9f751e3658f30800000000000000
+      internalID: 4577174415786757679
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_2
+      rect:
+        serializedVersion: 2
+        x: 54
+        y: 95
+        width: 34
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2a6f6b397523616b0800000000000000
+      internalID: -5326014157597247838
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_3
+      rect:
+        serializedVersion: 2
+        x: 90
+        y: 98
+        width: 18
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0f702d40fb03a1c40800000000000000
+      internalID: 5483749093254760432
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_4
+      rect:
+        serializedVersion: 2
+        x: 106
+        y: 61
+        width: 14
+        height: 43
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 55247eb6b86523470800000000000000
+      internalID: 8372849814045934165
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_5
+      rect:
+        serializedVersion: 2
+        x: 93
+        y: 76
+        width: 10
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dbf2d88ac20b4bd10800000000000000
+      internalID: 2140529428760702909
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_6
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 28
+        width: 22
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d7e104a40c5215a70800000000000000
+      internalID: 8813867453550435965
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_7
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 57
+        width: 6
+        height: 4
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d549ccd6cd8a20e10800000000000000
+      internalID: 2162476435779654749
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_8
+      rect:
+        serializedVersion: 2
+        x: 106
+        y: 36
+        width: 15
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ff27aa2e5e266cd80800000000000000
+      internalID: -8230782529483148545
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_9
+      rect:
+        serializedVersion: 2
+        x: 26
+        y: 44
+        width: 6
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dc71e2d33df753610800000000000000
+      internalID: 1600325787841337293
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_10
+      rect:
+        serializedVersion: 2
+        x: 82
+        y: 47
+        width: 7
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8f61155766e08dd50800000000000000
+      internalID: 6762170673714501368
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_11
+      rect:
+        serializedVersion: 2
+        x: 90
+        y: 49
+        width: 4
+        height: 4
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5f2037cbfdedd6770800000000000000
+      internalID: 8605779515495613173
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_12
+      rect:
+        serializedVersion: 2
+        x: 41
+        y: 33
+        width: 7
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2580ad77d0a891160800000000000000
+      internalID: 6996775286546761810
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_13
+      rect:
+        serializedVersion: 2
+        x: 59
+        y: 34
+        width: 5
+        height: 5
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3aae48a4c0b83d300800000000000000
+      internalID: 275716887105825443
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_14
+      rect:
+        serializedVersion: 2
+        x: 82
+        y: 34
+        width: 9
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3df570ef25eb2ac90800000000000000
+      internalID: -7159951193907175469
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_15
+      rect:
+        serializedVersion: 2
+        x: 100
+        y: 11
+        width: 16
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a04c1c30ecc55d8f0800000000000000
+      internalID: -516404542368005110
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_16
+      rect:
+        serializedVersion: 2
+        x: 19
+        y: 18
+        width: 8
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ac3b6daadfd812070800000000000000
+      internalID: 8079895327111820234
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_17
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 25
+        width: 5
+        height: 4
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f3b1882d1d2769460800000000000000
+      internalID: 7248106895805258559
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_18
+      rect:
+        serializedVersion: 2
+        x: 20
+        y: 9
+        width: 16
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9b025dd296c082520800000000000000
+      internalID: 2677403624351801529
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_19
+      rect:
+        serializedVersion: 2
+        x: 38
+        y: 6
+        width: 14
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8836d10345d6151f0800000000000000
+      internalID: -1057944229103443064
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Effect (29)6_20
+      rect:
+        serializedVersion: 2
+        x: 55
+        y: 5
+        width: 44
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 495c0bbcbdb75d590800000000000000
+      internalID: -7650072208073505388
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Effect (29)6_0: 4345960453584605912
+      Effect (29)6_1: 4577174415786757679
+      Effect (29)6_10: 6762170673714501368
+      Effect (29)6_11: 8605779515495613173
+      Effect (29)6_12: 6996775286546761810
+      Effect (29)6_13: 275716887105825443
+      Effect (29)6_14: -7159951193907175469
+      Effect (29)6_15: -516404542368005110
+      Effect (29)6_16: 8079895327111820234
+      Effect (29)6_17: 7248106895805258559
+      Effect (29)6_18: 2677403624351801529
+      Effect (29)6_19: -1057944229103443064
+      Effect (29)6_2: -5326014157597247838
+      Effect (29)6_20: -7650072208073505388
+      Effect (29)6_3: 5483749093254760432
+      Effect (29)6_4: 8372849814045934165
+      Effect (29)6_5: 2140529428760702909
+      Effect (29)6_6: 8813867453550435965
+      Effect (29)6_7: 2162476435779654749
+      Effect (29)6_8: -8230782529483148545
+      Effect (29)6_9: 1600325787841337293
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

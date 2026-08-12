@@ -30,7 +30,23 @@ MonoBehaviour:
   - {fileID: -2117281626113365366, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
   - {fileID: 8368210344236706294, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
   - {fileID: -4456398528377030394, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
-  walkFrames: []
+  walkFrames:
+  - {fileID: 547616915966978244, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 2628837334788201933, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: -9117673599689444731, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 7984193360874236748, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 9095396709291411468, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 5560693099792762368, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 5053834367230067067, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: -8831471568446256274, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: -8921327886147302402, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 6657612155911878750, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: -5146684982798595382, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 479474371369255418, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 5370879570745020885, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: 5906738078115014807, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: -8899436622705449214, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
+  - {fileID: -6026479560036296424, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
   hurtFrames: []
   deathFrames:
   - {fileID: 143969792064742435, guid: 004ce5a8e54d98145ad865fc1faaed67, type: 3}
@@ -50,8 +66,10 @@ MonoBehaviour:
   moveSpeed: 1.25
   queueSpacing: 1
   attackFrames: []
+  attackVariants: []
   attackInterval: 2
   attackImpactPoint: 0.5
+  attackTelegraphSeconds: 0.35
   hoverHeight: 0.35
   artBottomOffset: 1.0625
   artFacesLeft: 0

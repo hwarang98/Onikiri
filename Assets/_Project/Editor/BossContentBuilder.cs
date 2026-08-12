@@ -125,6 +125,11 @@ namespace Onikiri.EditorTools
             var roster = BossConfigBuilder.EnsureDefaultAssets();
             if (roster == null) return null;
 
+            // 요괴 팩에서 뜯은 이펙트를 다시 굽는다. 보스 시트를 굽는 것과 같은
+            // 자리다 - 둘 다 같은 aseprite에서 나오므로, 한쪽만 새로 구우면
+            // 보스와 그 보스가 뿜는 참격의 붉은색이 어긋난다
+            if (YokaiVfxBaker.BakeAll()) YokaiVfxBaker.BuildLibrary();
+
             int built = 0;
             foreach (var config in ConfigsIn(roster))
             {
@@ -271,6 +276,23 @@ namespace Onikiri.EditorTools
             // 배치 애셋. 있으면 BossFight가 이쪽 말만 듣는다
             fightSo.FindProperty("roster").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<BossRoster>(BossConfigBuilder.RosterPath);
+
+            // 보스가 휘두를 때 앞에 뜨는 참격. 요괴 팩에서 뜯어낸 조각을 돌린다
+            fightSo.FindProperty("attackVfx").objectReferenceValue = WireAttackVfx(battle);
+
+            /**
+             * @brief 공용 기본 참격은 **없다.** 빌더가 매번 비운다.
+             *
+             * C# 필드 기본값을 바꾸는 것으로는 부족하다 - 그 값은 컴포넌트를
+             * 처음 붙일 때만 쓰이고, 이미 씬에 직렬화된 값은 그대로 남는다.
+             * 실제로 기본값을 지운 뒤에도 씬에는 `crescent`가 남아 있어서
+             * 다섯 보스가 계속 요괴의 참격을 뿜었다.
+             *
+             * 그래서 씬에 굳는 값을 여기서 못박는다. 참격은 BossConfig가
+             * 보스마다 정하는 것이고(BossConfig.attackVfxId), 공용 자리에
+             * 어느 요괴의 서명을 놓아서도 안 된다.
+             */
+            fightSo.FindProperty("defaultAttackVfxId").stringValue = string.Empty;
 
             // 토리이 관문. BattleStageBuilder가 지면 앵커 아래에 만들어두고
             // 숨겨둔 것을 찾아 연결한다
@@ -605,6 +627,42 @@ namespace Onikiri.EditorTools
             challenge.SetActive(false);
             fightHud.SetActive(false);
             result.SetActive(false);
+        }
+
+        /**
+         * @brief 보스 참격 재생기를 씬에 붙이고 라이브러리를 물린다.
+         *
+         * 사무라이의 오의(`SkillPerformer`)와 **같은 프리팹, 같은 VFX 루트**를
+         * 쓴다. 참격을 재생하는 일은 양쪽이 똑같고, 다른 것은 어떤 클립을 어느
+         * 자리에 놓느냐뿐이라 프리팹을 하나 더 만들 이유가 없다.
+         *
+         * 라이브러리가 아직 안 구워졌으면 여기서 굽는다. 배선만 하고 넘어가면
+         * 참조가 빈 채로 씬에 굳고, 그 상태는 게임을 켜서 보스를 잡아 봐야 안다.
+         */
+        private static VfxBurst WireAttackVfx(GameObject battle)
+        {
+            var library = AssetDatabase.LoadAssetAtPath<VfxLibrary>(YokaiVfxBaker.LibraryPath);
+            if (library == null)
+            {
+                if (!YokaiVfxBaker.BakeAll()) return null;
+                library = YokaiVfxBaker.BuildLibrary();
+                if (library == null) return null;
+            }
+
+            var burst = battle.GetComponent<VfxBurst>();
+            if (burst == null) burst = battle.AddComponent<VfxBurst>();
+
+            var slashPrefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
+                SkillPanelBuilder.SlashPrefabPath);
+
+            var so = new SerializedObject(burst);
+            so.FindProperty("library").objectReferenceValue = library;
+            so.FindProperty("slashPrefab").objectReferenceValue =
+                slashPrefabRoot != null ? slashPrefabRoot.GetComponent<PackSlash>() : null;
+            so.FindProperty("vfxParent").objectReferenceValue = battle.transform.Find("VFX");
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            return burst;
         }
 
         // ---------------------------------------------------------------- 도구

@@ -134,6 +134,13 @@ namespace Onikiri.EditorTools
                     // 128px 세트는 건드리지 않는다. 직접 색을 바꾼 시트는 이미 64px이다
                     if (!path.Contains("64x64") && !path.StartsWith("Assets/_Project/Art/VFX")) continue;
 
+                    // 요괴에게서 뜯은 조각은 셀이 64가 아니다(114x46, 82x70, 79x82).
+                    // YokaiVfxBaker가 자기 셀로 이미 잘라뒀고, 그 셀은 조각마다
+                    // 다르므로 여기서 한 가지 크기로 다시 자를 수 있는 대상이
+                    // 아니다. 지금은 64로 나누어떨어지지 않아 SliceGrid가 거부하지만,
+                    // 그것은 우연이라 기대고 있을 규칙이 못 된다
+                    if (path.StartsWith(YokaiVfxBaker.OutputFolder)) continue;
+
                     // 그려진 호는 64x64 셀 한가운데에 있지 않다. 그래서 단순 중앙 피벗은
                     // 이펙트를 떨어져야 할 지점에서 벗어나게 한다. 대신 아트의 중심에
                     // 피벗을 둔다. 시트 전체를 합쳐 측정하므로 애니메이션의 모든 프레임이

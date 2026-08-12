@@ -77,6 +77,23 @@ namespace Onikiri.Battle
         public Texture2D deathSheet;
         public Texture2D attackSheet;
 
+        /**
+         * @brief **추가** 공격 시트. 매 주기에 attackSheet와 함께 무작위로 고른다.
+         *
+         * 비워 두는 것이 기본이고, 비어 있으면 attackSheet 하나만 도는
+         * 지금까지의 동작 그대로다. 대부분의 팩에는 공격 시트가 하나뿐이다.
+         *
+         * 다크 사무라이(Inimig 9)만 채운다. 그 팩의 오의 블록에는 서로 다른
+         * 공격이 넷 들어 있어서(혈참·혈조·혈륜·혈파) 한 벌만 쓰면 아깝고,
+         * 무엇보다 2초마다 같은 그림이 돌면 금방 벽지가 된다.
+         *
+         * 셀 크기는 attackSheet와 같아야 한다 - 같은 config의 셀 하나로 전부
+         * 자르기 때문이다. 베이커가 한 번에 구우면 저절로 맞는다.
+         */
+        [Tooltip("추가 공격 시트. 매 주기에 attackSheet와 함께 무작위로 고른다. " +
+                 "비우면 attackSheet 하나만 쓴다. 셀 크기는 같아야 한다")]
+        public Texture2D[] attackSheetVariants;
+
         [Tooltip("시트 한 칸의 크기. 팩마다 다르다 - 모든 시트 폭의 최대공약수가 " +
                  "셀 폭이고, 한 줄 배치라 시트 높이가 곧 셀 높이다")]
         public int cellWidth = 128;
@@ -105,6 +122,19 @@ namespace Onikiri.Battle
 
         [Tooltip("빌더가 시트에서 만들어 넣는다. 손으로 채우지 않는다")]
         public EnemyDefinition generatedDefinition;
+
+        /**
+         * @brief 이 보스가 휘두를 때 앞에 뜨는 이펙트 이름 (`VfxLibrary`의 id).
+         *
+         * 비워두면 `BossFight`의 기본값을 쓴다. 대부분의 보스가 비워둔 채로 두면
+         * 되도록 그렇게 했다 - 참격이 뜨는 것이 기본이고, 이 칸은 "이 보스만
+         * 다른 것을 뿜는다"를 적는 자리다.
+         *
+         * 라이브러리에 없는 이름을 적으면 아무것도 안 뜬다. 이펙트를 끄고 싶은
+         * 보스가 있으면 그 성질을 이용해 `none`처럼 없는 이름을 적으면 된다.
+         */
+        [Tooltip("휘두를 때 앞에 뜰 이펙트 이름. 비우면 BossFight의 기본값을 쓴다")]
+        public string attackVfxId;
 
         // ------------------------------------------------------------ 확대형
 

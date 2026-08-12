@@ -36,6 +36,22 @@ namespace Onikiri.UI
         [SerializeField] private Image rowBackground;
         [SerializeField] private Image icon;
 
+        /**
+         * @brief 장착 버튼 (49단계). 줄 본체와 **다른 일을 한다.**
+         *
+         *   줄 본체   골드를 써서 레벨을 올린다 (26단계 그대로)
+         *   이 버튼   자리에 끼운다 (재화가 안 든다)
+         *
+         * 두 조작을 한 버튼에 겹치지 않는 이유는 되돌릴 수 있는 정도가 다르기
+         * 때문이다. 장착은 언제든 되돌릴 수 있고 레벨업은 골드가 사라진다 -
+         * 실수로 눌렀을 때의 대가가 다르면 버튼도 달라야 한다.
+         *
+         * **빼는 것은 여기가 아니라 슬롯 칩이다**(SkillSlotChip). 한쪽 조작에
+         * 두 뜻을 주지 않는다는 규칙이고, 그 이유는 그쪽 주석에 있다.
+         */
+        [SerializeField] private Button equipButton;
+        [SerializeField] private TMP_Text equipLabel;
+
         [Header("색")]
         [SerializeField] private Color affordableColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
         [SerializeField] private Color unaffordableColor = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
@@ -56,6 +72,9 @@ namespace Onikiri.UI
 
         [SerializeField] private Color iconTint = new Color(0.82f, 0.80f, 0.86f, 1f);
 
+        /** 장착된 줄의 바탕. 네 자리가 목록 어디에 있는지 한눈에 읽혀야 한다 */
+        [SerializeField] private Color equippedRowTint = new Color(0.52f, 0.46f, 0.72f, 1f);
+
         private PlayerWallet wallet;
         private CharacterLevel character;
 
@@ -65,6 +84,7 @@ namespace Onikiri.UI
             character = CharacterLevel.Instance;
 
             if (button != null) button.onClick.AddListener(OnClick);
+            if (equipButton != null) equipButton.onClick.AddListener(OnEquip);
             if (system != null) system.Changed += Refresh;
             if (wallet != null) wallet.GoldChanged += OnGoldChanged;
 
@@ -92,6 +112,7 @@ namespace Onikiri.UI
         private void OnDestroy()
         {
             if (button != null) button.onClick.RemoveListener(OnClick);
+            if (equipButton != null) equipButton.onClick.RemoveListener(OnEquip);
             if (system != null) system.Changed -= Refresh;
             if (wallet != null) wallet.GoldChanged -= OnGoldChanged;
             if (character != null) character.Changed -= Refresh;
@@ -107,6 +128,53 @@ namespace Onikiri.UI
             if (system != null) system.TryPurchase(slotIndex);
         }
 
+        /**
+         * @brief **빈 자리에만** 끼운다. 차 있으면 아무 일도 하지 않는다.
+         *
+         * 자동으로 무언가를 밀어내지 않는 것이 요점이다. 밀어낸다면 무엇을
+         * 밀어낼지를 코드가 정하게 되는데, 그 결정이 곧 이 스텝이 만든 질문
+         * ("네 자리에 무엇을 두는가")이고 그것은 플레이어의 것이다.
+         *
+         * 자리가 없으면 버튼이 아예 안 눌린다(Refresh) - 눌러도 아무 일이
+         * 없는 버튼을 두는 것이 이 프로젝트가 가장 싫어하는 상태다.
+         */
+        private void OnEquip()
+        {
+            if (system == null) return;
+
+            for (int slot = 0; slot < system.SlotCapacity; slot++)
+            {
+                if (system.EquippedAt(slot) >= 0) continue;
+                system.Equip(slot, slotIndex);
+                return;
+            }
+        }
+
+        /**
+         * @brief 잠긴 줄이 적는 조건. **게이트 종류마다 다른 말을 한다.**
+         *
+         * 50단계에 세 번째 종류가 생겼고, 그때 이 함수가 실기에서 거짓말을
+         * 했다 - 혈조의 잠긴 줄이 **"41스테이지"**로 떴다. 그 값은 게이트가
+         * 아니라 골드 비용의 기준점인데(SkillSpec.GachaGated 주석), 게이트를
+         * `unlockLevel <= 0`으로만 갈랐으므로 스테이지 게이트로 읽혔다.
+         *
+         * 화면에 나온 증상이 특히 나쁘다: **st41을 이미 지난 플레이어에게
+         * "41스테이지 필요"라고 적는다.** 조건을 이미 만족했는데 잠겨 있으니
+         * 버그로 읽히고, 실제로는 조건 자체가 다른 것이다.
+         *
+         * 뽑기 게이트를 **가장 먼저** 본다. 순서가 반대면 unlockStage가
+         * 있는 한 언제나 그쪽이 이긴다 - SkillSystem.IsUnlocked가 같은
+         * 순서를 쓰는 것과 같은 이유다.
+         */
+        private static string GateText(SkillSystem.Slot slot)
+        {
+            if (slot.gachaGated) return "뽑기";
+
+            return slot.unlockLevel > 0
+                ? "Lv." + slot.unlockLevel
+                : slot.unlockStage + "스테이지";
+        }
+
         private void Refresh()
         {
             if (system == null) return;
@@ -120,10 +188,11 @@ namespace Onikiri.UI
                 // 것으로 읽힌다 - UpgradeButton의 잠긴 줄과 같은 규칙이다
                 if (nameLabel != null) { nameLabel.text = slot.displayName; nameLabel.color = lockedColor; }
                 if (valueLabel != null) { valueLabel.text = FormatCooldown(slot); valueLabel.color = lockedColor; }
-                if (costLabel != null) { costLabel.text = "Lv." + slot.unlockLevel; costLabel.color = lockedColor; }
+                if (costLabel != null) { costLabel.text = GateText(slot); costLabel.color = lockedColor; }
                 if (rowBackground != null) rowBackground.color = lockedRowTint;
                 if (icon != null) icon.color = lockedIconTint;
                 if (button != null) button.interactable = false;
+                ShowEquip(false, false, "장착");
                 return;
             }
 
@@ -157,10 +226,44 @@ namespace Onikiri.UI
                                 : affordable ? affordableColor : unaffordableColor;
             }
 
+            // 49단계: 장착이 완성(MASTER)보다 위다. 네 자리가 목록 어디에
+            // 있는지가 이 화면에서 가장 먼저 읽혀야 하는 사실이기 때문이다 -
+            // 금색 MASTER는 그 오의 하나의 사정이고, 장착은 지금 나가는 것이
+            // 무엇인지를 말한다
+            bool equipped = system.IsEquipped(slotIndex);
+
             if (rowBackground != null)
-                rowBackground.color = capped ? masteredRowTint : normalRowTint;
+                rowBackground.color = equipped ? equippedRowTint
+                                    : capped ? masteredRowTint : normalRowTint;
 
             if (button != null) button.interactable = !capped && affordable;
+
+            bool hasRoom = false;
+            for (int open = 0; open < system.SlotCapacity; open++)
+                if (system.EquippedAt(open) < 0) { hasRoom = true; break; }
+
+            ShowEquip(true, !equipped && hasRoom, equipped ? "장착 중" : "장착");
+        }
+
+        /**
+         * @brief 장착 버튼의 상태를 한 자리에서 적는다.
+         *
+         * @param visible     잠긴 줄에서는 아예 감춘다 - 못 끼우는 것에 버튼이
+         *                    떠 있으면 잠금이 조건이 아니라 실패로 읽힌다
+         * @param interactable 빈 자리가 있고 아직 안 끼운 줄에서만 눌린다
+         */
+        private void ShowEquip(bool visible, bool interactable, string text)
+        {
+            if (equipButton != null)
+            {
+                equipButton.gameObject.SetActive(visible);
+                equipButton.interactable = interactable;
+            }
+            if (equipLabel != null)
+            {
+                equipLabel.text = text;
+                equipLabel.color = interactable ? affordableColor : unaffordableColor;
+            }
         }
 
         /** 빌더가 적어둔 평상시 행 색. 잠금·완성에서 되돌아올 자리가 필요하다 */

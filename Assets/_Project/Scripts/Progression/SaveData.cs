@@ -36,10 +36,12 @@ namespace Onikiri.Progression
          *   14 44단계. 요도 넷(혼·티어·발견)과 파편이 생겼다
          *   15 46단계. 뽑기(천장 카운터·누적·일일 무료 쿨)가 생겼다
          *   16 47단계. 희귀도 사다리 - 자루별 혼격과 전설 妖刀 보유
+         *   17 49단계. 오의 장착 슬롯 - 어느 오의를 어느 자리에 끼웠는가
+         *   18 50단계. 오의 뽑기 - 스킬 XP · 가챠 몫 보유 · 그 배너의 천장/무료 쿨
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 16;
+        public const int CurrentVersion = 18;
 
         public int version = CurrentVersion;
 
@@ -122,6 +124,21 @@ namespace Onikiri.Progression
          */
         public string[] skillIds = new string[0];
         public int[] skillLevels = new int[0];
+
+        /**
+         * @brief 장착 구성 (49단계). 자리 순서대로 오의 id, 빈 자리는 빈 문자열.
+         *
+         * **레벨 배열과 따로 두는 것이 요점이다.** 보유(레벨)와 장착은 다른
+         * 물건이다 - 여덟 자루를 다 갖고 넷만 끼운다. 한 배열에 섞으면 "끼우지
+         * 않은 오의의 레벨"을 적을 자리가 없어지고, 그러면 슬롯을 바꿀 때마다
+         * 레벨이 사라진다.
+         *
+         * 길이는 SkillCurve.MaxSlots다. 슬롯이 몇 개 열려 있는지는 저장하지
+         * 않는다 - 최전선에서 유도되는 값이라(SkillCurve.SlotsAtStage) 저장하면
+         * 두 출처가 갈릴 수 있다. 43단계가 심화 축 해금 상태를 저장하지 않은
+         * 것과 같은 규칙이다.
+         */
+        public string[] skillEquipped = new string[0];
 
         /**
          * @brief 자동 시전이 켜져 있는가.
@@ -323,6 +340,47 @@ namespace Onikiri.Progression
          */
         public string[] legendaryYodoIds = new string[0];
         public int[] legendaryYodoCopies = new int[0];
+
+        // ---------------------------------------------------------------- 50단계
+
+        /**
+         * @brief 뽑기로 얻은 오의의 id. **보유한 것만 적는다.**
+         *
+         * 미보유를 0으로 함께 적는 방식(petUnlocked · yodoDiscovered)을 안
+         * 쓰는 이유는 값이 없기 때문이다. 저쪽 배열들은 해금 옆에 레벨·티어가
+         * 나란히 서지만 여기 있는 것은 bool 하나뿐이라, 있는 것만 적으면
+         * 세이브가 스스로 설명된다.
+         *
+         * 오의 레벨(skillLevels)에 접어 넣지 않는 이유는 47단계가 혼격을
+         * 티어에 안 접은 것과 같다 - 레벨 0을 "미보유"로 쓰면 레벨이 1부터라는
+         * 규칙이 이 두 오의에서만 깨지고, 그 예외는 읽는 쪽 모두에 퍼진다.
+         */
+        public string[] gachaSkillIds = new string[0];
+
+        /**
+         * @brief 아직 레벨로 바뀌지 않은 스킬 XP. **하나의 풀이다.**
+         *
+         * 오의별로 나눠 담지 않는 이유는 SkillSystem.skillXp 주석에 있다 -
+         * 나누면 뽑기가 타겟팅을 갖는다.
+         *
+         * long인 것은 GemWallet·yodoSouls와 같은 판단이다. 파밍으로 늘지
+         * 않고 뽑기로만 들어오므로(한 번에 6~240) 평생 십만 단위를 안 넘는다.
+         */
+        public long skillXp;
+
+        /**
+         * @brief 오의 뽑기의 천장 카운터. **요도 뽑기(gachaPity)와 다른 값이다.**
+         *
+         * 한 칸에 접지 않는 이유는 두 배너가 다른 상품이기 때문이다
+         * (SkillGachaSystem 머리 주석) - 합치면 요도를 스물아홉 번 돌린
+         * 사람이 오의 해금을 한 번에 받는다.
+         */
+        public int skillGachaPity;
+
+        public int skillGachaTotalPulls;
+
+        /** 마지막으로 오의 무료 뽑기를 쓴 퀘스트일. 요도 쪽과 같은 형식·같은 경계 */
+        public long skillGachaFreePullDayTicks;
 
         public static SaveData NewGame()
         {
@@ -678,6 +736,85 @@ namespace Onikiri.Progression
                 EnsureLegendaryYodo(data, LegendaryYodoCatalog.ThousandHandId);
 
                 data.version = 16;
+            }
+
+            if (data.version == 16)
+            {
+                // v16에는 장착이라는 개념이 없었다. 오의 셋은 **전부 상시
+                // 발동**이었고, 그것은 곧 "셋이 세 자리에 끼워져 있다"와 같다.
+                //
+                // **그래서 값을 지어내지 않는다.** 빈 배열로 두면 SkillSystem이
+                // FillEmptySlots로 기준 구성(상한 기여 내림차순)을 채우는데,
+                // st51 아래에서는 열린 자리가 셋이고 열린 오의도 그 셋뿐이라
+                // 결과가 언제나 귀참·일섬·연참이다 - 마이그레이션이 하는 일이
+                // 없는 것이 정답이다.
+                //
+                // **소급도 없다.** 이미 심층에 있는 플레이어는 접속하는 순간
+                // 4번 슬롯이 열리고 신규 다섯이 전부 해금되지만, 그것은 소급이
+                // 아니라 **게이트가 최전선 하나뿐**이기 때문이다(SkillCurve.
+                // ExpansionStage). 요도가 st41 게이트 하나로 열린 것과 같다.
+                // 신규 오의의 레벨은 다 1에서 시작하므로 얻는 것은 자리 하나이고,
+                // 그 자리의 값이 이 스텝의 밴드 재기준이 잰 크기 그대로다.
+                data.skillEquipped = new string[0];
+
+                // **신규 오의의 칸은 여기서 만든다.** v6 -> v7이 그때의 오의
+                // 셋에 칸을 만들어 준 것과 같은 처리다 - 그 단계는 v6 이하만
+                // 지나므로 v7~v16 세이브에는 49단계의 다섯이 아예 없다.
+                //
+                // 레벨은 1이다(EnsureSkill의 기본값). 소급이 아니라 **없던
+                // 것이 생기는 것**이고, 레벨 1의 오의는 상한까지 열한 칸을
+                // 골드로 사야 한다 - 심층 플레이어도 예외가 아니다
+                foreach (var skill in SkillCatalog.Skills) EnsureSkill(data, skill.Id);
+
+                data.version = 17;
+            }
+
+            if (data.version == 17)
+            {
+                // v17에는 오의 뽑기가 없었다. 천장 0 · 누적 0 · 무료 뽑기
+                // **미사용** · XP 0으로 명시적으로 적어 넣는다.
+                //
+                // **이 마이그레이션은 밸런스를 바꾸지 않는다.** XP 0의 기여가
+                // 정확히 0이고, 미보유 오의의 기여도 정확히 0이다 - 장비
+                // v8->v9(1등급 Lv.1), 전직 v9->v10(0티어), 펫 v10->v11(잠금),
+                // 요도 v13->v14(미봉인), 뽑기 v14->v15(0회)와 같은 성질이다.
+                //
+                // **소급도 없다.** 지나온 날수만큼 무료 뽑기를 쌓아주면
+                // 접속하자마자 천장을 여러 번 지나 오의 둘이 통째로 열리고,
+                // 그것은 이 스텝이 판 재고를 지우는 일이다.
+                data.skillXp = 0L;
+                data.skillGachaPity = 0;
+                data.skillGachaTotalPulls = 0;
+                data.skillGachaFreePullDayTicks = 0L;
+
+                // ---- 그런데 **이미 가진 것은 유지한다.**
+                //
+                // 49단계에서 혈폭·혈조는 최전선 st51의 스테이지 게이트였다.
+                // 50단계가 그 게이트를 뽑기로 옮기므로, 손대지 않으면 이미
+                // st51을 넘긴 플레이어가 **갖고 있던 오의 둘을 잃는다.**
+                //
+                // 소급이 아니라 보존이다. 위 세 줄이 "지나온 플레이를 값으로
+                // 쳐주지 않는다"는 규칙이라면, 이 줄은 "이미 준 것을 도로
+                // 뺏지 않는다"는 다른 규칙이다 - v12 -> v13이 강화 레벨을
+                // 환산해 파워를 보존한 것과 같은 자리이고, 47단계가 천장
+                // 카운터를 안 건드린 이유("지불한 것을 몰수하지 않는다")의
+                // 연장이다.
+                //
+                // 기준이 st51인 것은 그것이 **v17의 게이트 그 자체**이기
+                // 때문이다. 여기서 다른 값을 고르면 마이그레이션이 v17 세계의
+                // 사실이 아니라 새 판단을 지어내는 것이 된다.
+                if (data.maxStageReached >= SkillCurve.ExpansionStage)
+                {
+                    var owned = new string[SkillGachaCurve.UnlockOrder.Length];
+                    Array.Copy(SkillGachaCurve.UnlockOrder, owned, owned.Length);
+                    data.gachaSkillIds = owned;
+                }
+                else
+                {
+                    data.gachaSkillIds = new string[0];
+                }
+
+                data.version = 18;
             }
 
             data.version = CurrentVersion;

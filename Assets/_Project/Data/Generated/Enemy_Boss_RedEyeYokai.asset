@@ -65,14 +65,32 @@ MonoBehaviour:
   - {fileID: -8222471432525534737, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
   - {fileID: -5060464365741366859, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
   - {fileID: 2732036489171911614, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
-  - {fileID: -4115261504728875612, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
-  - {fileID: 3802779199635122695, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
-  - {fileID: 4098611991708678332, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
-  - {fileID: -715981269168923527, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
-  - {fileID: -6464717584006797268, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
-  - {fileID: 5412541418613530657, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
+  attackVariants:
+  - frames:
+    - {fileID: -2926758804681288333, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+    - {fileID: 6277552369616489848, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+    - {fileID: -5630969925048632771, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+    - {fileID: -7643582024471960757, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+    - {fileID: -914370229680298026, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+    - {fileID: -7515177359284222635, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+  - frames:
+    - {fileID: 4014672033620451516, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+    - {fileID: -6870300212070793146, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+    - {fileID: -8850378921204198208, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+    - {fileID: -9106123613656457063, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+    - {fileID: 5308146616694670453, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+    - {fileID: 5355540012494119274, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+  - frames:
+    - {fileID: -1465008800629163659, guid: f90959345b5551c488058b50594b5661, type: 3}
+    - {fileID: 7127563456679689644, guid: f90959345b5551c488058b50594b5661, type: 3}
+    - {fileID: 7424203949768761957, guid: f90959345b5551c488058b50594b5661, type: 3}
+    - {fileID: -5862574851552424492, guid: f90959345b5551c488058b50594b5661, type: 3}
+    - {fileID: -3762217269840536535, guid: f90959345b5551c488058b50594b5661, type: 3}
+    - {fileID: -653775607098526153, guid: f90959345b5551c488058b50594b5661, type: 3}
+    - {fileID: 7431108188740271114, guid: f90959345b5551c488058b50594b5661, type: 3}
   attackInterval: 2
   attackImpactPoint: 0.55
+  attackTelegraphSeconds: 0
   hoverHeight: 0
   artBottomOffset: 0
   artFacesLeft: 0

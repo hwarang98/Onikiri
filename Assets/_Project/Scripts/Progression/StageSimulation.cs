@@ -129,6 +129,30 @@ namespace Onikiri.Progression
              */
             public double SkillDpsShare;
 
+            /**
+             * @brief 지금 **열려 있는** 장착 자리 수 (49단계). st51에 셋에서 넷이 된다.
+             *
+             * 채워진 수가 아니다. 둘은 초반에 갈린다 - st1에는 자리가 셋인데
+             * 열린 오의가 하나도 없어서(연참이 Lv.10) 채워진 것은 0이다.
+             * 밴드가 보는 것은 **예산**이므로 자리 수가 맞는 값이고, 실제로
+             * 무엇이 끼워졌는지는 아래 배열이 말한다.
+             */
+            public int SkillSlots;
+
+            /** 그 자리에 실제로 끼워진 오의들 (SkillCatalog 인덱스) */
+            public int[] SkillEquipped;
+
+            // ------------------------------------------------------------ 50단계
+
+            /** 지금까지 돌린 오의 뽑기 수. 요도 뽑기(GachaPulls)와 다른 지갑이다 */
+            public double SkillGachaPulls;
+
+            /** 뽑기로 얻은 오의의 비트마스크. 폭이 얼마나 열렸는지가 이 값이다 */
+            public int SkillGachaOwned;
+
+            /** 아직 레벨로 안 바뀐 스킬 XP 잔액 */
+            public double SkillXp;
+
             // ------------------------------------------------------------ 32단계
 
             public int WeaponGrade;
@@ -303,6 +327,97 @@ namespace Onikiri.Progression
 
             /** 스킬을 한 번도 올리지 않는다 (해금은 되므로 레벨 1의 기여는 남는다) */
             public bool SkipSkills;
+
+            /**
+             * @brief **4번 장착 슬롯을 쓰지 않는다.** 49단계의 죽은 버튼 비교군.
+             *
+             * 이 스텝이 밴드에 지는 빚의 전부가 그 한 자리이므로, 이 정책이
+             * 곧 "49단계를 안 한 세계"다. 신규 오의를 따로 지우지 않는 이유는
+             * 지울 것이 없기 때문이다 - 자리가 셋이면 기준 구성이 기존 셋으로
+             * 떨어지고(상한 기여가 그 셋이 가장 크다), 신규 다섯은 보유만 된
+             * 채 아무 일도 안 한다. 그것이 슬롯 설계가 주장하는 바로 그 성질이다.
+             */
+            public bool SkipSkillSlot;
+
+            /**
+             * @brief 신규 오의 다섯이 **아예 없는** 세계 (49b).
+             *
+             * 코리더 비트 불변의 증인이다. 49b가 신규 셋을 코리더 안(st12/18/27)으로
+             * 앞당기면서, "자리 예산이 같으니 공짜"라는 주장을 등호로 증명할
+             * 대조군이 필요해졌다 - `SkipSkillSlot`은 자리만 줄이고 풀은 그대로라
+             * 그 증명을 못 한다.
+             */
+            public bool SkipExpansionSkills;
+
+            /**
+             * @brief 오의 뽑기를 돌린다 (50단계). **기본 정책은 안 돈다.**
+             *
+             * ## 왜 기본이 꺼짐인가 - 46단계의 무과금 규칙이 여기서는 모두에게 적용된다
+             *
+             * 46단계는 "무과금은 뽑기에 보석을 쓰지 않는다"를 정책으로 뒀다
+             * (GemsFromQuestsOnly). 오의 뽑기에서는 그 판단이 **과금 쪽에도**
+             * 그대로 걸린다 - 이 배너가 파는 것이 폭과 가속뿐이라(파워 0)
+             * 보석당 DPS가 정확히 0이고, 그러면 밴드가 가정하는 최적 지출은
+             * 요도 뽑기와 촉매다.
+             *
+             * 켜 두면 밴드가 "보석을 DPS 0인 곳에 쓰는 플레이어"를 기준으로
+             * 서게 되고, 그것은 20단계 골드 축이 겪은 함정 버튼의 정반대
+             * 실수다 - 축이 나쁜 것이 아니라 **자가 그 축을 못 재는 것**인데
+             * 곡선이 그 자를 믿어버린다.
+             *
+             * 그래서 이 축은 밴드 밖에 선다. 47단계의 일일 무료 트리클이
+             * "표 밖에 있고 보고되는 f2p 바닥은 여전히 하한"이었던 것과 같은
+             * 자리이고, 여기서는 과금 곡선까지 그 규칙을 쓴다.
+             *
+             * 켜는 곳은 셋뿐이다 - 잠식 반례(SkillGachaBeforeCore), 가속
+             * 실측(SkillGachaTests), 그리고 재고·XP 표를 뽑는 보고 경로.
+             */
+            public bool SkillGacha;
+
+            /**
+             * @brief 뽑기가 **해금만 주고 XP는 안 준다.** 가속의 크기를 재는 자.
+             *
+             * 47단계의 `SkipRarity`(사다리 없는 뽑기)와 같은 자리, 같은
+             * 이유다 - 한 스텝이 얹은 층을 통째로 재려면 그 층만 없는
+             * 세계가 있어야 하고, 축 전체를 지우는 자(SkillGacha 끔)로는
+             * 폭과 가속이 한 숫자에 섞인다.
+             *
+             * **잠식 반례는 따로 두지 않았다.** `SkillGacha`를
+             * `GemsFromQuestsOnly`와 함께 켜면 그것이 곧 "무과금이 이 배너에
+             * 보석을 쓰는 세계"이고, 46단계의 `GachaBeforeCore`가 필요했던
+             * 이유(그쪽은 무과금 정책이 뽑기를 아예 막고 있었다)가 여기에는
+             * 없다 - 이 함수는 정책이 켜져 있으면 지갑만 본다.
+             */
+            public bool SkillGachaWithoutXp;
+
+            /**
+             * @brief 장착 구성을 못 박는다. null이면 기준 구성.
+             *
+             * 오의별 장착 가치를 재는 자다. 값은 SkillCatalog의 인덱스이고,
+             * 잠긴 것은 조용히 건너뛴다 - 게이트를 무시하면 st1에서 신규
+             * 오의를 끼운 세계가 만들어져 코리더 불변이 거짓이 된다.
+             */
+            public int[] ForceLoadout;
+
+            /**
+             * @brief 파편을 이 자루 하나에만 쓴다. **1부터 센다 - 0이 "고르게"다.**
+             *
+             * 1-based인 이유는 Policy가 struct이기 때문이다. 0-based로 두면
+             * 아무것도 안 적은 기본 정책이 "0번 자루에 몰아주기"가 되고, 그것은
+             * 이 파일의 모든 기존 검사가 조용히 다른 세계를 재게 된다는 뜻이다.
+             *
+             * 45단계가 만든 두 방향(몰아주기 / 고르기) 중 앞쪽을 시뮬레이션이
+             * 실제로 돌 수 있게 하는 손잡이다. 49단계에 필요해진 이유는 신규
+             * 오의의 장착 가치가 **그 오의의 혼을 민 세계**에서만 0이 아니기
+             * 때문이다 - 고르게 미는 세계에서는 다섯이 동률이라 정확히 0이고,
+             * 그 0은 설계이지 결함이 아니다(SkillCatalog 머리 주석).
+             *
+             * 혼은 그대로 떨어진다. 막는 것은 **파편**뿐이다 - 봉인(0 -> 1)은
+             * 혼만 들기 때문에 몰아주기 세계에서도 네 자루가 다 봉인되고,
+             * 갈리는 것은 그 뒤의 티어다. 그것이 게임에서 실제로 일어나는
+             * 몰아주기의 모양이다.
+             */
+            public int YodoFocus;
 
             /**
              * @brief 업적 보상을 한 번도 받지 않는다. 31단계의 비교군.
@@ -739,6 +854,12 @@ namespace Onikiri.Progression
             levels.NoSpirit = policy.SkipSpirit || policy.NeutralizeYodoPower
                            || policy.SkipYodo || policy.NeutralizeYodo;
 
+            // 49단계: 장착. 정책이 말하지 않으면 기준 구성이고, 그것이 밴드가
+            // 가정하는 구성이자 게임 쪽 기본값이다(SkillSystem.FillEmptySlots)
+            levels.NoExpansionSlot = policy.SkipSkillSlot;
+            levels.NoExpansionSkills = policy.SkipExpansionSkills;
+            levels.ForcedLoadout = policy.ForceLoadout;
+
             double purse = 0d;
 
             // 이미 받은 업적. 일회성이므로 한 번만 지급된다 - 게임 쪽
@@ -751,6 +872,10 @@ namespace Onikiri.Progression
 
             for (int stage = 1; stage <= throughStage; stage++)
             {
+                // 49단계: 이 세계의 최전선. 4번 슬롯과 신규 오의의 게이트이고,
+                // 스테이지마다 다시 적어야 st51에서 자리가 하나 열린다
+                levels.Frontier = stage;
+
                 // 이 스테이지에서 획득 축을 산 순간의 회수 시간. 스테이지마다
                 // 비운다 - 표의 한 줄은 그 스테이지에서 일어난 일만 말해야 한다
                 double purchasePayback = double.PositiveInfinity;
@@ -871,6 +996,19 @@ namespace Onikiri.Progression
                 // 게임에서도 봉인은 강화 화면을 열기 전에 끝나 있다
                 TryForgeYodo(ref levels, stage, policy);
 
+                // 오의 뽑기(50단계)는 요도 **다음**, 구매 **앞**이다. 요도
+                // 다음인 이유는 두 배너가 한 지갑을 나눠 쓰기 때문이고 -
+                // 순서를 뒤집으면 잠식 반례가 재는 것이 "누가 먼저 썼는가"가
+                // 되어 버린다 - 구매 앞인 이유는 XP가 올린 오의 레벨이 이
+                // 스테이지의 화력 저울에 들어가야 게임과 같은 순간이 되기
+                // 때문이다(TryForgeYodo가 구매 앞에 선 것과 같은 판단).
+                //
+                // 요도와 달리 TryForgeYodo 안이 아니라 밖에 두는 것은 두 축이
+                // 서로를 모르기 때문이다 - 요도 뽑기는 요도의 재료를 팔아
+                // 벼림과 한 덩어리이지만, 오의 뽑기는 요도가 없는 세계
+                // (SkipYodo)에서도 돌아야 한다
+                TrySkillGacha(ref levels, stage, policy);
+
                 Buy(ref levels, ref purse, stage + 1, lastGoldPerSecond, stage, policy, ref purchasePayback);
 
                 results.Add(new StageResult
@@ -950,6 +1088,12 @@ namespace Onikiri.Progression
                     YodoPowerFactor = levels.PowerFactor,
 
                     SkillLevels = levels.SkillLevelsSnapshot(),
+                    SkillSlots = levels.OpenSlots,
+                    SkillEquipped = levels.EquippedSnapshot(),
+
+                    SkillGachaPulls = levels.SkillGachaPulls,
+                    SkillGachaOwned = levels.SkillGachaMask,
+                    SkillXp = levels.SkillXp,
 
                     // 레벨은 levels에서, 비율은 stats에서 온다. 다른 축과 같은
                     // 규칙이다 - 레벨 칸은 보스 보상까지 쓴 뒤의 값이고, DPS 칸은
@@ -1091,13 +1235,14 @@ namespace Onikiri.Progression
             if (activeSeconds <= 0d) return 0d;
 
             double casts = 0d;
-            int count = Math.Min(SkillCatalog.Count, SkillSlotCapacity);
 
-            for (int i = 0; i < count; i++)
+            // 장착한 것만 나간다(49단계). 안 끼운 오의의 쿨다운은 안 돌므로
+            // 반복 퀘스트의 "오의 N회"도 그만큼만 찬다 - 게임 쪽 SkillSystem.
+            // Update가 장착 자리만 도는 것과 같은 값이어야 한다
+            var equipped = levels.EquippedSnapshot();
+            for (int slot = 0; slot < equipped.Length; slot++)
             {
-                if (!SkillCatalog.IsUnlockedAt(i, levels.L)) continue;
-
-                double cooldown = SkillCatalog.Skills[i].CooldownSeconds;
+                double cooldown = SkillCatalog.Skills[equipped[slot]].CooldownSeconds;
                 if (cooldown > 0d) casts += activeSeconds / cooldown;
             }
 
@@ -1342,6 +1487,26 @@ namespace Onikiri.Progression
              */
             public double GachaRarityProgress;
             public double GachaLegendProgress;
+
+            // ------------------------------------------------------------ 50단계
+
+            /** 오의 뽑기를 돌린 수. 요도 쪽과 갈라 둔다 - 천장 카운터가 다르다 */
+            public double SkillGachaPulls;
+
+            /**
+             * @brief 뽑기로 얻은 오의의 비트마스크. 카탈로그 인덱스다.
+             *
+             * 게임 쪽(SkillSystem.GachaOwnedMask)과 같은 형식이라 두 세계가
+             * 같은 함수를 지난다(SkillCatalog.IsUnlockedAt).
+             */
+            public int SkillGachaMask;
+
+            /** 아직 레벨로 안 바뀐 스킬 XP. 게임 쪽 skillXp와 같은 자리 */
+            public double SkillXp;
+
+            /** 다음 ★4(해금)·★5(개안)까지의 확률 질량. 47단계와 같은 단위(0~1) */
+            public double SkillUnlockProgress;
+            public double SkillAwakenProgress;
 
             /**
              * @brief 혼 정수가 지금 갈 자루. 없으면 -1.
@@ -1589,9 +1754,14 @@ namespace Onikiri.Progression
                 {
                     double attack = AttackSpeedCurve.CappedValueAtLevel(S);
                     double plain = 0d;
-                    int count = Math.Min(SkillCatalog.Count, SkillSlotCapacity);
-                    for (int i = 0; i < count; i++)
-                        plain += SkillCatalog.RateAt(i, SkillLevel(i), L);
+                    // 49단계: 상성이 없는 세계도 **같은 장착 구성**으로 재야
+                    // 비가 상성만의 크기가 된다
+                    int slots = FillEquipped();
+                    for (int slot = 0; slot < slots; slot++)
+                    {
+                        int i = EquipScratch[slot];
+                        plain += SkillCatalog.RateAt(i, SkillLevel(i), L, F, SkillGachaMask);
+                    }
 
                     double before = attack + plain;
                     if (before <= 0d) return 1d;
@@ -1635,6 +1805,13 @@ namespace Onikiri.Progression
             public int Skill1;
             public int Skill2;
 
+            // 49단계에 다섯이 붙었다. 배열을 못 두는 이유는 위와 같다
+            public int Skill3;
+            public int Skill4;
+            public int Skill5;
+            public int Skill6;
+            public int Skill7;
+
             public int SkillLevel(int index)
             {
                 int level;
@@ -1643,6 +1820,11 @@ namespace Onikiri.Progression
                     case 0: level = Skill0; break;
                     case 1: level = Skill1; break;
                     case 2: level = Skill2; break;
+                    case 3: level = Skill3; break;
+                    case 4: level = Skill4; break;
+                    case 5: level = Skill5; break;
+                    case 6: level = Skill6; break;
+                    case 7: level = Skill7; break;
                     default: return 1;
                 }
                 // 다른 축과 같은 규칙 - 모든 축은 레벨 1이 시작값이다
@@ -1656,6 +1838,11 @@ namespace Onikiri.Progression
                     case 0: Skill0 = level; break;
                     case 1: Skill1 = level; break;
                     case 2: Skill2 = level; break;
+                    case 3: Skill3 = level; break;
+                    case 4: Skill4 = level; break;
+                    case 5: Skill5 = level; break;
+                    case 6: Skill6 = level; break;
+                    case 7: Skill7 = level; break;
                 }
             }
 
@@ -1679,7 +1866,9 @@ namespace Onikiri.Progression
                 {
                     int total = 0;
                     int count = Math.Min(SkillCatalog.Count, SkillSlotCapacity);
-                    for (int i = 0; i < count; i++) total += SkillLevel(i);
+                    // 49단계: **산 칸의 합**이다. 풀 크기와 무관해야 하는 이유는
+                    // SkillSystem.TotalLevels 주석에 있다
+                    for (int i = 0; i < count; i++) total += Math.Max(0, SkillLevel(i) - 1);
                     return total;
                 }
             }
@@ -1718,11 +1907,202 @@ namespace Onikiri.Progression
                 get
                 {
                     double rate = 0d;
-                    int count = Math.Min(SkillCatalog.Count, SkillSlotCapacity);
-                    for (int i = 0; i < count; i++)
-                        rate += SkillCatalog.RateAt(i, SkillLevel(i), L) * AffinityFor(i);
+                    int slots = FillEquipped();
+                    for (int slot = 0; slot < slots; slot++)
+                    {
+                        int i = EquipScratch[slot];
+                        rate += SkillCatalog.RateAt(i, SkillLevel(i), L, F, SkillGachaMask) * AffinityFor(i);
+                    }
                     return rate;
                 }
+            }
+
+            // ------------------------------------------------------- 49단계: 장착
+
+            /**
+             * @brief 지금까지 도달한 최전선. **신규 오의와 4번 슬롯의 게이트다.**
+             *
+             * 시뮬레이션은 스테이지를 단조 증가로만 지나므로 최전선이 곧 현재
+             * 스테이지다. 그래도 이름을 최전선으로 두는 이유는 게임 쪽이 읽는
+             * 값이 그것이기 때문이다(SkillSystem.FrontierNow) - 두 이름이 다르면
+             * 재선택으로 아래에 내려간 플레이어에서 둘이 갈린다.
+             */
+            public int Frontier;
+
+            public int F { get { return Frontier < 1 ? 1 : Frontier; } }
+
+            /** 4번 슬롯이 없는 비교군. 죽은 버튼 검사가 켠다 */
+            public bool NoExpansionSlot;
+
+            /**
+             * @brief 신규 오의 다섯이 **아예 없는** 세계. 49단계 이전의 풀이다.
+             *
+             * NoExpansionSlot과 다른 질문이다 - 저쪽은 "자리가 셋인가"이고
+             * 이쪽은 "고를 것이 셋뿐인가"다. 코리더 비트 불변을 증명하려면
+             * 이쪽이 필요하다: 자리 수가 같아도 신규가 기준 구성에 끼어들면
+             * 곡선이 움직일 수 있고, 그것을 등호로 재는 것이 유일한 증명이다.
+             */
+            public bool NoExpansionSkills;
+
+            /**
+             * @brief 장착 구성을 강제한다. null이면 기준 구성을 쓴다.
+             *
+             * 오의별 장착 가치를 재는 자다 - "그 오의 대신 다른 것을 끼운
+             * 세계"를 만들려면 정책이 구성을 직접 말할 수 있어야 한다.
+             */
+            public int[] ForcedLoadout;
+
+            /**
+             * @brief 장착 스크래치. **Levels가 struct라 배열을 못 든다.**
+             *
+             * YodoScratch와 같은 규칙이고 같은 이유다 - 채운 즉시 읽고 버리므로
+             * 상태가 남지 않고, 시뮬레이션은 한 스레드에서 돈다.
+             */
+            private static readonly int[] EquipScratch = new int[SkillCurve.MaxSlots];
+
+            /**
+             * @brief 지금 끼워져 있는 오의들을 EquipScratch에 채운다.
+             *
+             * @return 채워진 자리 수
+             */
+            /**
+             * @brief 지금 열려 있는 자리 수. 채워진 수와 다를 수 있다.
+             *
+             * **레벨과 최전선을 둘 다 본다**(49b). 앞의 셋은 기본 오의를 배울
+             * 때마다 하나씩 열리고(Lv.10/15/20) 넷째는 st51이다 - 자리를 3으로
+             * 고정하면 코리더에서 빈 자리가 생기고, 거기 신규 오의가 그냥
+             * 들어가 공짜 DPS가 된다(SkillCurve.SlotsFor 주석).
+             */
+            public int OpenSlots
+            {
+                get
+                {
+                    int slots = SkillCurve.SlotsFor(L, F);
+
+                    // 4번 자리가 없는 비교군. 앞의 셋은 그대로 램프를 탄다 -
+                    // 그것이 49단계 **이전**의 세계이기 때문이다
+                    if (NoExpansionSlot && slots > SkillCurve.BaseSlots) slots = SkillCurve.BaseSlots;
+                    return slots;
+                }
+            }
+
+            public int FillEquipped()
+            {
+                int slots = OpenSlots;
+
+                if (ForcedLoadout != null)
+                {
+                    int filled = 0;
+                    for (int i = 0; i < ForcedLoadout.Length && filled < slots; i++)
+                    {
+                        int index = ForcedLoadout[i];
+                        if (index < 0 || index >= SkillCatalog.Count) continue;
+                        if (NoExpansionSkills && SkillCatalog.Skills[index].StageGated) continue;
+                        if (!SkillCatalog.IsUnlockedAt(index, L, F, SkillGachaMask)) continue;
+                        EquipScratch[filled++] = index;
+                    }
+                    return filled;
+                }
+
+                // 신규가 없는 세계는 최전선을 0으로 속인다 - 스테이지 게이트의
+                // 오의가 전부 잠겨 49단계 이전의 풀이 그대로 남는다
+                return SkillCatalog.ReferenceLoadout(L, NoExpansionSkills ? 0 : F, EquipScratch, slots,
+                                                     NoExpansionSkills ? 0 : SkillGachaMask);
+            }
+
+            /**
+             * @brief 방금 채운 스크래치의 slot번 칸. **FillEquipped 직후에만 읽는다.**
+             *
+             * 밖에서 구성을 훑어야 하는 자리가 하나 있어서 연다(개안 대상 고르기).
+             * 배열을 돌려주지 않는 이유는 그러면 호출부가 보관할 수 있게 되고,
+             * 그 다음 FillEquipped가 조용히 덮어쓰기 때문이다.
+             */
+            public static int EquippedAtScratch(int slot)
+            {
+                if (slot < 0 || slot >= EquipScratch.Length) return -1;
+                return EquipScratch[slot];
+            }
+
+            /** 이 오의가 지금 끼워져 있는가. 구매 정책이 읽는다 */
+            public bool IsSkillEquipped(int index)
+            {
+                int slots = FillEquipped();
+                for (int slot = 0; slot < slots; slot++)
+                    if (EquipScratch[slot] == index) return true;
+                return false;
+            }
+
+            // ------------------------------------------------------- 50단계: 스킬 XP
+
+            /**
+             * @brief XP가 들어갈 오의. 장착 -> 벤치 순, 각 구간에서 최저 레벨.
+             *
+             * 게임 쪽 SkillSystem.FindXpTarget과 **같은 규칙**이다. 두 곳이
+             * 갈리면 시뮬레이션이 재는 가속과 플레이어가 받는 가속이 다른
+             * 오의에 붙는다.
+             *
+             * `EquipScratch`를 한 번만 채우고 그 위에서만 읽는다 - 루프 안에서
+             * IsSkillEquipped를 부르면 그 호출이 스크래치를 다시 채워 방금
+             * 읽던 배열이 바뀐다(Levels가 struct라 배열을 못 드는 대가).
+             */
+            public int SkillXpTarget()
+            {
+                int slots = FillEquipped();
+                int equippedBest = -1;
+
+                for (int slot = 0; slot < slots; slot++)
+                {
+                    int i = EquipScratch[slot];
+                    if (i < 0 || SkillLevel(i) >= SkillCurve.MaxLevel) continue;
+                    if (equippedBest < 0 || SkillLevel(i) < SkillLevel(equippedBest))
+                        equippedBest = i;
+                }
+                if (equippedBest >= 0) return equippedBest;
+
+                int benchBest = -1;
+                int count = Math.Min(SkillCatalog.Count, SkillSlotCapacity);
+                for (int i = 0; i < count; i++)
+                {
+                    if (!SkillCatalog.IsUnlockedAt(i, L, F, SkillGachaMask)) continue;
+                    if (SkillLevel(i) >= SkillCurve.MaxLevel) continue;
+
+                    bool equipped = false;
+                    for (int slot = 0; slot < slots; slot++)
+                        if (EquipScratch[slot] == i) { equipped = true; break; }
+                    if (equipped) continue;
+
+                    if (benchBest < 0 || SkillLevel(i) < SkillLevel(benchBest)) benchBest = i;
+                }
+                return benchBest;
+            }
+
+            /**
+             * @brief 이 배너에 아직 팔 것이 남아 있는가.
+             *
+             * 게임 쪽 SkillSystem.HasStock과 같은 정의다 - 못 얻은 가챠 몫이
+             * 있거나, **장착한** 오의 중 상한에 안 닿은 것이 있으면 재고다.
+             * 벤치는 안 센다(그쪽 주석 참고).
+             */
+            public bool HasSkillStock()
+            {
+                if (!SkillGachaCurve.AllUnlocked(SkillGachaMask)) return true;
+
+                int slots = FillEquipped();
+                for (int slot = 0; slot < slots; slot++)
+                {
+                    int i = EquipScratch[slot];
+                    if (i >= 0 && SkillLevel(i) < SkillCurve.MaxLevel) return true;
+                }
+                return false;
+            }
+
+            /** 표에 찍는 장착 구성. 스냅샷이라 여기서만 배열을 만든다 */
+            public int[] EquippedSnapshot()
+            {
+                int slots = FillEquipped();
+                var copy = new int[slots];
+                Array.Copy(EquipScratch, copy, slots);
+                return copy;
             }
 
             // ------------------------------------------------------------ 12단계
@@ -2149,7 +2529,7 @@ namespace Onikiri.Progression
          * 시뮬레이션만 없는 DPS로 계산하게 되므로 테스트가 못 박는다
          * (Simulation_HasASlotForEverySkill).
          */
-        public const int SkillSlotCapacity = 3;
+        public const int SkillSlotCapacity = 8;
 
         private static void Advance(ref Levels levels, int axis)
         {
@@ -2277,6 +2657,12 @@ namespace Onikiri.Progression
                     // 봉인(0 -> 1)은 혼만 든다. 파편은 합성의 재료이지
                     // 탄생의 재료가 아니다
                     int shardCost = tier == 0 ? 0 : YodoCurve.ShardCostAtTier(tier);
+
+                    // 몰아주기(49단계): 파편은 고른 자루에만 간다. 봉인은
+                    // 위 규칙대로 혼만 들므로 네 자루가 전부 봉인은 된다 -
+                    // 갈리는 것은 그 뒤의 티어이고, 그것이 실제 몰아주기의 모양이다
+                    if (shardCost > 0 && policy.YodoFocus > 0 && policy.YodoFocus - 1 != i) break;
+
                     if (shardCost > levels.Shards && !TryBuyShards(ref levels, shardCost, policy)) break;
 
                     levels.Shards -= shardCost;
@@ -2434,6 +2820,147 @@ namespace Onikiri.Progression
             int target = levels.LegendaryTarget();
             if (target >= 0) levels.SetLegendary(target, levels.LegendaryAt(target) + 1);
             else levels.Shards += LegendaryYodoCurve.ShardsPerOverflow;
+        }
+
+        /**
+         * @brief 오의 뽑기를 돌린다 (50단계). **기댓값으로 센다 - 실제는 굴린다.**
+         *
+         * ## 무엇을 사는가 - 그리고 왜 이 함수가 기본 정책에서 안 불리는가
+         *
+         * 파는 것이 둘인데(폭·가속) 둘 다 DPS를 안 올린다.
+         *
+         *   **폭**   가챠 몫 둘은 신규 셋과 초당 기여가 동률이고(ExpansionRate)
+         *            동률은 표 순서로 갈리므로 기준 구성에 못 들어간다. 끼우면
+         *            상성이 낮아 오히려 느려진다(49단계 실측 ×1.88 대 ×2.79) -
+         *            **뽑기로 얻는 것이 진행으로 얻는 것보다 세지 않다.**
+         *   **가속** 상한까지만 민다. 도달점이 골드로 도달하는 곳과 같으므로
+         *            천장은 안 움직이고 **닿는 시점**만 앞당겨진다.
+         *
+         * 그래서 이 축의 보석당 DPS가 0이고, 밴드는 그 지출을 가정하지 않는다
+         * (Policy.SkillGacha 주석). 그것이 이 스텝이 "생명줄 원칙"을 지키는
+         * 방식이고, 대가는 죽은 버튼 검사를 **다른 자로** 재야 한다는 것이다
+         * (SkillGachaTests - 상한 도달 스테이지).
+         *
+         * ## 정지 조건이 곧 재고다
+         *
+         * 46단계가 "상한이 곧 재고"로 요도 뽑기를 멈춘 것과 같은 자리인데,
+         * 이쪽의 재고는 **유한하다** - 오의 둘을 열고 장착이 전부 상한에
+         * 닿으면 그것으로 끝이다. 재고를 늘리는 유일한 길이 오의 레벨 상한을
+         * 올리는 것인데 그 상한이 오의 몫 계약의 안전선이므로, 이 축은
+         * 유한한 채로 닫히고 화면이 그것을 적는다(SkillSystem.HasStock).
+         */
+        private static void TrySkillGacha(ref Levels levels, int stage, Policy policy)
+        {
+            if (!policy.SkillGacha) return;
+            if (!SkillGachaCurve.IsUnlockedAt(stage)) return;
+
+            for (int guard = 0; guard < 100000; guard++)
+            {
+                // XP가 없는 비교군에서는 **재고도 해금뿐이다.** 그러지 않으면
+                // "장착이 상한 미달"이 영원히 참으로 남아(줄 것이 없으므로)
+                // 뽑기가 가드까지 돌고, 그 세계는 "XP가 없는 세계"가 아니라
+                // "보석을 버리는 세계"가 된다 - 47단계가 SkipRarity에서
+                // 정확히 같은 함정에 빠져 죽은 버튼 검사가 음수를 냈다
+                bool stock = policy.SkillGachaWithoutXp
+                    ? !SkillGachaCurve.AllUnlocked(levels.SkillGachaMask)
+                    : levels.HasSkillStock();
+                if (!stock) return;
+
+                if (policy.GemsFromQuestsOnly
+                    && levels.GemsAvailable < SkillGachaCurve.PullCostGems) return;
+
+                levels.GemsSpent += SkillGachaCurve.PullCostGems;
+                levels.SkillGachaPulls += 1d;
+
+                // ★1~★3. 소수 자리를 들고 있다가 레벨이 되면 넘긴다
+                if (!policy.SkillGachaWithoutXp)
+                {
+                    levels.SkillXp += SkillGachaCurve.ExpectedXpPerPull;
+                    SpendSimSkillXp(ref levels);
+                }
+
+                GrantSimSkillUnlock(ref levels, policy.SkillGachaWithoutXp);
+                if (!policy.SkillGachaWithoutXp) GrantSimAwakening(ref levels);
+            }
+        }
+
+        /**
+         * @brief 풀이 닿는 만큼 레벨을 산다. **상한에서 멈춘다 - 이 스텝의 안전선.**
+         *
+         * 게임 쪽 SkillSystem.SpendXp와 같은 규칙이고, 특히 정지 조건이
+         * 같아야 한다: `SkillCurve.MaxLevel`. 두 곳이 갈리면 시뮬레이션이
+         * 재는 오의 몫과 플레이어가 실제로 내는 오의 몫이 달라지고, 그
+         * 순간 45단계의 계약(49.0% / 한계 50%)이 무엇을 지키는지 알 수 없게 된다.
+         */
+        private static void SpendSimSkillXp(ref Levels levels)
+        {
+            for (int guard = 0; guard < 1000; guard++)
+            {
+                int target = levels.SkillXpTarget();
+                if (target < 0) break;
+
+                long cost = SkillGachaCurve.XpToNextLevel(levels.SkillLevel(target));
+                if (cost <= 0L || levels.SkillXp + 1e-9d < cost) break;
+
+                levels.SkillXp -= cost;
+                levels.SetSkillLevel(target, levels.SkillLevel(target) + 1);
+            }
+        }
+
+        /**
+         * @brief ★4 한 번의 기대 몫. **게임과 같은 순서로 미끄러진다.**
+         *
+         * 해금 -> XP다(SkillGachaCurve.SlideFor). 둘 다 열린 뒤로는 이
+         * 결과가 사실상 ★3이 되고, 그 사실이 이 축의 재고가 유한하다는
+         * 것을 시뮬레이션 안에서도 그대로 보여준다.
+         */
+        private static void GrantSimSkillUnlock(ref Levels levels, bool withoutXp)
+        {
+            levels.SkillUnlockProgress += SkillGachaCurve.EffectiveUnlockChance;
+            if (levels.SkillUnlockProgress + 1e-12d < 1d) return;
+
+            levels.SkillUnlockProgress -= 1d;
+
+            int target = SkillGachaCurve.UnlockTargetFor(levels.SkillGachaMask);
+            if (target >= 0)
+            {
+                levels.SkillGachaMask |= 1 << target;
+                return;
+            }
+
+            if (withoutXp) return;
+
+            levels.SkillXp += SkillGachaCurve.XpFor(SkillGachaCurve.Outcome.XpSurge);
+            SpendSimSkillXp(ref levels);
+        }
+
+        /** ★5 한 번의 기대 몫. 장착이 전부 상한이면 두 칸 미끄러진다 */
+        private static void GrantSimAwakening(ref Levels levels)
+        {
+            levels.SkillAwakenProgress += SkillGachaCurve.EffectiveAwakenChance;
+            if (levels.SkillAwakenProgress + 1e-12d < 1d) return;
+
+            levels.SkillAwakenProgress -= 1d;
+
+            // 개안은 **장착 중 최저 레벨**을 상한으로 민다. 벤치를 안 고르는
+            // 이유는 게임 쪽과 같다 - 지금 안 나가는 오의를 상한으로 만들어도
+            // 화면에서 아무 일도 안 일어난다
+            int slots = levels.FillEquipped();
+            int best = -1;
+            for (int slot = 0; slot < slots; slot++)
+            {
+                int i = Levels.EquippedAtScratch(slot);
+                if (i < 0 || levels.SkillLevel(i) >= SkillCurve.MaxLevel) continue;
+                if (best < 0 || levels.SkillLevel(i) < levels.SkillLevel(best)) best = i;
+            }
+
+            if (best >= 0)
+            {
+                levels.SetSkillLevel(best, SkillCurve.MaxLevel);
+                return;
+            }
+
+            GrantSimSkillUnlock(ref levels, false);
         }
 
         /**
@@ -2761,7 +3288,15 @@ namespace Onikiri.Progression
                     // 안 넣으면 계산만 오의를 미리 쓰고, 그 차이가 그대로
                     // "보고서의 밴드와 실제 플레이가 다르다"가 된다 - 골드
                     // 획득 축에서 21단계에 한 번 겪은 자리다
-                    if (!SkillCatalog.IsUnlockedAt(index, levels.L)) return false;
+                    if (policy.SkipExpansionSkills && SkillCatalog.Skills[index].StageGated) return false;
+                    if (!SkillCatalog.IsUnlockedAt(index, levels.L, levels.F,
+                                                   levels.SkillGachaMask)) return false;
+
+                    // 49단계: **안 끼운 오의에는 골드를 한 푼도 안 쓴다.**
+                    // 나가지 않는 것을 올리는 것은 이 정책의 정의상 이득이
+                    // 0이고(SkillRate가 장착만 센다), 저울에 올려 두면 이득 0인
+                    // 축이 매 프레임 계산만 한 번씩 더 돌게 된다
+                    if (!levels.IsSkillEquipped(index)) return false;
 
                     int skillLevel = levels.SkillLevel(index);
                     if (skillLevel >= SkillCurve.MaxLevel) return false;
