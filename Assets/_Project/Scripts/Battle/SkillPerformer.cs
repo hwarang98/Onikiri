@@ -103,6 +103,19 @@ namespace Onikiri.Battle
             [Tooltip("회전각 (도). 팩 원본 방향을 화면 방향으로 돌린다")]
             public float slashAngle;
 
+            /**
+             * @brief 참격 조각에 곱할 색. **기존 여덟은 흰색이라 안 바뀐다.**
+             *
+             * 기존 오의의 조각은 혈 램프를 지나 붉게 구워져 있어 색이 이미
+             * 그림 안에 있다. 신규 일곱은 검식(청)과 귀오의(금)가 섞여 한
+             * 램프로 못 덮으므로 **은백으로 굽고 여기서 물들인다**
+             * (PozacVfxBaker의 신규 일곱 주석).
+             *
+             * 흰색이 기본값인 것이 요점이다 - 곱연산에서 흰색은 항등원이라,
+             * 안무 표에서 이 줄을 안 적으면 기존 동작 그대로다.
+             */
+            public Color slashTint = Color.white;
+
             [Tooltip("사무라이 기준 참격 중심의 전방 거리 (월드 단위)")]
             public float slashForwardOffset = 1.6f;
 
@@ -160,8 +173,49 @@ namespace Onikiri.Battle
             [Tooltip("데미지 숫자의 크기 배수. 정수만 (래스터 폰트)")]
             public int numberSizeMultiple = 2;
 
-            [Tooltip("풀스크린 번쩍을 내는가. 귀참만")]
+            // ------------------------------------------------------ 15종 재설계: 신규 거동
+
+            [Tooltip("Around의 판정 반경 (월드 단위). 원이라 시전자 뒤쪽도 든다")]
+            public float aroundRadius = 3.0f;
+
+            [Tooltip("Field 장판의 가로 사거리. 관통과 같은 창이지만 자리가 굳는다")]
+            public float fieldRange = 3.6f;
+
+            [Tooltip("Field 장판의 세로 폭")]
+            public float fieldHeight = 2.6f;
+
+            [Tooltip("Pull이 대상을 찾는 전방 거리. 화면 우단까지가 4.575u다")]
+            public float pullRange = 5.0f;
+
+            [Tooltip("Pull이 대상을 옮길 자리 (시전자 기준 전방 오프셋). " +
+                     "평타 사거리 2.9u 안이라 끌어모은 뒤 모든 오의가 닿는다")]
+            public float pullDestinationOffset = 1.6f;
+
+            [Tooltip("Pull이 대상을 끌어오는 데 걸리는 시간. 첫 타격보다 짧아야 " +
+                     "폭발이 '모인 뒤에' 터진다")]
+            public float pullSeconds = 0.25f;
+
+            [Header("화면 번쩍")]
+            [Tooltip("풀스크린 번쩍을 내는가. 귀참·혈폭·귀왕강림")]
             public bool screenFlash;
+
+            /**
+             * @brief 번쩍의 가장자리 색.
+             *
+             * 셋이 같은 흰 번쩍을 쓰면 세 개의 큰 사건이 화면에서 한 연출로
+             * 읽힌다. 귀참·혈폭은 흰색 그대로 두고(기존 동작 불변) 귀왕강림만
+             * 자기 참격 색으로 물들여 가른다.
+             */
+            public Color flashTint = Color.white;
+
+            /**
+             * @brief 번쩍의 **지속** 배수. 세기는 안 건드린다.
+             *
+             * 세기(edgePeak 0.85 / vignettePeak 0.88)에 곱하면 1을 넘어 잘리고,
+             * 잘리면 "더 세게"가 화면에서 안 읽힌다. 세기의 차이는 색이 말하고
+             * 이 값은 시간만 늘린다.
+             */
+            public float flashScale = 1f;
 
             /** 클립 전체 길이 (초) */
             public float ClipSeconds
@@ -230,6 +284,36 @@ namespace Onikiri.Battle
 
             /** 시전 순간의 사무라이 X. 돌진 오프셋이 얹히기 전 값이라 경로의 기준이다 */
             public float baseX;
+
+            // -------------------------------------------------- 15종 재설계: 신규 거동
+
+            /**
+             * @brief 장판이 깔린 자리. **시전 순간에 굳는다.**
+             *
+             * 매 틱 사무라이의 지금 위치를 쓰면 장판이 따라다니고, 그러면 그것은
+             * 장판이 아니라 오라다. "위치에 걸린다"가 남은 틱 규칙(대상이 죽어도
+             * 재타깃 안 함)의 근거이므로 자리부터 굳혀야 앞뒤가 맞는다.
+             */
+            public float fieldOriginX;
+            public float fieldOriginY;
+
+            /**
+             * @brief 흡인이 확정한 대상 목록. **시전 시각에 굳는다.**
+             *
+             * 목록을 안 굳히고 폭발 시점에 다시 고르면 흡인 도중에 스폰된 적이
+             * 끼어들고, 그러면 "끌어모은 것만 맞는다"가 거짓이 된다. 상한
+             * (PullTargetCount)도 그 순간의 수라 뜻이 흐려진다.
+             */
+            public readonly List<Enemy> captured = new List<Enemy>();
+
+            /** 끌어오기가 끝나는 시각 (초). 이 시각까지 대상이 도착점으로 흐른다 */
+            public float pullEndsAt;
+
+            /** 각 대상의 출발 X. 도착점까지 보간한다 */
+            public readonly List<float> capturedFromX = new List<float>();
+
+            /** 흡인 도착점의 월드 X */
+            public float pullDestinationX;
         }
 
         public int SlashPoolGrowthCount
@@ -307,7 +391,7 @@ namespace Onikiri.Battle
             for (int i = 0; i < active.Count; i++)
                 if (active[i].skillIndex == skillIndex) return false;
 
-            active.Add(new ActiveCast
+            var started = new ActiveCast
             {
                 skillIndex = skillIndex,
                 choreography = choreography,
@@ -316,8 +400,19 @@ namespace Onikiri.Battle
                 elapsed = 0f,
                 nextHit = 0,
                 nextGhost = 0,
-                baseX = combat.transform.position.x
-            });
+                baseX = combat.transform.position.x,
+
+                // 장판의 자리는 여기서 굳는다. 돌진 오프셋이 얹히기 전 값이라
+                // 사무라이가 이후 어디로 움직이든 장판은 깔린 곳에 남는다
+                fieldOriginX = combat.transform.position.x,
+                fieldOriginY = LaneOriginY
+            };
+
+            // 흡인은 **시전 순간에** 목록을 굳힌다. 폭발(타격 프레임)보다 먼저다 -
+            // 그 사이에 스폰된 적이 목록에 끼면 "끌어모은 것만 맞는다"가 거짓이 된다
+            if (spec.Special == SkillSpecial.Pull) CapturePullTargets(started, spec, choreography);
+
+            active.Add(started);
 
             combat.PlaySkillClip(choreography.clip, choreography.clipFrameRate);
 
@@ -348,6 +443,11 @@ namespace Onikiri.Battle
                 // 이펙트가 전부 스케일 타임이므로(23단계), 여기만 unscaled로 돌면
                 // 정지 중에 타격이 들어가고 화면에는 아무 일도 일어나지 않는다
                 cast.elapsed += Time.deltaTime;
+
+                // 흡인은 타격이 아니라 **시간에 걸린 이동**이라 타격 루프 밖에서
+                // 매 프레임 흐른다. 끌어오기가 끝난 뒤에도 한 번 더 돌지만
+                // 보간이 1에서 멈추므로 자리가 안 흔들린다
+                if (cast.captured.Count > 0) AdvancePull(cast);
 
                 while (cast.nextHit < c.HitCount && cast.elapsed >= c.HitTime(cast.nextHit))
                 {
@@ -416,18 +516,39 @@ namespace Onikiri.Battle
             var damage = BigDouble.FromDouble(share);
 
             int hits;
-            switch (spec.Shape)
+            switch (spec.Area)
             {
-                case SkillShape.Pierce:
+                case SkillArea.Pierce:
                     hits = DeliverLane(cast, damage, c.pierceRange, c.pierceHeight);
                     break;
 
-                case SkillShape.Screen:
+                case SkillArea.Screen:
                     // 화면 전체다. 관통과 같은 코드를 아주 큰 사거리로 쓰지 않는
                     // 이유는 뜻이 다르기 때문이다 - 관통은 '경로'이고 광역은
                     // '살아 있는 전부'다. 사거리로 흉내내면 화면 밖의 요괴가
                     // 사거리에 들어오는 날 조용히 뜻이 달라진다
                     hits = DeliverAll(cast, damage);
+                    break;
+
+                case SkillArea.Around:
+                    // 시전자 중심 원. 관통과 달리 **뒤쪽도** 든다
+                    hits = combat.DeliverSkillAround(combat.transform.position.x, LaneOriginY,
+                                                     c.aroundRadius, damage, cast.tint,
+                                                     c.numberSizeMultiple);
+                    break;
+
+                case SkillArea.Field:
+                    // 장판. 판정 모양은 관통과 같지만 **자리가 시전 순간에 굳는다** -
+                    // 사무라이가 움직여도(돌진·넉백) 장판은 깔린 곳에 남는다.
+                    // 그래서 원점을 cast에 적어 두고 매 틱 그 값을 쓴다
+                    hits = combat.DeliverSkillLane(cast.fieldOriginX, cast.fieldOriginY,
+                                                   c.fieldRange, c.fieldHeight, damage,
+                                                   cast.tint, c.numberSizeMultiple);
+                    break;
+
+                case SkillArea.Captured:
+                    // 흡인이 시전 시각에 확정한 목록. 그 밖은 안 맞는다
+                    hits = DeliverCaptured(cast, damage);
                     break;
 
                 default:
@@ -442,7 +563,10 @@ namespace Onikiri.Battle
             // 타격마다 얹으면 연참·혈륜에서 화면이 스파크로 덮인다
             if (last) SpawnTierSparks(c);
 
-            if (c.screenFlash && screenFlash != null) screenFlash.Play();
+            // 번쩍은 색과 지속으로 갈린다. 귀참·혈폭은 흰색 x1.0이라 기존과
+            // 같은 연출이고, 귀왕강림만 자기 참격 색으로 40% 길게 뜬다
+            if (c.screenFlash && screenFlash != null)
+                screenFlash.Play(c.flashTint, c.flashScale);
 
             // 무게는 마지막 타격에만. 다타의 중간 타격에 정지를 주면 0.5초 동안
             // 화면이 세 번 끊기고, 그것은 '연속 베기'가 아니라 '느려짐'이다
@@ -485,6 +609,100 @@ namespace Onikiri.Battle
             return combat.DeliverSkillLane(combat.transform.position.x, LaneOriginY,
                                            range, height, damage, cast.tint,
                                            cast.choreography.numberSizeMultiple);
+        }
+
+        // ------------------------------------------------------------ 흡인 (SkillSpecial.Pull)
+
+        /**
+         * @brief 끌어올 대상을 **시전 시각에 확정**한다.
+         *
+         * 목록을 굳히는 것이 이 거동의 계약 전부다. 폭발 시점에 다시 고르면
+         * 흡인 도중 스폰된 적이 끼어들어 "끌어모은 것만 맞는다"가 거짓이 되고,
+         * 상한(PullTargetCount)도 그 순간의 수가 되어 뜻이 흐려진다.
+         */
+        private void CapturePullTargets(ActiveCast cast, SkillSpec spec, Choreography c)
+        {
+            cast.captured.Clear();
+            cast.capturedFromX.Clear();
+
+            float originX = combat.transform.position.x;
+            cast.pullDestinationX = originX + c.pullDestinationOffset;
+            cast.pullEndsAt = Mathf.Max(0f, c.pullSeconds);
+
+            int limit = Mathf.Max(0, spec.PullTargetCount);
+            if (limit == 0) return;
+
+            var enemies = combat.ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var enemy = enemies[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                // **보스는 안 끌린다.** 보스전의 거리 설계를 이 오의 하나가 바꾸면
+                // 30초 창의 산수가 통째로 갈린다
+                if (enemy.IsBoss) continue;
+
+                float dx = enemy.CurrentX - originX;
+                if (dx < 0f || dx > c.pullRange) continue;
+
+                cast.captured.Add(enemy);
+            }
+
+            // 가까운 순으로 자른다. 먼 것을 골라 끌어오면 앞의 적을 통과해 지나가고,
+            // 화면에서 그것은 흡인이 아니라 순간이동으로 보인다
+            cast.captured.Sort(CompareByX);
+            if (cast.captured.Count > limit)
+                cast.captured.RemoveRange(limit, cast.captured.Count - limit);
+
+            for (int i = 0; i < cast.captured.Count; i++)
+                cast.capturedFromX.Add(cast.captured[i].CurrentX);
+        }
+
+        private static int CompareByX(Enemy a, Enemy b)
+        {
+            return a.CurrentX.CompareTo(b.CurrentX);
+        }
+
+        /**
+         * @brief 끌어오기를 한 프레임 진행한다. **데미지는 안 준다** - 위치만이다.
+         *
+         * ease-out인 이유는 돌진(LungeAt)과 같다 - 처음이 가장 빨라야 "빨려
+         * 들어간다"로 읽힌다. 등속이면 미끄러지는 것으로 보인다.
+         */
+        private static void AdvancePull(ActiveCast cast)
+        {
+            float t = cast.pullEndsAt <= 0f
+                ? 1f : Mathf.Clamp01(cast.elapsed / cast.pullEndsAt);
+            float eased = 1f - (1f - t) * (1f - t);
+
+            for (int i = 0; i < cast.captured.Count && i < cast.capturedFromX.Count; i++)
+            {
+                var enemy = cast.captured[i];
+                if (enemy == null || !enemy.IsAlive) continue;
+
+                enemy.PullTo(Mathf.Lerp(cast.capturedFromX[i], cast.pullDestinationX, eased));
+            }
+        }
+
+        /**
+         * @brief 포획 목록에만 피해를 준다.
+         *
+         * 흡인 중에 죽은 대상은 조용히 빠진다. **총량을 남은 대상에 몰아주지
+         * 않는다** - 몰아주면 적이 적을수록 세지는 오의가 되고, 그것은 총량
+         * 계약이 아니라 그 반대다.
+         */
+        private int DeliverCaptured(ActiveCast cast, BigDouble damage)
+        {
+            int hits = 0;
+            for (int i = 0; i < cast.captured.Count; i++)
+            {
+                var enemy = cast.captured[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                if (combat.DeliverSkillHit(enemy, damage, cast.tint,
+                                           cast.choreography.numberSizeMultiple)) hits++;
+            }
+            return hits;
         }
 
         /** 화면 광역. 살아 있는 요괴 전부 */
@@ -554,7 +772,7 @@ namespace Onikiri.Battle
                 0f);
 
             SpawnSlashAt(frames, c.slashFrameRate, anchor,
-                         c.slashAngle, c.slashScale, mirror);
+                         c.slashAngle, c.slashScale, mirror, c.slashTint);
         }
 
         // ---------------------------------------------------------------- 티어 스파크
@@ -649,10 +867,23 @@ namespace Onikiri.Battle
         public void SpawnSlashAt(Sprite[] frames, float fps, Vector3 anchor,
                                  float angle, float scale, bool flip)
         {
+            SpawnSlashAt(frames, fps, anchor, angle, scale, flip, Color.white);
+        }
+
+        /**
+         * @brief 색을 지정해 띄우는 판. 신규 일곱의 은백 조각이 이 경로를 지난다.
+         *
+         * 흰색을 넘기면 위 판과 **같은 결과**다 - PackSlash가 곱연산으로
+         * 물들이므로 흰색은 항등원이다. 그래서 기존 호출부(영체·티어 스파크)를
+         * 한 줄도 안 고쳐도 된다.
+         */
+        public void SpawnSlashAt(Sprite[] frames, float fps, Vector3 anchor,
+                                 float angle, float scale, bool flip, Color tint)
+        {
             if (slashPool == null || frames == null || frames.Length == 0) return;
 
             var slash = slashPool.Get();
-            slash.Play(frames, fps, anchor, angle, scale, flip, ReleaseSlash);
+            slash.Play(frames, fps, anchor, angle, scale, flip, tint, ReleaseSlash);
         }
 
         private void ReleaseSlash(PackSlash slash)

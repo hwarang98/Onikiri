@@ -82,6 +82,18 @@ namespace Onikiri.Tests
          * 이 검사가 지키는 것은 값이 아니라 **그 결정**이다. 언젠가 두 뽑기가
          * 다른 물건이 되는 날 이 검사가 먼저 깨지고, 그때 표를 나누는 것이
          * 의식적인 선택이 된다.
+         *
+         * ---------------------------------------------------------------------
+         * ⚠ **교체 예정 (재설계 v2.2 §12.2-1, 구현 5단계)**
+         *
+         * 그날이 왔다. 스킬 뽑기가 st14(ShopCurve.UnlockStage)로 내려오고 요도는
+         * st41에 남으므로 **아래 UnlockStage 단언만 제거**한다. 나머지는 그대로다 -
+         * 확률표·등급·가격·일일 무료·★4 소프트 천장은 계속 공유하기 때문이다.
+         *
+         * 이름도 바뀐다: `TheLadder_SharesTheTableButNotTheGate`.
+         * 새 문장은 "기본 확률표·가격·일일 무료·★4 소프트 천장은 공유하고,
+         * 상점 해금 시점과 ★5 하드 천장은 스킬 뽑기 전용이다"이다.
+         * ---------------------------------------------------------------------
          */
         [Test]
         public void TheLadder_IsTheSameLadderAsTheYodoBanner()
@@ -95,6 +107,9 @@ namespace Onikiri.Tests
             Assert.AreEqual(GachaCurve.PullCostGems, SkillGachaCurve.PullCostGems);
             Assert.AreEqual(GachaCurve.TenPullCostGems, SkillGachaCurve.TenPullCostGems);
             Assert.AreEqual(GachaCurve.FreePullsPerDay, SkillGachaCurve.FreePullsPerDay);
+
+            // ⚠ 이 한 줄이 5단계에 삭제된다 (v2.2 §12.2-1). 스킬 배너는 st14,
+            //   요도 배너는 st41로 갈리므로 등호가 성립하지 않는다
             Assert.AreEqual(GachaCurve.UnlockStage, SkillGachaCurve.UnlockStage,
                 "배너가 상점보다 먼저(또는 나중에) 열린다");
 
@@ -171,6 +186,23 @@ namespace Onikiri.Tests
          *
          * 그리고 **셋째가 없다.** 그것이 이 축의 재고가 유한하다는 사실이고,
          * 다 팔린 배너가 닫히는 근거다.
+         *
+         * ---------------------------------------------------------------------
+         * ⚠ **폐기 예정 (재설계 v2.2 §12.2-2, 구현 5단계)**
+         *
+         * `Assert.AreEqual(2, UnlockOrder.Length)`가 **단일 풀 전제**다. v2.2는
+         * 배열을 둘로 가른다:
+         *
+         *     StandardUnlockOrder   혈조 -> 혈폭 -> 심격 -> 회월참 -> 검진   (5종)
+         *     OniSecretUnlockOrder  귀신난무 -> 나락인력 -> 참수 -> 귀왕강림  (4종)
+         *
+         * 그러므로 이 검사를 둘로 나눈다:
+         *     TheStandardPool_IsTheTableOrderAndItRunsOut    (5종)
+         *     TheOniSecretPool_IsTheTableOrderAndItRunsOut   (4종)
+         *
+         * 그리고 `SkillRosterContractTests.TheTwoPools_...`가 두 배열의 교집합이
+         * 비었는지를 함께 잰다.
+         * ---------------------------------------------------------------------
          */
         [Test]
         public void TheUnlockOrder_IsTheTableOrderAndItRunsOut()
@@ -277,6 +309,17 @@ namespace Onikiri.Tests
          * 이 성질이 **오의 몫 계약을 구조로 지킨다** - 밴드가 재는 세계에
          * 가챠 몫이 애초에 없으므로, 49단계가 잰 49.0%를 다시 유도할 필요가
          * 없다. 49단계가 슬롯으로 "풀 크기와 밴드를 떼어놓은" 것의 배당금이다.
+         *
+         * ---------------------------------------------------------------------
+         * ⚠ **수정 예정 (재설계 v2.2 §12.2-5, 구현 5단계)**
+         *
+         * 아래에서 마스크를 만드는 줄이 `UnlockOrder` 하나를 훑는다. 배열이 둘로
+         * 갈리면 **두 배열을 합쳐** 마스크를 지어야 한다 - 안 그러면 귀오의 넷이
+         * 마스크에서 빠져 "뽑아도 기준 구성이 안 움직인다"를 절반만 재게 된다.
+         *
+         * 검사의 주장 자체는 안 바뀐다. 신규 일곱도 전부 GachaGated이고 상한 기여가
+         * 0.576 동률이라 기준 구성은 그대로다.
+         * ---------------------------------------------------------------------
          */
         [Test]
         public void OwningTheGachaSkills_DoesNotMoveTheReferenceLoadout()
@@ -474,6 +517,27 @@ namespace Onikiri.Tests
          * 그래서 유한한 채로 닫는다. 이 검사는 그 사실이 **실제로 일어나는지**를
          * 본다 - 안 멈추면 화면의 배너도 안 닫히고, 보석이 아무것도 안 주는
          * 곳으로 계속 흘러간다.
+         *
+         * ---------------------------------------------------------------------
+         * ⚠ **기준 재설계 예정 (재설계 v2.2 §12.2-4, 구현 5단계)**
+         *
+         * 두 가지가 틀어진다.
+         *
+         * **하나. `settledAt <= 60`이 st41 해금 · 재고 2종 전제다.** 상점이 st14로
+         * 내려오고 재고가 9종이 되면 이 숫자가 아무것도 안 막는다.
+         *
+         * **둘. 이름이 `HasStock`의 실제 계약과 어긋난다.** `SkillSystem.HasStock`은
+         * 미보유 뽑기 스킬 **또는 장착 중 상한 미도달**을 본다. 두 해금 풀이
+         * 소진돼도 장착 오의가 미상한이면 배너는 계속 열려 있고, 그 중간 상태가
+         * 정상이다(화면은 "해금 소진 - XP로 지급"을 적는다).
+         *
+         * 교체본: `TheBanner_ClosesOnlyAfterBothPoolsAreDrainedAndEquippedSkillsAreMaxed`
+         *     ① StandardSoldOut == true
+         *     ② OniSecretSoldOut == true
+         *     ③ 장착 스킬 중 미상한 대상 없음
+         *     ④ 그 뒤 뽑기 수가 증가하지 않음
+         *     ⑤ 두 풀만 소진된 중간 상태에서는 배너가 **열려 있다**
+         * ---------------------------------------------------------------------
          */
         [Test]
         public void TheBanner_StopsWhenItsStockRunsOut()
@@ -594,6 +658,25 @@ namespace Onikiri.Tests
          *
          * 시뮬레이션에는 달력이 없으므로 이 트리클은 표 밖에 있다(47단계의
          * 일일 무료와 같은 자리). 그래서 여기서 재는 것은 곡선의 산수뿐이다.
+         *
+         * ---------------------------------------------------------------------
+         * ⚠ **폐기 예정 (재설계 v2.2 §12.2-3, 구현 5단계)**
+         *
+         * `PityPulls * UnlockOrder.Length <= 62`가 **2종 · 단일 천장** 전제다.
+         * 9종 · 이중 천장에서는 이 산수가 성립하지 않는다.
+         *
+         * 그리고 아래 611행 언저리가 `ExpectedPullsPerUnlock`의 **유일한 테스트
+         * 소비처**다. 그 값이 단일 천장 닫힌 식(20.2208)에서 이중 천장 정상해
+         * (25.6475)로 바뀌므로 소비처도 함께 교체된다.
+         *
+         * 교체본 셋 (v2.2 §12.3의 5·6·7):
+         *     TheIntroReward_GuaranteesBloodWhipOnDayZero
+         *         무료 10연이 첫 표준 스킬(혈조)을 0일차에 보장한다
+         *     TheHardPity_BoundsTheFifthStarAtOneHundred
+         *         ★5 간격이 100을 넘지 않는다. 4종 최악 = 4 x 100 = 400회
+         *     TheSoftPity_IsResetByFifthStarToo
+         *         ★5가 소프트 카운터를 0으로 만든다 (★4 보장이 아니라 ★4 **이상** 보장)
+         * ---------------------------------------------------------------------
          */
         [Test]
         public void TheDailyFree_OpensBothSkillsWithinTwoMonths()

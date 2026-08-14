@@ -1812,6 +1812,17 @@ namespace Onikiri.Progression
             public int Skill6;
             public int Skill7;
 
+            // 15종 재설계에 일곱이 더 붙었다. 손으로 적는 칸이 열다섯이 되는 것이
+            // 보기 싫지만, 위 주석의 이유(struct 값 복사)는 수가 늘어도 그대로다 -
+            // 배열을 두는 순간 GainPerGoldFor의 사본이 원본을 함께 올린다
+            public int Skill8;
+            public int Skill9;
+            public int Skill10;
+            public int Skill11;
+            public int Skill12;
+            public int Skill13;
+            public int Skill14;
+
             public int SkillLevel(int index)
             {
                 int level;
@@ -1825,6 +1836,13 @@ namespace Onikiri.Progression
                     case 5: level = Skill5; break;
                     case 6: level = Skill6; break;
                     case 7: level = Skill7; break;
+                    case 8: level = Skill8; break;
+                    case 9: level = Skill9; break;
+                    case 10: level = Skill10; break;
+                    case 11: level = Skill11; break;
+                    case 12: level = Skill12; break;
+                    case 13: level = Skill13; break;
+                    case 14: level = Skill14; break;
                     default: return 1;
                 }
                 // 다른 축과 같은 규칙 - 모든 축은 레벨 1이 시작값이다
@@ -1843,6 +1861,13 @@ namespace Onikiri.Progression
                     case 5: Skill5 = level; break;
                     case 6: Skill6 = level; break;
                     case 7: Skill7 = level; break;
+                    case 8: Skill8 = level; break;
+                    case 9: Skill9 = level; break;
+                    case 10: Skill10 = level; break;
+                    case 11: Skill11 = level; break;
+                    case 12: Skill12 = level; break;
+                    case 13: Skill13 = level; break;
+                    case 14: Skill14 = level; break;
                 }
             }
 
@@ -2594,7 +2619,7 @@ namespace Onikiri.Progression
          * 시뮬레이션만 없는 DPS로 계산하게 되므로 테스트가 못 박는다
          * (Simulation_HasASlotForEverySkill).
          */
-        public const int SkillSlotCapacity = 8;
+        public const int SkillSlotCapacity = 15;
 
         private static void Advance(ref Levels levels, int axis)
         {

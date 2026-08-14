@@ -110,7 +110,7 @@ namespace Onikiri.UI
          */
         public void Play()
         {
-            Begin(Color.white, false);
+            Begin(Color.white, false, 1f);
         }
 
         /**
@@ -126,11 +126,30 @@ namespace Onikiri.UI
          */
         public void Play(Color edgeTint)
         {
-            Begin(edgeTint, true);
+            Begin(edgeTint, true, 1f);
         }
 
-        private void Begin(Color edgeTint, bool tinted)
+        /**
+         * @brief 색과 **지속 배율**을 함께 받는다 (15종 재설계).
+         *
+         * 세기가 아니라 지속만 배수를 받는 이유는 클램프다. edgePeak 0.85에
+         * 1.4를 곱하면 1.19가 되어 잘리고, 잘리면 "더 세게"가 화면에서 안
+         * 읽힌다 - 두 배를 줘도 같은 흰 화면이다. 세기의 차이는 **색**이
+         * 말하고 이 값은 시간만 늘린다.
+         *
+         * 귀참·혈폭은 흰색 x1.0으로 이 경로를 지나므로 기존 연출과 같다.
+         */
+        public void Play(Color edgeTint, float durationScale)
         {
+            Begin(edgeTint, true, durationScale);
+        }
+
+        private void Begin(Color edgeTint, bool tinted, float durationScale)
+        {
+            // 0이나 음수가 오면 연출이 시작하자마자 끝난다. 배선 실수를
+            // 화면에서 알아채려면 최소 길이가 있어야 한다
+            this.durationScale = Mathf.Max(0.05f, durationScale);
+
             // 채집이 활성화보다 먼저다. 위 edgeBase 주석 참고
             CaptureEdgeBase();
 
@@ -142,6 +161,13 @@ namespace Onikiri.UI
             playing = true;
         }
 
+        /** 이번 재생의 지속 배율. Play가 매번 다시 쓴다 */
+        private float durationScale = 1f;
+
+        /** 배율이 얹힌 실제 지속. Update와 비네트가 이 값만 본다 */
+        private float EdgeSeconds { get { return edgeSeconds * durationScale; } }
+        private float VignetteSeconds { get { return vignetteSeconds * durationScale; } }
+
         private void Update()
         {
             if (!playing) return;
@@ -149,7 +175,7 @@ namespace Onikiri.UI
             // unscaled다. 위 주석 참고 - 정지 중에도 이 연출은 흘러야 한다
             elapsed += Time.unscaledDeltaTime;
 
-            float longest = Mathf.Max(edgeSeconds, vignetteSeconds);
+            float longest = Mathf.Max(EdgeSeconds, VignetteSeconds);
             if (elapsed >= longest)
             {
                 playing = false;
@@ -162,8 +188,8 @@ namespace Onikiri.UI
             // 엣지 번쩍: 곧바로 최대에서 시작해 사라진다. 올라가는 구간을 두면
             // 그 프레임들이 "밝아지는 중"으로 보이는데, 번쩍은 이미 일어난 일이라
             // 시작이 곧 최대여야 한다
-            SetAlpha(edgeFlash, edgeSeconds > 0f
-                ? edgePeak * (1f - Mathf.Clamp01(elapsed / edgeSeconds))
+            SetAlpha(edgeFlash, EdgeSeconds > 0f
+                ? edgePeak * (1f - Mathf.Clamp01(elapsed / EdgeSeconds))
                 : 0f);
 
             SetAlpha(vignette, VignetteAlphaAt(elapsed));
@@ -172,12 +198,15 @@ namespace Onikiri.UI
         /** 빠르게 닫히고 천천히 열린다 */
         private float VignetteAlphaAt(float t)
         {
-            if (vignetteSeconds <= 0f) return 0f;
+            float total = VignetteSeconds;
+            if (total <= 0f) return 0f;
 
-            float close = Mathf.Clamp(vignetteCloseSeconds, 0.0001f, vignetteSeconds);
+            // 닫힘도 함께 늘어난다. 닫힘만 고정하면 배율이 큰 연출에서
+            // "번쩍 닫히고 한참 열린다"가 되어 리듬이 갈린다
+            float close = Mathf.Clamp(vignetteCloseSeconds * durationScale, 0.0001f, total);
             if (t <= close) return vignettePeak * (t / close);
 
-            float open = Mathf.Clamp01((t - close) / (vignetteSeconds - close));
+            float open = Mathf.Clamp01((t - close) / (total - close));
             // 처음이 느리고 끝에서 빠르게 사라진다. 여운이 끌리는 모양이다
             return vignettePeak * (1f - open * open);
         }

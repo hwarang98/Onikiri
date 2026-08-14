@@ -3,34 +3,177 @@ using System;
 namespace Onikiri.Progression
 {
     /**
-     * @brief 오의가 데미지를 **어떻게 뿌리는가**.
+     * @brief 오의가 데미지를 **어디에** 뿌리는가.
      *
      * 27단계에 생겼다. 26단계에는 셋 다 단일 대상 한 방이었고, 색만 다른 같은
      * 아크가 떴다 - 화면에서 "무엇이 나갔는지"가 구분되지 않았고 그것이 뽕맛이
      * 없다는 소감의 원인이었다.
      *
      * **총 데미지는 바뀌지 않는다.** 배율·쿨다운·상한은 26단계 값 그대로이고,
-     * 이 enum이 정하는 것은 그 데미지를 시간(다타)과 공간(관통·광역)에 어떻게
+     * 거동이 정하는 것은 그 데미지를 시간(다타)과 공간(관통·광역)에 어떻게
      * 펴는가뿐이다. 그래서 밸런스 가드가 성립한다 - **보스는 언제나 단일
      * 대상**이므로 어느 거동이든 보스에게 들어가는 총량이 같다.
+     *
+     * ## 15종 재설계에 축이 셋으로 갈렸다
+     *
+     * 27단계의 `SkillShape`는 범위와 분할을 한 열거형에 담았다(MultiHit / Pierce /
+     * Screen). 여덟일 때는 충분했는데 열다섯이 되면서 표현할 수 없는 조합이 생겼다:
+     *
+     *     검진      전방 장판을 **네 틱**에 나눠  (Field  x MultiHit)
+     *     귀신난무  화면 전체를 **다섯 번**       (Screen x MultiHit)
+     *
+     * 한 축에서는 둘 중 하나만 고를 수 있으므로 축을 나눈다. 그리고 데미지 공식
+     * 밖의 거동(흡인·처형)은 셋째 축(SkillSpecial)이 맡는다 - 그것까지 여기 섞으면
+     * 열거형이 열 칸 넘게 늘고, 무엇보다 **총량을 바꾸는 것과 안 바꾸는 것**이
+     * 한 축에 서게 된다.
+     *
+     *     SkillArea     어디를 때리는가   (총량 불변)
+     *     SkillSplit    몇 번에 나누는가  (총량 불변)
+     *     SkillSpecial  그 밖의 거동      (총량 불변 - 위치와 연출만)
      */
-    public enum SkillShape
+    public enum SkillArea
     {
-        /**
-         * @brief 한 대상을 여러 번. 총 배율을 HitCount로 나눈다.
-         *
-         * 나눗셈이라 합이 원래 배율과 정확히 같아야 한다. 마지막 타격이
-         * **나머지를 받는다**(SkillCatalog.HitDamageShare) - 배율을 셋으로
-         * 나눠 셋을 더하면 부동소수점에서 원래 값과 미세하게 어긋나고,
-         * 그 어긋남이 "총 데미지 불변"을 검사할 수 없게 만든다.
-         */
-        MultiHit,
+        /** 최근접 하나. 27단계의 MultiHit이 서 있던 자리다 */
+        Single,
 
         /** 전방 일렬 관통. 경로의 모든 대상이 **각자 총 배율**을 받는다 */
         Pierce,
 
         /** 화면 전체. 살아 있는 모든 대상이 각자 총 배율을 받는다 */
-        Screen
+        Screen,
+
+        /**
+         * @brief 시전자 중심 원. **뒤쪽도 본다** - Pierce와 갈리는 유일한 점이다.
+         *
+         * 관통은 `dx ∈ [-0.3, range]`로 앞만 보는데(PlayerCombat.DeliverSkillLane),
+         * 원은 거리로 재므로 시전자 뒤 반경까지 든다. 그리고 **가까울수록 세로가
+         * 넓다** - 원의 성질이고, 그것이 이 거동의 값이다(떠 있는 도깨비불).
+         */
+        Around,
+
+        /**
+         * @brief 전방 장판. **시간에 걸쳐 여러 번 판정한다.**
+         *
+         * Pierce와 판정 모양은 같지만(가로 x 세로 창) 한 번에 끝나지 않는다.
+         * 장판은 **위치에 걸린다** - 대상이 죽어도 재타깃하지 않고, 그 자리에
+         * 들어온 다른 적이 남은 틱을 받는다.
+         */
+        Field,
+
+        /**
+         * @brief 특수 거동이 **미리 확정한 목록**만. 지금은 흡인(Pull)뿐이다.
+         *
+         * Screen과 갈라 두는 이유가 밸런스다. 화면 전체에 주면 같은 초당 기여로
+         * 광역 오의보다 무조건 나아지고(같은 광역 + 끌어모으기), 그것은
+         * "뽑기가 파워를 안 판다"를 잡몹 층에서 깨는 것이다. 목록의 상한
+         * (PullTargetCount)이 그 자리를 막는다.
+         */
+        Captured
+    }
+
+    /**
+     * @brief 총 배율을 **몇 번에 나눠** 넣는가.
+     *
+     * 27단계에는 이것이 SkillArea와 한 축에 섞여 있었다(SkillShape.MultiHit).
+     * 그 세계에서는 "화면 전체를 다섯 번"이나 "장판을 네 틱"을 적을 수가 없었다 -
+     * 열거형 하나가 범위와 분할을 동시에 말하므로 둘 중 하나만 고를 수 있었다.
+     *
+     * 쪼개면서 기존 여덟의 뜻은 한 톨도 안 바뀐다. `MultiHit`이던 셋은
+     * `Single + MultiHit`이 되고 나머지는 `+ Once`가 붙을 뿐이다.
+     * `SkillRosterContractTests`가 그 등가를 비트 단위로 잠근다.
+     */
+    public enum SkillSplit
+    {
+        /** 한 번에 총 배율 전부 */
+        Once,
+
+        /**
+         * @brief HitCount 번에 나눠 넣는다. **합이 정확히 총 배율이어야 한다.**
+         *
+         * 나눗셈이라 마지막 타격이 **나머지를 받는다**(SkillCatalog.HitDamageShare) -
+         * 배율을 셋으로 나눠 셋을 더하면 부동소수점에서 원래 값과 미세하게
+         * 어긋나고, 그 어긋남이 "총 데미지 불변"을 검사할 수 없게 만든다.
+         */
+        MultiHit
+    }
+
+    /**
+     * @brief 데미지 공식 **밖**의 거동. 이름이나 VfxId로 추측하지 않는다.
+     *
+     * 이 축이 없으면 구현이 반드시 문자열 추측으로 흐른다 - "id가
+     * `skill_abyss_pull`이면 끌어당긴다" 같은 코드가 생기고, 그것은 id를 바꾸는
+     * 날(혹은 비슷한 접두사가 생기는 날) 조용히 틀린다. `skill_oni`·
+     * `skill_oni_dance`·`skill_oni_advent`가 이미 접두사를 나눠 쓰고 있다.
+     *
+     * **피해량은 이 축이 안 건드린다.** 끌어당김은 위치를 옮기고, 처형은 연출을
+     * 튼다. 둘 다 총 배율은 그대로다 - 그래야 초당 환산 기여 하나로 잴 수 있고,
+     * 그 저울이 ExpansionRate 동률 계약의 근거다.
+     */
+    public enum SkillSpecial
+    {
+        None,
+
+        /**
+         * @brief 대상을 골라 한 점으로 끌어모은다 (나락인력).
+         *
+         * 시전 시각에 목록을 **확정(capture)**하고 그 목록만 피해를 받는다
+         * (SkillArea.Captured). 흡인 중에 죽은 대상은 목록에서 빠지되
+         * **총량을 남은 대상에 몰아주지 않는다** - 몰아주면 적이 적을수록
+         * 세지는 오의가 되고, 그것은 총량 계약이 아니다.
+         */
+        Pull,
+
+        /**
+         * @brief 처형 연출 판정 (참수). **피해량을 안 바꾼다.**
+         *
+         * 실제 즉사는 남은 체력과 무관한 처치라 초당 환산 기여로 잴 수가 없다.
+         * 그 순간 이 오의만 저울 밖에 서고 ExpansionRate 계약이 깨진다.
+         * 그래서 남긴 것은 연출뿐이고, 조건은 ExecutionThreshold가 정한다.
+         */
+        Execution
+    }
+
+    /**
+     * @brief 오의의 **전투 계열**. 뽑기 희귀도(GachaCurve.Grade)와 다른 축이다.
+     *
+     * ## 왜 셋째 축이 필요한가
+     *
+     * 로스터가 열다섯이 되면 목록 한 화면에 다 안 들어간다. 나누는 자를 무엇으로
+     * 할 것인가에서 **뽑기 희귀도는 답이 아니다** - 진행으로 열리는 여섯(연참·일섬·
+     * 귀참·혈파동·낙혈·혈륜)에는 희귀도가 아예 없고, 있다 해도 그것은 "얼마나
+     * 얻기 어려운가"이지 "무엇을 하는가"가 아니다.
+     *
+     * 계열은 **전투에서의 역할**로 나눈다. 검식은 짧고 잦게(쿨 2.5~7초), 귀오의는
+     * 길고 무겁게(11~19초), 혈식은 그 사이에서 변칙을 맡는다.
+     *
+     * ## 이름·id로 추측하지 않는다
+     *
+     * `skill_blood*`가 전부 혈식인 것은 우연에 가깝다 - 혈조·혈폭은 뽑기 몫이고
+     * 혈파동·낙혈·혈륜은 진행 몫이라 두 무리의 성질이 갈리는데, 문자열은 그 둘을
+     * 같게 본다. 그리고 신규 일곱 중 `skill_oni_dance`·`skill_oni_advent`는 접두사가
+     * 귀참(`skill_oni`)과 겹친다 - 문자열로 가르면 `StartsWith`가 셋을 한 무리로
+     * 묶는다.
+     *
+     * 그래서 **명시적 데이터**로 둔다. 45단계가 상성을 혼 id로 못 박은 것과 같은
+     * 자리이고, 같은 이유다.
+     *
+     * ## 표시 이름이 여기 없는 이유
+     *
+     * 열거형 이름(SwordForm)은 코드가 읽는 것이고 화면에 뜨는 것은 "검식"이다.
+     * 그 문자열은 아래 FamilyNames 표에 있고, 그 표를 문자셋 하베스트가 읽는다
+     * (FontCharsetBuilder.DisplayNames) - 화면에 서는 글자의 출처가 하나여야
+     * 아틀라스에 □이 안 생긴다.
+     */
+    public enum SkillFamily
+    {
+        /** 검식 - 빠르고 안정적인 검술 */
+        SwordForm,
+
+        /** 혈식 - 피와 요괴의 힘, 변칙 기술 */
+        BloodForm,
+
+        /** 귀오의 - 흐름을 바꾸는 필살기 */
+        OniSecret
     }
 
     /**
@@ -46,6 +189,15 @@ namespace Onikiri.Progression
         public string Id;
 
         public string DisplayName;
+
+        /**
+         * @brief 이 오의의 전투 계열. **명시적 데이터다 - id로 추측 금지**
+         *
+         * 이유는 SkillFamily 머리 주석에 있다. 기본값이 SwordForm(0)인 것은
+         * 열거형의 첫 칸이라 그런 것뿐이고 뜻이 없다 - 표의 모든 행이 이 필드를
+         * 명시해야 하고, `SkillRosterContractTests`가 빠진 행을 잡는다.
+         */
+        public SkillFamily Family;
 
         /** 레벨 1의 배율. 공격력에 곱해진다 */
         public double BaseMultiplier;
@@ -133,10 +285,38 @@ namespace Onikiri.Progression
          */
         public string VfxId;
 
-        // ------------------------------------------------------------ 27단계: 거동
+        // ------------------------------------------------------------ 거동 (27단계 -> 15종 재설계)
 
-        /** 데미지를 어떻게 뿌리는가. 총량은 바꾸지 않는다 */
-        public SkillShape Shape;
+        /** 어디를 때리는가. 총량은 바꾸지 않는다 */
+        public SkillArea Area;
+
+        /** 총 배율을 몇 번에 나눠 넣는가. 총량은 바꾸지 않는다 */
+        public SkillSplit Split;
+
+        /** 데미지 공식 밖의 거동. 기본은 None이고, 표의 모든 행이 명시한다 */
+        public SkillSpecial Special;
+
+        /**
+         * @brief `SkillSpecial.Pull`이 한 번에 잡는 최대 대상 수.
+         *
+         * **`SkillSpec`에 있는 이유는 이것이 총량 계약이기 때문이다.** 흡인 범위나
+         * 도착 위치는 화면 배치라 안무(Choreography)에 있지만, "몇 명이 맞는가"는
+         * 이 오의가 잡몹 무리에 넣는 총량의 상한이고 그 값을 테스트가 읽어야 한다.
+         *
+         * Pull이 아닌 오의에서는 0이고 아무 뜻이 없다.
+         */
+        public int PullTargetCount;
+
+        /**
+         * @brief `SkillSpecial.Execution`의 빈사 판정 기준 (체력 비율).
+         *
+         * 공격 **전** 체력이 이 비율 이하이거나 이 공격으로 죽으면 처형 연출이
+         * 뜬다. 연출만 바뀌고 피해량은 그대로다 - 그 등호를 계약 테스트가
+         * 잰다(TheExecution_DoesNotChangeDamage).
+         *
+         * 보스는 이 판정을 아예 안 지난다. 값이 아니라 규칙이라 여기 안 적는다.
+         */
+        public double ExecutionThreshold;
 
         /**
          * @brief MultiHit의 타격 수. 나머지 거동은 1이다.
@@ -336,6 +516,32 @@ namespace Onikiri.Progression
         public const string BloodBurstId = "skill_bloodburst";
         public const string BloodWhipId = "skill_bloodwhip";
 
+        // ------------------------------------------------------------ 15종 재설계
+
+        /**
+         * @brief 신규 일곱. **전부 뽑기가 연다**(GachaGated).
+         *
+         * ## id 관례가 갈리는 것을 알고 둔다
+         *
+         * 기존 혈식 다섯은 `skill_bloodwave`처럼 붙여 쓰고 이 일곱은
+         * `skill_deep_thrust`처럼 밑줄로 끊는다. 통일하려면 기존 id를 바꿔야
+         * 하는데, 세이브가 이 문자열로 레벨과 보유를 가르므로(SaveData 주석)
+         * 바꾸는 순간 기존 플레이어의 진행이 사라진다. **표기 일관성보다 그
+         * 대가가 크다** - 새로 추가되는 것만 밑줄 규칙을 따르고 이 주석이
+         * 이유를 남긴다.
+         *
+         * 그리고 접두사로 계열을 추측하면 안 되는 이유가 여기 그대로 보인다 -
+         * `skill_oni`(귀참)·`skill_oni_dance`·`skill_oni_advent` 셋이 접두사를
+         * 나눠 쓴다. `StartsWith`로 가르면 셋이 한 무리가 된다(SkillFamily 주석).
+         */
+        public const string DeepThrustId = "skill_deep_thrust";
+        public const string MoonArcId = "skill_moon_arc";
+        public const string SwordFieldId = "skill_sword_field";
+        public const string OniDanceId = "skill_oni_dance";
+        public const string AbyssPullId = "skill_abyss_pull";
+        public const string DecapitateId = "skill_decapitate";
+        public const string OniAdventId = "skill_oni_advent";
+
         /**
          * @brief 신규 다섯이 공유하는 초당 환산 기여.
          *
@@ -414,28 +620,31 @@ namespace Onikiri.Progression
         public static readonly SkillSpec[] Skills =
         {
             new SkillSpec {
-                Id = ChainSlashId, DisplayName = "연참",
+                Id = ChainSlashId, DisplayName = "연참", Family = SkillFamily.SwordForm,
                 BaseMultiplier = 0.54d, CooldownSeconds = 3d,
                 UnlockLevel = 10, UnlockStage = 8,
                 IconFile = "Icon076",           // 붉은 타일 + 흰 삼연 참격
                 SlashRgba = 0xA8D8FFFFu,        // 창백한 청백 (평타 #FFF4D6 과 거리 0.39)
-                Shape = SkillShape.MultiHit, HitCount = 3, Weight = 0
+                Area = SkillArea.Single, Split = SkillSplit.MultiHit, HitCount = 3, Weight = 0,
+                Special = SkillSpecial.None
             },
             new SkillSpec {
-                Id = FlashId, DisplayName = "일섬",
+                Id = FlashId, DisplayName = "일섬", Family = SkillFamily.SwordForm,
                 BaseMultiplier = 1.50d, CooldownSeconds = 6d,
                 UnlockLevel = 15, UnlockStage = 15,
                 IconFile = "Icon140",           // 어두운 타일 + 붉은 단발 참격
                 SlashRgba = 0xFF4A3AFFu,        // 선명한 적 (처치 #FF8A7A 과 거리 0.36)
-                Shape = SkillShape.Pierce, HitCount = 1, Weight = 1
+                Area = SkillArea.Pierce, Split = SkillSplit.Once, HitCount = 1, Weight = 1,
+                Special = SkillSpecial.None
             },
             new SkillSpec {
-                Id = OniCleaveId, DisplayName = "귀참",
+                Id = OniCleaveId, DisplayName = "귀참", Family = SkillFamily.OniSecret,
                 BaseMultiplier = 3.52d, CooldownSeconds = 11d,
                 UnlockLevel = 20, UnlockStage = 21,
                 IconFile = "Icon118",           // 오니 뿔
                 SlashRgba = 0xFF9500FFu,        // 깊은 호박빛 금 (치명타 #FFD34D 과 거리 0.39)
-                Shape = SkillShape.Screen, HitCount = 1, Weight = 2
+                Area = SkillArea.Screen, Split = SkillSplit.Once, HitCount = 1, Weight = 2,
+                Special = SkillSpecial.None
             },
 
             // ---------------------------------------------------------- 49단계
@@ -457,30 +666,33 @@ namespace Onikiri.Progression
             // 것이 그 두 스텝의 공통된 기둥이다.
 
             new SkillSpec {
-                Id = BloodWaveId, DisplayName = "혈파동",
+                Id = BloodWaveId, DisplayName = "혈파동", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 1.44d, CooldownSeconds = 8d,
                 UnlockLevel = 0, UnlockStage = BloodWaveStage,
                 IconFile = "Icon058",           // 붉은 타일 + 사방으로 퍼지는 방사
                 SlashRgba = 0xE8446EFFu,        // 선명한 로즈
-                Shape = SkillShape.Screen, HitCount = 1, Weight = 1,
+                Area = SkillArea.Screen, Split = SkillSplit.Once, HitCount = 1, Weight = 1,
+                Special = SkillSpecial.None,
                 VfxId = SkillVfx.WaveRing
             },
             new SkillSpec {
-                Id = BloodFallId, DisplayName = "낙혈",
+                Id = BloodFallId, DisplayName = "낙혈", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 0.99d, CooldownSeconds = 5.5d,
                 UnlockLevel = 0, UnlockStage = BloodFallStage,
                 IconFile = "Icon056",           // 위에서 떨어지는 핏줄기
                 SlashRgba = 0xB02060FFu,        // 짙은 자적
-                Shape = SkillShape.Pierce, HitCount = 1, Weight = 1,
+                Area = SkillArea.Pierce, Split = SkillSplit.Once, HitCount = 1, Weight = 1,
+                Special = SkillSpecial.None,
                 VfxId = SkillVfx.Wave
             },
             new SkillSpec {
-                Id = BloodWheelId, DisplayName = "혈륜",
+                Id = BloodWheelId, DisplayName = "혈륜", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 0.81d, CooldownSeconds = 4.5d,
                 UnlockLevel = 0, UnlockStage = BloodWheelStage,
                 IconFile = "Icon062",           // 회전하는 톱니 고리
                 SlashRgba = 0xC8304CFFu,        // 하베스트의 중심색
-                Shape = SkillShape.MultiHit, HitCount = 5, Weight = 0,
+                Area = SkillArea.Single, Split = SkillSplit.MultiHit, HitCount = 5, Weight = 0,
+                Special = SkillSpecial.None,
                 VfxId = SkillVfx.Vortex
             },
             // 아래 둘은 **뽑기가 연다**(50단계). UnlockStage가 st41인 것은
@@ -488,22 +700,125 @@ namespace Onikiri.Progression
             // 오의의 "가장 이른 획득 가능 시점"이 곧 상점이 열리는 칸이다
             // (SkillSpec.GachaGated 주석).
             new SkillSpec {
-                Id = BloodBurstId, DisplayName = "혈폭",
+                Id = BloodBurstId, DisplayName = "혈폭", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 1.71d, CooldownSeconds = 9.5d,
                 UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon083",           // 터져 오르는 폭발 기둥
                 SlashRgba = 0xD81E7AFFu,        // 자홍
-                Shape = SkillShape.MultiHit, HitCount = 1, Weight = 2,
+                Area = SkillArea.Single, Split = SkillSplit.Once, HitCount = 1, Weight = 2,
+                Special = SkillSpecial.None,
                 VfxId = SkillVfx.Burst
             },
             new SkillSpec {
-                Id = BloodWhipId, DisplayName = "혈조",
+                Id = BloodWhipId, DisplayName = "혈조", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 0.45d, CooldownSeconds = 2.5d,
                 UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon082",           // 휘어 감기는 갈고리
                 SlashRgba = 0x96285EFFu,        // 어두운 자적
-                Shape = SkillShape.Pierce, HitCount = 1, Weight = 0,
+                Area = SkillArea.Pierce, Split = SkillSplit.Once, HitCount = 1, Weight = 0,
+                Special = SkillSpecial.None,
                 VfxId = SkillVfx.Whip
+            },
+
+            // ---------------------------------------------------------- 15종 재설계
+            //
+            // 일곱 다 `배율/쿨 = 0.180`이다. 표에서는 안 보이므로 옆에 적어 둔다.
+            //
+            //   심격      0.72/4.0  = 0.180   최근접 단일 강타      (기존 거동)
+            //   회월참    0.90/5.0  = 0.180   시전자 중심 원        (Around)
+            //   검진      1.26/7.0  = 0.180   전방 장판 4틱         (Field x MultiHit)
+            //   귀신난무  2.16/12.0 = 0.180   화면 광역 5타         (Screen x MultiHit)
+            //   나락인력  2.52/14.0 = 0.180   끌어모음 + 폭발       (Captured + Pull)
+            //   참수      2.88/16.0 = 0.180   처형 연출형 단일      (Execution)
+            //   귀왕강림  3.42/19.0 = 0.180   최장 쿨 필살기        (기존 거동)
+            //
+            // 쿨다운 4·5·7·12·14·16·19초가 기존 여덟(2.5~11초)의 사이와 위를
+            // 메운다. 계열 정체성 = 검식은 짧고 잦게, 귀오의는 길고 무겁게.
+            //
+            // **귀왕강림(x3.42)이 귀참(x3.52)을 안 넘는다.** 귀참은 진행 확정
+            // 스킬이자 게임의 이름이라, 뽑기 스킬이 그 위에 서면 "뽑기가 파워를
+            // 판다"의 체감 버전이 된다. 귀왕강림의 값은 최장 쿨의 무게와 전용
+            // 화면 번쩍이지 최고 단발 피해가 아니다.
+
+            new SkillSpec {
+                Id = DeepThrustId, DisplayName = "심격", Family = SkillFamily.SwordForm,
+                BaseMultiplier = 0.72d, CooldownSeconds = 4d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon016",           // 세로로 뻗는 관통 빔 (파란 타일)
+                SlashRgba = 0x4FA0E6FFu,        // 깊은 하늘
+                Area = SkillArea.Single, Split = SkillSplit.Once, HitCount = 1, Weight = 0,
+                Special = SkillSpecial.None,
+                VfxId = SkillVfx.Thrust
+            },
+            new SkillSpec {
+                Id = MoonArcId, DisplayName = "회월참", Family = SkillFamily.SwordForm,
+                BaseMultiplier = 0.90d, CooldownSeconds = 5d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon044",           // 초승달 곡선 (파란 타일)
+                SlashRgba = 0x7CE0D8FFu,        // 청록 달빛
+                Area = SkillArea.Around, Split = SkillSplit.Once, HitCount = 1, Weight = 1,
+                Special = SkillSpecial.None,
+                VfxId = SkillVfx.MoonArc
+            },
+            new SkillSpec {
+                Id = SwordFieldId, DisplayName = "검진", Family = SkillFamily.SwordForm,
+                BaseMultiplier = 1.26d, CooldownSeconds = 7d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon001",           // 교차한 무기 + X 참격 (파란 타일)
+                SlashRgba = 0x3F63D2FFu,        // 짙은 강철청
+                // 4틱 전체의 합이 x1.26이다. 틱당 x0.315이고 마지막 틱이
+                // 나머지를 받는다(HitDamageShare) - 장판이라고 총량이 늘지 않는다
+                Area = SkillArea.Field, Split = SkillSplit.MultiHit, HitCount = 4, Weight = 1,
+                Special = SkillSpecial.None,
+                VfxId = SkillVfx.SwordField
+            },
+            new SkillSpec {
+                Id = OniDanceId, DisplayName = "귀신난무", Family = SkillFamily.OniSecret,
+                BaseMultiplier = 2.16d, CooldownSeconds = 12d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon145",           // 사방으로 뻗는 금빛 섬광 (어두운 타일)
+                SlashRgba = 0xFF7A1AFFu,        // 선명한 주황금
+                // 5타 전체의 합이 x2.16. **각 적이 받는 5타의 합**이라
+                // 화면에 몇이 서 있든 한 마리가 받는 총량은 같다
+                Area = SkillArea.Screen, Split = SkillSplit.MultiHit, HitCount = 5, Weight = 2,
+                Special = SkillSpecial.None,
+                VfxId = SkillVfx.OniDance
+            },
+            new SkillSpec {
+                Id = AbyssPullId, DisplayName = "나락인력", Family = SkillFamily.OniSecret,
+                BaseMultiplier = 2.52d, CooldownSeconds = 14d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon183",           // 빨아들이는 검은 구 (자주 타일)
+                SlashRgba = 0xB87333FFu,        // 청동금
+                // 화면 전체가 아니라 **흡인이 확정한 목록**만 맞는다. 화면
+                // 전체면 같은 초당 기여로 귀참·혈파동보다 무조건 나아지고,
+                // 그것은 "뽑기가 파워를 안 판다"를 잡몹 층에서 깨는 것이다
+                Area = SkillArea.Captured, Split = SkillSplit.Once, HitCount = 1, Weight = 2,
+                Special = SkillSpecial.Pull, PullTargetCount = 8,
+                VfxId = SkillVfx.AbyssPull
+            },
+            new SkillSpec {
+                Id = DecapitateId, DisplayName = "참수", Family = SkillFamily.OniSecret,
+                BaseMultiplier = 2.88d, CooldownSeconds = 16d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon165",           // 후드를 쓴 사신 (자주 타일)
+                SlashRgba = 0xE8B000FFu,        // 짙은 금
+                // **즉사가 아니다.** 남은 체력과 무관한 처치는 초당 환산 기여로
+                // 잴 수가 없어서 이 오의만 저울 밖에 선다. 남긴 것은 연출뿐이고
+                // 피해량은 x2.88 그대로다(TheExecution_DoesNotChangeDamage)
+                Area = SkillArea.Single, Split = SkillSplit.Once, HitCount = 1, Weight = 2,
+                Special = SkillSpecial.Execution, ExecutionThreshold = 0.30d,
+                VfxId = SkillVfx.Decapitate
+            },
+            new SkillSpec {
+                Id = OniAdventId, DisplayName = "귀왕강림", Family = SkillFamily.OniSecret,
+                BaseMultiplier = 3.42d, CooldownSeconds = 19d,
+                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                IconFile = "Icon172",           // 뿔 달린 오니 두개골 (자주 타일)
+                SlashRgba = 0xE85A00FFu,        // 깊은 주적금
+                Area = SkillArea.Screen, Split = SkillSplit.Once, HitCount = 1, Weight = 2,
+                Special = SkillSpecial.None,
+                VfxId = SkillVfx.OniAdvent
             }
         };
 
@@ -524,6 +839,30 @@ namespace Onikiri.Progression
             public const string WaveRing = "pozac_wave_ring";
             public const string Burst = "pozac_burst";
             public const string Vortex = "pozac_vortex";
+
+            /**
+             * @brief 15종 재설계의 일곱. 전부 같은 Pozac 팩에서 새로 굽는다.
+             *
+             * ## 왜 기존 클립을 안 빌리는가
+             *
+             * `EverySkillEffect_BelongsToExactlyOneSkill`은 **빈 VfxId를
+             * 건너뛴다**. 그러니 일곱을 비워 두는 것 자체는 그 검사를 통과한다.
+             *
+             * 문제는 색 검사다. 비워 두면 `SkillColors_AreDistinctFromEachOther`가
+             * 이 일곱을 연참·일섬·귀참(전부 빈 VfxId)과 **같은 그림**으로 보고
+             * 한계를 0.08에서 **0.25로 올린다.** RGB 정육면체에 열 색을 0.25씩
+             * 벌려 넣을 수 없어서 여섯 쌍이 실패한다(귀참↔참수 0.139 등).
+             *
+             * 즉 고유 VFX는 테스트가 강제하는 의무가 아니라 **연출 품질을 위한
+             * 설계 결정**이고, 그 결정이 열다섯 색을 성립시킨다.
+             */
+            public const string Thrust = "thrust";
+            public const string MoonArc = "moon_arc";
+            public const string SwordField = "sword_field";
+            public const string OniDance = "oni_dance";
+            public const string AbyssPull = "abyss_pull";
+            public const string Decapitate = "decapitate";
+            public const string OniAdvent = "oni_advent";
         }
 
         /**
@@ -542,7 +881,7 @@ namespace Onikiri.Progression
             if (skillIndex < 0 || skillIndex >= Skills.Length) return totalMultiplier;
 
             var spec = Skills[skillIndex];
-            int hits = spec.Shape == SkillShape.MultiHit ? Math.Max(1, spec.HitCount) : 1;
+            int hits = spec.Split == SkillSplit.MultiHit ? Math.Max(1, spec.HitCount) : 1;
             if (hits <= 1) return totalMultiplier;
 
             double share = totalMultiplier / hits;
@@ -557,8 +896,71 @@ namespace Onikiri.Progression
         {
             if (skillIndex < 0 || skillIndex >= Skills.Length) return 1;
             var spec = Skills[skillIndex];
-            return spec.Shape == SkillShape.MultiHit ? Math.Max(1, spec.HitCount) : 1;
+            return spec.Split == SkillSplit.MultiHit ? Math.Max(1, spec.HitCount) : 1;
         }
+
+        // ---------------------------------------------------------------- 계열 표시
+
+        /**
+         * @brief 계열 탭의 **주 표기**. 열거형 순서와 자리가 맞물린다.
+         *
+         * ## 왜 런타임 어셈블리에 있는가
+         *
+         * 이 표를 UI(에디터 빌더)에 두고 싶어지는데, 그러면 문자셋 하베스트
+         * (FontCharsetBuilder.DisplayNames)가 에디터 타입을 참조하게 된다. 그것은
+         * SkillVfx 상수를 런타임에 둔 이유와 같은 함정이다 - 빌드에서 빠지거나,
+         * 하베스트가 이 표를 못 읽어 "검식"의 `식`이 아틀라스에서 누락된다.
+         *
+         * **화면에 서는 글자의 출처는 하나여야 한다.** 오의 이름·퀘스트 제목·
+         * 가이드 문구가 전부 코드에 있고 하베스트가 그 코드를 읽는 것과 같은 규칙이다.
+         *
+         * ## 아틀라스 주의
+         *
+         * `식`은 2026-08-14 시점 FontCharset.txt에 **없다.** 이 표를 하베스트에
+         * 물리고 `Rebuild Font Charset` -> `Build Pixel Font Assets`를 돌리기 전까지
+         * 탭이 "검□ / 혈□ / 귀오의"로 뜬다. 구현 2단계가 그 순서를 지킨다.
+         */
+        public static readonly string[] FamilyNames = { "검식", "혈식", "귀오의" };
+
+        /**
+         * @brief 탭의 **작은 부제**. 주 표기 아래 반 크기로 선다.
+         *
+         * 뽑기 희귀도(GachaCurve.Grade - 일반·고급·희귀·영웅·전설)와 겹치는 낱말이
+         * "일반" 하나뿐인 것을 알고 고른 값이다. 겹치는 그 하나를 화면에서 가르는
+         * 규칙은 자리로 정한다:
+         *
+         *     뽑기 결과·확률 정보  등급의 낱말만 쓴다 (계열 부제 금지)
+         *     스킬 목록            계열의 낱말만 쓴다 (별 표시 금지)
+         *
+         * 부제를 아예 안 쓰는 안도 있었지만, 계열 이름 셋만으로는 "무엇이 더 귀한가"가
+         * 안 읽힌다 - 검식·혈식·귀오의는 **역할**의 이름이라 서열을 안 말한다.
+         */
+        public static readonly string[] FamilySubtitles = { "일반", "상급", "각성" };
+
+        /** 이 계열의 주 표기. 범위 밖이면 빈 문자열 - 화면이 □ 대신 빈칸을 그린다 */
+        public static string NameOf(SkillFamily family)
+        {
+            int index = (int)family;
+            return index >= 0 && index < FamilyNames.Length ? FamilyNames[index] : string.Empty;
+        }
+
+        public static string SubtitleOf(SkillFamily family)
+        {
+            int index = (int)family;
+            return index >= 0 && index < FamilySubtitles.Length
+                ? FamilySubtitles[index] : string.Empty;
+        }
+
+        /** 이 계열에 든 오의 수. 탭이 빈 목록을 그리지 않게 미리 센다 */
+        public static int CountOf(SkillFamily family)
+        {
+            int total = 0;
+            for (int i = 0; i < Skills.Length; i++)
+                if (Skills[i].Family == family) total++;
+            return total;
+        }
+
+        // ----------------------------------------------------------------
 
         public static int Count { get { return Skills.Length; } }
 

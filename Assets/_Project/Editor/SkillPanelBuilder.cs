@@ -91,6 +91,60 @@ namespace Onikiri.EditorTools
         public const string ViewportName = "Viewport";
         public const string ContentName = "Content";
 
+        // ------------------------------------------------------------ 15종 재설계: 계열 탭
+
+        /**
+         * @brief 계열 탭 줄 (검식 / 혈식 / 귀오의). **슬롯 줄과 목록 사이에 선다.**
+         *
+         * 자리를 여기로 고른 이유는 두 줄이 다른 질문에 답하기 때문이다 - 슬롯
+         * 줄은 "지금 무엇이 나가는가"이고 탭은 "무엇을 고를 것인가"다. 앞의
+         * 질문이 위에 있어야 목록을 훑기 전에 현재 상태를 먼저 읽는다.
+         *
+         * 스크롤 밖인 것도 슬롯 줄과 같은 이유다. 목록을 굴리는 동안 탭이 함께
+         * 굴러가면 "지금 어느 계열을 보고 있는가"를 위로 되감아 확인해야 한다.
+         *
+         * 높이 92는 두 줄짜리다 - 주 표기(검식) 위에 부제(일반)가 반 크기로
+         * 얹힌다. 한 줄로 "검식·일반"을 붙여 쓰는 안도 있었지만, 그러면 가운뎃점이
+         * 두 낱말을 같은 층으로 만든다. 이 화면에서 그 둘은 **다른 축**이다.
+         */
+        private const float FamilyTabHeight = 92f;
+        private const float FamilyTabGap = 14f;
+
+        /** 탭 셋 사이의 틈. 셋이 폭을 3등분하고 이 값만큼 벌어진다 */
+        private const float FamilyTabSpacing = 10f;
+
+        /**
+         * @brief 행 왼쪽의 계열 띠.
+         *
+         * 4px로 잡았다가 실기에서 안 보였다 - 행 높이가 144px이라 4px는 테두리의
+         * 반올림 오차와 구분되지 않는다. 8px면 색이 색으로 읽히면서도 아이콘의
+         * 왼쪽 여백(24px)을 안 침범한다.
+         */
+        private const float FamilyStripeWidth = 8f;
+
+        public const string FamilyTabsName = "FamilyTabs";
+
+        /** 한 줄이 차지하는 세로. 런타임 스크롤 길이 계산이 같은 값을 받는다 */
+        private const float RowPitch = RowHeight + RowGap;
+
+        /**
+         * @brief 계열 색. 탭 바탕과 행 왼쪽 띠가 함께 쓴다.
+         *
+         * 새 색을 정의하지 않는다 - 각 계열의 대표 오의가 뿌리는 참격 색
+         * (SkillCatalog.SlashRgba)을 그대로 빌린다. 그래야 탭 색과 그 계열이
+         * 화면에서 실제로 내는 색이 같은 것을 가리킨다.
+         *
+         *     검식   #A8D8FF  연참
+         *     혈식   #C8304C  혈륜
+         *     귀오의 #FF9500  귀참
+         */
+        private static readonly Color[] FamilyTints =
+        {
+            new Color32(0xA8, 0xD8, 0xFF, 0xFF),
+            new Color32(0xC8, 0x30, 0x4C, 0xFF),
+            new Color32(0xFF, 0x95, 0x00, 0xFF)
+        };
+
         // 39단계 톤 통일: 자기 색을 갖지 않는다. 팔레트의 단일 출처는 UiSkin이다
         private static readonly Color TextColor = UiSkin.Text;
         private static readonly Color DimColor = UiSkin.TextDim;
@@ -131,7 +185,20 @@ namespace Onikiri.EditorTools
             BuildSlotRow(panel, system, font);
 
             var content = BuildScroll(panel);
-            for (int i = 0; i < SkillCatalog.Count; i++) BuildRow(content, system, font, i);
+
+            // 줄의 자리는 카탈로그 인덱스가 아니라 **계열 안의 순서**로 정해진다.
+            // 한 번에 한 계열만 뜨므로 어느 탭을 열어도 첫 줄이 목록 맨 위다
+            int familyCount = System.Enum.GetValues(typeof(SkillFamily)).Length;
+            var orderInFamily = new int[familyCount];
+            var rows = new GameObject[SkillCatalog.Count];
+
+            for (int i = 0; i < SkillCatalog.Count; i++)
+            {
+                int family = (int)SkillCatalog.Skills[i].Family;
+                rows[i] = BuildRow(content, system, font, i, orderInFamily[family]++);
+            }
+
+            BuildFamilyTabs(panel, font, rows);
 
             PruneStrays(panel);
             VerifyPanelFits();
@@ -1014,6 +1081,116 @@ namespace Onikiri.EditorTools
                 hitStop: 1.0f, shake: 0.9f, perHitShake: 0f,
                 numberSize: 1, flash: false);
 
+            // ---------------------------------------------------------- 15종 재설계
+            //
+            // 일곱의 조각은 전부 **은백으로 구워** 여기서 색을 준다
+            // (PozacVfxBaker의 신규 일곱 주석). 색은 카탈로그의 SlashRgba를
+            // 그대로 읽는다 - 참격·데미지 숫자·이름 플래시가 한 색이어야
+            // 화면에서 한 사건으로 읽힌다(SkillSpec.SlashRgba 주석).
+
+            // 심격 - 정면 찌르기. 최근접 하나에 꽂힌다.
+            // attack1 몸을 쓰는 이유는 가장 짧은 클립이라서다 - 쿨 4초는
+            // 신규 일곱 중 가장 빠르고, 몸이 길면 다음 시전과 겹친다
+            WriteChoreography(list.GetArrayElementAtIndex(8), SkillCatalog.DeepThrustId,
+                attack1, 24f, new[] { Attack1ImpactFrame },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.Thrust),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 1.5f, shake: 1.2f, perHitShake: 0f,
+                numberSize: 1, flash: false,
+                extra: Extra(SkillCatalog.DeepThrustId));
+
+            // 회월참 - 몸을 축으로 도는 원. **뒤쪽도 벤다.**
+            //
+            // 반경 3.0u는 평타 사거리(2.9u) 바로 위다. 관통 셋(4.0/4.6/5.4)보다
+            // 짧은 대신 원이라 **가까울수록 세로가 넓고**, 그래서 열다섯 중
+            // 떠 있는 도깨비불을 확실히 베는 유일한 오의가 된다
+            WriteChoreography(list.GetArrayElementAtIndex(9), SkillCatalog.MoonArcId,
+                attack3, 24f, new[] { Attack3ImpactFrame },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.MoonArc),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 1.4f, shake: 1.3f, perHitShake: 0f,
+                numberSize: 1, flash: false,
+                extra: Extra(SkillCatalog.MoonArcId, aroundRadius: 3.0f));
+
+            // 검진 - 전방에 깔리는 검기 장판. 네 틱으로 나눈다.
+            //
+            // **타격 프레임이 몸 클립보다 길다.** SPECIAL은 14프레임(0.583초)인데
+            // 마지막 틱이 28프레임(1.167초)이다 - 일부러 그렇다. 장판은 몸이
+            // 멈춘 뒤에도 남아야 장판이고, 시전은 마지막 타격까지 살아 있다
+            // (SkillPerformer.Update의 종료 조건).
+            //
+            // 틱 간격 8프레임(0.333초)은 혈륜(0.100초)·연참(0.150초)보다 길다.
+            // 그 아래로 내리면 "지속"이 아니라 "다타"로 읽힌다
+            WriteChoreography(list.GetArrayElementAtIndex(10), SkillCatalog.SwordFieldId,
+                special, 24f, new[] { 4, 12, 20, 28 },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.SwordField),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 1.1f, shake: 1.0f, perHitShake: 0.35f,
+                numberSize: 1, flash: false,
+                extra: Extra(SkillCatalog.SwordFieldId, fieldRange: 3.6f, fieldHeight: 2.6f));
+
+            // 귀신난무 - 화면 전체를 다섯 번. 27단계 이후 처음으로 광역과
+            // 다타가 한 오의에 얹힌다(SkillArea.Screen x SkillSplit.MultiHit).
+            //
+            // 각 적이 받는 **다섯 타의 합**이 x2.16이다. 화면에 몇이 서 있든
+            // 한 마리가 받는 총량은 같다 - 광역의 계약 그대로다
+            WriteChoreography(list.GetArrayElementAtIndex(11), SkillCatalog.OniDanceId,
+                special, 24f, new[] { 3, 8, 13, 18, 23 },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.OniDance),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 2.2f, shake: 2.4f, perHitShake: 0.5f,
+                numberSize: 2, flash: false,
+                extra: Extra(SkillCatalog.OniDanceId));
+
+            // 나락인력 - 끌어모으고 터뜨린다.
+            //
+            // **흡인(0.25초)이 폭발(8프레임 = 0.333초)보다 먼저 끝난다.** 순서가
+            // 뒤집히면 아직 흩어져 있는 적을 때리게 되고, 그러면 이 오의의
+            // 유틸리티가 화면에서 아무 뜻이 없다
+            WriteChoreography(list.GetArrayElementAtIndex(12), SkillCatalog.AbyssPullId,
+                special, 24f, new[] { 8 },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.AbyssPull),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 2.6f, shake: 2.5f, perHitShake: 0f,
+                numberSize: 2, flash: false,
+                extra: Extra(SkillCatalog.AbyssPullId,
+                             pullRange: 5.0f, pullDestination: 1.6f, pullSeconds: 0.25f));
+
+            // 참수 - 처형의 한 방. **즉사가 아니다.**
+            //
+            // 피해량은 x2.88 그대로이고 빈사(30% 이하)나 처치일 때 연출만 바뀐다.
+            // 화면 번쩍을 안 쓰는 이유는 그 자리가 셋(귀참·혈폭·귀왕강림)으로
+            // 이미 차 있어서다 - 넷이 되면 "큰 사건"이 흔해진다
+            WriteChoreography(list.GetArrayElementAtIndex(13), SkillCatalog.DecapitateId,
+                special, 24f, new[] { 7 },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.Decapitate),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 3.0f, shake: 2.4f, perHitShake: 0f,
+                numberSize: 2, flash: false,
+                extra: Extra(SkillCatalog.DecapitateId));
+
+            // 귀왕강림 - 열다섯 중 가장 긴 쿨(19초)이자 가장 큰 연출.
+            //
+            // **번쩍이 귀참·혈폭과 갈린다.** 셋 다 screenFlash를 쓰는데 흰색
+            // 그대로 두면 세 개의 큰 사건이 한 연출로 읽힌다. 이쪽만 자기
+            // 참격 색(#E85A00)으로 물들이고 40% 길게 끈다 - 세기는 안 건드린다
+            // (edgePeak에 곱하면 1을 넘어 잘린다, ScreenFlash.Play 주석)
+            WriteChoreography(list.GetArrayElementAtIndex(14), SkillCatalog.OniAdventId,
+                special, 24f, new[] { 9 },
+                usesSlash: true, slash: VfxSlash(SkillCatalog.SkillVfx.OniAdvent),
+                pierceRange: 0f, pierceHeight: 0f,
+                lunge: 0f, lungeOut: 0f, lungeBack: 0f, afterimages: 0,
+                hitStop: 3.0f, shake: 2.8f, perHitShake: 0f,
+                numberSize: 2, flash: true,
+                extra: Extra(SkillCatalog.OniAdventId,
+                             flashTint: TintOfSkill(SkillCatalog.OniAdventId), flashScale: 1.4f));
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             Debug.Log(string.Format(
@@ -1141,7 +1318,8 @@ namespace Onikiri.EditorTools
                                               int afterimages,
                                               float hitStop, float shake, float perHitShake,
                                               int numberSize, bool flash,
-                                              StreakSpec streak = default(StreakSpec))
+                                              StreakSpec streak = default(StreakSpec),
+                                              ExtraSpec extra = default(ExtraSpec))
         {
             element.FindPropertyRelative("id").stringValue = id;
             element.FindPropertyRelative("clipFrameRate").floatValue = frameRate;
@@ -1188,6 +1366,104 @@ namespace Onikiri.EditorTools
             element.FindPropertyRelative("perHitShakeMultiplier").floatValue = perHitShake;
             element.FindPropertyRelative("numberSizeMultiple").intValue = numberSize;
             element.FindPropertyRelative("screenFlash").boolValue = flash;
+
+            // ------------------------------------------------ 15종 재설계: 신규 거동
+            //
+            // **0이면 기본값을 쓴다.** 배열 원소는 크기를 늘릴 때 0으로 초기화되므로
+            // 안 적은 안무가 반경 0짜리 원(= 아무도 안 맞는다)을 갖게 된다.
+            // 기존 여덟은 이 값을 안 넘기고, 그래서 여기서 메워 준다
+            element.FindPropertyRelative("slashTint").colorValue =
+                extra.slashTint.a > 0f ? extra.slashTint : Color.white;
+
+            element.FindPropertyRelative("aroundRadius").floatValue =
+                extra.aroundRadius > 0f ? extra.aroundRadius : 3.0f;
+
+            element.FindPropertyRelative("fieldRange").floatValue =
+                extra.fieldRange > 0f ? extra.fieldRange : 3.6f;
+            element.FindPropertyRelative("fieldHeight").floatValue =
+                extra.fieldHeight > 0f ? extra.fieldHeight : 2.6f;
+
+            element.FindPropertyRelative("pullRange").floatValue =
+                extra.pullRange > 0f ? extra.pullRange : 5.0f;
+            element.FindPropertyRelative("pullDestinationOffset").floatValue =
+                extra.pullDestination > 0f ? extra.pullDestination : 1.6f;
+            element.FindPropertyRelative("pullSeconds").floatValue =
+                extra.pullSeconds > 0f ? extra.pullSeconds : 0.25f;
+
+            // 번쩍 색은 흰색이 기본이다. 귀참·혈폭이 그 값이라 기존과 비트 동일하고,
+            // 귀왕강림만 자기 참격 색으로 물들여 셋이 한 연출로 안 읽히게 한다
+            element.FindPropertyRelative("flashTint").colorValue =
+                extra.flashTint.a > 0f ? extra.flashTint : Color.white;
+            element.FindPropertyRelative("flashScale").floatValue =
+                extra.flashScale > 0f ? extra.flashScale : 1f;
+        }
+
+        /**
+         * @brief 신규 오의의 ExtraSpec 한 벌. **참격 색은 카탈로그에서 온다.**
+         *
+         * 색을 호출부마다 손으로 적지 않는 이유는 39단계의 팔레트 단일 출처
+         * 규칙이다 - 카탈로그의 SlashRgba가 이미 그 오의의 색이고, 여기서
+         * 다시 적으면 두 값이 갈리는 날 참격만 옛 색으로 남는다.
+         */
+        private static ExtraSpec Extra(string id,
+                                       float aroundRadius = 0f,
+                                       float fieldRange = 0f, float fieldHeight = 0f,
+                                       float pullRange = 0f, float pullDestination = 0f,
+                                       float pullSeconds = 0f,
+                                       Color flashTint = default(Color), float flashScale = 0f)
+        {
+            return new ExtraSpec
+            {
+                slashTint = TintOfSkill(id),
+                aroundRadius = aroundRadius,
+                fieldRange = fieldRange,
+                fieldHeight = fieldHeight,
+                pullRange = pullRange,
+                pullDestination = pullDestination,
+                pullSeconds = pullSeconds,
+                flashTint = flashTint,
+                flashScale = flashScale
+            };
+        }
+
+        /** 카탈로그가 적어 둔 이 오의의 참격 색 (SlashRgba). 없으면 흰색 */
+        private static Color TintOfSkill(string id)
+        {
+            int index = SkillCatalog.IndexOf(id);
+            if (index < 0) return Color.white;
+
+            uint rgba = SkillCatalog.Skills[index].SlashRgba;
+            return new Color32((byte)((rgba >> 24) & 0xFF), (byte)((rgba >> 16) & 0xFF),
+                               (byte)((rgba >> 8) & 0xFF), (byte)(rgba & 0xFF));
+        }
+
+        /**
+         * @brief 신규 거동의 값 묶음. **기본값이 0이라는 사실을 이용한다.**
+         *
+         * 기존 여덟의 호출부를 한 줄도 안 고치려고 구조체로 묶어 선택 인자로 뒀다.
+         * 안 넘기면 전부 0이고, WriteChoreography가 0을 "안 적었다"로 읽어
+         * SkillPerformer의 선언 기본값과 같은 수로 메운다.
+         */
+        private struct ExtraSpec
+        {
+            /** 은백으로 구운 조각에 곱할 색. 신규 일곱만 쓴다 */
+            public Color slashTint;
+
+            /** Around의 판정 반경 (회월참 3.0u) */
+            public float aroundRadius;
+
+            /** Field 장판의 가로·세로 (검진 3.6 x 2.6) */
+            public float fieldRange;
+            public float fieldHeight;
+
+            /** Pull의 탐색 거리·도착 오프셋·끌어오는 시간 (나락인력 5.0 / +1.6 / 0.25초) */
+            public float pullRange;
+            public float pullDestination;
+            public float pullSeconds;
+
+            /** 화면 번쩍의 색과 지속 배수 (귀왕강림만 흰색이 아니다) */
+            public Color flashTint;
+            public float flashScale;
         }
 
         /**
@@ -1612,19 +1888,41 @@ namespace Onikiri.EditorTools
             }
         }
 
-        /** 스크롤 안쪽 목록의 높이. 여덟 줄이라 뷰포트보다 길다 */
+        /**
+         * @brief 스크롤 안쪽 목록의 높이. **가장 긴 계열 하나의 길이다.**
+         *
+         * 15종 재설계 전에는 `Count * pitch`였다 - 여덟 줄이 한 목록에 다 있었기
+         * 때문이다. 계열 탭이 생기면서 한 번에 뜨는 것은 **한 계열뿐**이라,
+         * 전체 길이로 잡으면 어느 탭을 열어도 목록 아래로 두 계열 몫의 빈 판이
+         * 스크롤된다.
+         *
+         * 여기서 가장 긴 계열을 쓰는 이유는 이 값이 **씬에 굽히는 초기값**이기
+         * 때문이다. 실제 길이는 탭을 고를 때마다 SkillFamilyTabs가 다시 쓴다 -
+         * 초기값이 가장 긴 것이면 어느 탭이 먼저 열려도 잘리지 않는다.
+         */
         private static float PanelContentHeight
         {
-            get { return SkillCatalog.Count * (RowHeight + RowGap); }
+            get
+            {
+                int longest = 0;
+                foreach (SkillFamily family in System.Enum.GetValues(typeof(SkillFamily)))
+                {
+                    int count = SkillCatalog.CountOf(family);
+                    if (count > longest) longest = count;
+                }
+                return longest * RowPitch;
+            }
         }
 
-        /** 스크롤 창의 높이. 띠에서 머리글과 슬롯 줄을 뺀 나머지 */
+        /** 스크롤 창의 높이. 띠에서 머리글·슬롯 줄·계열 탭을 뺀 나머지 */
         private static float ViewportHeight
         {
             get
             {
                 return BandHeight - TopPadding - HeaderHeight - HeaderGap
-                       - SlotRowHeight - SlotRowGap - BottomPadding;
+                       - SlotRowHeight - SlotRowGap
+                       - FamilyTabHeight - FamilyTabGap
+                       - BottomPadding;
             }
         }
 
@@ -1680,7 +1978,8 @@ namespace Onikiri.EditorTools
             viewport.offsetMax = Vector2.zero;
             viewport.sizeDelta = new Vector2(0f, ViewportHeight);
             viewport.anchoredPosition = new Vector2(0f,
-                -(TopPadding + HeaderHeight + HeaderGap + SlotRowHeight + SlotRowGap));
+                -(TopPadding + HeaderHeight + HeaderGap + SlotRowHeight + SlotRowGap
+                  + FamilyTabHeight + FamilyTabGap));
 
             // 마스크가 있어야 목록이 슬롯 줄 위로 삐져 나오지 않는다.
             // RectMask2D는 이미지를 요구하지 않아 바탕을 한 겹 덜 그린다
@@ -1711,6 +2010,146 @@ namespace Onikiri.EditorTools
             scroll.scrollSensitivity = 30f;
 
             return content;
+        }
+
+        // ---------------------------------------------------------------- 계열 탭
+
+        /**
+         * @brief 계열 탭 셋을 세우고 SkillFamilyTabs에 줄들을 물린다.
+         *
+         * ## 탭 이름을 여기 적지 않는다
+         *
+         * "검식"·"일반" 같은 문자열은 전부 `SkillCatalog.FamilyNames` /
+         * `FamilySubtitles`에서 온다. 빌더가 자기 문자열을 들고 있으면 화면에
+         * 서는 글자의 출처가 둘이 되고, 그러면 **문자셋 하베스트가 못 따라온다** -
+         * `FontCharsetBuilder.DisplayNames`는 카탈로그 쪽 표만 읽으므로, 여기
+         * 손으로 적은 낱말은 아틀라스에 안 구워져 □로 뜬다.
+         *
+         * 이 프로젝트가 보스 이름으로 세 번 밟은 자리이고, 그래서 규칙이 하나다:
+         * **이름의 출처가 어디든 문자셋은 그 출처에서 나와야 한다.**
+         */
+        private static void BuildFamilyTabs(RectTransform panel, TMP_FontAsset font,
+                                            GameObject[] rows)
+        {
+            var existing = panel.Find(FamilyTabsName);
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+
+            var go = new GameObject(FamilyTabsName, typeof(RectTransform));
+            go.transform.SetParent(panel, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(SidePadding, 0f);
+            rect.offsetMax = new Vector2(-SidePadding, 0f);
+            rect.sizeDelta = new Vector2(-SidePadding * 2f, FamilyTabHeight);
+            rect.anchoredPosition = new Vector2(0f,
+                -(TopPadding + HeaderHeight + HeaderGap + SlotRowHeight + SlotRowGap));
+
+            int count = System.Enum.GetValues(typeof(SkillFamily)).Length;
+            var tabs = new Onikiri.UI.SkillFamilyTabs.Tab[count];
+
+            for (int i = 0; i < count; i++)
+                tabs[i] = BuildFamilyTab(rect, font, (SkillFamily)i, i, count);
+
+            var component = panel.gameObject.GetComponent<Onikiri.UI.SkillFamilyTabs>();
+            if (component == null)
+                component = panel.gameObject.AddComponent<Onikiri.UI.SkillFamilyTabs>();
+
+            var so = new SerializedObject(component);
+
+            var tabsProperty = so.FindProperty("tabs");
+            tabsProperty.arraySize = count;
+            for (int i = 0; i < count; i++)
+            {
+                var element = tabsProperty.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("button").objectReferenceValue = tabs[i].button;
+                element.FindPropertyRelative("nameLabel").objectReferenceValue = tabs[i].nameLabel;
+                element.FindPropertyRelative("subtitleLabel").objectReferenceValue =
+                    tabs[i].subtitleLabel;
+                element.FindPropertyRelative("background").objectReferenceValue =
+                    tabs[i].background;
+            }
+
+            var rowsProperty = so.FindProperty("rows");
+            rowsProperty.arraySize = rows.Length;
+            for (int i = 0; i < rows.Length; i++)
+                rowsProperty.GetArrayElementAtIndex(i).objectReferenceValue = rows[i];
+
+            var tintProperty = so.FindProperty("familyTints");
+            tintProperty.arraySize = FamilyTints.Length;
+            for (int i = 0; i < FamilyTints.Length; i++)
+                tintProperty.GetArrayElementAtIndex(i).colorValue = FamilyTints[i];
+
+            so.FindProperty("scroll").objectReferenceValue =
+                panel.gameObject.GetComponent<ScrollRect>();
+            so.FindProperty("rowPitch").floatValue = RowPitch;
+            so.FindProperty("selectedText").colorValue = TextColor;
+            so.FindProperty("unselectedText").colorValue = DimColor;
+            so.FindProperty("unselectedTint").colorValue = UiSkin.Chrome;
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /**
+         * @brief 탭 하나. 주 표기 위, 부제 아래의 두 줄이다.
+         *
+         * 부제를 반 크기로 두는 것이 요점이다(UiFonts.Demote 두 번). 같은 크기로
+         * 나란히 두면 "검식"과 "일반"이 같은 층의 두 낱말로 읽히는데, 실제로는
+         * 계열(전투 역할)과 성격(귀함)이라는 **다른 축**이다.
+         */
+        private static Onikiri.UI.SkillFamilyTabs.Tab BuildFamilyTab(
+            RectTransform row, TMP_FontAsset font, SkillFamily family, int index, int count)
+        {
+            var go = new GameObject("Tab_" + family, typeof(RectTransform));
+            go.transform.SetParent(row, false);
+
+            // 폭을 셋으로 나누고 사이를 FamilyTabSpacing 만큼 벌린다. 앵커로
+            // 나누므로 화면 폭이 바뀌어도 셋이 같은 비율을 지킨다
+            float left = index / (float)count;
+            float right = (index + 1) / (float)count;
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(left, 0f);
+            rect.anchorMax = new Vector2(right, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = new Vector2(index > 0 ? FamilyTabSpacing * 0.5f : 0f, 0f);
+            rect.offsetMax = new Vector2(index < count - 1 ? -FamilyTabSpacing * 0.5f : 0f, 0f);
+            rect.anchoredPosition = Vector2.zero;
+
+            var background = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(background, UiSkin.Chrome);
+
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, background);
+
+            var nameLabel = CreateLabel(go.transform, font, "Name", TextAlignmentOptions.Center);
+            var nameRect = (RectTransform)nameLabel.transform;
+            nameRect.anchorMin = new Vector2(0f, 0.42f);
+            nameRect.anchorMax = new Vector2(1f, 1f);
+            nameRect.offsetMin = Vector2.zero;
+            nameRect.offsetMax = new Vector2(0f, -6f);
+            nameLabel.text = SkillCatalog.NameOf(family);
+
+            var subtitleLabel = CreateLabel(go.transform, font, "Subtitle",
+                                            TextAlignmentOptions.Center);
+            UiFonts.Demote(subtitleLabel);
+            UiFonts.Demote(subtitleLabel);
+            var subtitleRect = (RectTransform)subtitleLabel.transform;
+            subtitleRect.anchorMin = new Vector2(0f, 0f);
+            subtitleRect.anchorMax = new Vector2(1f, 0.42f);
+            subtitleRect.offsetMin = new Vector2(0f, 6f);
+            subtitleRect.offsetMax = Vector2.zero;
+            subtitleLabel.text = SkillCatalog.SubtitleOf(family);
+
+            return new Onikiri.UI.SkillFamilyTabs.Tab
+            {
+                button = button,
+                nameLabel = nameLabel,
+                subtitleLabel = subtitleLabel,
+                background = background
+            };
         }
 
         // ---------------------------------------------------------------- 장착 슬롯 줄
@@ -1937,6 +2376,7 @@ namespace Onikiri.EditorTools
                 var child = panel.GetChild(i);
                 if (child.name == "Header") continue;
                 if (child.name == SlotRowName) continue;
+                if (child.name == FamilyTabsName) continue;
                 if (child.name == ViewportName) continue;
                 if (child.name == BackdropTextureBuilder.BranchName) continue;
                 if (child.name.StartsWith("Skill")) continue;
@@ -2038,7 +2478,15 @@ namespace Onikiri.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void BuildRow(RectTransform content, SkillSystem system, TMP_FontAsset font, int index)
+        /**
+         * @param orderInFamily 이 오의가 **자기 계열 안에서** 몇 번째인가. 자리를
+         *                      정하는 값이고, 카탈로그 인덱스가 아니다 - 한 번에
+         *                      한 계열만 뜨므로 목록의 첫 줄은 언제나 y=0이다
+         *                      (SkillFamilyTabs 주석 참고)
+         * @return 세워진 줄. 계열 탭이 켜고 끌 대상으로 받아 간다
+         */
+        private static GameObject BuildRow(RectTransform content, SkillSystem system,
+                                           TMP_FontAsset font, int index, int orderInFamily)
         {
             var spec = SkillCatalog.Skills[index];
             string rowName = "Skill" + index;
@@ -2049,8 +2497,8 @@ namespace Onikiri.EditorTools
             var go = new GameObject(rowName, typeof(RectTransform));
             go.transform.SetParent(content, false);
 
-            // 목록 안이라 자리는 스크롤 원점 기준이다. 머리글·슬롯 줄은 스크롤
-            // 밖에 있으므로 여기 계산에 안 들어간다
+            // 목록 안이라 자리는 스크롤 원점 기준이다. 머리글·슬롯 줄·계열 탭은
+            // 스크롤 밖에 있으므로 여기 계산에 안 들어간다
             var rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
@@ -2058,10 +2506,14 @@ namespace Onikiri.EditorTools
             rect.offsetMin = new Vector2(SidePadding, 0f);
             rect.offsetMax = new Vector2(-SidePadding, 0f);
             rect.sizeDelta = new Vector2(-SidePadding * 2f, RowHeight);
-            rect.anchoredPosition = new Vector2(0f, -(index * (RowHeight + RowGap)));
+            rect.anchoredPosition = new Vector2(0f, -(orderInFamily * RowPitch));
 
             var image = go.AddComponent<Image>();
             UiSkin.ApplyPanel(image, UiSkin.Row);
+
+            // 계열 띠. 탭 색과 같은 색이라 "지금 보는 묶음"이 행에서도 읽힌다.
+            // 버튼(아래)보다 먼저 세워 자식 순서상 바탕 위·글자 아래에 놓는다
+            BuildFamilyStripe(go.transform, spec.Family);
 
             var button = go.AddComponent<Button>();
             UiSkin.ApplyButton(button, image);
@@ -2120,6 +2572,43 @@ namespace Onikiri.EditorTools
                 ? popupObject.GetComponent<Onikiri.UI.SkillInfoPopup>() : null;
 
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            return go;
+        }
+
+        /**
+         * @brief 행 왼쪽의 계열 띠. **스프라이트 없이 단색 Image 하나다.**
+         *
+         * 9-슬라이스 판을 쓰지 않는 이유는 이것이 모서리를 가진 물건이 아니라
+         * **색 자체**이기 때문이다. 판을 쓰면 8px 폭에 모서리 네 개가 들어가
+         * 색이 아니라 작은 상자로 읽힌다.
+         */
+        private static void BuildFamilyStripe(Transform parent, SkillFamily family)
+        {
+            var go = new GameObject("FamilyStripe", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.sizeDelta = new Vector2(FamilyStripeWidth, 0f);
+            rect.anchoredPosition = Vector2.zero;
+
+            var image = go.AddComponent<Image>();
+            image.color = TintOf(family);
+
+            // 띠는 누를 것이 아니다. 레이캐스트를 켜 두면 행 왼쪽 8px에서만
+            // 탭이 안 먹고, 그 8px는 화면에서 아무 표시가 없다
+            image.raycastTarget = false;
+        }
+
+        private static Color TintOf(SkillFamily family)
+        {
+            int index = (int)family;
+            return index >= 0 && index < FamilyTints.Length ? FamilyTints[index] : UiSkin.Chrome;
         }
 
         /** 장착 버튼 하나. 값은 SkillButton이 매 갱신마다 다시 쓴다 */

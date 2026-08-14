@@ -86,6 +86,19 @@ namespace Onikiri.EditorTools
             foreach (var skill in Onikiri.Progression.SkillCatalog.Skills)
                 yield return skill.DisplayName;
 
+            // 계열 탭의 주 표기와 부제도 코드(SkillCatalog)에 있다. 오의 이름과
+            // **같은 규칙, 다른 표**라 따로 걷어야 한다 - 이름 목록만 훑으면
+            // "검식/혈식/귀오의"의 `식`이 빠지고, 그 글자는 오의 이름 어디에도
+            // 없어서 아무도 대신 데려오지 못한다.
+            //
+            // 이것이 15종 재설계에서 하베스트에 **새로 물리는 유일한 줄**이다.
+            // 신규 오의 일곱의 이름은 위 Skills 루프가 이미 데려온다
+            foreach (var name in Onikiri.Progression.SkillCatalog.FamilyNames)
+                yield return name;
+
+            foreach (var subtitle in Onikiri.Progression.SkillCatalog.FamilySubtitles)
+                yield return subtitle;
+
             // 퀘스트 제목도 코드(QuestCatalog)에 있다. 오의와 같은 이유로 여기서
             // 끌어온다 - 열여덟 줄을 손으로 옮겨 적으면 하나를 고치는 날 그 글자가
             // 빠지고, 화면에 □이 뜬다

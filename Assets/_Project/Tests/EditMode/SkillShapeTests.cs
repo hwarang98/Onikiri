@@ -36,7 +36,7 @@ namespace Onikiri.Tests
             for (int s = 0; s < SkillCatalog.Count; s++)
             {
                 var spec = SkillCatalog.Skills[s];
-                if (spec.Shape != SkillShape.MultiHit) continue;
+                if (spec.Split != SkillSplit.MultiHit) continue;
 
                 // 레벨별 배율 전 구간에서 확인한다. 상한 근처의 잘린 배율에서도
                 // 합이 맞아야 한다
@@ -69,10 +69,10 @@ namespace Onikiri.Tests
             for (int s = 0; s < SkillCatalog.Count; s++)
             {
                 var spec = SkillCatalog.Skills[s];
-                if (spec.Shape == SkillShape.MultiHit) continue;
+                if (spec.Split == SkillSplit.MultiHit) continue;
 
                 Assert.AreEqual(1, SkillCatalog.HitsPerCast(s), string.Format(
-                    "'{0}'은 {1}인데 시전당 타격이 {2}회다", spec.DisplayName, spec.Shape,
+                    "'{0}'은 {1}인데 시전당 타격이 {2}회다", spec.DisplayName, spec.Area,
                     SkillCatalog.HitsPerCast(s)));
 
                 double total = SkillCurve.CappedMultiplierAtLevel(spec.BaseMultiplier, 7);

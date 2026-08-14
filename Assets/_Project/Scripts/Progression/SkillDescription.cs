@@ -42,31 +42,45 @@ namespace Onikiri.Progression
             var spec = SkillCatalog.Skills[index];
             string percent = Percent(multiplier);
 
-            string body;
-            switch (spec.Shape)
-            {
-                case SkillShape.MultiHit:
-                {
-                    int hits = Math.Max(1, spec.HitCount);
-                    // 한 대상을 여러 번 때린다. **총 배율을 나눠 갖는다**는
-                    // 사실까지는 안 적는다 - 플레이어가 알아야 하는 것은
-                    // 그 오의가 한 번에 넣는 총량이고, 나눗셈은 연출의 문제다
-                    body = hits > 1
-                        ? "가장 가까운 적을 공격력의 " + percent + "로 " + hits + "회 나눠 공격"
-                        : "가장 가까운 적을 공격력의 " + percent + "로 공격";
-                    break;
-                }
+            // 나눗셈을 문장 끝으로 뺀다. 범위와 분할이 다른 축이 되면서
+            // (SkillArea / SkillSplit) 문장도 그렇게 갈리는 편이 맞다 - 예전에는
+            // "가장 가까운 적을 N회"가 한 덩이였는데, 이제 "화면 전체를 다섯 번"
+            // (귀신난무)도 있어서 그 덩이가 성립하지 않는다
+            int hits = spec.Split == SkillSplit.MultiHit ? Math.Max(1, spec.HitCount) : 1;
 
-                case SkillShape.Pierce:
+            string body;
+            switch (spec.Area)
+            {
+                case SkillArea.Pierce:
                     // 경로의 모든 대상이 **각자** 총 배율을 받는다. 잡몹이
                     // 줄지어 선 화면에서 이것이 곧 위력이라 반드시 적는다
                     body = "전방 일렬의 적을 관통해 각각 공격력의 " + percent + "로 공격";
                     break;
 
-                default:
+                case SkillArea.Screen:
                     body = "화면의 모든 적을 각각 공격력의 " + percent + "로 공격";
                     break;
+
+                case SkillArea.Around:
+                    body = "주변의 적을 각각 공격력의 " + percent + "로 공격";
+                    break;
+
+                case SkillArea.Field:
+                    body = "전방에 검기를 깔아 공격력의 " + percent + "로 공격";
+                    break;
+
+                case SkillArea.Captured:
+                    body = "적을 끌어모아 공격력의 " + percent + "로 공격";
+                    break;
+
+                default:
+                    body = "가장 가까운 적을 공격력의 " + percent + "로 공격";
+                    break;
             }
+
+            // 총 배율을 나눠 갖는다는 사실까지는 안 적는다 - 플레이어가 알아야
+            // 하는 것은 그 오의가 한 번에 넣는 총량이고, 나눗셈은 연출의 문제다
+            if (hits > 1) body += " (" + hits + "회 나눔)";
 
             return body + "\n" + cooldown.ToString("F1") + "초마다 자동 시전";
         }

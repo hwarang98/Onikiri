@@ -179,12 +179,15 @@ namespace Onikiri.Tests
                 Assert.AreEqual(SkillCatalog.ExpansionRate, skill.BaseRate,
                     SkillCatalog.ExpansionRate * 1e-9d, string.Format(
                         "'{0}'의 초당 기여가 {1:F5}다 (설계 {2:F5}). 배율 {3} / 쿨 {4}초가 "
-                        + "어긋났다 - 다섯이 동률이라는 것이 이 스텝의 밸런스 전부다",
+                        + "어긋났다 - 열둘이 동률이라는 것이 이 축의 밸런스 전부다",
                         skill.DisplayName, skill.BaseRate, SkillCatalog.ExpansionRate,
                         skill.BaseMultiplier, skill.CooldownSeconds));
             }
 
-            Assert.AreEqual(5, counted, "신규 오의가 다섯이 아니다 - 표가 바뀌었으면 이 검사도 함께 봐야 한다");
+            // 49단계의 다섯 + 15종 재설계의 일곱. **수를 세는 이유는 변함없다** -
+            // 표에서 오의가 빠지면 이 검사가 조용히 0개를 훑고 통과하기 때문이다
+            Assert.AreEqual(12, counted,
+                "레벨 게이트가 아닌 오의가 열둘이 아니다 - 표가 바뀌었으면 이 검사도 함께 봐야 한다");
         }
 
         /**

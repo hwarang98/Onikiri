@@ -209,6 +209,27 @@ namespace Onikiri.Battle
             targetX = x;
         }
 
+        /**
+         * @brief 흡인이 이 요괴를 **직접 옮긴다** (나락인력, SkillSpecial.Pull).
+         *
+         * `SetTargetX`와 갈라 두는 이유는 속도다. 저쪽은 "걸어가야 할 곳"을 적고
+         * 요괴가 자기 걸음으로 가는데, 흡인은 0.25초 안에 끝나야 폭발이 **모인
+         * 뒤에** 터진다 - 걸음으로는 그 시각을 못 맞춘다.
+         *
+         * 목표 X도 함께 옮기는 것이 요점이다. 안 옮기면 끌려가는 동안 요괴가
+         * 원래 자리로 되돌아가려 하고, 화면에서 그것은 '끌린다'가 아니라
+         * '떤다'로 보인다. 복귀는 저절로 일어난다 - 다음 큐 정렬에서
+         * 스포너가 자기 자리를 다시 적어 준다(EnemySpawner).
+         */
+        public void PullTo(float x)
+        {
+            if (!IsAlive) return;
+
+            var position = transform.position;
+            transform.position = new Vector3(x, position.y, position.z);
+            targetX = x;
+        }
+
         public float CurrentX { get { return transform.position.x; } }
 
         /**

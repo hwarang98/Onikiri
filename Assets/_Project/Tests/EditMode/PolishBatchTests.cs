@@ -30,23 +30,35 @@ namespace Onikiri.Tests
 
                 Assert.IsNotEmpty(text, spec.Id + "의 설명이 비어 있다");
 
-                switch (spec.Shape)
+                switch (spec.Area)
                 {
-                    case SkillShape.Pierce:
+                    case SkillArea.Pierce:
                         StringAssert.Contains("관통", text, spec.Id + ": 관통이 설명에 없다");
                         break;
 
-                    case SkillShape.Screen:
+                    case SkillArea.Screen:
                         StringAssert.Contains("화면", text, spec.Id + ": 전체 공격이 설명에 없다");
                         break;
 
-                    default:
-                        // 다타는 타격 수가 문장에 있어야 한다. 한 번이면 안 적는다
-                        if (spec.HitCount > 1)
-                            StringAssert.Contains(spec.HitCount + "회", text,
-                                spec.Id + ": 타격 수가 설명에 없다");
+                    case SkillArea.Around:
+                        StringAssert.Contains("주변", text, spec.Id + ": 전방위가 설명에 없다");
+                        break;
+
+                    case SkillArea.Field:
+                        StringAssert.Contains("검기", text, spec.Id + ": 장판이 설명에 없다");
+                        break;
+
+                    case SkillArea.Captured:
+                        StringAssert.Contains("끌어", text, spec.Id + ": 끌어모음이 설명에 없다");
                         break;
                 }
+
+                // 다타는 타격 수가 문장에 있어야 한다. 한 번이면 안 적는다.
+                // **범위와 무관해졌으므로 switch 밖으로 나온다** - 이제 화면
+                // 광역도 다타일 수 있다(귀신난무)
+                if (spec.Split == SkillSplit.MultiHit && spec.HitCount > 1)
+                    StringAssert.Contains(spec.HitCount + "회", text,
+                        spec.Id + ": 타격 수가 설명에 없다");
 
                 // 주기는 언제나 적힌다 - 이 축의 값어치가 배율/쿨다운이라
                 // 배율만 적힌 문장은 절반만 참이다(SkillButton 머리 주석)

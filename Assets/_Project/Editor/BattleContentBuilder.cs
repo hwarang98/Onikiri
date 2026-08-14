@@ -1209,7 +1209,7 @@ namespace Onikiri.EditorTools
                 // 관통(일섬)은 눈에 보이는 것이 있어야 한다. 팩 참격이든 돌진
                 // 섬광이든 둘 중 하나는 켜져 있어야, 데미지만 들어가고 화면에는
                 // 아무것도 안 나오는 상태를 빌드가 잡는다
-                if (spec.Shape == Onikiri.Progression.SkillShape.Pierce && !usesSlash && !usesStreak)
+                if (spec.Area == Onikiri.Progression.SkillArea.Pierce && !usesSlash && !usesStreak)
                     problems.Add("'" + spec.DisplayName + "'에 참격도 섬광도 없다 - "
                                  + "데미지는 들어가는데 화면에는 아무것도 안 나온다");
 

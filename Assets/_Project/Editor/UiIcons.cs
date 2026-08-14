@@ -87,6 +87,29 @@ namespace Onikiri.EditorTools
             { SkillCatalog.BloodWheelId,    "Icon062" },  // 회전하는 톱니 고리
             { SkillCatalog.BloodBurstId,    "Icon083" },  // 터져 오르는 폭발 기둥
             { SkillCatalog.BloodWhipId,     "Icon082" },  // 휘어 감기는 갈고리
+
+            // 15종 재설계의 일곱. **팩에 심볼별 색 변형이 없다는 것을 알고 고른다.**
+            //
+            // 설계 초안은 "같은 심볼의 Blue 변형"을 가정했는데, 팩을 열어 보니
+            // 187개가 각자 하나의 타일 색을 갖는 구성이었다(165 unique + 색이
+            // 다른 변형들이 합쳐 187). 같은 그림의 다른 색을 꺼낼 수가 없다.
+            //
+            // 그래서 **타일 색을 계열에 맞추되 강제하지 않는다.** 계열 신호는
+            // 탭 틴트와 행 좌측 띠가 이미 맡고 있고(SkillFamilyTabs), 아이콘이
+            // 책임지는 것은 **심볼 구분성**이다. 다행히 새로 고른 일곱이
+            // 검식 셋은 파란 타일, 귀오의 넷은 어두운 타일이라 기존 여덟과
+            // 나란히 놓아도 무리가 읽힌다.
+            //
+            // 기존 여덟은 한 장도 안 바꿨다. 연참(붉은 타일)이 검식인 것이
+            // 어긋나 보이지만, 게임에서 가장 오래된 오의의 그림을 바꾸는 대가가
+            // 타일 색 하나보다 크다
+            { SkillCatalog.DeepThrustId,    "Icon016" },  // 세로로 뻗는 관통 빔
+            { SkillCatalog.MoonArcId,       "Icon044" },  // 초승달 곡선
+            { SkillCatalog.SwordFieldId,    "Icon001" },  // 교차한 무기 + X 참격
+            { SkillCatalog.OniDanceId,      "Icon145" },  // 사방으로 뻗는 금빛 섬광
+            { SkillCatalog.AbyssPullId,     "Icon183" },  // 빨아들이는 검은 구
+            { SkillCatalog.DecapitateId,    "Icon165" },  // 후드를 쓴 사신
+            { SkillCatalog.OniAdventId,     "Icon172" },  // 뿔 달린 오니 두개골
         };
 
         public const string GoldIcon = "Icon114";   // 금화

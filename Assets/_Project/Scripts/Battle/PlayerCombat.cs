@@ -230,6 +230,51 @@ namespace Onikiri.Battle
             return hits;
         }
 
+        /**
+         * @brief 시전자 중심 원. **뒤쪽도 든다** - 관통과 갈리는 유일한 점이다.
+         *
+         * ## 왜 큰 사거리의 관통으로 흉내내지 않는가
+         *
+         * `DeliverSkillLane`은 `dx ∈ [-0.3, range]`로 앞만 보고 세로는 **고정
+         * 폭**이다. 원은 둘 다 다르다 - 뒤로 반경만큼 들고, 세로가 **거리에 따라
+         * 좁아진다**. 그 둘째가 이 거동의 값이다: 가까운 요괴는 세로 ±반경까지
+         * 들어 떠 있는 도깨비불을 확실히 베고, 먼 요괴는 지면 근처만 든다.
+         *
+         * 관통의 세로를 키워 흉내내면 먼 곳의 도깨비불까지 들어 사거리가
+         * 조용히 커진다. 모양이 다르면 함수도 다른 편이 정직하다(DeliverSkillAll이
+         * 관통을 안 빌린 것과 같은 판단).
+         *
+         * @param originX 원의 중심 x. 시전자의 지금 위치다
+         * @param originY 원의 중심 y. 사무라이의 **그려진** 중심이지 발이 아니다
+         * @param radius  판정 반경 (월드 단위)
+         */
+        public int DeliverSkillAround(float originX, float originY, float radius,
+                                      BigDouble multiplier, Color tint, int numberSizeMultiple)
+        {
+            if (radius <= 0f) return 0;
+
+            float squared = radius * radius;
+            int hits = 0;
+
+            var enemies = ActiveEnemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var enemy = enemies[i];
+                if (enemy == null || !enemy.IsTargetable) continue;
+
+                var point = enemy.HitPoint;
+                float dx = point.x - originX;
+                float dy = point.y - originY;
+
+                // 제곱으로 비교한다. 반경 하나 재자고 프레임마다 제곱근을
+                // 뽑을 이유가 없다 - 답이 같다
+                if (dx * dx + dy * dy > squared) continue;
+
+                if (DeliverSkillHit(enemy, multiplier, tint, numberSizeMultiple)) hits++;
+            }
+            return hits;
+        }
+
         /** 화면 광역. 살아 있는 요괴 전부. 관통과 같은 이유로 여기 있다 */
         public int DeliverSkillAll(BigDouble multiplier, Color tint, int numberSizeMultiple)
         {

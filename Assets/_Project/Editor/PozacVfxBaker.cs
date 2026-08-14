@@ -211,6 +211,79 @@ namespace Onikiri.EditorTools
                 FrameRate = 20f, Scale = 1f, Angle = 0f,
                 ForwardOffset = 0f, HeightOffset = 0f, Silver = true
             },
+
+            // ------------------------------------------------ 15종 재설계: 신규 일곱
+            //
+            // **전부 은백으로 굽는다.** 위의 세 오의 조각은 혈 램프를 지나 붉게
+            // 구워져 있는데, 그것은 그 셋이 전부 혈식이라 성립한 선택이었다.
+            // 신규 일곱은 검식 셋(청)과 귀오의 넷(금)이라 한 램프로 못 덮는다.
+            //
+            // 그래서 47단계의 규칙을 그대로 빌린다 - **밝기만 남긴 한 벌을 굽고
+            // 재생할 때 물들인다**(Recipe.Silver 주석). 물들이는 색은 각 오의의
+            // SlashRgba이고, 안무의 slashTint가 그 값을 나른다. 기존 여덟의
+            // slashTint는 흰색이라 한 픽셀도 안 바뀐다.
+
+            // 심격 - 세로로 길게 뻗는 창 (E5, 6프레임). 찌르기의 그림이다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.Thrust, FileName = "THRUST.png", Effect = 5,
+                FrameRate = 18f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 1.4f, HeightOffset = 1.0f, Silver = true
+            },
+
+            // 회월참 - 휘어 도는 초승달 궤적 (E20, 5프레임).
+            // 시전자를 감싸는 원이라 앞으로 안 민다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.MoonArc, FileName = "MOON_ARC.png", Effect = 20,
+                FrameRate = 18f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 0f, HeightOffset = 1.0f, Silver = true
+            },
+
+            // 검진 - 흩뿌려 남는 검기 (E18, 12프레임).
+            // **프레임이 가장 많은 조각을 고른 이유가 지속이다** - 12프레임을
+            // 8fps로 재생하면 1.5초이고, 그것이 장판의 수명과 같다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.SwordField, FileName = "SWORD_FIELD.png", Effect = 18,
+                FrameRate = 8f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 1.8f, HeightOffset = 0.7f, Silver = true
+            },
+
+            // 귀신난무 - 사방으로 터지는 침 (E15, 4프레임).
+            // 다섯 타격마다 한 번씩 뜨므로 짧아야 한다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.OniDance, FileName = "ONI_DANCE.png", Effect = 15,
+                FrameRate = 20f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 1.6f, HeightOffset = 1.05f, Silver = true
+            },
+
+            // 나락인력 - 빨아들이는 구체 (E9, 8프레임).
+            // 도착점(시전자 +1.6u)에 뜨므로 그 자리에 맞춘다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.AbyssPull, FileName = "ABYSS_PULL.png", Effect = 9,
+                FrameRate = 16f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 1.6f, HeightOffset = 1.0f, Silver = true
+            },
+
+            // 참수 - 처형의 섬광 (E32, 8프레임). 최근접 하나에 떨어진다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.Decapitate, FileName = "DECAPITATE.png", Effect = 32,
+                FrameRate = 16f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 1.4f, HeightOffset = 1.1f, Silver = true
+            },
+
+            // 귀왕강림 - 금빛 강림진 (E27, 16프레임).
+            // 팩에서 가장 긴 조각이다. 최장 쿨(19초)의 오의라 여기가 그 자리다
+            new Recipe
+            {
+                Id = Onikiri.Progression.SkillCatalog.SkillVfx.OniAdvent, FileName = "ONI_ADVENT.png", Effect = 27,
+                FrameRate = 14f, Scale = 1f, Angle = 0f,
+                ForwardOffset = 0f, HeightOffset = 1.2f, Silver = true
+            },
         };
 
         /** 구운 조각의 셀 크기. 굽고 나서 채워진다 */
