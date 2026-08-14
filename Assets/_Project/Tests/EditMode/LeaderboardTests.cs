@@ -320,7 +320,7 @@ namespace Onikiri.Tests
 
             Assert.IsTrue(SaveData.Migrate(data));
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(19, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
+            Assert.AreEqual(20, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
 
             Assert.AreEqual(string.Empty, data.playerName,
                 "마이그레이션이 이름을 지어냈다 - 옛 플레이어 전원이 '이름을 고른 사람'이 된다");

@@ -83,20 +83,22 @@ namespace Onikiri.Tests
          * 다른 물건이 되는 날 이 검사가 먼저 깨지고, 그때 표를 나누는 것이
          * 의식적인 선택이 된다.
          *
-         * ---------------------------------------------------------------------
-         * ⚠ **교체 예정 (재설계 v2.2 §12.2-1, 구현 5단계)**
+         * ## 15종 재설계에 그날이 왔다 - 그런데 절반만이다
          *
-         * 그날이 왔다. 스킬 뽑기가 st14(ShopCurve.UnlockStage)로 내려오고 요도는
-         * st41에 남으므로 **아래 UnlockStage 단언만 제거**한다. 나머지는 그대로다 -
-         * 확률표·등급·가격·일일 무료·★4 소프트 천장은 계속 공유하기 때문이다.
+         * 정확한 문장은 이제 이것이다:
          *
-         * 이름도 바뀐다: `TheLadder_SharesTheTableButNotTheGate`.
-         * 새 문장은 "기본 확률표·가격·일일 무료·★4 소프트 천장은 공유하고,
-         * 상점 해금 시점과 ★5 하드 천장은 스킬 뽑기 전용이다"이다.
-         * ---------------------------------------------------------------------
+         *   **기본 확률표·가격·일일 무료·★4 소프트 천장은 공유한다.**
+         *   **상점 해금 시점과 ★5 하드 천장은 스킬 뽑기 전용이다.**
+         *
+         * 갈리는 둘만 갈린 이유는 두 배너가 파는 것이 다르기 때문이다 - 요도는
+         * 파워를 팔아 st41 가속 구간과 얽혀 있고, 스킬은 폭과 시간을 팔아
+         * 코리더 안에 세워도 된다(ShopCurve 머리 주석).
+         *
+         * 해금 칸의 등호는 `TheSkillBanner_OpensBeforeTheYodoBanner`가 이어받는다 -
+         * 같은 자리를 재는 검사가 사라지지 않고 **부등호로 바뀐 것**이다.
          */
         [Test]
-        public void TheLadder_IsTheSameLadderAsTheYodoBanner()
+        public void TheLadder_SharesTheTableButNotTheGate()
         {
             Assert.AreSame(GachaCurve.Chances, SkillGachaCurve.Chances,
                 "확률표가 갈렸다 - 두 배너가 다른 사다리를 쓰면 등급 색이 뜻을 잃는다");
@@ -107,11 +109,6 @@ namespace Onikiri.Tests
             Assert.AreEqual(GachaCurve.PullCostGems, SkillGachaCurve.PullCostGems);
             Assert.AreEqual(GachaCurve.TenPullCostGems, SkillGachaCurve.TenPullCostGems);
             Assert.AreEqual(GachaCurve.FreePullsPerDay, SkillGachaCurve.FreePullsPerDay);
-
-            // ⚠ 이 한 줄이 5단계에 삭제된다 (v2.2 §12.2-1). 스킬 배너는 st14,
-            //   요도 배너는 st41로 갈리므로 등호가 성립하지 않는다
-            Assert.AreEqual(GachaCurve.UnlockStage, SkillGachaCurve.UnlockStage,
-                "배너가 상점보다 먼저(또는 나중에) 열린다");
 
             // 등급이 자리마다 맞물려야 GradeOf를 그대로 쓸 수 있다
             for (int i = 0; i < SkillGachaCurve.OutcomeCount; i++)
@@ -184,48 +181,86 @@ namespace Onikiri.Tests
          * 뽑으려 하는지"를 화면이 말할 수 없고, 둘째를 먼저 받은 플레이어와
          * 아닌 플레이어가 다른 세계에 살게 된다.
          *
-         * 그리고 **셋째가 없다.** 그것이 이 축의 재고가 유한하다는 사실이고,
-         * 다 팔린 배너가 닫히는 근거다.
+         * 그리고 **재고가 유한하다.** 그것이 다 팔린 배너가 닫히는 근거다.
          *
-         * ---------------------------------------------------------------------
-         * ⚠ **폐기 예정 (재설계 v2.2 §12.2-2, 구현 5단계)**
+         * ## 15종 재설계에 풀이 둘로 갈렸다
          *
-         * `Assert.AreEqual(2, UnlockOrder.Length)`가 **단일 풀 전제**다. v2.2는
-         * 배열을 둘로 가른다:
+         *     StandardUnlockOrder   혈조 -> 혈폭 -> 심격 -> 회월참 -> 검진   (★4)
+         *     OniSecretUnlockOrder  귀신난무 -> 나락인력 -> 참수 -> 귀왕강림  (★5)
          *
-         *     StandardUnlockOrder   혈조 -> 혈폭 -> 심격 -> 회월참 -> 검진   (5종)
-         *     OniSecretUnlockOrder  귀신난무 -> 나락인력 -> 참수 -> 귀왕강림  (4종)
-         *
-         * 그러므로 이 검사를 둘로 나눈다:
-         *     TheStandardPool_IsTheTableOrderAndItRunsOut    (5종)
-         *     TheOniSecretPool_IsTheTableOrderAndItRunsOut   (4종)
-         *
-         * 그리고 `SkillRosterContractTests.TheTwoPools_...`가 두 배열의 교집합이
-         * 비었는지를 함께 잰다.
-         * ---------------------------------------------------------------------
+         * 한 배열이면 ★5가 ★4의 재고를 먼저 가져간다 - 전설을 뽑았는데 받는
+         * 것이 혈조가 되는 자리다(SkillGachaCurve.OniSecretUnlockOrder 주석).
          */
         [Test]
-        public void TheUnlockOrder_IsTheTableOrderAndItRunsOut()
+        public void TheStandardPool_IsTheTableOrderAndItRunsOut()
         {
-            Assert.AreEqual(2, SkillGachaCurve.UnlockOrder.Length,
-                "가챠 몫이 둘이 아니다 - 재고가 바뀌었으면 배너가 닫히는 조건도 함께 봐야 한다");
+            AssertPoolDrainsInOrder(SkillGachaCurve.StandardUnlockOrder, 5,
+                                    SkillGachaCurve.StandardTargetFor, "표준");
+        }
+
+        /**
+         * @brief ★5가 여는 귀오의 넷도 **같은 규칙**으로 소진된다.
+         *
+         * 두 검사를 하나로 접지 않는 이유는 실패 메시지다 - 어느 풀이 깨졌는지가
+         * 이름에 있어야 한다.
+         */
+        [Test]
+        public void TheOniSecretPool_IsTheTableOrderAndItRunsOut()
+        {
+            AssertPoolDrainsInOrder(SkillGachaCurve.OniSecretUnlockOrder, 4,
+                                    SkillGachaCurve.OniSecretTargetFor, "귀오의");
+        }
+
+        private static void AssertPoolDrainsInOrder(string[] order, int expectedSize,
+                                                    System.Func<int, int> targetFor, string label)
+        {
+            Assert.AreEqual(expectedSize, order.Length, string.Format(
+                "{0} 풀이 {1}종이 아니다 - 재고가 바뀌었으면 배너가 닫히는 조건도 함께 봐야 한다",
+                label, expectedSize));
 
             int owned = 0;
-            for (int i = 0; i < SkillGachaCurve.UnlockOrder.Length; i++)
+            for (int i = 0; i < order.Length; i++)
             {
-                int expected = SkillCatalog.IndexOf(SkillGachaCurve.UnlockOrder[i]);
-                int target = SkillGachaCurve.UnlockTargetFor(owned);
+                int expected = SkillCatalog.IndexOf(order[i]);
+                int target = targetFor(owned);
 
-                Assert.AreEqual(expected, target, "해금 순서가 표 순서와 다르다");
+                Assert.AreEqual(expected, target, label + " 해금 순서가 표 순서와 다르다");
                 Assert.IsTrue(SkillGachaCurve.IsGachaGated(target),
-                    "진행으로 열리는 오의가 뽑기 몫에 들어 있다");
+                    "진행으로 열리는 오의가 " + label + " 풀에 들어 있다");
 
                 owned |= 1 << target;
             }
 
-            Assert.IsTrue(SkillGachaCurve.AllUnlocked(owned));
-            Assert.AreEqual(-1, SkillGachaCurve.UnlockTargetFor(owned),
-                "셋째 오의가 열린다 - 이 축의 재고는 둘로 끝나야 한다");
+            Assert.AreEqual(-1, targetFor(owned), label + " 풀이 재고보다 하나 더 연다");
+        }
+
+        /**
+         * @brief 두 풀이 **겹치지 않고 뽑기 몫 아홉을 정확히 덮는가.**
+         *
+         * 겹치면 한 오의가 ★4로도 ★5로도 열려 전설의 상품이 흐려지고,
+         * 모자라면 어느 풀에도 없는 뽑기 전용 오의가 생겨 **영영 못 얻는다.**
+         */
+        [Test]
+        public void TheTwoPools_AreDisjointAndCoverTheNineGachaSkills()
+        {
+            int standard = 0, oni = 0;
+            foreach (var id in SkillGachaCurve.StandardUnlockOrder)
+                standard |= 1 << SkillCatalog.IndexOf(id);
+            foreach (var id in SkillGachaCurve.OniSecretUnlockOrder)
+                oni |= 1 << SkillCatalog.IndexOf(id);
+
+            Assert.AreEqual(0, standard & oni,
+                "두 풀이 같은 오의를 갖고 있다 - ★4로도 ★5로도 열린다");
+
+            int gated = 0;
+            for (int i = 0; i < SkillCatalog.Count; i++)
+                if (SkillCatalog.Skills[i].GachaGated) gated |= 1 << i;
+
+            Assert.AreEqual(gated, standard | oni,
+                "뽑기 몫과 두 풀의 합집합이 다르다 - 어느 풀에도 없는 오의는 영영 못 얻는다");
+
+            Assert.IsTrue(SkillGachaCurve.AllUnlocked(standard | oni),
+                "아홉을 다 열었는데 재고가 남았다고 한다");
         }
 
         // ---------------------------------------------------------------- 상한 (안전선)
@@ -310,22 +345,17 @@ namespace Onikiri.Tests
          * 가챠 몫이 애초에 없으므로, 49단계가 잰 49.0%를 다시 유도할 필요가
          * 없다. 49단계가 슬롯으로 "풀 크기와 밴드를 떼어놓은" 것의 배당금이다.
          *
-         * ---------------------------------------------------------------------
-         * ⚠ **수정 예정 (재설계 v2.2 §12.2-5, 구현 5단계)**
-         *
-         * 아래에서 마스크를 만드는 줄이 `UnlockOrder` 하나를 훑는다. 배열이 둘로
-         * 갈리면 **두 배열을 합쳐** 마스크를 지어야 한다 - 안 그러면 귀오의 넷이
-         * 마스크에서 빠져 "뽑아도 기준 구성이 안 움직인다"를 절반만 재게 된다.
-         *
-         * 검사의 주장 자체는 안 바뀐다. 신규 일곱도 전부 GachaGated이고 상한 기여가
-         * 0.576 동률이라 기준 구성은 그대로다.
-         * ---------------------------------------------------------------------
+         * 15종 재설계 뒤에는 **두 풀을 합쳐** 마스크를 짓는다. 하나만 훑으면
+         * 귀오의 넷이 빠져 "뽑아도 기준 구성이 안 움직인다"를 절반만 재게 된다.
          */
         [Test]
         public void OwningTheGachaSkills_DoesNotMoveTheReferenceLoadout()
         {
             int owned = 0;
-            foreach (var id in SkillGachaCurve.UnlockOrder) owned |= 1 << SkillCatalog.IndexOf(id);
+            foreach (var id in SkillGachaCurve.StandardUnlockOrder)
+                owned |= 1 << SkillCatalog.IndexOf(id);
+            foreach (var id in SkillGachaCurve.OniSecretUnlockOrder)
+                owned |= 1 << SkillCatalog.IndexOf(id);
 
             var without = new int[SkillCurve.MaxSlots];
             int a = SkillCatalog.ReferenceLoadout(int.MaxValue, int.MaxValue, without,
@@ -499,8 +529,14 @@ namespace Onikiri.Tests
 
             // 해금 **직후**의 체감. 뽑은 오의가 Lv.1로 벤치에 앉는 순간
             // 그동안 모은 XP가 그리로 흘러가므로, 화면에서 "뽑았더니 이미
-            // 자라 있다"가 된다 - 그것이 이 축의 첫인상이다
-            int atUnlock = fast[SkillGachaCurve.UnlockStage - 1].SkillLevels[burst];
+            // 자라 있다"가 된다 - 그것이 이 축의 첫인상이다.
+            //
+            // **재는 자리가 배너 해금(st14)이 아니라 보석 구매 해금(st41)이다.**
+            // 시뮬레이션에는 달력이 없어서 일일 무료·온보딩 10연을 못 돈다
+            // (FreePullsPerDay 주석) - 즉 이 세계가 뽑기를 시작하는 순간은
+            // 보석을 쓸 수 있게 되는 칸이고, 그 전의 레벨을 물으면 "아직 안
+            // 뽑은 오의"의 레벨을 묻는 것이 된다
+            int atUnlock = fast[SkillGachaCurve.PullUnlockStage - 1].SkillLevels[burst];
             Assert.GreaterOrEqual(atUnlock, 5, string.Format(
                 "해금 스테이지에서 뽑은 오의가 Lv.{0}이다 - 상한의 절반도 못 미치면 "
                 + "'뽑았는데 약하다'가 되고, 바꿔 끼워 볼 이유가 안 생긴다", atUnlock));
@@ -518,35 +554,28 @@ namespace Onikiri.Tests
          * 본다 - 안 멈추면 화면의 배너도 안 닫히고, 보석이 아무것도 안 주는
          * 곳으로 계속 흘러간다.
          *
-         * ---------------------------------------------------------------------
-         * ⚠ **기준 재설계 예정 (재설계 v2.2 §12.2-4, 구현 5단계)**
+         * ## 15종 재설계에 **닫히는 조건이 셋이 됐다**
          *
-         * 두 가지가 틀어진다.
+         * `SkillSystem.HasStock`은 예전부터 두 가지를 봤다 - 미보유 뽑기 오의
+         * **또는** 장착 중 상한 미도달. 재고가 둘일 때는 앞의 조건이 워낙 빨리
+         * 꺼져서 뒤의 조건만 남았고, 그래서 이름이 "재고가 다 팔리면"이어도
+         * 틀린 말이 아니었다.
          *
-         * **하나. `settledAt <= 60`이 st41 해금 · 재고 2종 전제다.** 상점이 st14로
-         * 내려오고 재고가 9종이 되면 이 숫자가 아무것도 안 막는다.
-         *
-         * **둘. 이름이 `HasStock`의 실제 계약과 어긋난다.** `SkillSystem.HasStock`은
-         * 미보유 뽑기 스킬 **또는 장착 중 상한 미도달**을 본다. 두 해금 풀이
-         * 소진돼도 장착 오의가 미상한이면 배너는 계속 열려 있고, 그 중간 상태가
-         * 정상이다(화면은 "해금 소진 - XP로 지급"을 적는다).
-         *
-         * 교체본: `TheBanner_ClosesOnlyAfterBothPoolsAreDrainedAndEquippedSkillsAreMaxed`
-         *     ① StandardSoldOut == true
-         *     ② OniSecretSoldOut == true
-         *     ③ 장착 스킬 중 미상한 대상 없음
-         *     ④ 그 뒤 뽑기 수가 증가하지 않음
-         *     ⑤ 두 풀만 소진된 중간 상태에서는 배너가 **열려 있다**
-         * ---------------------------------------------------------------------
+         * 아홉이 되면서 그 둘이 실제로 갈린다. **두 풀이 다 소진돼도 장착 오의가
+         * 미상한이면 배너는 열려 있고, 그 중간 상태가 정상이다** - 화면은 그때
+         * "해금 소진 - XP로 지급"을 적는다. 그러므로 검사도 셋을 다 봐야 한다.
          */
         [Test]
-        public void TheBanner_StopsWhenItsStockRunsOut()
+        public void TheBanner_ClosesOnlyAfterBothPoolsAreDrainedAndEquippedSkillsAreMaxed()
         {
             var rows = StageSimulation.Run(200, Field(), WithGacha());
 
             var last = rows[rows.Count - 1];
-            Assert.IsTrue(SkillGachaCurve.AllUnlocked(last.SkillGachaOwned),
-                "보석 무제한인데 200스테이지까지 가챠 몫을 다 못 열었다");
+
+            Assert.IsTrue(SkillGachaCurve.StandardSoldOut(last.SkillGachaOwned),
+                "보석 무제한인데 200스테이지까지 표준 다섯을 다 못 열었다");
+            Assert.IsTrue(SkillGachaCurve.OniSecretSoldOut(last.SkillGachaOwned),
+                "보석 무제한인데 200스테이지까지 귀오의 넷을 다 못 열었다");
 
             // 재고가 닫힌 뒤로는 한 번도 안 돈다. 마지막 뽑기가 일어난
             // 스테이지를 찾아 그 뒤가 평평한지 본다
@@ -556,11 +585,21 @@ namespace Onikiri.Tests
                 if (row.SkillGachaPulls >= settled) { settledAt = row.Stage; break; }
 
             Assert.AreNotEqual(-1, settledAt);
-            Assert.LessOrEqual(settledAt, 60, string.Format(
-                "재고가 st{0}까지 안 닫힌다 - 유한한 재고라는 것이 이 축의 설계이고, "
-                + "안 닫히면 배너가 영원히 열려 아무것도 안 판다", settledAt));
-
             Assert.Greater(settled, 0d, "보석 무제한인데 한 번도 안 뽑았다");
+
+            // **아홉을 여는 산수가 실제로 돌았는가.** 귀오의 넷의 결정론적
+            // 하한이 4 x 69.01 = 276회다. 그보다 적게 돌고 다 열렸다면 두 풀이
+            // 갈리지 않았거나 하드 천장이 확률을 두 번 세고 있다는 뜻이다
+            Assert.GreaterOrEqual(settled, 276d, string.Format(
+                "아홉을 {0:F0}회에 다 열었다 - 귀오의 넷의 하한(276회)보다 적다",
+                settled));
+
+            // 다 열린 뒤로는 평평하다
+            foreach (var row in rows)
+                if (row.Stage > settledAt)
+                    Assert.AreEqual(settled, row.SkillGachaPulls, 1e-9d, string.Format(
+                        "st{0}에서 재고가 없는데 또 뽑았다 - 보석이 아무것도 안 주는 "
+                        + "곳으로 흘러간다", row.Stage));
         }
 
         // ---------------------------------------------------------------- f2p
@@ -659,42 +698,92 @@ namespace Onikiri.Tests
          * 시뮬레이션에는 달력이 없으므로 이 트리클은 표 밖에 있다(47단계의
          * 일일 무료와 같은 자리). 그래서 여기서 재는 것은 곡선의 산수뿐이다.
          *
-         * ---------------------------------------------------------------------
-         * ⚠ **폐기 예정 (재설계 v2.2 §12.2-3, 구현 5단계)**
-         *
-         * `PityPulls * UnlockOrder.Length <= 62`가 **2종 · 단일 천장** 전제다.
-         * 9종 · 이중 천장에서는 이 산수가 성립하지 않는다.
-         *
-         * 그리고 아래 611행 언저리가 `ExpectedPullsPerUnlock`의 **유일한 테스트
-         * 소비처**다. 그 값이 단일 천장 닫힌 식(20.2208)에서 이중 천장 정상해
-         * (25.6475)로 바뀌므로 소비처도 함께 교체된다.
-         *
-         * 교체본 셋 (v2.2 §12.3의 5·6·7):
-         *     TheIntroReward_GuaranteesBloodWhipOnDayZero
-         *         무료 10연이 첫 표준 스킬(혈조)을 0일차에 보장한다
-         *     TheHardPity_BoundsTheFifthStarAtOneHundred
-         *         ★5 간격이 100을 넘지 않는다. 4종 최악 = 4 x 100 = 400회
-         *     TheSoftPity_IsResetByFifthStarToo
-         *         ★5가 소프트 카운터를 0으로 만든다 (★4 보장이 아니라 ★4 **이상** 보장)
-         * ---------------------------------------------------------------------
+         * 15종 재설계에 산수가 바뀌었다 - 재고가 둘에서 다섯이 되고 대기가
+         * 20.22회에서 25.65회로 늘었지만, **첫 하나를 온보딩이 0일차에 준다.**
+         * 그래서 이 검사가 재는 것은 "나머지 넷"이다.
          */
         [Test]
-        public void TheDailyFree_OpensBothSkillsWithinTwoMonths()
+        public void TheDailyFree_OpensTheStandardPoolInAboutOneSeason()
         {
             Assert.AreEqual(1, SkillGachaCurve.FreePullsPerDay,
                 "일일 무료가 하루 한 번이 아니다 - 아래 산수가 통째로 바뀐다");
 
-            int worstCaseDays = SkillGachaCurve.PityPulls * SkillGachaCurve.UnlockOrder.Length;
+            // 첫 하나는 **온보딩이 0일차에 준다**(무료 10연). 일일 무료가
+            // 맡는 것은 나머지 넷이다
+            double days = SkillGachaCurve.ExpectedPullsPerUnlock * 4d;
 
-            Assert.LessOrEqual(worstCaseDays, 62, string.Format(
-                "일일 무료만으로 두 오의를 여는 데 최악 {0}일이 걸린다 - 무과금에게 "
-                + "이 축이 '언젠가'가 되면 폭을 판다는 말이 거짓이 된다", worstCaseDays));
+            Assert.Less(days, 130d, string.Format(
+                "표준 다섯을 여는 데 기대 {0:F0}일이 걸린다 - 무과금에게 이 축이 "
+                + "언젠가가 되면 폭을 판다는 말이 거짓이 된다", days));
+        }
 
-            // 평균은 그보다 훨씬 짧다. 천장이 접힌 대기가 20.22회다
-            double average = SkillGachaCurve.ExpectedPullsPerUnlock
-                             * SkillGachaCurve.UnlockOrder.Length;
-            Assert.Less(average, worstCaseDays,
-                "천장이 평균을 못 줄인다 - 표와 천장이 어긋났다");
+        /**
+         * @brief ★5에 **상한이 생겼다.** 그 사실이 이 재설계의 약속이다.
+         *
+         * v19까지 ★5는 표 확률 0.8%에 상한이 없었다 - 400회를 돌아도 안 나올
+         * 수 있었고, 그때는 ★5가 XP 가속이라 견딜 만했다. 이제 귀오의 넷의
+         * 유일한 출처가 되면서 상한 없음이 곧 "영영 못 볼 수도 있다"가 된다.
+         */
+        [Test]
+        public void TheHardPity_BoundsTheFifthStarAtOneHundred()
+        {
+            Assert.AreEqual(100, SkillGachaCurve.AwakenPityPulls,
+                "하드 천장이 100회가 아니다 - 문서의 획득 기간표가 통째로 바뀐다");
+
+            Assert.AreEqual(0, SkillGachaCurve.PullsUntilAwakenPity(100),
+                "천장을 넘겨도 남은 회수가 음수로 안 접힌다");
+            Assert.AreEqual(100, SkillGachaCurve.PullsUntilAwakenPity(0));
+
+            // 귀오의 넷의 **최악**이 닫힌다. 기대는 그 7할이다 (69.01 x 4)
+            int worst = SkillGachaCurve.AwakenPityPulls
+                      * SkillGachaCurve.OniSecretUnlockOrder.Length;
+            Assert.AreEqual(400, worst, "귀오의 넷의 최악이 400회가 아니다");
+
+            double expected = SkillGachaCurve.ExpectedPullsPerAwaken
+                            * SkillGachaCurve.OniSecretUnlockOrder.Length;
+            Assert.Less(expected, worst,
+                "기대가 최악과 같다 - 천장이 확률을 안 접고 있다");
+            Assert.AreEqual(276d, expected, 1d,
+                "귀오의 넷의 기대가 276회가 아니다 - 문서의 경제표와 갈렸다");
+        }
+
+        /**
+         * @brief 온보딩 보상과 배너 문구가 **같은 데이터를 읽는가.**
+         *
+         * 두 경로가 갈리면 "다음 해금: 혈조"라고 적어 놓고 혈폭을 주는 날이 온다.
+         */
+        [Test]
+        public void TheIntroReward_TargetsTheSameSkillTheBannerAdvertises()
+        {
+            Assert.AreEqual(10, SkillGachaCurve.IntroPullCount, "온보딩이 10연이 아니다");
+
+            int fresh = SkillGachaCurve.StandardTargetFor(0);
+            Assert.AreEqual(SkillCatalog.IndexOf(SkillCatalog.BloodWhipId), fresh,
+                "신규 플레이어의 첫 표준 오의가 혈조가 아니다");
+
+            Assert.AreEqual(SkillCatalog.BloodWhipId, SkillGachaCurve.StandardUnlockOrder[0],
+                "표준 풀의 머리가 혈조가 아니다 - 온보딩 보상과 배너 문구가 갈린다");
+        }
+
+        /**
+         * @brief 상점과 요도 배너가 **다른 칸에 선다.**
+         *
+         * 47단계까지 두 배너가 같은 상수를 봤고 그것이 맞았다 - 배너가 하나뿐일
+         * 때는 상점이 열리는 칸이 곧 그 배너가 열리는 칸이었다. 배너가 둘이
+         * 되면서 등호가 깨진다(ShopCurve 머리 주석).
+         */
+        [Test]
+        public void TheSkillBanner_OpensBeforeTheYodoBanner()
+        {
+            Assert.AreEqual(ShopCurve.UnlockStage, SkillGachaCurve.UnlockStage,
+                "스킬 배너가 상점과 다른 칸에 선다 - 화면은 들어가지는데 배너만 비어 있다");
+
+            Assert.Less(SkillGachaCurve.UnlockStage, GachaCurve.UnlockStage,
+                "스킬 뽑기가 요도 뽑기보다 늦게 열린다 - 폭을 파는 배너가 "
+                + "다 고르고 난 뒤에 열리면 팔 것이 없다");
+
+            Assert.AreEqual(14, SkillGachaCurve.UnlockStage,
+                "상점 해금이 st14가 아니다 - 코리더의 사건 배치가 바뀐다");
         }
     }
 }

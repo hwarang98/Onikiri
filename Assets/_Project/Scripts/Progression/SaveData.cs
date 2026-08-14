@@ -39,10 +39,11 @@ namespace Onikiri.Progression
          *   17 49단계. 오의 장착 슬롯 - 어느 오의를 어느 자리에 끼웠는가
          *   18 50단계. 오의 뽑기 - 스킬 XP · 가챠 몫 보유 · 그 배너의 천장/무료 쿨
          *   19 54단계. 리더보드 - 플레이어가 정한 이름
+         *   20 15종 재설계. ★5 하드 천장 · 온보딩 10연 수령 · 그 오의의 첫 장착
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 19;
+        public const int CurrentVersion = 20;
 
         public int version = CurrentVersion;
 
@@ -382,6 +383,35 @@ namespace Onikiri.Progression
 
         /** 마지막으로 오의 무료 뽑기를 쓴 퀘스트일. 요도 쪽과 같은 형식·같은 경계 */
         public long skillGachaFreePullDayTicks;
+
+        // ---------------------------------------------------------------- v20
+
+        /**
+         * @brief 마지막 ★5 뒤로 돌린 뽑기 수 (15종 재설계).
+         *
+         * `skillGachaPity`와 한 칸에 접지 않는 이유가 두 배너를 안 접은 이유와
+         * 같다 - **서로 다른 것을 센다.** 소프트는 "★4 이상"을 재고 이쪽은
+         * "★5만"을 재므로, 영웅을 아무리 받아도 이 값은 안 줄어든다.
+         */
+        public int skillGachaAwakenPity;
+
+        /**
+         * @brief st14 온보딩 무료 10연을 받았는가.
+         *
+         * v19에서 오면 **false**다. 그래서 기존 플레이어 전원이 업데이트 후
+         * 한 번 받는다 - 하드 천장을 0에서 시작시키는 것에 대한 보상이고,
+         * 버그가 아니라 의도한 선물이다(Migrate 주석).
+         */
+        public bool skillGachaIntroClaimed;
+
+        /**
+         * @brief 온보딩으로 받은 오의를 **처음 장착했는가.**
+         *
+         * 파생 조건(보유 && 미장착)으로는 1회성이 안 되므로 칸을 하나 쓴다 -
+         * 그 조건이면 플레이어가 나중에 그 오의를 뺄 때 온보딩 안내가
+         * 되살아난다. 안내를 한 번만 띄우려면 "띄웠다"를 기억해야 한다.
+         */
+        public bool skillGachaIntroEquipDone;
 
         // ---------------------------------------------------------------- 54단계
 
@@ -821,9 +851,15 @@ namespace Onikiri.Progression
                 // 사실이 아니라 새 판단을 지어내는 것이 된다.
                 if (data.maxStageReached >= SkillCurve.ExpansionStage)
                 {
-                    var owned = new string[SkillGachaCurve.UnlockOrder.Length];
-                    Array.Copy(SkillGachaCurve.UnlockOrder, owned, owned.Length);
-                    data.gachaSkillIds = owned;
+                    // v17 세계의 가챠 몫은 혈폭·혈조 둘이었다. 15종 재설계로
+                    // 표준 풀이 다섯이 됐지만 **여기서 주는 것은 그때의 둘**이다 -
+                    // 마이그레이션은 v17이 실제로 갖고 있던 것을 보존하는
+                    // 자리이지 새 판단을 지어내는 자리가 아니다
+                    data.gachaSkillIds = new[]
+                    {
+                        SkillCatalog.BloodBurstId,
+                        SkillCatalog.BloodWhipId
+                    };
                 }
                 else
                 {
@@ -848,6 +884,55 @@ namespace Onikiri.Progression
                 // maxStageReached 그대로이고, 리더보드는 그것을 읽기만 한다.
                 data.playerName = string.Empty;
                 data.version = 19;
+            }
+
+            if (data.version == 19)
+            {
+                // ---- 세 칸 다 기본값이다. **소급하지 않는다.**
+                //
+                // `skillGachaAwakenPity`를 누적 뽑기 수(min(total, 99))로
+                // 소급하고 싶어지는데, 그 방식은 아무것도 인정하지 못한다.
+                // 하드 천장이 재는 것은 **마지막 ★5 이후**의 횟수인데
+                // `skillGachaTotalPulls`는 누적일 뿐이다 - 200회를 돌며 ★5를
+                // 세 번 받은 플레이어와 한 번도 못 받은 플레이어가 같은 200을
+                // 갖는다. 전자에게 99를 주면 과보상이고, 후자는 200회를
+                // 기다렸는데 "1회 남았다"는 말을 듣는다.
+                //
+                // 게다가 v19의 ★5는 개안이라 **해금 이력이 저장되지 않았다.**
+                // 복원할 원본이 세이브 안에 없다.
+                data.skillGachaAwakenPity = 0;
+
+                // ---- 그 대신 **전원에게 무료 10연을 준다.**
+                //
+                // 하드 천장을 0에서 시작시키는 것의 보상이다. v14->v15가 요도
+                // 무료 뽑기를, v17->v18이 오의 무료 뽑기를 접속 즉시 하나씩
+                // 쥐어 준 것과 같은 자리 - 새 시스템이 열리는 것이지 소급이
+                // 아니다.
+                data.skillGachaIntroClaimed = false;
+                data.skillGachaIntroEquipDone = false;
+
+                // ---- **신규 일곱의 칸을 만든다.**
+                //
+                // v6 -> v7과 v16 -> v17이 각자 그때의 카탈로그에 칸을 만들어
+                // 준 것과 같은 처리다. 그 두 단계는 v19 세이브를 안 지나므로,
+                // 여기서 안 만들면 열다섯 중 여덟만 칸을 가진 채로 남는다.
+                //
+                // 런타임이 다음 저장에서 채워 주기는 한다(SkillSystem이 슬롯을
+                // 열다섯 개 들고 있다). 그래도 여기서 만드는 이유는 **세이브가
+                // 스스로 일관되어야** 하기 때문이다 - 로드 직후와 저장 직후의
+                // 세이브가 다르면 그 차이를 아는 사람이 아무도 없다.
+                //
+                // 레벨은 1이다. 소급이 아니라 없던 것이 생기는 것이고, 어차피
+                // 뽑기로 열기 전에는 목록에 안 뜬다(GachaGated)
+                foreach (var skill in SkillCatalog.Skills) EnsureSkill(data, skill.Id);
+
+                // ---- 신규 오의 일곱은 여기서 손댈 것이 없다.
+                //
+                // 세이브가 id 병렬 배열이라(skillIds/skillLevels) 옛 세이브에
+                // 없는 id는 Lv.1 미보유로 자연 처리된다. 다만 **다음 저장에서
+                // 열다섯이 전부 수집되는지**는 별개 문제라 테스트가 잰다
+                // (TheSaveV20_RoundTripsAllFifteenSkillIds).
+                data.version = 20;
             }
 
             data.version = CurrentVersion;

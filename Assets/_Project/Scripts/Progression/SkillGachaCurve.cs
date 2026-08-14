@@ -84,12 +84,113 @@ namespace Onikiri.Progression
          * 게이트가 st41이면 그 불변이 계수가 아니라 **구조로** 지켜진다 -
          * 44·45·46·47단계가 전부 같은 자리에서 같은 방법을 썼다.
          */
-        public static int UnlockStage { get { return GachaCurve.UnlockStage; } }
+        public static int UnlockStage { get { return ShopCurve.UnlockStage; } }
 
         public static bool IsUnlockedAt(int stage)
         {
             return stage >= UnlockStage;
         }
+
+        /**
+         * @brief **보석으로 뽑을 수 있게 되는 칸.** 배너가 서는 칸과 다르다.
+         *
+         * ## 왜 갈라야 했는가 - 실측이 강제했다
+         *
+         * 처음에는 하나였다. 배너가 st14에 서면 거기서부터 사고 팔면 된다고
+         * 봤는데, 시뮬레이션이 그 세계를 거절했다:
+         *
+         *     무과금이 퀘스트 보석을 전부 이 배너에 쓰면
+         *     st52에서 보스 여유가 1.343 -> 바닥(1.40)을 뚫는다
+         *
+         * 47단계부터 이 축의 계약은 "**보석을 여기 쓰면 느려지지만 막히지는
+         * 않는다**"였다(SpendingFreeToPlayGemsHere_CostsProgressButNeverBreaksTheFloor).
+         * 느려지는 것은 선택이고 막히는 것은 함정이다. 상점을 스물일곱 칸
+         * 앞당기면서 그 차이가 무너졌다 - 코리더(st1~30)는 보석 여유가 가장
+         * 얇은 구간이라, 거기서 빠져나간 보석은 나중에 못 메운다.
+         *
+         * ## 그래서 배너와 지갑을 따로 연다
+         *
+         *     st14  배너가 선다. **무료 10연 + 일일 무료**가 열린다
+         *     st41  **보석 구매**가 열린다 (요도 배너와 같은 칸)
+         *
+         * 재설계가 원한 것은 "폭을 일찍 판다"와 "무과금이 일찍 닿는다" 둘이고,
+         * 그 둘은 무료 경로만으로 성립한다 - 애초에 이 축의 f2p 경로가 일일
+         * 무료라고 적어 둔 자리다(FreePullsPerDay 주석). 보석 구매는 가속이지
+         * 경로가 아니므로, 가속만 st41에 남겨도 설계가 안 무너진다.
+         *
+         * 그리고 그 st41은 요도 배너가 서는 칸이다 - 두 배너의 지갑이 같은
+         * 칸에서 동시에 열리므로, 44단계가 잰 보석 배정표가 한 번만 흔들린다.
+         */
+        public static int PullUnlockStage { get { return GachaCurve.UnlockStage; } }
+
+        /** 보석으로 뽑을 수 있는가. 배너가 보이는 것과 다른 질문이다 */
+        public static bool CanBuyAt(int stage)
+        {
+            return stage >= PullUnlockStage;
+        }
+
+        // ------------------------------------------------------- 15종 재설계: 전용 규칙
+
+        /**
+         * @brief ★5 하드 천장. **이 배너만의 규칙이다.**
+         *
+         * ## 왜 필요한가
+         *
+         * 47단계의 소프트 천장(30회)은 "★4 **이상**"을 보장한다. ★5는 그 안에
+         * 얹혀 있을 뿐 따로 보장되지 않아서, 표 확률 0.8%면 기대 125회이고
+         * 상한이 없다. 400회를 돌아도 안 나올 수 있다는 뜻이다.
+         *
+         * ★5가 XP 가속(개안)이던 시절에는 그것이 견딜 만했다. 안 나와도
+         * 진행으로 도달하는 곳이 같았기 때문이다. 이제 ★5가 **귀오의 넷의
+         * 유일한 출처**가 되면서 상한이 없는 것이 곧 "영영 못 볼 수도 있다"가
+         * 된다 - 그것은 수집 목표가 아니라 도박이다.
+         *
+         * ## 왜 100인가
+         *
+         * 이 값으로 자르면 ★5 간격의 기대가 69.01회가 되고(SkillGachaPityModel),
+         * 귀오의 넷이 기대 276회 · **최악 400회**로 닫힌다. 일일 무료만 도는
+         * 무과금에게 기대 266일 · 최악 390일이다 - 장기 목표로는 길지만
+         * **끝이 있는** 수다.
+         *
+         * 소프트 천장(30)의 세 배가 조금 넘는 것도 값이다. 두 게이지가 화면에
+         * 나란히 서는데 배수가 정수에 가까우면 "★4 세 번쯤에 ★5 한 번"이라는
+         * 감각이 생긴다.
+         */
+        public const int AwakenPityPulls = 100;
+
+        public static int PullsUntilAwakenPity(int counter)
+        {
+            int left = AwakenPityPulls - counter;
+            return left < 0 ? 0 : left;
+        }
+
+        /**
+         * @brief 배너의 천장 줄. **두 약속을 한 줄에 나란히 적는다.**
+         *
+         * 요도 배너는 천장이 하나라 `GachaCurve.PityText` 하나면 됐다. 이쪽은
+         * 둘이고, **하나만 적으면 안 적은 쪽이 없는 규칙이 된다** - ★5 게이지를
+         * 감추면 "100회 안에 반드시"라는 이 재설계의 가장 큰 약속이 화면 어디에도
+         * 없다.
+         *
+         * 누적 횟수를 뺀 자리에 ★5를 넣었다. 셋을 다 적으면 칸을 넘치는데
+         * (빌드의 CheckLine이 잡는다), 셋 중 버릴 것을 고르면 누적이다 -
+         * 그것은 지나온 기록이고 나머지 둘은 **앞으로의 약속**이다.
+         */
+        public static string PityText(int softLeft, int hardLeft)
+        {
+            return GachaCurve.GradeNames[(int)GachaCurve.Grade.Epic] + " 확정 " + softLeft
+                 + "회  ·  " + GachaCurve.GradeNames[(int)GachaCurve.Grade.Legendary]
+                 + " 확정 " + hardLeft + "회";
+        }
+
+        /**
+         * @brief 온보딩 무료 뽑기 수. st14에 한 번만 열린다.
+         *
+         * 10연인 것은 `GachaCurve.TenPullCount`와 같은 수이지만 **빌려 쓰지
+         * 않는다.** 저쪽은 상품(225젬짜리 묶음)의 크기이고 이쪽은 선물의
+         * 크기다 - 상품 가격을 조정하는 날 선물까지 따라 움직이면 안 된다.
+         */
+        public const int IntroPullCount = 10;
 
         // ------------------------------------------------------- 빌린 것들 (47단계)
 
@@ -239,17 +340,52 @@ namespace Onikiri.Progression
             }
         }
 
-        /** 한 번의 뽑기가 내는 기대 XP. **천장에 눌린 값이다** */
-        public static double ExpectedXpPerPull { get { return Suppressed(TableXpPerPull); } }
+        /**
+         * @brief 이중 천장의 **장기 평균**. 정적 생성자에서 한 번만 푼다.
+         *
+         * ## 왜 닫힌 식을 못 쓰게 됐는가
+         *
+         * 47단계의 식은 천장이 하나일 때 유도됐다. ★5 하드 천장이 붙으면
+         * 그 전제가 깨진다 - 하드가 만든 ★5가 **소프트 카운터도 함께** 0으로
+         * 되돌리므로(★5는 ★4 이상이다) 30회 천장이 발동할 기회를 ★5가
+         * 가로챈다. 두 과정이 얽히면 곱셈으로 못 풀고 상태를 세어야 한다.
+         *
+         * 그 결과 ★4가 4.145% -> 3.899%로 내려가고 ★5가 0.800% -> 1.449%로
+         * 오른다. 합계는 4.945% -> 5.348%로 늘어난다.
+         *
+         * ## ⚠ 이 값은 **장기 보고 전용**이다
+         *
+         * 실제 여정의 초반은 이 평균과 전혀 다르다 - 100회차의 ★5는 45.589%다
+         * (하드 천장이 그 회차에 몰려 있다). 총변동거리가 1e-3 아래로 내려가는
+         * 데 859회가 걸리는데 귀오의 넷의 기대가 276회이므로, **여정 전체가
+         * 과도기 안에 있다.**
+         *
+         * 여정을 재는 쪽(StageSimulation)은 이 값이 아니라
+         * `SkillGachaPityModel.Advance`로 상태를 전진시켜야 한다.
+         */
+        private static readonly SkillGachaPityModel.Rates SteadyRates =
+            SkillGachaPityModel.SolveSteady(PityPulls, AwakenPityPulls);
 
-        /** 회당 ★4(해금) 확률. 천장이 밀어 올린 값이라 표보다 크다 */
-        public static double EffectiveUnlockChance { get { return GachaCurve.EffectiveRarityChance; } }
+        /** 한 번의 뽑기가 내는 기대 XP (장기 평균). 수집기 기준이라 ★4·★5는 0이다 */
+        public static double ExpectedXpPerPull { get { return SteadyRates.Xp; } }
 
-        /** 회당 ★5(개안) 확률. **표와 정확히 같다** - 천장은 전설을 훔치지 않는다 */
-        public static double EffectiveAwakenChance { get { return GachaCurve.EffectiveLegendaryChance; } }
+        /** 회당 ★4(표준 해금) 확률. 소프트 천장이 밀어 올리고 하드 천장이 조금 깎았다 */
+        public static double EffectiveUnlockChance { get { return SteadyRates.UnlockChance; } }
 
-        /** ★4 이상 하나당 실제 뽑기 수. 천장을 접은 값 */
-        public static double ExpectedPullsPerUnlock { get { return GachaCurve.ExpectedPullsPerEpic; } }
+        /** 회당 ★5(귀오의) 확률. **표(0.8%)의 두 배 가까이다** - 하드 천장의 몫 */
+        public static double EffectiveAwakenChance { get { return SteadyRates.AwakenChance; } }
+
+        /** ★4 하나당 실제 뽑기 수 (장기 평균) */
+        public static double ExpectedPullsPerUnlock
+        {
+            get { return SkillGachaPityModel.PullsPerUnlock(SteadyRates); }
+        }
+
+        /** ★5 하나당 실제 뽑기 수 (장기 평균). 귀오의 넷이면 이 값의 네 배다 */
+        public static double ExpectedPullsPerAwaken
+        {
+            get { return SkillGachaPityModel.PullsPerAwaken(SteadyRates); }
+        }
 
         // ---------------------------------------------------------------- 스킬 XP
 
@@ -339,10 +475,55 @@ namespace Onikiri.Progression
          * 자리다 - 47단계가 혼격 상한을 바퀴로 늘려 재고를 만든 것과 반대
          * 방향의 선택이고, 그 대가는 아래 IsSoldOut이 화면에 그대로 적는다.
          */
-        public static readonly string[] UnlockOrder =
+        /**
+         * @brief ★4가 여는 **표준 해금 풀** (5종). 머리가 혈조다.
+         *
+         * ## 왜 혈조가 머리인가
+         *
+         * 온보딩 무료 10연이 표준 해금을 못 뽑았을 때 주는 보상이 이 배열의
+         * **첫 미보유**다(SkillGachaSystem.ClaimIntro). 자연 뽑기가 여는 것도
+         * 같은 함수를 지난다 - 즉 두 경로가 한 데이터를 읽으므로 "다음 해금"
+         * 문구와 실제 결과가 갈릴 수가 없다.
+         *
+         * 그 머리에 혈조를 두는 이유는 **첫 오의의 체감**이다. 쿨 2.5초로
+         * 열다섯 중 가장 짧아서 해금 즉시 전투 리듬이 눈에 띄게 빨라진다.
+         * 혈폭(9.5초)을 앞에 두면 첫 오의가 "가끔 큰 거 한 방"이라 안 읽힌다.
+         *
+         * 47단계의 순서(혈폭 -> 혈조)를 뒤집는 것이지만 잃는 것이 없다 -
+         * 그때는 둘뿐이라 순서가 곧 전부였고, 지금은 다섯 중 앞의 둘이다.
+         */
+        public static readonly string[] StandardUnlockOrder =
         {
-            SkillCatalog.BloodBurstId,
-            SkillCatalog.BloodWhipId
+            SkillCatalog.BloodWhipId,    // 혈조    2.5초 - 첫 오의의 체감이 가장 크다
+            SkillCatalog.BloodBurstId,   // 혈폭
+            SkillCatalog.DeepThrustId,   // 심격
+            SkillCatalog.MoonArcId,      // 회월참
+            SkillCatalog.SwordFieldId    // 검진
+        };
+
+        /**
+         * @brief ★5가 여는 **귀오의 해금 풀** (4종).
+         *
+         * ## 왜 배열이 둘이어야 하는가
+         *
+         * 아홉을 한 배열에 넣고 싶어진다 - `UnlockTargetFor` 하나로 끝나기
+         * 때문이다. 그런데 그 함수는 앞에서부터 첫 미보유를 돌려주므로,
+         * 한 배열이면 **★5가 ★4의 재고를 먼저 가져간다.** 운 좋게 전설을
+         * 뽑은 플레이어가 받는 것이 귀오의가 아니라 혈조가 된다.
+         *
+         * 재고 표시도 갈려야 한다. "★4는 소진, ★5는 남음"이 정상 상태이고
+         * 화면이 그 둘을 따로 말한다 - 한 배열이면 그 문장을 쓸 수가 없다.
+         *
+         * 순서를 고정하는 이유는 44단계 요도와 같다. 무작위면 "무엇을 뽑으려
+         * 하는지"를 화면이 말할 수 없고, 셋째를 먼저 받은 플레이어와 아닌
+         * 플레이어가 다른 세계에 살게 된다.
+         */
+        public static readonly string[] OniSecretUnlockOrder =
+        {
+            SkillCatalog.OniDanceId,     // 귀신난무
+            SkillCatalog.AbyssPullId,    // 나락인력
+            SkillCatalog.DecapitateId,   // 참수
+            SkillCatalog.OniAdventId     // 귀왕강림 - 수집의 마지막 칸
         };
 
         /** 이 오의가 뽑기로만 열리는가. 카탈로그의 플래그를 이름으로 빌려준다 */
@@ -353,15 +534,15 @@ namespace Onikiri.Progression
         }
 
         /**
-         * @brief 다음에 열릴 가챠 몫 오의. 둘 다 열려 있으면 -1.
+         * @brief 배열에서 첫 미보유를 찾는다. 두 풀이 같은 규칙을 지난다.
          *
          * @param owned 카탈로그 인덱스 비트마스크. 비트가 서 있으면 보유
          */
-        public static int UnlockTargetFor(int owned)
+        private static int TargetIn(string[] order, int owned)
         {
-            for (int i = 0; i < UnlockOrder.Length; i++)
+            for (int i = 0; i < order.Length; i++)
             {
-                int index = SkillCatalog.IndexOf(UnlockOrder[i]);
+                int index = SkillCatalog.IndexOf(order[i]);
                 if (index < 0) continue;
                 if ((owned & (1 << index)) != 0) continue;
                 return index;
@@ -369,10 +550,40 @@ namespace Onikiri.Progression
             return -1;
         }
 
-        /** 가챠 몫 오의를 전부 열었는가 */
+        /** ★4가 다음에 열 표준 오의. 다 열렸으면 -1 */
+        public static int StandardTargetFor(int owned)
+        {
+            return TargetIn(StandardUnlockOrder, owned);
+        }
+
+        /** ★5가 다음에 열 귀오의. 다 열렸으면 -1 */
+        public static int OniSecretTargetFor(int owned)
+        {
+            return TargetIn(OniSecretUnlockOrder, owned);
+        }
+
+        /**
+         * @brief 표준 다섯을 전부 열었는가. **배너를 닫는 조건이 아니다.**
+         *
+         * 표준이 소진돼도 귀오의가 남아 있으면 배너는 열려 있고, 둘 다
+         * 소진돼도 장착 오의가 미상한이면 여전히 열려 있다
+         * (SkillSystem.HasStock). 이 함수가 답하는 것은 "★4가 무엇을
+         * 주는가"뿐이다 - 소진 뒤에는 XP로 미끄러진다.
+         */
+        public static bool StandardSoldOut(int owned)
+        {
+            return StandardTargetFor(owned) < 0;
+        }
+
+        public static bool OniSecretSoldOut(int owned)
+        {
+            return OniSecretTargetFor(owned) < 0;
+        }
+
+        /** 뽑기 몫 아홉을 전부 열었는가 */
         public static bool AllUnlocked(int owned)
         {
-            return UnlockTargetFor(owned) < 0;
+            return StandardSoldOut(owned) && OniSecretSoldOut(owned);
         }
     }
 }

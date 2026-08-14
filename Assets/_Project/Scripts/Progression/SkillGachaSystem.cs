@@ -92,6 +92,28 @@ namespace Onikiri.Progression
          */
         [SerializeField] private int pityCounter;
 
+        /**
+         * @brief 마지막 ★5 뒤로 돌린 뽑기 수. **소프트 천장과 별개 카운터다.**
+         *
+         * ★4가 이 값을 안 건드리는 것이 요점이다. 소프트 천장은 "★4 이상"을
+         * 재고 이쪽은 "★5만"을 재므로, 영웅을 아무리 받아도 전설까지의 거리는
+         * 안 줄어든다. 두 게이지가 화면에 나란히 서서 서로 다른 속도로 차는
+         * 이유가 그것이다.
+         */
+        [SerializeField] private int awakenPity;
+
+        /** 온보딩 무료 10연을 받았는가. 계정당 한 번이다 */
+        [SerializeField] private bool introClaimed;
+
+        /**
+         * @brief 온보딩으로 받은 오의를 **처음 장착했는가.**
+         *
+         * 파생 조건(보유 && 미장착)으로는 1회성이 안 된다 - 플레이어가 나중에
+         * 그 오의를 빼면 온보딩 안내가 되살아난다. 장착한 순간 이 값이 서고,
+         * 그 뒤로는 무엇을 끼우든 다시 안 뜬다.
+         */
+        [SerializeField] private bool introEquipDone;
+
         [SerializeField] private int totalPulls;
 
         /** 마지막으로 무료 뽑기를 쓴 **퀘스트일** (UTC ticks). 시각이 아니라 날짜다 */
@@ -105,6 +127,25 @@ namespace Onikiri.Progression
         public int PityCounter { get { return pityCounter; } }
         public int TotalPulls { get { return totalPulls; } }
         public int PullsUntilPity { get { return SkillGachaCurve.PullsUntilPity(pityCounter); } }
+
+        public int AwakenPity { get { return awakenPity; } }
+
+        public int PullsUntilAwakenPity
+        {
+            get { return SkillGachaCurve.PullsUntilAwakenPity(awakenPity); }
+        }
+
+        public bool IntroClaimed { get { return introClaimed; } }
+        public bool IntroEquipDone { get { return introEquipDone; } }
+
+        /**
+         * @brief 온보딩 무료 10연 버튼이 떠 있는가.
+         *
+         * 재고를 안 보는 것이 일일 무료와 다른 점이다. 온보딩은 **재고가
+         * 있을 수밖에 없는 시점**(st14, 아홉 다 미보유)에 뜨고, 만에 하나
+         * 재고가 없더라도 XP로 미끄러지므로 빈 우편함이 안 된다.
+         */
+        public bool CanClaimIntro { get { return IsUnlocked && !introClaimed; } }
 
         /** 결과를 담아 넘기는 목록. 듣는 쪽이 보관하지 않는다 - GachaSystem과 같은 계약 */
         private readonly List<PullResult> results = new List<PullResult>();
@@ -158,9 +199,12 @@ namespace Onikiri.Progression
         public bool HasStock { get { return skills == null || skills.HasStock; } }
 
         /** 지금 뽑을 수 있는가. 해금 · 재고 · 지갑을 다 본다 */
+        /** 보석 구매가 열렸는가. 배너 자체(IsUnlocked)보다 스물일곱 칸 늦다 */
+        public bool CanBuy { get { return SkillGachaCurve.CanBuyAt(StageNow); } }
+
         public bool CanPull(int count)
         {
-            if (!IsUnlocked || !HasStock) return false;
+            if (!IsUnlocked || !CanBuy || !HasStock) return false;
             if (gems == null) gems = GemWallet.Instance;
             return gems != null && gems.CanAfford(CostFor(count));
         }
@@ -232,6 +276,95 @@ namespace Onikiri.Progression
             return true;
         }
 
+        // ---------------------------------------------------------------- 온보딩 10연
+
+        /**
+         * @brief st14의 무료 10연. **결과를 덮어쓰지 않는다.**
+         *
+         * ## 왜 강제 승격이 아닌가
+         *
+         * 처음 설계는 "10번째에 ★4 미출현이면 강제 승격"이었다 - 기존 천장
+         * 코드와 같은 모양이라 싸 보였다. 그런데 그 방식은 **10번째가 ★5였을
+         * 때 그 ★5를 빼앗는다.** 첫 뽑기가 플레이어에게 주는 가장 큰 사건을
+         * 온보딩 보정이 가져가는 것이고, 그것은 선물이 아니라 몰수다.
+         *
+         * 그래서 열 번은 그냥 돈다. 천장 카운터에도 정상 반영된다 - 온보딩이
+         * 끝난 뒤 소프트 게이지가 10칸 차 있는 것이 맞다.
+         *
+         * ## 보상은 뽑기 결과가 아니다
+         *
+         * 열 번 안에 표준 해금이 없었을 때만 **별도로** 지급한다. 뽑기 결과가
+         * 아니므로 천장 카운터를 초기화하지 않고 확률 정보 표에도 안 들어간다 -
+         * 표에 넣으면 공개 확률이 거짓이 된다.
+         *
+         * 주는 것은 `StandardTargetFor`의 답이다. 신규 플레이어에게 그것은
+         * 언제나 혈조이고(StandardUnlockOrder의 머리), 자연 뽑기가 여는 것도
+         * 같은 함수를 지나므로 **배너 문구와 실제 결과가 갈릴 수가 없다.**
+         *
+         * @return 실제로 받았으면 true. 이미 받았거나 잠겨 있으면 false
+         */
+        public bool ClaimIntro()
+        {
+            if (!CanClaimIntro) return false;
+
+            introClaimed = true;
+
+            int before = skills != null ? skills.GachaOwnedMask : 0;
+            RunPulls(SkillGachaCurve.IntroPullCount);
+            int after = skills != null ? skills.GachaOwnedMask : 0;
+
+            if (!OpenedAnyStandard(before, after)) GrantIntroConsolation();
+
+            Raise();
+            return true;
+        }
+
+        /** 열 번 사이에 표준 풀의 오의가 하나라도 열렸는가 */
+        private static bool OpenedAnyStandard(int before, int after)
+        {
+            int opened = after & ~before;
+            if (opened == 0) return false;
+
+            foreach (var id in SkillGachaCurve.StandardUnlockOrder)
+            {
+                int index = SkillCatalog.IndexOf(id);
+                if (index >= 0 && (opened & (1 << index)) != 0) return true;
+            }
+            return false;
+        }
+
+        /**
+         * @brief 열 번이 표준을 못 열었을 때의 별도 보상.
+         *
+         * 표준이 이미 다 팔린 상태(v19 고인물이 업데이트로 받는 경우)에는
+         * XP 240을 준다 - ★3과 같은 값이고, 사다리의 바닥이 아무것도 아닌
+         * 곳이 아니라는 44단계 규칙 그대로다.
+         */
+        private void GrantIntroConsolation()
+        {
+            if (skills == null) return;
+
+            int target = SkillGachaCurve.StandardTargetFor(skills.GachaOwnedMask);
+            if (target >= 0 && skills.GrantGachaSkill(target)) return;
+
+            skills.GrantXp(SkillGachaCurve.XpFor(SkillGachaCurve.Outcome.XpSurge));
+        }
+
+        /**
+         * @brief 온보딩으로 받은 오의를 처음 장착했다. **되돌아오지 않는 표시다.**
+         *
+         * 화면(SkillButton)이 장착에 성공한 뒤 부른다. 여기서 세워 두면
+         * 나중에 그 오의를 빼도 온보딩 안내가 다시 안 뜬다 - 파생 조건으로는
+         * 못 하는 일이고, 그래서 세이브 필드가 하나 더 있다.
+         */
+        public void MarkIntroEquipDone()
+        {
+            if (introEquipDone) return;
+
+            introEquipDone = true;
+            Raise();
+        }
+
         private void RunPulls(int count)
         {
             results.Clear();
@@ -256,20 +389,42 @@ namespace Onikiri.Progression
          */
         private PullResult RollOnce()
         {
-            var outcome = SkillGachaCurve.Roll(UnityEngine.Random.value);
+            var rolled = SkillGachaCurve.Roll(UnityEngine.Random.value);
+            var outcome = rolled;
 
             bool pity = false;
-            if (SkillGachaCurve.GradeFor(outcome) < GachaCurve.Grade.Epic
-                && pityCounter + 1 >= SkillGachaCurve.PityPulls)
+
+            // **순서가 규칙이다: 자연 판정 -> ★5 하드 -> ★4 소프트.**
+            //
+            // 하드가 먼저인 이유는 그것이 더 강한 약속이기 때문이다. 100회차에
+            // 소프트를 먼저 태우면 그 회차가 ★4가 되고 ★5는 다시 100회를
+            // 기다린다 - "100회 안에 반드시"가 문구로 깨진다.
+            //
+            // 그 대가로 100회차의 자연 ★4가 ★5에 덮어써질 수 있다. 정상해상
+            // 전체 뽑기의 0.0137%라 규칙을 단순하게 유지한다
+            if (SkillGachaCurve.GradeFor(outcome) < GachaCurve.Grade.Legendary
+                && awakenPity + 1 >= SkillGachaCurve.AwakenPityPulls)
+            {
+                outcome = SkillGachaCurve.Outcome.Awakening;
+                pity = true;
+            }
+            else if (SkillGachaCurve.GradeFor(outcome) < GachaCurve.Grade.Epic
+                     && pityCounter + 1 >= SkillGachaCurve.PityPulls)
             {
                 outcome = SkillGachaCurve.Outcome.SkillUnlock;
                 pity = true;
             }
 
-            if (SkillGachaCurve.GradeFor(outcome) >= GachaCurve.Grade.Epic) pityCounter = 0;
-            else pityCounter++;
+            var grade = SkillGachaCurve.GradeFor(outcome);
 
-            return Grant(outcome, pity, outcome);
+            // ★5는 두 카운터를 다 되돌린다 - 전설은 영웅 이상이므로 소프트
+            // 천장이 재는 "★4 이상"을 충족한다. ★4는 소프트만 되돌리고
+            // 하드는 계속 쌓인다
+            if (grade >= GachaCurve.Grade.Legendary) { awakenPity = 0; pityCounter = 0; }
+            else if (grade >= GachaCurve.Grade.Epic) { pityCounter = 0; awakenPity++; }
+            else { pityCounter++; awakenPity++; }
+
+            return Grant(outcome, pity, rolled);
         }
 
         /**
@@ -290,15 +445,23 @@ namespace Onikiri.Progression
             {
                 case SkillGachaCurve.Outcome.Awakening:
                 {
-                    int index = skills != null ? skills.AwakenEquipped() : -1;
-                    if (index >= 0) return Result(outcome, 0, 0, -1, index, pity, rolled);
+                    // **해금이 개안보다 먼저다.** 귀오의 넷이 이 자리의 상품이고,
+                    // 개안은 그것이 다 팔린 뒤의 두 번째 값이다. 순서를 뒤집으면
+                    // 전설을 받고도 새 오의 대신 XP 가속만 오는 회차가 생긴다
+                    int unlock = skills != null
+                        ? SkillGachaCurve.OniSecretTargetFor(skills.GachaOwnedMask) : -1;
+                    if (unlock >= 0 && skills.GrantGachaSkill(unlock))
+                        return Result(outcome, 0, 0, unlock, -1, pity, rolled);
+
+                    int awakened = skills != null ? skills.AwakenEquipped() : -1;
+                    if (awakened >= 0) return Result(outcome, 0, 0, -1, awakened, pity, rolled);
                     break;
                 }
 
                 case SkillGachaCurve.Outcome.SkillUnlock:
                 {
                     int index = skills != null
-                        ? SkillGachaCurve.UnlockTargetFor(skills.GachaOwnedMask) : -1;
+                        ? SkillGachaCurve.StandardTargetFor(skills.GachaOwnedMask) : -1;
                     if (index >= 0 && skills.GrantGachaSkill(index))
                         return Result(outcome, 0, 0, index, -1, pity, rolled);
                     break;
@@ -341,6 +504,9 @@ namespace Onikiri.Progression
         public int CollectPity() { return pityCounter; }
         public int CollectTotalPulls() { return totalPulls; }
         public long CollectFreePullDay() { return lastFreePullDayTicks; }
+        public int CollectAwakenPity() { return awakenPity; }
+        public bool CollectIntroClaimed() { return introClaimed; }
+        public bool CollectIntroEquipDone() { return introEquipDone; }
 
         /**
          * @brief 세이브 복원.
@@ -352,9 +518,38 @@ namespace Onikiri.Progression
          */
         public void Restore(int savedPity, int savedTotal, long savedFreeDay)
         {
+            Restore(savedPity, savedTotal, savedFreeDay, 0, false, false);
+        }
+
+        /**
+         * @brief v20 세이브 복원. 세 필드가 늘었다.
+         *
+         * ## v19에서 오면 셋 다 기본값이다
+         *
+         * `skillGachaAwakenPity`를 누적 뽑기 수로 소급하지 않는다. 그 값은
+         * **마지막 ★5 이후**의 횟수인데 v19에는 그 이력이 없다 - ★5가 개안이라
+         * 해금 기록이 남지 않았고, 누적 횟수만으로는 세 번 받은 사람과 한 번도
+         * 못 받은 사람이 구분되지 않는다.
+         *
+         * 대신 `introClaimed`가 false로 와서 **기존 플레이어 전원이 무료 10연을
+         * 한 번 받는다.** 하드 천장을 0에서 시작시키는 것에 대한 보상이고,
+         * 버그가 아니라 의도한 업데이트 선물이다.
+         *
+         * 소프트 천장은 v19에서 그대로 넘어온다 - 그쪽은 이력이 남아 있다.
+         */
+        public void Restore(int savedPity, int savedTotal, long savedFreeDay,
+                            int savedAwakenPity, bool savedIntroClaimed,
+                            bool savedIntroEquipDone)
+        {
             pityCounter = Mathf.Clamp(savedPity, 0, SkillGachaCurve.PityPulls - 1);
             totalPulls = Mathf.Max(0, savedTotal);
             lastFreePullDayTicks = savedFreeDay < 0L ? 0L : savedFreeDay;
+
+            // 소프트 천장과 같은 처리다. 상한을 넘겨 저장된 값이 오면 그
+            // 회차가 곧바로 천장이 되는데, 그것은 복원이 아니라 선물이다
+            awakenPity = Mathf.Clamp(savedAwakenPity, 0, SkillGachaCurve.AwakenPityPulls - 1);
+            introClaimed = savedIntroClaimed;
+            introEquipDone = savedIntroEquipDone;
 
             Raise();
         }
@@ -380,11 +575,29 @@ namespace Onikiri.Progression
             Raise();
         }
 
+        /** ★5 하드 천장 직전. 100번 안 돌리고 귀오의 해금을 보는 경로 */
+        public void DebugPushToAwakenPity()
+        {
+            awakenPity = SkillGachaCurve.AwakenPityPulls - 1;
+            Raise();
+        }
+
+        /** 온보딩 10연을 다시 받을 수 있게 되돌린다 */
+        public void DebugResetIntro()
+        {
+            introClaimed = false;
+            introEquipDone = false;
+            Raise();
+        }
+
         public void DebugReset()
         {
             pityCounter = 0;
+            awakenPity = 0;
             totalPulls = 0;
             lastFreePullDayTicks = 0L;
+            introClaimed = false;
+            introEquipDone = false;
             Raise();
         }
 

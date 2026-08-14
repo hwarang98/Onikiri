@@ -27,6 +27,11 @@ namespace Onikiri.Tests
 
             foreach (var step in GuideQuestCatalog.Steps)
             {
+                // 퀘스트를 안 가리키는 칸은 이 검사의 대상이 아니다. 완료를
+                // 세이브에서 직접 읽으므로(GuideGate) 가리킬 퀘스트가 없다 -
+                // 그 칸의 계약은 TheGuideGate_OnlyShowsAfterTheShopOpens 가 잰다
+                if (step.Gate != GuideGate.Quest) continue;
+
                 Assert.GreaterOrEqual(step.Index, 0,
                     "가이드가 가리키는 퀘스트 '" + step.QuestId + "' 가 QuestCatalog에 없다. "
                     + "퀘스트를 표에서 빼려면 GuideQuestCatalog의 그 칸도 함께 고쳐야 한다 - "

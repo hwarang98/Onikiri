@@ -1228,7 +1228,9 @@ namespace Onikiri.EditorTools
                           halfLine, "skill narrow line");
 
                 float fullLine = wideLine;
-                foreach (var id in SkillGachaCurve.UnlockOrder)
+                // 두 풀을 다 훑는다. 천장 줄에 뜰 수 있는 이름이 아홉으로
+                // 늘었으므로 그 아홉이 전부 칸에 드는지 재야 한다
+                foreach (var id in AllGachaSkillIds())
                 {
                     int index = SkillCatalog.IndexOf(id);
                     if (index < 0) continue;
@@ -1261,6 +1263,19 @@ namespace Onikiri.EditorTools
             text.font = font;
             text.fontSharedMaterial = font.material;
             text.fontSize = size;
+        }
+
+        /**
+         * @brief 뽑기가 열 수 있는 오의 전부 (표준 다섯 + 귀오의 넷).
+         *
+         * 두 배열을 여기서 합치는 이유는 **폭 검산이 묻는 질문이 하나**이기
+         * 때문이다 - "천장 줄에 뜰 수 있는 가장 긴 이름이 칸에 드는가". 어느
+         * 풀에서 왔는지는 그 질문과 무관하다.
+         */
+        private static System.Collections.Generic.IEnumerable<string> AllGachaSkillIds()
+        {
+            foreach (var id in SkillGachaCurve.StandardUnlockOrder) yield return id;
+            foreach (var id in SkillGachaCurve.OniSecretUnlockOrder) yield return id;
         }
 
         private static void CheckLine(TMP_Text probe, string worst, float boxWidth, string where)

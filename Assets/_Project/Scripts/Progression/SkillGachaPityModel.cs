@@ -71,6 +71,15 @@ namespace Onikiri.Progression
         {
             private readonly double[] cells;
 
+            /**
+             * @brief 전이 결과를 받는 버퍼. **매번 새로 잡지 않는다.**
+             *
+             * 3,000칸 double이 뽑기 한 번마다 새로 할당되면 시뮬레이션 한 번에
+             * 수백 벌이 쌓인다 - EditMode 스위트가 이미 6분이라 그 GC가 그대로
+             * 벽시계에 얹힌다. 상태와 수명이 같으므로 여기 두는 것이 맞다.
+             */
+            private readonly double[] scratch;
+
             public int SoftSize { get; private set; }
             public int HardSize { get; private set; }
 
@@ -88,6 +97,7 @@ namespace Onikiri.Progression
                 HardSize = HardPityEnabled ? hardPityPulls : 1;
 
                 cells = new double[SoftSize * HardSize];
+                scratch = new double[cells.Length];
                 ResetToNewSave();
             }
 
@@ -122,6 +132,13 @@ namespace Onikiri.Progression
             }
 
             internal double[] Cells { get { return cells; } }
+
+            /** 비운 전이 버퍼. Advance가 채워서 cells에 되돌린다 */
+            internal double[] TakeScratch()
+            {
+                Array.Clear(scratch, 0, scratch.Length);
+                return scratch;
+            }
 
             /**
              * @brief 두 분포의 총변동거리. 정상해 수렴 판정이 쓴다.
@@ -215,7 +232,7 @@ namespace Onikiri.Progression
 
             double low = LowChance, epic = EpicChance, legendary = LegendaryChance, lowXp = LowXp;
 
-            var next = new double[state.Cells.Length];
+            var next = state.TakeScratch();
 
             for (int s = 0; s < state.SoftSize; s++)
             {

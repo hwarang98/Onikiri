@@ -1459,7 +1459,7 @@ namespace Onikiri.EditorTools
             {
                 EditorGUILayout.LabelField("가챠 몫", GUILayout.Width(56f));
 
-                foreach (var id in Onikiri.Progression.SkillGachaCurve.UnlockOrder)
+                foreach (var id in Onikiri.Progression.SkillGachaCurve.StandardUnlockOrder)
                 {
                     int index = system.IndexOf(id);
                     if (index < 0) continue;

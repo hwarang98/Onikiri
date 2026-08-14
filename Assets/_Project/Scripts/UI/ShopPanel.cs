@@ -214,7 +214,12 @@ namespace Onikiri.UI
 
         private void SkillPullFree()
         {
-            if (skillSystem != null) skillSystem.TryFreePull();
+            if (skillSystem == null) return;
+
+            // 온보딩이 남아 있으면 그것부터다. 위 RefreshSkillFree와 같은
+            // 순서여야 버튼에 적힌 말과 눌렀을 때 오는 것이 같다
+            if (skillSystem.CanClaimIntro) skillSystem.ClaimIntro();
+            else skillSystem.TryFreePull();
         }
 
         /**
@@ -297,6 +302,14 @@ namespace Onikiri.UI
                     skillPityLabel.text = SkillGachaCurve.UnlockStage + "스테이지부터";
                     skillPityLabel.color = unaffordableColor;
                 }
+                else if (!skillSystem.CanBuy)
+                {
+                    // 배너는 섰는데 지갑이 아직이다. **무료로는 돌아간다** -
+                    // 그 사실을 안 적으면 플레이어가 배너를 잠긴 것으로 읽는다
+                    skillPityLabel.text = "보석 구매는 " + SkillGachaCurve.PullUnlockStage
+                                        + "스테이지부터  ·  무료는 지금부터";
+                    skillPityLabel.color = unaffordableColor;
+                }
                 else if (!stock)
                 {
                     skillPityLabel.text = SoldOutText;
@@ -304,9 +317,17 @@ namespace Onikiri.UI
                 }
                 else
                 {
+                    // **두 게이지를 함께 적는다.** 하나만 적으면 안 적은 쪽이
+                    // 없는 규칙이 된다(SkillGachaCurve.PityText 주석)
                     int left = skillSystem.PullsUntilPity;
-                    skillPityLabel.text = GachaCurve.PityText(left, skillSystem.TotalPulls);
-                    skillPityLabel.color = left <= SkillGachaCurve.TenPullCount
+                    int awakenLeft = skillSystem.PullsUntilAwakenPity;
+
+                    skillPityLabel.text = SkillGachaCurve.PityText(left, awakenLeft);
+
+                    // 둘 중 **더 가까운 쪽**이 색을 정한다. ★5가 코앞이면
+                    // ★4가 아직 멀어도 그 줄은 금빛이어야 한다
+                    int nearest = left < awakenLeft ? left : awakenLeft;
+                    skillPityLabel.color = nearest <= SkillGachaCurve.TenPullCount
                         ? goldColor : unaffordableColor;
                 }
             }
@@ -356,7 +377,12 @@ namespace Onikiri.UI
             if (skillSystem == null) return;
 
             var now = DateTime.UtcNow;
-            bool ready = skillSystem.HasFreePullAt(now);
+
+            // **온보딩 10연이 일일 무료보다 먼저다.** st14에 상점을 처음 연
+            // 플레이어에게 오늘의 한 번을 먼저 권하면, 열 번짜리 선물이 그
+            // 한 번에 가려진다 - 첫 화면에서 가장 큰 것이 가장 크게 보여야 한다
+            bool intro = skillSystem.CanClaimIntro;
+            bool ready = intro || skillSystem.HasFreePullAt(now);
             bool unlocked = skillSystem.IsUnlocked;
             bool stock = skillSystem.HasStock;
 
@@ -368,6 +394,7 @@ namespace Onikiri.UI
             if (skillFreeCost != null)
             {
                 if (!unlocked) skillFreeCost.text = SkillGachaCurve.UnlockStage + "스테이지부터";
+                else if (intro) skillFreeCost.text = "무료 " + SkillGachaCurve.IntroPullCount + "회";
                 else if (!stock) skillFreeCost.text = "완료";
                 else if (ready) skillFreeCost.text = "무료";
                 else skillFreeCost.text = Clock(skillSystem.UntilFreePull(now));
@@ -378,6 +405,7 @@ namespace Onikiri.UI
             {
                 skillFreeStateLabel.text = !unlocked
                     ? SkillGachaCurve.UnlockStage + "스테이지 도달 시 해금"
+                    : intro ? "처음 여는 선물이다"
                     : !stock ? SoldOutText
                     : ready ? "오늘의 무료 뽑기가 남아 있다"
                             : "새벽 4시에 다시 열린다";

@@ -78,6 +78,22 @@ namespace Onikiri.Progression
     {
         public static GuideQuestView Resolve(QuestSystem quests)
         {
+            return Resolve(quests, int.MaxValue, false);
+        }
+
+        /**
+         * @brief 최전선과 온보딩 수령 여부까지 보고 고른다 (15종 재설계).
+         *
+         * 인자가 둘 는 이유는 st14 온보딩 칸 때문이다. 그 칸은 퀘스트를 안
+         * 가리키므로 완료를 QuestSystem에 물을 수가 없고(GuideGate 주석),
+         * 상점이 열리기 전에는 아예 안 보여야 한다.
+         *
+         * @param frontierStage 최전선. 게이트 칸의 MinStage를 재는 값
+         * @param introClaimed  온보딩 무료 10연을 받았는가
+         */
+        public static GuideQuestView Resolve(QuestSystem quests, int frontierStage,
+                                             bool introClaimed)
+        {
             var view = Empty();
             if (quests == null) return view;
 
@@ -87,6 +103,20 @@ namespace Onikiri.Progression
             var steps = GuideQuestCatalog.Steps;
             for (int i = 0; i < steps.Length; i++)
             {
+                if (steps[i].Gate == GuideGate.SkillGachaIntro)
+                {
+                    // 상점이 열리기 전에는 건너뛴다 - 못 깨는 칸을 가리키는
+                    // 카드는 안내가 아니라 벽이다
+                    if (frontierStage < steps[i].MinStage) continue;
+                    if (introClaimed) continue;
+
+                    // 이 칸은 **절대 Claimable 이 안 된다.** 받을 것이 퀘스트
+                    // 화면에 없고 뽑기 버튼이 곧 수령이라, "받기"를 띄우면
+                    // 플레이어를 없는 버튼으로 보낸다
+                    if (firstOpen < 0) firstOpen = i;
+                    continue;
+                }
+
                 // 표에서 빠진 퀘스트를 가리키는 칸. 조용히 건너뛴다
                 if (steps[i].Index < 0) continue;
 
@@ -121,6 +151,23 @@ namespace Onikiri.Progression
 
             var steps = GuideQuestCatalog.Steps;
             if (quests == null || step < 0 || step >= steps.Length) return view;
+
+            if (steps[step].Gate == GuideGate.SkillGachaIntro)
+            {
+                // 목표치가 1이고 진행도가 0이다. 게이지가 비어 있는 것이
+                // 맞다 - 열 번을 나눠 받는 것이 아니라 한 번에 받는 사건이다
+                view.Step = step;
+                view.Action = steps[step].Action;
+                view.Title = "무료 10회 뽑기";
+                view.Target = 1d;
+                view.Progress = 0d;
+                view.Gems = 0;
+                view.HasGold = false;
+                view.Ratio = 0f;
+                view.State = GuideQuestState.InProgress;
+                return view;
+            }
+
             if (steps[step].Index < 0) return view;
 
             var spec = QuestCatalog.Of(steps[step].Kind)[steps[step].Index];

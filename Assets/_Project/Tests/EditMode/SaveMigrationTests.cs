@@ -49,7 +49,7 @@ namespace Onikiri.Tests
             Assert.IsTrue(SaveData.Migrate(data));
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(19, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
+            Assert.AreEqual(20, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
 
             Assert.AreEqual(SkillCatalog.Count, data.skillIds.Length,
                 "v6 -> v7이 오의 칸을 다 만들지 않았다");
@@ -674,7 +674,7 @@ namespace Onikiri.Tests
 
             Assert.IsTrue(SaveData.Migrate(data));
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(19, SaveData.CurrentVersion, "세이브 버전이 v19가 아니다");
+            Assert.AreEqual(20, SaveData.CurrentVersion, "세이브 버전이 v20이 아니다");
 
             Assert.AreEqual(0, data.gachaPity, "천장 카운터를 소급해 줬다");
             Assert.AreEqual(0, data.gachaTotalPulls);
@@ -869,13 +869,17 @@ namespace Onikiri.Tests
 
             Assert.IsTrue(SaveData.Migrate(data));
 
-            foreach (var id in SkillGachaCurve.UnlockOrder)
+            // **v17 세계의 가챠 몫은 둘이었다.** 15종 재설계로 표준 풀이
+            // 다섯이 됐지만 마이그레이션이 주는 것은 그때 실제로 갖고 있던
+            // 둘뿐이다 - 여기서 다섯을 요구하면 검사가 마이그레이션에 없는
+            // 소급을 강요하게 된다
+            foreach (var id in new[] { SkillCatalog.BloodBurstId, SkillCatalog.BloodWhipId })
                 Assert.Contains(id, data.gachaSkillIds, string.Format(
                     "심층(st{0}) 플레이어가 v17에서 갖고 있던 '{1}'을 잃었다", data.maxStageReached, id));
 
             // 그래도 레벨은 그대로 1이다. 갖고 있던 것을 지키는 것과
             // 소급해 올려 주는 것은 다른 일이다
-            foreach (var id in SkillGachaCurve.UnlockOrder)
+            foreach (var id in new[] { SkillCatalog.BloodBurstId, SkillCatalog.BloodWhipId })
             {
                 int index = System.Array.IndexOf(data.skillIds, id);
                 Assert.GreaterOrEqual(index, 0, "'" + id + "'의 칸이 없다");

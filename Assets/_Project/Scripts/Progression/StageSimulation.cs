@@ -846,6 +846,12 @@ namespace Onikiri.Progression
 
             var levels = new Levels();
 
+            // 뽑기 천장 분포를 **새 세이브 상태로** 되돌린다. 정적 스크래치라
+            // 안 되돌리면 앞선 Run이 남긴 분포에서 이어 돌고, 그러면 같은
+            // 정책을 두 번 돌린 결과가 달라진다 - 비교군을 쓰는 검사(f2p 바닥·
+            // 죽은 버튼)가 통째로 무의미해지는 자리다
+            PityState.ResetToNewSave();
+
             // 45단계의 두 축은 정책이 곧 세계의 규칙이라 Levels가 들고 간다
             // (Levels.NoAffinity 주석). 요도 자체가 없는 세계에서는 티어가
             // 0이라 자동으로 꺼지지만, 명시해 두면 "왜 0인가"를 두 번 묻지 않는다
@@ -2939,10 +2945,39 @@ namespace Onikiri.Progression
          * 올리는 것인데 그 상한이 오의 몫 계약의 안전선이므로, 이 축은
          * 유한한 채로 닫히고 화면이 그것을 적는다(SkillSystem.HasStock).
          */
+        /**
+         * @brief 뽑기 여정의 (소프트, 하드) 상태 분포. **정상해가 아니라 과도기다.**
+         *
+         * ## 왜 평균을 못 쓰는가
+         *
+         * 정상해를 매 회차에 더하면 초반이 통째로 틀린다 - 100회차의 실제 ★5는
+         * 45.589%인데 평균은 1.449%라고 말한다(29배). 총변동거리가 1e-3 아래로
+         * 내려가는 데 859회가 걸리는데 귀오의 넷의 기대가 276회이므로,
+         * **이 축의 여정 전체가 과도기 안에 있다.**
+         *
+         * 그리고 두 개의 독립 누산기로는 ★4·★5의 상관을 못 적는다. ★5가
+         * 소프트 카운터를 초기화한다는 사실이 분포 안에만 있다.
+         *
+         * ## 왜 Levels 안이 아닌가
+         *
+         * 3,000칸 double = 24KB이고 Levels는 ref로 도는 struct다. 효율을 재려고
+         * 만드는 사본마다 24KB를 복사하면 시뮬레이션이 멈춘다. EquipScratch가
+         * 이미 세운 정적 스크래치 방식을 따르고, Run이 시작할 때 리셋한다 -
+         * 시뮬레이션은 한 스레드에서 한 번에 하나만 돈다.
+         */
+        private static readonly SkillGachaPityModel.State PityState =
+            new SkillGachaPityModel.State(SkillGachaCurve.PityPulls,
+                                          SkillGachaCurve.AwakenPityPulls);
+
         private static void TrySkillGacha(ref Levels levels, int stage, Policy policy)
         {
             if (!policy.SkillGacha) return;
-            if (!SkillGachaCurve.IsUnlockedAt(stage)) return;
+
+            // **보석을 쓰는 자리이므로 구매 해금을 본다.** 배너가 서는 칸
+            // (st14)이 아니다 - 그 칸부터 보석을 쓰게 두면 코리더의 얇은
+            // 보석 여유가 빠져나가 st52에서 f2p 바닥을 뚫는다
+            // (SkillGachaCurve.PullUnlockStage 주석)
+            if (!SkillGachaCurve.CanBuyAt(stage)) return;
 
             for (int guard = 0; guard < 100000; guard++)
             {
@@ -2962,15 +2997,25 @@ namespace Onikiri.Progression
                 levels.GemsSpent += SkillGachaCurve.PullCostGems;
                 levels.SkillGachaPulls += 1d;
 
+                // **이 회차의 값**이다. 상수가 아니라 상태에서 나오므로
+                // 30회차에는 ★4가 43%, 100회차에는 ★5가 46%로 뛴다
+                var rates = SkillGachaPityModel.Advance(PityState);
+
                 // ★1~★3. 소수 자리를 들고 있다가 레벨이 되면 넘긴다
                 if (!policy.SkillGachaWithoutXp)
                 {
-                    levels.SkillXp += SkillGachaCurve.ExpectedXpPerPull;
+                    levels.SkillXp += rates.Xp;
                     SpendSimSkillXp(ref levels);
                 }
 
-                GrantSimSkillUnlock(ref levels, policy.SkillGachaWithoutXp);
-                if (!policy.SkillGachaWithoutXp) GrantSimAwakening(ref levels);
+                GrantSimSkillUnlock(ref levels, policy.SkillGachaWithoutXp, rates.UnlockChance);
+
+                // **XP가 없는 세계에서도 귀오의는 열린다.** 해금은 XP가 아니라
+                // 재고이고, 안 열면 그 세계의 재고가 영원히 안 비어 위 guard
+                // 루프가 10만 번을 돈다(실제로 그렇게 멈췄다). 개안(상한까지
+                // 밀기)만 XP 세계의 것이라 안쪽에서 갈린다
+                GrantSimAwakening(ref levels, rates.AwakenChance,
+                                  policy.SkillGachaWithoutXp);
             }
         }
 
@@ -3004,14 +3049,14 @@ namespace Onikiri.Progression
          * 결과가 사실상 ★3이 되고, 그 사실이 이 축의 재고가 유한하다는
          * 것을 시뮬레이션 안에서도 그대로 보여준다.
          */
-        private static void GrantSimSkillUnlock(ref Levels levels, bool withoutXp)
+        private static void GrantSimSkillUnlock(ref Levels levels, bool withoutXp, double chance)
         {
-            levels.SkillUnlockProgress += SkillGachaCurve.EffectiveUnlockChance;
+            levels.SkillUnlockProgress += chance;
             if (levels.SkillUnlockProgress + 1e-12d < 1d) return;
 
             levels.SkillUnlockProgress -= 1d;
 
-            int target = SkillGachaCurve.UnlockTargetFor(levels.SkillGachaMask);
+            int target = SkillGachaCurve.StandardTargetFor(levels.SkillGachaMask);
             if (target >= 0)
             {
                 levels.SkillGachaMask |= 1 << target;
@@ -3024,13 +3069,34 @@ namespace Onikiri.Progression
             SpendSimSkillXp(ref levels);
         }
 
-        /** ★5 한 번의 기대 몫. 장착이 전부 상한이면 두 칸 미끄러진다 */
-        private static void GrantSimAwakening(ref Levels levels)
+        /**
+         * @brief ★5 한 번의 기대 몫. **해금이 먼저, 개안이 나중.**
+         *
+         * 게임 쪽 Grant와 같은 순서여야 시뮬이 재는 것과 플레이어가 받는 것이
+         * 같은 것을 뜻한다(SkillGachaSystem.Grant).
+         *
+         * @param withoutXp XP가 없는 비교군인가. **해금은 그래도 일어난다** -
+         *                  해금은 XP가 아니라 재고이고, 안 열면 그 세계의
+         *                  재고가 영원히 안 비어 뽑기 루프가 안 끝난다
+         */
+        private static void GrantSimAwakening(ref Levels levels, double chance, bool withoutXp)
         {
-            levels.SkillAwakenProgress += SkillGachaCurve.EffectiveAwakenChance;
+            levels.SkillAwakenProgress += chance;
             if (levels.SkillAwakenProgress + 1e-12d < 1d) return;
 
             levels.SkillAwakenProgress -= 1d;
+
+            // **해금이 개안보다 먼저다** - 게임 쪽 Grant와 같은 순서여야
+            // 시뮬이 재는 것과 플레이어가 받는 것이 같은 것을 뜻한다
+            int unlock = SkillGachaCurve.OniSecretTargetFor(levels.SkillGachaMask);
+            if (unlock >= 0)
+            {
+                levels.SkillGachaMask |= 1 << unlock;
+                return;
+            }
+
+            // 귀오의가 다 팔렸다. 여기서부터가 개안이고, 그것은 XP 축의 것이다
+            if (withoutXp) return;
 
             // 개안은 **장착 중 최저 레벨**을 상한으로 민다. 벤치를 안 고르는
             // 이유는 게임 쪽과 같다 - 지금 안 나가는 오의를 상한으로 만들어도
@@ -3050,7 +3116,10 @@ namespace Onikiri.Progression
                 return;
             }
 
-            GrantSimSkillUnlock(ref levels, false);
+            // 개안할 대상이 없어 **사다리를 한 칸 미끄러진다.** 확률 1.0인
+            // 이유는 이것이 이미 당첨된 결과의 이동이기 때문이다 - 여기서
+            // 회차 확률을 다시 넘기면 전설 한 번이 영웅 0.039번이 된다
+            GrantSimSkillUnlock(ref levels, false, 1d);
         }
 
         /**

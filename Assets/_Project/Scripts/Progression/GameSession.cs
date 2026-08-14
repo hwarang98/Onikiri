@@ -159,7 +159,10 @@ namespace Onikiri.Progression
             // 오의가 아직 비어 있는 프레임에 배너가 "재고 없음"으로 서지 않게 한다
             if (skillGacha != null)
                 skillGacha.Restore(data.skillGachaPity, data.skillGachaTotalPulls,
-                                   data.skillGachaFreePullDayTicks);
+                                   data.skillGachaFreePullDayTicks,
+                                   data.skillGachaAwakenPity,
+                                   data.skillGachaIntroClaimed,
+                                   data.skillGachaIntroEquipDone);
 
             // 펫은 순서 제약이 느슨하다 - 스탯에 곱해지지 않고 PetCombat이
             // 매 타마다 현재 값을 읽는다. 그래도 퀘스트보다 앞에 두는 것은
@@ -304,6 +307,9 @@ namespace Onikiri.Progression
                 data.skillGachaPity = skillGacha.CollectPity();
                 data.skillGachaTotalPulls = skillGacha.CollectTotalPulls();
                 data.skillGachaFreePullDayTicks = skillGacha.CollectFreePullDay();
+                data.skillGachaAwakenPity = skillGacha.CollectAwakenPity();
+                data.skillGachaIntroClaimed = skillGacha.CollectIntroClaimed();
+                data.skillGachaIntroEquipDone = skillGacha.CollectIntroEquipDone();
             }
 
             if (petSystem != null)

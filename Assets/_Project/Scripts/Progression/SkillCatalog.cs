@@ -702,7 +702,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = BloodBurstId, DisplayName = "혈폭", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 1.71d, CooldownSeconds = 9.5d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon083",           // 터져 오르는 폭발 기둥
                 SlashRgba = 0xD81E7AFFu,        // 자홍
                 Area = SkillArea.Single, Split = SkillSplit.Once, HitCount = 1, Weight = 2,
@@ -712,7 +712,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = BloodWhipId, DisplayName = "혈조", Family = SkillFamily.BloodForm,
                 BaseMultiplier = 0.45d, CooldownSeconds = 2.5d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon082",           // 휘어 감기는 갈고리
                 SlashRgba = 0x96285EFFu,        // 어두운 자적
                 Area = SkillArea.Pierce, Split = SkillSplit.Once, HitCount = 1, Weight = 0,
@@ -743,7 +743,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = DeepThrustId, DisplayName = "심격", Family = SkillFamily.SwordForm,
                 BaseMultiplier = 0.72d, CooldownSeconds = 4d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon016",           // 세로로 뻗는 관통 빔 (파란 타일)
                 SlashRgba = 0x4FA0E6FFu,        // 깊은 하늘
                 Area = SkillArea.Single, Split = SkillSplit.Once, HitCount = 1, Weight = 0,
@@ -753,7 +753,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = MoonArcId, DisplayName = "회월참", Family = SkillFamily.SwordForm,
                 BaseMultiplier = 0.90d, CooldownSeconds = 5d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon044",           // 초승달 곡선 (파란 타일)
                 SlashRgba = 0x7CE0D8FFu,        // 청록 달빛
                 Area = SkillArea.Around, Split = SkillSplit.Once, HitCount = 1, Weight = 1,
@@ -763,7 +763,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = SwordFieldId, DisplayName = "검진", Family = SkillFamily.SwordForm,
                 BaseMultiplier = 1.26d, CooldownSeconds = 7d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon001",           // 교차한 무기 + X 참격 (파란 타일)
                 SlashRgba = 0x3F63D2FFu,        // 짙은 강철청
                 // 4틱 전체의 합이 x1.26이다. 틱당 x0.315이고 마지막 틱이
@@ -775,7 +775,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = OniDanceId, DisplayName = "귀신난무", Family = SkillFamily.OniSecret,
                 BaseMultiplier = 2.16d, CooldownSeconds = 12d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon145",           // 사방으로 뻗는 금빛 섬광 (어두운 타일)
                 SlashRgba = 0xFF7A1AFFu,        // 선명한 주황금
                 // 5타 전체의 합이 x2.16. **각 적이 받는 5타의 합**이라
@@ -787,7 +787,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = AbyssPullId, DisplayName = "나락인력", Family = SkillFamily.OniSecret,
                 BaseMultiplier = 2.52d, CooldownSeconds = 14d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon183",           // 빨아들이는 검은 구 (자주 타일)
                 SlashRgba = 0xB87333FFu,        // 청동금
                 // 화면 전체가 아니라 **흡인이 확정한 목록**만 맞는다. 화면
@@ -800,7 +800,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = DecapitateId, DisplayName = "참수", Family = SkillFamily.OniSecret,
                 BaseMultiplier = 2.88d, CooldownSeconds = 16d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon165",           // 후드를 쓴 사신 (자주 타일)
                 SlashRgba = 0xE8B000FFu,        // 짙은 금
                 // **즉사가 아니다.** 남은 체력과 무관한 처치는 초당 환산 기여로
@@ -813,7 +813,7 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = OniAdventId, DisplayName = "귀왕강림", Family = SkillFamily.OniSecret,
                 BaseMultiplier = 3.42d, CooldownSeconds = 19d,
-                UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
+                UnlockLevel = 0, UnlockStage = ShopCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon172",           // 뿔 달린 오니 두개골 (자주 타일)
                 SlashRgba = 0xE85A00FFu,        // 깊은 주적금
                 Area = SkillArea.Screen, Split = SkillSplit.Once, HitCount = 1, Weight = 2,

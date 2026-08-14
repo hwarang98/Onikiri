@@ -47,8 +47,15 @@ namespace Onikiri.Tests
             Assert.AreEqual(GachaCurve.EffectiveLegendaryChance, rates.AwakenChance, 1e-9d,
                 "하드 천장을 껐는데 ★5가 표 확률과 다르다 - 소프트 천장이 전설을 훔치고 있다");
 
-            Assert.AreEqual(SkillGachaCurve.ExpectedXpPerPull, rates.Xp, 1e-9d,
-                "하드 천장을 껐는데 기대 XP가 닫힌 식과 다르다");
+            // **곡선이 아니라 표에서 유도한다.** 곡선의 ExpectedXpPerPull은
+            // 5단계에 이중 천장 값으로 갈아끼워졌으므로, 그것과 대조하면 이
+            // 검사가 자기 자신을 검사하게 된다
+            double q = 1d - GachaCurve.EpicOrBetterChance;
+            double closedFormXp = (1d - GachaCurve.PityShare)
+                                * SkillGachaCurve.TableXpPerPull / q;
+
+            Assert.AreEqual(closedFormXp, rates.Xp, 1e-9d,
+                "하드 천장을 껐는데 기대 XP가 47단계의 닫힌 식과 다르다");
 
             // 꺼진 경로는 하드 축의 길이가 1이다. 30칸만 돈다는 것이 설계다
             var state = new SkillGachaPityModel.State(Soft, 0);
@@ -198,32 +205,36 @@ namespace Onikiri.Tests
 
         #endregion
 
-        #region 아직 안 붙였다 - 5단계에 이어진다
+        #region 곡선에 붙었다 - 5단계에서 갈아끼웠다
 
         /**
-         * @brief 이 모델은 **아직 아무도 안 쓴다.** 그 사실을 여기 적어 둔다.
+         * @brief 곡선의 파생값이 **이중 천장을 읽는가.**
          *
-         * `SkillGachaCurve`의 네 파생값(ExpectedXpPerPull · EffectiveUnlockChance ·
-         * EffectiveAwakenChance · ExpectedPullsPerUnlock)은 여전히 47단계의 닫힌
-         * 식을 가리키고, `StageSimulation`도 그것을 읽는다.
+         * 4단계까지 이 자리에는 반대 검사가 있었다 - "아직 안 붙었다". 하드
+         * 천장이 `SkillGachaSystem`에 없는 동안 파생값만 갈아끼우면 시뮬레이션이
+         * **일어나지 않는 일**을 계산하기 때문이다(화면에서는 100회를 채워도
+         * ★5가 안 나오는데 밴드는 나온다고 가정하는 상태).
          *
-         * **일부러 안 바꿨다.** 하드 천장은 아직 `SkillGachaSystem`에 없으므로,
-         * 지금 파생값만 이중 천장 값으로 갈아끼우면 시뮬레이션이 **일어나지 않는
-         * 일**을 계산하게 된다 - 화면에서는 100회를 채워도 ★5가 안 나오는데
-         * 밴드는 나온다고 가정하는 상태다.
-         *
-         * 갈아끼우는 것은 5단계(하드 천장 구현)와 **같은 커밋**이어야 하고,
-         * 이 검사가 그때까지 그 사실을 지킨다. 5단계에서 이 검사를 지우는 것이
-         * 곧 "이제 붙었다"의 표시다.
+         * 5단계가 하드 천장을 실제로 넣으면서 그 조건이 사라졌고, 검사가
+         * 부호를 뒤집었다. **같은 자리를 계속 재는 것**이 요점이다 - 붙기
+         * 전에는 안 붙었는지를, 붙은 뒤에는 붙었는지를.
          */
         [Test]
-        public void ThePityModel_IsNotWiredIntoTheCurveYet()
+        public void ThePityModel_IsWiredIntoTheCurve()
         {
-            Assert.AreEqual(GachaCurve.EffectiveRarityChance, SkillGachaCurve.EffectiveUnlockChance,
-                1e-12d, "곡선이 이미 이중 천장을 읽고 있다 - 하드 천장 구현과 같은 커밋이어야 한다");
+            var rates = SkillGachaPityModel.SolveSteady(Soft, Hard);
 
-            Assert.AreEqual(GachaCurve.EffectiveLegendaryChance, SkillGachaCurve.EffectiveAwakenChance,
-                1e-12d, "곡선의 ★5가 이미 갈렸다");
+            Assert.AreEqual(rates.UnlockChance, SkillGachaCurve.EffectiveUnlockChance, 1e-12d,
+                "곡선의 ★4가 이중 천장 정상해와 다르다");
+            Assert.AreEqual(rates.AwakenChance, SkillGachaCurve.EffectiveAwakenChance, 1e-12d,
+                "곡선의 ★5가 이중 천장 정상해와 다르다");
+            Assert.AreEqual(rates.Xp, SkillGachaCurve.ExpectedXpPerPull, 1e-12d,
+                "곡선의 기대 XP가 이중 천장 정상해와 다르다");
+
+            // 그리고 **옛 닫힌 식과는 다르다.** 같으면 갈아끼운 것이 아니다
+            Assert.AreNotEqual(GachaCurve.EffectiveRarityChance,
+                               SkillGachaCurve.EffectiveUnlockChance,
+                "곡선이 아직 47단계의 닫힌 식을 읽는다");
         }
 
         #endregion
