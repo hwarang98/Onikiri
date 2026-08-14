@@ -55,8 +55,36 @@ namespace Onikiri.Progression
          *
          * 필드가 어긋나는 경로(직렬화 기본값, 옛 테스트 픽스처)에서도 "현재 위치가
          * 곧 최소한의 도달 기록"이라는 성질이 지켜져야 해금 판정이 뒤로 가지 않는다.
+         *
+         * ## 52단계 - 이 값이 곧 리더보드 점수다 (무한층 도달)
+         *
+         * 밴드 계약이 도달층으로 옮겨 가며(StageSimulation.ReachContractFrom
+         * 주석) 랭킹과 밸런스가 같은 자를 쓰게 됐고, 그 자의 런타임 쪽 값이
+         * 이것이다. 성질 셋이 이미 서 있다:
+         *
+         *   결정론   같은 세이브 상태 -> 같은 값. 난수도 시계도 안 낀다 -
+         *            서버(Firebase, 다음 스텝)가 재검증할 수 있는 조건이다
+         *   단조     오르기만 한다. 재선택(SelectStage)은 상한이 이 값이고,
+         *            복원(SetProgress)은 낮추지 않는다
+         *   유일 경로 올리는 곳은 AdvanceStage(보스 처치) 하나뿐이다
+         *
+         * 변조 세이브의 진짜 거부는 서버 몫이다(같은 세이브를 서버가 다시
+         * 시뮬레이션한다). 로컬은 SanityCap이 터무니없는 값만 걸러 UI·퀘스트
+         * 산수가 오염되는 것을 막는다.
          */
         public int MaxStageReached { get { return Mathf.Max(maxStageReached, stage); } }
+
+        /**
+         * @brief 도달층의 로컬 새니티 상한. **계약이 아니라 오염 방지다.**
+         *
+         * 시뮬레이션 실측으로 과금 최대 빌드의 벽이 st680 언저리다(52단계 -
+         * 성장 축이 전부 하드캡이라 그 뒤는 여유가 지수로 무너진다). 100,000은
+         * 그 백 배가 넘는 값이라 정상 플레이가 닿을 수 없고, 세이브 변조로만
+         * 온다. 걸리면 잘라서 넣는다 - 세이브 전체를 거부하지 않는 이유는
+         * 로컬에서는 어차피 증명이 안 되고(그건 서버 재검증의 일), 남의
+         * 진행을 파일 오염 하나로 날리는 쪽이 더 나쁘기 때문이다.
+         */
+        public const int ReachSanityCap = 100000;
 
         /**
          * @brief 지금 최전선에 서 있는가.
@@ -185,13 +213,15 @@ namespace Onikiri.Progression
         /** 세이브 복원용 (v12 - 최전선 포함) */
         public void SetProgress(int savedStage, int savedKills, int savedBossKills, int savedMaxStage)
         {
-            stage = Mathf.Max(1, savedStage);
+            // 도달층 새니티 (52단계). 현재 스테이지도 함께 자른다 - 최전선만
+            // 자르면 stage가 그보다 커서 MaxStageReached가 도로 오염된다
+            stage = Mathf.Clamp(savedStage, 1, ReachSanityCap);
             // 상한을 포함해서 클램프한다. 10/10은 유효한 상태이고 "보스가 열려 있다"는
             // 뜻이다. 8단계까지는 이 값이 상한 미만이어야 했는데, 그때는 10에 닿는
             // 순간 스테이지가 올라가 그 상태가 존재하지 않았기 때문이다
             killsThisStage = Mathf.Clamp(savedKills, 0, StageCurve.KillsPerStage);
             bossKillCount = Mathf.Max(0, savedBossKills);
-            maxStageReached = Mathf.Max(stage, savedMaxStage);
+            maxStageReached = Mathf.Min(Mathf.Max(stage, savedMaxStage), ReachSanityCap);
             Raise();
         }
 

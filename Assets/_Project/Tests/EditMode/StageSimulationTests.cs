@@ -1441,15 +1441,52 @@ namespace Onikiri.Tests
          * 무과금도 그대로 받고, 실측 f2p 바닥이 1.94/1.60/1.30에서
          * 2.01/1.69/1.36으로 **올랐다** - 바닥 상수는 하한이라 그대로 둔다.
          */
-        const double DeepCeiling = 26.8d;
-        const double DeepChapterCeiling = 19.2d;
-        const double DeepFinaleCeiling = 15.3d;
+        /**
+         * ## 52단계 - 여유 천장이 **은퇴했다.** 위 네 번의 재기준이 그 이유다.
+         *
+         * 45 -> 46 -> 47 -> 49, 네 스텝 연속 +8~28%씩 천장을 옮겼고, 그때마다
+         * "실측 + 9% 헤드룸"이라는 같은 문장을 썼다. 그 트레드밀의 원인은
+         * 축이 아니라 **자**다 - 심층에서 여유는 이미 스무 배라, 과금 한 겹이
+         * 실제로 사는 시간(3%)보다 여유 배수(+28%)가 8배 빠르게 부푼다
+         * (47단계 실측). 부푸는 자로 계약을 쓰면 계약이 스텝마다 갱신되고,
+         * 갱신되는 계약은 아무것도 막지 않는다.
+         *
+         * 그래서 st51부터의 계약은 **도달층**(아래 52단계 region)으로 넘어갔다.
+         * 과금 한 겹이 몇 층을 당기는지는 리드 상한(ReachLeadCap)이 막고,
+         * 그 자는 부풀지 않는다 - 같은 겹이 여유로는 +28%인데 층으로는
+         * 8층 언저리다(시간이 층마다 지수로 자라므로).
+         *
+         * 남은 것은 계약이 아니라 **붕괴 새니티**다. 여유가 이 값을 넘으면
+         * 그것은 과금이 앞선 것이 아니라 곱연산 버그다(마지막 실측 피크가
+         * 93.3이었다 - st201~500에서 여유는 산 모양으로 93까지 올랐다가
+         * 벽으로 내려온다). 등급을 안 가르는 단일 상수인 이유도 그것이다 -
+         * 새니티는 정밀할 필요가 없고, 정밀해 보이는 순간 계약으로 오독된다.
+         *
+         * 은퇴한 값 기록: 26.8 / 19.2 / 15.3 (49단계 재기준, st51~200에서
+         * 실측 24.56 / 17.64 / 14.00 + 9% 헤드룸).
+         */
+        const double MarginSanityCap = 150d;
 
+        /**
+         * ## 52단계 - 검사 구간이 st200에서 **st500**으로 늘었다.
+         *
+         * 바닥은 은퇴하지 않는다. 여유 자가 정밀도를 잃은 것은 **천장**
+         * 쪽이고(과금이 쌓은 스무 배 여유), 바닥은 "무과금이 노력으로
+         * 깬다"는 클리어 가능성의 정의라 1.x 언저리에서 재므로 여전히
+         * 정밀하다. 각 자를 그것이 정밀한 구간에서 쓴다는 이 스텝의 원칙
+         * 그대로다.
+         *
+         * 실측(52단계): st201~500 무과금 최소 여유 2.34 / 2.14 / 1.56 -
+         * 바닥(1.4 / 1.25 / 1.08) 위에 서고, 처음 바닥을 뚫는 곳은
+         * **st550**이다(그 뒤 st560 언저리에서 여유 1.0을 지나 벽이 된다).
+         * 계약 끝(st500)에서 벽까지 50층의 완충이 있다.
+         */
         [Test]
         public void DeepZone_F2pFloorClearsForever()
         {
             var policy = new StageSimulation.Policy { GemsFromQuestsOnly = true };
-            var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
+            var results = StageSimulation.Run(StageSimulation.ReachContractTo,
+                                              FieldFromAssets(), policy);
 
             for (int i = DeepZoneFrom - 1; i < results.Count; i++)
             {
@@ -1472,31 +1509,29 @@ namespace Onikiri.Tests
         }
 
         /**
-         * 49단계부터 **구성 둘**을 돌린다. 기준 구성(기본 정책)과 상성 최적
-         * 구성이고, 천장은 둘 다 담아야 한다 - 위 상수 주석 참고.
+         * @brief 여유의 **붕괴 새니티.** 계약이 아니다 - 위 MarginSanityCap 주석.
+         *
+         * 구성 둘을 돌리는 것은 은퇴한 천장 검사에서 물려받았다(49단계) -
+         * 가족 곡선이 깊어지는 날 몰아주기 구성이 먼저 넘친다.
          */
         [Test]
-        public void DeepZone_CeilingHolds()
+        public void DeepZone_MarginStaysSane()
         {
             var results = new List<StageSimulation.StageResult>();
-            results.AddRange(StageSimulation.Run(DeepZoneTo, FieldFromAssets()));
-            results.AddRange(StageSimulation.Run(DeepZoneTo, FieldFromAssets(),
+            results.AddRange(StageSimulation.Run(StageSimulation.ReachContractTo,
+                                                 FieldFromAssets()));
+            results.AddRange(StageSimulation.Run(StageSimulation.ReachContractTo,
+                FieldFromAssets(),
                 new StageSimulation.Policy { ForceLoadout = AffinityOptimalLoadout() }));
 
             foreach (var row in results)
             {
                 if (row.Stage < DeepZoneFrom) continue;
-                var tier = BossCurve.TierOf(row.Stage);
 
-                double ceiling = tier == BossCurve.Tier.Finale ? DeepFinaleCeiling
-                               : tier == BossCurve.Tier.Chapter ? DeepChapterCeiling
-                               : DeepCeiling;
-
-                Assert.LessOrEqual(row.BossMargin, ceiling, string.Format(
-                    "stage {0}: 가속 플레이어 여유 {1:F2}가 무한 구간 천장을 넘는다. "
-                    + "여유가 발산하고 있다 - 심층 램프(BossHealthRampDeep)를 올려라. "
-                    + "42단계 이전(램프 1.130 고정)에는 st200에서 8.4까지 발산했다",
-                    row.Stage, row.BossMargin));
+                Assert.LessOrEqual(row.BossMargin, MarginSanityCap, string.Format(
+                    "stage {0}: 여유 {1:F2} - 이것은 과금이 앞선 것이 아니라 곱연산 "
+                    + "버그다 (52단계 실측 피크 93.3). 새 축이 두 번 곱해지는 자리를 "
+                    + "찾아라", row.Stage, row.BossMargin));
             }
         }
 
@@ -1523,13 +1558,20 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 여유가 **수렴하는가.** 무한을 유한 검사로 지키는 근거.
+         * @brief 여유가 **수렴하는가.** 계약 구간(st51~200)의 모양 앵커.
          *
          * 심층 램프가 없으면 여유는 스테이지당 약 x1.008로 조용히 발산한다
-         * (42단계 실측 - st200 천장 8.4). 밴드 검사는 st200까지만 돌므로,
-         * 그 밖을 보증하는 것은 "이미 평평하다"는 이 사실이다. st100과
-         * st200의 피날레 여유가 서로 35% 안에 있으면 평평하다고 본다 -
-         * 발산(x1.008^100 = x2.2)은 이 문을 통과할 수 없다.
+         * (42단계 실측 - st200 천장 8.4). st100과 st200의 여유가 서로 35%
+         * 안에 있으면 평평하다고 본다 - 발산(x1.008^100 = x2.2)은 이 문을
+         * 통과할 수 없다.
+         *
+         * ## 52단계 - 이 검사는 st200까지만 남는다
+         *
+         * st201~500의 여유는 평평하지 않은 것이 **정상**이다 - 성장 축이
+         * 하나씩 상한에 닿으며(티어 10 · 혼격 4 · 전설 사본 4) 여유가 산
+         * 모양(93까지 올랐다가 벽으로 하강)을 그린다. 그 구간의 무한 보증은
+         * 여유의 평평함이 아니라 **도달층 리드의 수렴**이 맡는다
+         * (ReachLead_CompressesTowardTheWall).
          */
         [Test]
         public void DeepZone_MarginConverges()
@@ -1552,6 +1594,142 @@ namespace Onikiri.Tests
                     + "발산이면 BossHealthRampDeep을 올리고, 붕괴면 내려라",
                     at100, at200));
             }
+        }
+
+        // ------------------------------------------------------------ 52단계: 도달층 계약
+
+        /**
+         * ## 계약의 정의 - 예산과 지평
+         *
+         * 예산 = **기준 플레이어**(기본 정책 - 곡선을 따라가는 가속 플레이어)가
+         * st51부터 지평까지 가는 전투 시간(StageSimulation.CombatSeconds).
+         * 그 예산을 무과금(GemsFromQuestsOnly)에게 주고 몇 층을 가는지 센다.
+         *
+         *   바닥선   무과금 도달층 >= ReachFloorStage   "무과금은 이만큼은 간다"
+         *   리드     지평 - 무과금 도달층 <= 리드 상한   "과금은 층 수로 유한하게 앞선다"
+         *
+         * 리드가 배수가 아니라 **층 수**인 것이 자 교체의 요점이다. 과금 한
+         * 겹(x1.28)이 여유 배수로는 +28%지만 층으로는 8층 언저리다 - 시간이
+         * 층마다 지수로 자라기 때문이고, 그래서 이 자는 과금 축이 쌓여도
+         * 부풀지 않는다. 재기준이 필요해져도 "+28%"가 아니라 "8층"을 옮기게
+         * 되고, 그 8층이 곧 화면(리더보드)의 단위다.
+         *
+         * ## 실측 (52단계, 이 상수들의 출처)
+         *
+         *   지평 H200   예산 951s    무과금 st114   리드  86
+         *   지평 H500   예산 2381s   무과금 st276   리드 224
+         *   지평 H700   예산 5015s   무과금 st527   리드 173  <- 줄어든다
+         *
+         * 리드는 H500 언저리에서 최대이고 그 뒤 **줄어든다** - 과금의 성장
+         * 축이 하나씩 상한에 닿으며(티어 10 · 혼격 4 · 전설 4) 기준 플레이어가
+         * 먼저 벽(st680)에 붙고, 무과금이 그 뒤를 따라잡기 때문이다. "리드가
+         * 무한히 벌어지지 않는다"의 증인이 이 압축이다.
+         *
+         * 헤드룸은 여유 천장 시절(9%)과 같은 원칙으로 얹었다 - 바닥선 260
+         * (실측 276), 리드 상한 100/240(실측 86/224).
+         */
+        const int ReachFloorStage = 260;
+        const int ReachLeadCapAtContractZone = 100;
+        const int ReachLeadCap = 240;
+
+        /** 무과금 세계. 도달층 검사 셋이 같은 두 세계를 봐야 하므로 한 곳에 */
+        static List<StageSimulation.StageResult> F2pRun(int through)
+        {
+            return StageSimulation.Run(through, FieldFromAssets(),
+                new StageSimulation.Policy { GemsFromQuestsOnly = true });
+        }
+
+        /**
+         * @brief 무과금이 기준 예산으로 **바닥선까지는 간다.**
+         *
+         * f2p 여유 바닥(위)이 "각 층을 깰 수 있다"를 지킨다면, 이 검사는
+         * "그 속도가 기준 플레이어와 유한한 거리다"를 지킨다 - 둘이 다른
+         * 계약이다. 여유 바닥이 성립해도 층당 시간이 열 배면 도달층은
+         * 한없이 뒤처질 수 있다.
+         */
+        [Test]
+        public void ReachContract_F2pReachesTheFloorStage()
+        {
+            var baseline = StageSimulation.Run(StageSimulation.ReachContractTo, FieldFromAssets());
+            var f2p = F2pRun(StageSimulation.ReachContractTo);
+
+            double budget = StageSimulation.CombatSeconds(baseline,
+                StageSimulation.ReachContractFrom, StageSimulation.ReachContractTo);
+            int reached = StageSimulation.ReachedStage(f2p, budget,
+                StageSimulation.ReachContractFrom);
+
+            Assert.GreaterOrEqual(reached, ReachFloorStage, string.Format(
+                "기준 예산({0:F0}s)으로 무과금이 st{1}까지밖에 못 간다 (바닥선 st{2}). "
+                + "무과금의 층당 시간이 무거워졌다 - 어느 축이 f2p에게서 빠졌는지 보라",
+                budget, reached, ReachFloorStage));
+        }
+
+        /**
+         * @brief 과금 리드가 **층 수로 유한한가.** 은퇴한 여유 천장의 후임.
+         *
+         * 이 상한이 이제 "여기까지는 과금이 앞서도 된다"는 계약이다. 다음
+         * 스텝이 과금 축을 얹으면 여기의 리드가 몇 층 자라고, 상한을 넘으면
+         * 그 스텝이 이 상수를 실측 + 헤드룸으로 재기준해야 한다 - 여유
+         * 천장의 트레드밀과 같은 의무지만, 단위가 부풀지 않으므로 재기준의
+         * 크기가 실제 판 것과 같은 크기로 읽힌다.
+         */
+        [Test]
+        public void ReachContract_LeadIsBoundedInStages()
+        {
+            var baseline = StageSimulation.Run(StageSimulation.ReachContractTo, FieldFromAssets());
+            var f2p = F2pRun(StageSimulation.ReachContractTo);
+
+            double contractBudget = StageSimulation.CombatSeconds(baseline,
+                StageSimulation.ReachContractFrom, 200);
+            int contractLead = 200 - StageSimulation.ReachedStage(f2p, contractBudget,
+                StageSimulation.ReachContractFrom);
+
+            Assert.LessOrEqual(contractLead, ReachLeadCapAtContractZone, string.Format(
+                "계약 구간(H200)에서 과금 리드가 {0}층이다 (상한 {1}층)",
+                contractLead, ReachLeadCapAtContractZone));
+
+            double fullBudget = StageSimulation.CombatSeconds(baseline,
+                StageSimulation.ReachContractFrom, StageSimulation.ReachContractTo);
+            int fullLead = StageSimulation.ReachContractTo
+                - StageSimulation.ReachedStage(f2p, fullBudget, StageSimulation.ReachContractFrom);
+
+            Assert.LessOrEqual(fullLead, ReachLeadCap, string.Format(
+                "거버넌스 구간(H500)에서 과금 리드가 {0}층이다 (상한 {1}층). "
+                + "과금 축이 층 수로 발산하고 있다 - 새 축의 성장 시계를 바퀴에 "
+                + "묶어라(리드·혼격 상한이 한 일)", fullLead, ReachLeadCap));
+        }
+
+        /**
+         * @brief 무한 꼬리 - 리드가 지평을 늘려도 **다시 줄어드는가.**
+         *
+         * st500 밖을 유한 검사로 지키는 근거다(여유 시절의 MarginConverges가
+         * 하던 일). 성장 축이 전부 하드캡이라(티어 10 · 혼격 4 · 전설 4)
+         * 기준 플레이어가 먼저 포화하고, 그 뒤로 리드는 압축된다 - H700의
+         * 리드가 H500보다 작으면 그 압축이 실제로 일어나고 있다는 뜻이다.
+         *
+         * 이것이 깨지는 유일한 길은 상한 없는 과금 축이 생기는 것이고,
+         * 그것이 바로 이 검사가 다음 스텝들에게 거는 계약이다.
+         */
+        [Test]
+        public void ReachLead_CompressesTowardTheWall()
+        {
+            var baseline = StageSimulation.Run(700, FieldFromAssets());
+            var f2p = F2pRun(900);
+
+            double at500 = StageSimulation.CombatSeconds(baseline,
+                StageSimulation.ReachContractFrom, StageSimulation.ReachContractTo);
+            double at700 = StageSimulation.CombatSeconds(baseline,
+                StageSimulation.ReachContractFrom, 700);
+
+            int lead500 = StageSimulation.ReachContractTo
+                - StageSimulation.ReachedStage(f2p, at500, StageSimulation.ReachContractFrom);
+            int lead700 = 700
+                - StageSimulation.ReachedStage(f2p, at700, StageSimulation.ReachContractFrom);
+
+            Assert.Less(lead700, lead500, string.Format(
+                "지평을 700으로 늘렸는데 리드가 {0} -> {1}층으로 계속 벌어진다 - "
+                + "상한 없는 과금 축이 생겼다. 성장 시계를 바퀴에 묶어라",
+                lead500, lead700));
         }
 
         /**

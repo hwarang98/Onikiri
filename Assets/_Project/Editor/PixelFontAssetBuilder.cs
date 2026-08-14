@@ -108,8 +108,79 @@ namespace Onikiri.EditorTools
 
             Build(ThaleahSourcePath, "ThaleahFat", ThaleahSamplingSize, NumberCharset);
 
+            BuildNameFont();
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+        }
+
+        /** 남이 지은 이름을 그리는 한 벌. 경로가 곧 단일 출처다 */
+        public const string NameFontPath = OutputFolder + "/Galmuri11 Name SDF.asset";
+
+        /**
+         * @brief **이 한 벌만 동적이다** (54단계 리더보드).
+         *
+         * 나머지 아틀라스가 정적인 것은 계약이다 - 화면에 나오는 모든 글자가
+         * UIStrings.txt에 적혀 있고, 안 적힌 글자는 빌드 검사(VerifyGlyphCoverage)가
+         * 잡는다. 그 계약이 성립하는 이유는 **문구를 우리가 쓰기 때문**이다.
+         *
+         * 랭킹표에는 남이 지은 이름이 뜬다. 한글 음절만 11,172자이고, 그중 무엇이
+         * 올지는 우리가 알 수 없다 - 정적 아틀라스로는 원리상 덮을 수 없는 유일한
+         * 자리다. 안 덮으면 증상이 특히 나쁘다: **남의 이름이 빈 네모로 보인다.**
+         *
+         * 그래서 이름 라벨만 이 폰트를 쓴다. 작성한 UI는 여전히 정적이고 검사도
+         * 그대로 돈다 - 동적으로 새는 것은 "우리가 안 쓴 문자열"뿐이다.
+         *
+         * 대가: 원본 TTF가 빌드에 실린다(정적 아틀라스는 안 실린다). 폰트 하나
+         * 값이고, 그 대가 없이 남의 이름을 그릴 방법이 없다.
+         */
+        public static TMP_FontAsset BuildNameFont()
+        {
+            var sourceFont = AssetDatabase.LoadAssetAtPath<Font>(GalmuriSourcePath);
+            if (sourceFont == null)
+            {
+                Debug.LogError("[Onikiri] Galmuri11.ttf missing - name font not built.");
+                return null;
+            }
+
+            var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(NameFontPath);
+            if (existing != null) AssetDatabase.DeleteAsset(NameFontPath);
+
+            // 캡션 크기로 굽는다. 이름이 나오는 자리(랭킹 줄·내 이름)가 전부
+            // 캡션 티어라, 다른 크기로 구우면 1:1이 깨져 이름만 흐릿해진다
+            var fontAsset = TMP_FontAsset.CreateFontAsset(
+                sourceFont,
+                Onikiri.UI.PixelFontSizes.GalmuriCaptionSize,
+                AtlasPadding,
+                GlyphRenderMode.RASTER_HINTED,
+                AtlasWidth, AtlasHeight,
+                AtlasPopulationMode.Dynamic,
+                true);
+
+            if (fontAsset == null)
+            {
+                Debug.LogError("[Onikiri] CreateFontAsset failed for the name font.");
+                return null;
+            }
+
+            fontAsset.name = "Galmuri11 Name SDF";
+
+            AssetDatabase.CreateAsset(fontAsset, NameFontPath);
+            AttachSubAssets(fontAsset, fontAsset);
+
+            // Static으로 고정하지 **않는다** - 이 폰트의 존재 이유가 런타임
+            // 래스터다. 위 Build()의 마지막 줄과 정확히 반대이고, 그 차이가
+            // 이 에셋이 따로 있는 이유 전부다
+            ApplyPointFiltering(fontAsset);
+            ApplyBitmapShader(fontAsset);
+            fontAsset.ReadFontAssetDefinition();
+
+            EditorUtility.SetDirty(fontAsset);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log("[Onikiri] Name font (dynamic) built at "
+                      + Onikiri.UI.PixelFontSizes.GalmuriCaptionSize + "pt -> " + NameFontPath);
+            return fontAsset;
         }
 
         private const string GalmuriSourcePath = FontFolder + "/Galmuri11.ttf";

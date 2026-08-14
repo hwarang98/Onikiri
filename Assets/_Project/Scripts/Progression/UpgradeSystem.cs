@@ -235,6 +235,36 @@ namespace Onikiri.Progression
         }
 
         /**
+         * @brief 배수 구매 (#9). 한 칸씩 사는 것을 N번 반복한 것과 **같다.**
+         *
+         * 비용도 효과도 기존 곡선 그대로다. 달라지는 것은 화면을 백 번 두드리지
+         * 않아도 된다는 것뿐 - 총액이 같으므로 새로 생기는 힘은 없다.
+         *
+         * 실제로 오른 칸 수를 돌려준다. 골드가 중간에 떨어지면 거기까지다.
+         *
+         * 퀘스트 카운터는 **산 칸 수만큼** 센다. 한 번만 세면 ×100이 강화 1회로
+         * 기록되어 "강화 50회" 업적이 배수 버튼을 쓸수록 느려지고, 그건 편의
+         * 기능이 진행을 벌하는 모양이 된다.
+         */
+        public int TryPurchaseMany(int index, int count)
+        {
+            var track = GetTrack(index);
+            if (track == null) return 0;
+
+            int bought = track.TryPurchaseMany(PlayerWallet.Instance, count);
+            if (bought <= 0) return 0;
+
+            Apply(track);
+            Raise();
+
+            var quests = QuestSystem.Instance;
+            if (quests != null)
+                for (int i = 0; i < bought; i++) quests.ReportUpgradePurchase();
+
+            return bought;
+        }
+
+        /**
          * @brief 일곱 축의 레벨 총합. 업적이 읽는다.
          *
          * 축이 일곱이고 전부 레벨 1에서 시작하므로 새 게임의 총합은 7이다.

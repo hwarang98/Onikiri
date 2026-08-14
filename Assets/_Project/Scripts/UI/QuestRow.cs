@@ -198,21 +198,20 @@ namespace Onikiri.UI
         }
 
         /**
-         * @brief 보상 문구. 업적만 골드·경험치가 붙는다.
+         * @brief 보상 **수량**. 재화 이름은 이제 아이콘이 말한다 (#11).
          *
-         * 덧붙는 쪽을 **75% 크기로** 적는다. 보석은 세 종류가 다 주는 주 보상이고
-         * 골드·EXP는 업적에만 붙는 곁가지인데, 같은 크기로 두면 문구가 380px을
-         * 넘어 진행바를 밀어낸다.
+         * 그전에는 "보석 20 <size=75%>·골드 ·EXP</size>"였다. 재화 이름을
+         * 글자로 적으면 세 가지가 따라온다 - 매번 읽어야 하고, 곁가지를
+         * 75%로 줄여 넣는 편법이 필요하고, 그렇게 해도 380px을 먹어 진행바를
+         * 밀어낸다.
+         *
+         * 지금 이 함수가 돌려주는 것은 숫자 하나다. 아이콘은 빌드 시점에
+         * 행에 박힌다(QuestPanelBuilder.BuildRewardGroup) - 어느 재화를
+         * 주는가는 퀘스트마다 고정이라 런타임에 바뀔 일이 없기 때문이다.
          */
         private static string RewardText(QuestSpec spec)
         {
-            string text = "보석 " + spec.Gems;
-
-            string extra = "";
-            if (spec.GoldMobs > 0d) extra += " ·골드";
-            if (spec.ExpBosses > 0d) extra += " ·EXP";
-
-            return extra.Length == 0 ? text : text + "<size=75%>" + extra + "</size>";
+            return spec.Gems.ToString();
         }
 
         /**

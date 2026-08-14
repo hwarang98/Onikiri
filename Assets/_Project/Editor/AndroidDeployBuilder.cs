@@ -31,6 +31,24 @@ namespace Onikiri.EditorTools
         [MenuItem("Onikiri/Build/폰으로 빌드 + 설치", false, 100)]
         public static void BuildAndDeploy()
         {
+            BuildAndDeploy(false);
+        }
+
+        /**
+         * @brief 개발 빌드. 디버그 오버레이(CloudSpikeOverlay)가 여기에만 들어간다.
+         *
+         * 그 오버레이가 `#if DEVELOPMENT_BUILD`로 묶여 있어서, 일반 빌드로는
+         * 화면에 아무 버튼도 없다 - Firebase 스파이크를 기기에서 눌러보려면
+         * 반드시 이쪽으로 빌드해야 한다. 출시 빌드는 위의 일반 경로가 맞다.
+         */
+        [MenuItem("Onikiri/Build/폰으로 빌드 + 설치 (개발 빌드)", false, 102)]
+        public static void BuildAndDeployDevelopment()
+        {
+            BuildAndDeploy(true);
+        }
+
+        private static void BuildAndDeploy(bool development)
+        {
             string adb = FindAdb();
             if (adb == null)
             {
@@ -50,9 +68,10 @@ namespace Onikiri.EditorTools
                 return;
             }
 
-            Debug.Log("[Onikiri] 기기 확인: " + device + " - 빌드를 시작합니다.");
+            Debug.Log("[Onikiri] 기기 확인: " + device + " - "
+                      + (development ? "개발 빌드를" : "빌드를") + " 시작합니다.");
 
-            if (!BuildApk()) return;
+            if (!BuildApk(development)) return;
             if (!Install(adb, device)) return;
             Launch(adb, device);
         }
@@ -130,7 +149,7 @@ namespace Onikiri.EditorTools
 
         // ---------------------------------------------------------------- 빌드
 
-        private static bool BuildApk()
+        private static bool BuildApk(bool development)
         {
             var scenes = new List<string>();
             foreach (var scene in EditorBuildSettings.scenes)
@@ -150,7 +169,9 @@ namespace Onikiri.EditorTools
                 locationPathName = ApkPath,
                 target = BuildTarget.Android,
                 targetGroup = BuildTargetGroup.Android,
-                options = BuildOptions.None,
+                // 개발 빌드는 Debug.Log가 logcat에 그대로 남고(스파이크의 증거가
+                // 거기 있다) 디버그 오버레이가 컴파일에 포함된다
+                options = development ? BuildOptions.Development : BuildOptions.None,
             };
 
             var report = BuildPipeline.BuildPlayer(options);

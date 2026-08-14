@@ -339,12 +339,40 @@ namespace Onikiri.EditorTools
         /** 스트립이 패널 위쪽에서 먹는 몫. 탭 줄이 이만큼 내려앉는다 */
         public const float ExpStripStride = ExpStripHeight + TabBarGap;
 
+        /**
+         * @brief 레벨 헤더 행 (개선안 v2). 스트립과 탭 줄 사이의 한 줄.
+         *
+         * "Lv.56 · EXP 72%" 라벨과 레벨업 버튼이 여기 산다. 레벨업 버튼이
+         * 전투 화면(SafeArea, 스트립 위 손잡이)을 떠나 패널 안으로 들어온
+         * 자리다 - 슬레이어의 "Lv / EXP / LEVEL UP" 헤더와 같은 구성이고,
+         * 상단 HUD는 상태(초상 배지 + 스트립)만, 행동(레벨업)은 그 행동의
+         * 결과가 보이는 패널이 맡는다.
+         *
+         * 세우는 것은 BattleContentBuilder.BuildExpRow다(LevelHud 배선이
+         * 거기 있다). 여기는 자리만 안다 - 탭 줄과 뷰포트가 그만큼 더
+         * 내려앉는다.
+         */
+        public const string LevelHeaderName = "LevelHeader";
+        public const float LevelHeaderHeight = 76f;
+        public const float LevelHeaderStride = LevelHeaderHeight + TabBarGap;
+
+        /**
+         * @brief 강화 배수 줄 (#9). 탭 줄 바로 아래에 서는 고정 줄.
+         *
+         * 강화 탭에만 딸린다. 세로 몫은 켜져 있는 동안에만 뷰포트에서 빠지고
+         * (ScrollViewportInset), 그래서 성장·전직 탭의 높이는 그대로다.
+         *
+         * 68px은 탭 줄(76)보다 한 단 낮은 값이다. 배수는 탭보다 아래 층위의
+         * 선택이라 같은 크기로 서면 화면에 최상위 줄이 둘로 읽힌다.
+         */
+        public const string BatchRowName = "BatchRow";
+        public const float BatchBarHeight = 68f;
+        public const float BatchRowStride = BatchBarHeight + TabBarGap;
+
         /** 성장 패널 직속에 있어도 되는 것. 그 외는 잔재다 */
-        // 2b: 레벨업 버튼이 상단 바에서 패널 헤더(스트립 라인)로 내려왔다.
-        // 세우는 것은 BattleContentBuilder.BuildExpRow다
         public static readonly string[] PanelChildNames =
         {
-            "Viewport", TopTabBarName, ExpStripName, "LevelUpButton"
+            "Viewport", TopTabBarName, ExpStripName, LevelHeaderName, BatchRowName
         };
 
         // 1080 폭 캔버스 기준 배치값. 55pt 글자가 들어가야 하므로 줄 높이는 넉넉히 준다
@@ -599,7 +627,13 @@ namespace Onikiri.EditorTools
             BuildStatSection(growthPage, font);
             BuildAwakenPage(awakenPage, font);
 
-            BuildTopTabs(panel, font, enhancePage, growthPage, awakenPage);
+            // 배수 줄은 탭보다 먼저 세운다. 탭이 이 줄을 강화 탭의 roots에
+            // 넣어야 하고(탭에 딸린 고정 줄 - GrowthPanelTabs.Page.roots),
+            // 그러려면 오브젝트가 이미 있어야 한다
+            GameObject batchRow;
+            BuildBatchRow(panel, font, (RectTransform)panel.Find("Viewport"), out batchRow);
+
+            BuildTopTabs(panel, font, enhancePage, growthPage, awakenPage, batchRow);
 
             // 페이지가 아닌 Content 직속 자식은 전부 이전 세대의 잔재다. 17단계까지
             // 행이 Content 바로 아래에 있었으므로 이 프로젝트에는 실제로 그것이
@@ -640,17 +674,23 @@ namespace Onikiri.EditorTools
         {
             foreach (var name in PageNames)
             {
-                float height = PageHeight(name);
-                bool scrolls = height > ViewportHeight;
+                // 배수 줄이 딸린 탭은 그만큼 뷰포트가 눌린다(ScrollViewportInset)
+                bool hasBatchRow = name == EnhancePageName || name == GrowthPageName;
+                float viewport = hasBatchRow ? ViewportHeight - BatchRowStride : ViewportHeight;
 
-                // 강화만 넘쳐도 된다
-                if (name == EnhancePageName) continue;
+                float height = PageHeight(name);
+                bool scrolls = height > viewport;
+
+                // 강화는 설계상 넘친다. 성장은 배수 줄이 붙으면서 몇 px
+                // 넘치는데(486 vs 482) 그것도 의도다 - 배수 줄을 빼는 것보다
+                // 네 줄짜리 목록이 조금 스크롤되는 편이 싸다
+                if (hasBatchRow) continue;
                 if (!scrolls) continue;
 
                 Debug.LogWarning(string.Format(
                     "[Onikiri] Growth page '{0}' is {1:F0}px but the viewport is {2:F0}px"
                     + " - that tab now scrolls. Only 강화 is meant to.",
-                    name, height, ViewportHeight));
+                    name, height, viewport));
             }
         }
 
@@ -700,10 +740,11 @@ namespace Onikiri.EditorTools
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
             viewportRect.offsetMin = Vector2.zero;
-            // 경험치 스트립과 최상위 탭 줄 몫을 비운다. 계열 탭 줄은 강화
-            // 페이지에만 있으므로 여기서 비우면 성장·전직 탭에서 그 자리가 빈
-            // 채로 남는다 - 대신 강화 페이지 루트가 자기 몫으로 흡수한다(EnsurePage)
-            viewportRect.offsetMax = new Vector2(0f, -(ExpStripStride + TabRowStride));
+            // 경험치 스트립·레벨 헤더·최상위 탭 줄 몫을 비운다. 계열 탭 줄은
+            // 강화 페이지에만 있으므로 여기서 비우면 성장·전직 탭에서 그 자리가
+            // 빈 채로 남는다 - 대신 강화 페이지 루트가 자기 몫으로 흡수한다(EnsurePage)
+            viewportRect.offsetMax = new Vector2(
+                0f, -(ExpStripStride + LevelHeaderStride + TabRowStride));
 
             if (viewport.GetComponent<RectMask2D>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
@@ -723,8 +764,10 @@ namespace Onikiri.EditorTools
             contentRect.pivot = new Vector2(0.5f, 1f);
             contentRect.offsetMin = new Vector2(0f, 0f);
             contentRect.offsetMax = new Vector2(0f, 0f);
-            // 가장 긴 페이지에 맞춘다. 페이지는 한 번에 하나만 켜지므로 합이 아니다 -
-            // 합으로 잡으면 어느 페이지를 보든 그 아래로 빈 공간이 스크롤된다
+            // 초기값만 가장 긴 페이지다. **실제 높이는 켜진 페이지가 정한다**
+            // (#6 - ScrollPageMemory). 그전에는 이 값이 끝까지 남아서, 짧은
+            // 페이지를 보는 동안에도 그 차이만큼 빈 곳이 스크롤됐다 - 성장
+            // 탭에서 1300px이 그랬다
             contentRect.sizeDelta = new Vector2(0f, TallestPageHeight);
             contentRect.anchoredPosition = Vector2.zero;
 
@@ -735,9 +778,28 @@ namespace Onikiri.EditorTools
             scroll.viewport = viewportRect;
             scroll.horizontal = false;
             scroll.vertical = true;
-            // Elastic이 기본인데 손을 떼면 튕겨 돌아온다. 목록은 그냥 멈추는 편이
-            // 읽기 쉽고, 튕김은 이 화면에서 아무것도 알려주지 않는다
-            scroll.movementType = ScrollRect.MovementType.Clamped;
+
+            /**
+             * @brief 끝에서 튕긴다 (#7 - 모든 스크롤 탭 통일).
+             *
+             * 19단계에는 Clamped였다. 그때의 근거는 "튕김은 이 화면에서
+             * 아무것도 알려주지 않는다"였는데, 화면이 하나였을 때의 말이다.
+             * 지금은 스킬 목록에만 바운스가 있어서 **같은 제스처가 화면마다
+             * 다르게 반응한다** - 목록 끝에서 손가락이 멈추는 곳과 튕기는
+             * 곳이 갈리면, 그 차이가 알려주는 것은 "여기는 다른 목록이다"가
+             * 아니라 "여기가 고장났다"이다.
+             *
+             * 통일하는 방향은 튕김 쪽이다. 끝에서 멈추기만 하면 스크롤이
+             * 끝난 것인지 손가락이 미끄러진 것인지 구분되지 않는데, 짧은
+             * 되돌아옴이 "여기가 끝"을 몸으로 알려준다.
+             *
+             * #6 뒤로 콘텐츠 높이가 켜진 페이지에 딱 맞으므로(ScrollPageMemory)
+             * 튕김이 빈 공간을 드러내는 일도 없다. 이 둘은 같이 가야 한다 -
+             * 콘텐츠가 페이지보다 길던 시절에 Elastic을 켰으면 목록 밖의
+             * 빈 곳에서 늘어졌다 줄었다 했을 것이다
+             */
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.elasticity = 0.12f;
             scroll.scrollSensitivity = 40f;
             scroll.inertia = true;
             scroll.decelerationRate = 0.12f;
@@ -892,7 +954,7 @@ namespace Onikiri.EditorTools
                 float panelHeight = Onikiri.Core.DisplayConfig.DesignHeight
                                     * (Onikiri.Core.DisplayConfig.GrowthPanelTop
                                        - Onikiri.Core.DisplayConfig.BottomTabBarTop);
-                return panelHeight - ExpStripStride - TabRowStride;
+                return panelHeight - ExpStripStride - LevelHeaderStride - TabRowStride;
             }
         }
 
@@ -916,6 +978,18 @@ namespace Onikiri.EditorTools
             rect.offsetMax = Vector2.zero;
             rect.sizeDelta = new Vector2(0f, PageHeight(pageName));
             rect.anchoredPosition = Vector2.zero;
+
+            // 탭별 독립 스크롤 (#6·#7). 페이지가 켜질 때 콘텐츠를 자기 높이로
+            // 줄이고 자기 위치로 되돌린다 - 그전에는 셋이 한 스크롤을 공유해서
+            // 성장 탭에서도 강화 목록 길이(1866px)만큼 빈 곳이 스크롤됐다
+            var memory = go.AddComponent<Onikiri.UI.ScrollPageMemory>();
+            var memorySo = new SerializedObject(memory);
+            memorySo.FindProperty("scroll").objectReferenceValue =
+                content.GetComponentInParent<ScrollRect>();
+            memorySo.FindProperty("content").objectReferenceValue = content;
+            memorySo.FindProperty("pageHeight").floatValue = PageHeight(pageName);
+            memorySo.ApplyModifiedPropertiesWithoutUndo();
+
             return rect;
         }
 
@@ -1074,7 +1148,7 @@ namespace Onikiri.EditorTools
          */
         private static void BuildTopTabs(Transform panel, TMP_FontAsset font,
                                          RectTransform enhancePage, RectTransform growthPage,
-                                         RectTransform awakenPage)
+                                         RectTransform awakenPage, GameObject batchRow)
         {
             var existing = panel.Find(TopTabBarName);
             if (existing != null) Object.DestroyImmediate(existing.gameObject);
@@ -1089,13 +1163,36 @@ namespace Onikiri.EditorTools
             barRect.offsetMin = new Vector2(SidePadding, 0f);
             barRect.offsetMax = new Vector2(-SidePadding, 0f);
             barRect.sizeDelta = new Vector2(-SidePadding * 2f, TabBarHeight);
-            // 경험치 스트립이 패널 최상단을 가져갔다. 탭 줄은 그 아래다
-            barRect.anchoredPosition = new Vector2(0f, -ExpStripStride);
+            // 경험치 스트립과 레벨 헤더가 패널 최상단을 가져갔다. 탭 줄은 그 아래다
+            barRect.anchoredPosition = new Vector2(0f, -(ExpStripStride + LevelHeaderStride));
+
+            /**
+             * @brief 배수 줄은 **강화와 성장 둘 다**에 딸린다.
+             *
+             * Page.roots가 배열인 이유가 이것이다 - "탭에 딸린 고정 줄"
+             * (GrowthPanelTabs 주석)의 첫 사례가 배수 줄이다.
+             *
+             * 성장 탭에도 붙는 이유: 스탯 포인트도 한 점씩 찍는 재화이고,
+             * 레벨업이 방치로 밀리므로 오래 안 열어본 화면에는 수십 점이
+             * 쌓여 있다. 배수가 강화에만 있으면 같은 문제가 옆 탭에 그대로
+             * 남는다.
+             *
+             * 전직 탭에는 없다 - 거기서 사는 것은 진화 하나뿐이라 배수가
+             * 뜻을 갖지 않는다.
+             *
+             * ⚠️ 같은 오브젝트를 두 탭의 roots에 넣는다. GrowthPanelTabs는
+             * 켤 것과 끌 것을 탭마다 따로 훑으므로, 강화 -> 성장으로 옮길 때
+             * 성장이 켜는 것을 강화가 끄는 순서가 되면 줄이 사라진다.
+             * 실제로는 끄기가 먼저 돌고 켜기가 나중이라 살아남지만, 그
+             * 순서에 기대는 대신 아래 Select에서 **켤 것을 나중에** 처리하게
+             * 두었다(GrowthPanelTabs.Select 주석).
+             */
+            var batchRoot = batchRow != null ? new[] { batchRow } : new GameObject[0];
 
             var pageRoots = new[]
             {
-                new[] { enhancePage.gameObject },
-                new[] { growthPage.gameObject },
+                Combine(enhancePage.gameObject, batchRoot),
+                Combine(growthPage.gameObject, batchRoot),
                 new[] { awakenPage.gameObject }
             };
             string[] names = { "강화", "성장", "전직" };
@@ -1155,7 +1252,10 @@ namespace Onikiri.EditorTools
                     element.FindPropertyRelative("badge").objectReferenceValue = badge.gameObject;
                     element.FindPropertyRelative("badgeLabel").objectReferenceValue = badgeLabel;
 
-                    VerifyBadgeClearsLabel(label, TabInnerWidth(names.Length));
+                    // 점이 탭 이름을 덮지 않는지 (#4 뒤로는 28px 정사각이라
+                    // 여유가 커졌지만, 탭 이름이 길어지면 다시 다툰다)
+                    VerifyBadgeClearsLabel(label, TabInnerWidth(names.Length),
+                                           QuestPanelBuilder.BadgeDotSize);
                 }
 
                 if (i == EvolutionBadgePage)
@@ -1183,6 +1283,113 @@ namespace Onikiri.EditorTools
             enhancePage.gameObject.SetActive(true);
             growthPage.gameObject.SetActive(false);
             awakenPage.gameObject.SetActive(false);
+
+            // 배수 줄은 강화와 운명을 같이한다. 기본 탭이 강화이므로 켠 채로
+            // 저장한다 - 꺼진 채로 저장되면 에디터에서는 뷰포트가 안 눌린 모양이
+            // 씬에 남고, 그것이 런타임의 첫 프레임과 다르다
+            if (batchRow != null) batchRow.SetActive(true);
+        }
+
+        /**
+         * @brief 강화 배수 줄 - [×1] [×10] [×100] [최대] (#9).
+         *
+         * ## 왜 탭 줄 아래의 고정 줄인가
+         *
+         * 목록과 함께 스크롤되면 안 된다. 배수를 바꾸려고 맨 위까지 올라가야
+         * 하면, 백 번 두드리지 않으려고 만든 버튼이 스크롤로 값을 도로 받아간다.
+         *
+         * 그렇다고 뷰포트를 빌드 시점에 줄일 수도 없다. 이 줄은 강화 탭에만
+         * 있으므로 성장·전직까지 짧아지고, 그 둘은 지금 스크롤 없이 들어가는
+         * 높이다(VerifyPageHeights가 재는 것이 그것이다). 그래서 줄 자신이
+         * 켜질 때 뷰포트를 눌렀다가 꺼질 때 되돌린다 - ScrollViewportInset.
+         *
+         * ## 칩 넷의 폭이 같은 이유
+         *
+         * "최대"가 가장 긴 글자인데 칩을 글자에 맞춰 재면 넷의 크기가 제각각이
+         * 되고, 그러면 어느 것이 선택됐는지를 **크기와 색 둘로** 읽어야 한다.
+         * 균등 분할이면 색 하나만 읽으면 된다(탭 줄과 같은 규칙).
+         */
+        private static void BuildBatchRow(Transform panel, TMP_FontAsset font,
+                                          RectTransform viewport, out GameObject row)
+        {
+            var existing = panel.Find(BatchRowName);
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+
+            var barObject = new GameObject(BatchRowName, typeof(RectTransform));
+            barObject.transform.SetParent(panel, false);
+
+            var barRect = (RectTransform)barObject.transform;
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot = new Vector2(0.5f, 1f);
+            barRect.offsetMin = new Vector2(SidePadding, 0f);
+            barRect.offsetMax = new Vector2(-SidePadding, 0f);
+            barRect.sizeDelta = new Vector2(-SidePadding * 2f, BatchBarHeight);
+            barRect.anchoredPosition = new Vector2(
+                0f, -(ExpStripStride + LevelHeaderStride + TabRowStride));
+
+            // 0은 "최대"다. 잔액이 감당하는 데까지 사고, 그 수는 축마다 다르다
+            int[] counts = { 1, 10, 100, 0 };
+            string[] names = { "×1", "×10", "×100", "최대" };
+
+            var selector = barObject.AddComponent<Onikiri.UI.UpgradeBatchSelector>();
+            var so = new SerializedObject(selector);
+            var array = so.FindProperty("choices");
+            array.arraySize = counts.Length;
+
+            float slice = 1f / counts.Length;
+
+            for (int i = 0; i < counts.Length; i++)
+            {
+                var chip = new GameObject("Batch_" + counts[i], typeof(RectTransform));
+                chip.transform.SetParent(barObject.transform, false);
+
+                var rect = (RectTransform)chip.transform;
+                rect.anchorMin = new Vector2(i * slice, 0f);
+                rect.anchorMax = new Vector2((i + 1) * slice, 1f);
+                rect.offsetMin = new Vector2(6f, 0f);
+                rect.offsetMax = new Vector2(-6f, 0f);
+
+                var image = chip.AddComponent<Image>();
+                UiSkin.ApplyPanel(image, UiSkin.Row);
+
+                var button = chip.AddComponent<Button>();
+                UiSkin.ApplyButton(button, image);
+
+                var label = CreateLabel(chip.transform, font, "Label", TextAlignmentOptions.Center);
+                UiFonts.Demote(label);
+                var labelRect = (RectTransform)label.transform;
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = new Vector2(0f, -10f);
+                labelRect.offsetMax = new Vector2(0f, 10f);
+                label.text = names[i];
+
+                var element = array.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("button").objectReferenceValue = button;
+                element.FindPropertyRelative("label").objectReferenceValue = label;
+                element.FindPropertyRelative("background").objectReferenceValue = image;
+                element.FindPropertyRelative("count").intValue = counts[i];
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            var inset = barObject.AddComponent<Onikiri.UI.ScrollViewportInset>();
+            var insetSo = new SerializedObject(inset);
+            insetSo.FindProperty("viewport").objectReferenceValue = viewport;
+            insetSo.FindProperty("inset").floatValue = BatchRowStride;
+            insetSo.ApplyModifiedPropertiesWithoutUndo();
+
+            row = barObject;
+        }
+
+        /** 페이지 하나 + 그 탭에 딸린 고정 줄들 */
+        private static GameObject[] Combine(GameObject page, GameObject[] extras)
+        {
+            var list = new System.Collections.Generic.List<GameObject> { page };
+            foreach (var extra in extras)
+                if (extra != null) list.Add(extra);
+            return list.ToArray();
         }
 
         /** 탭 하나의 안쪽 폭. 탭 줄이 좌우 여백을 뺀 폭을 균등 분할하고 각 탭이 6씩 더 준다 */
@@ -1193,7 +1400,7 @@ namespace Onikiri.EditorTools
         }
 
         /** 배지가 탭 이름을 덮지 않는지. 폭은 어림하지 않고 TMP에게 묻는다 */
-        private static void VerifyBadgeClearsLabel(TMP_Text label, float tabWidth)
+        private static void VerifyBadgeClearsLabel(TMP_Text label, float tabWidth, float badgeWidth)
         {
             if (label == null) return;
 
@@ -1207,16 +1414,16 @@ namespace Onikiri.EditorTools
             }
 
             float textRight = (tabWidth + textWidth) * 0.5f;
-            float badgeLeft = tabWidth - BadgeWidth + BadgeOverhang;
+            float badgeLeft = tabWidth - badgeWidth + BadgeOverhang;
 
             if (badgeLeft >= textRight) return;
 
             Debug.LogWarning(string.Format(
                 "[Onikiri] Points badge starts at {0:F0}px but the tab label ends at {1:F0}px"
-                + " - the badge covers the tab's own name. Narrow BadgeWidth ({2:F0}) or"
+                + " - the badge covers the tab's own name. Narrow the dot ({2:F0}) or"
                 + " push BadgeOverhang ({3:F0}) further out. 55pt Galmuri is 55px per Hangul"
                 + " glyph and 37px per digit - measured, not estimated.",
-                badgeLeft, textRight, BadgeWidth, BadgeOverhang));
+                badgeLeft, textRight, badgeWidth, BadgeOverhang));
         }
 
         /**
@@ -1230,6 +1437,16 @@ namespace Onikiri.EditorTools
          */
         private static Image CreateBadge(Transform parent, TMP_FontAsset font, out TMP_Text label)
         {
+            // 쌓인 옛 배지를 **전부** 치운다 - 이유는
+            // QuestPanelBuilder.BuildBadge 주석에 한 번만 적어둔다.
+            // 이쪽은 탭 줄을 통째로 다시 만들므로 쌓일 일이 없었지만,
+            // 같은 함정을 두 곳에 남겨두지 않는다
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                var stale = parent.GetChild(i);
+                if (stale.name == "Badge") Object.DestroyImmediate(stale.gameObject);
+            }
+
             var go = new GameObject("Badge", typeof(RectTransform));
             go.transform.SetParent(parent, false);
 
@@ -1237,25 +1454,26 @@ namespace Onikiri.EditorTools
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(BadgeWidth, BadgeHeight);
+            // 점이다 (#4). 자릿수와 무관하게 같은 자리를 쓴다 -
+            // 이유는 QuestPanelBuilder.BuildBadge 주석에 한 번만 적어둔다
+            rect.sizeDelta = new Vector2(QuestPanelBuilder.BadgeDotSize,
+                                         QuestPanelBuilder.BadgeDotSize);
             // 모서리에 걸치게 내민다. 탭 안에 얌전히 들어가 있으면 탭 장식으로
             // 읽히고, 걸쳐야 "나중에 붙은 알림"으로 읽힌다
             rect.anchoredPosition = new Vector2(BadgeOverhang, BadgeOverhang);
 
             var image = go.AddComponent<Image>();
-            UiSkin.ApplyPanel(image, UiSkin.Danger);
+
+            // 원 스프라이트다 (#4) - 이유는 QuestPanelBuilder.BuildBadge에
+            // 한 번만 적어둔다
+            image.sprite = UiGlyphBuilder.Load(UiGlyphBuilder.Dot);
+            image.type = Image.Type.Simple;
+            image.color = UiSkin.Danger;
             image.raycastTarget = false;
 
-            label = CreateLabel(go.transform, font, "Count", TextAlignmentOptions.Center);
-            // 배지 숫자는 캡션 크기(38단계). 62px 판에 44pt 숫자는 두 자리부터
-            // 삐져나오고 있었다
-            UiFonts.Demote(label);
-            var labelRect = (RectTransform)label.transform;
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(0f, -10f);
-            labelRect.offsetMax = new Vector2(0f, 10f);
-            label.text = "0";
+            // 숫자 칸 없음. GrowthPanelTabs.RefreshBadges는 라벨이 비어 있으면
+            // 켜고 끄기만 한다
+            label = null;
 
             return image;
         }

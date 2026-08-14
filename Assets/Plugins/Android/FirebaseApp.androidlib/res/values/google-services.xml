@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@string/gcm_defaultSenderId,@string/google_storage_bucket,@string/project_id,@string/google_api_key,@string/google_crash_reporting_api_key,@string/google_app_id,@string/default_android_client_id,@string/default_web_client_id">
+  <string name="gcm_defaultSenderId" translatable="false">598938331304</string>
+  <string name="google_storage_bucket" translatable="false">onikiri-9cc18.firebasestorage.app</string>
+  <string name="project_id" translatable="false">onikiri-9cc18</string>
+  <string name="google_api_key" translatable="false">AIzaSyBocS5bvSWxJY1WOs6sNUcwMwTI0gu8CNA</string>
+  <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBocS5bvSWxJY1WOs6sNUcwMwTI0gu8CNA</string>
+  <string name="google_app_id" translatable="false">1:598938331304:android:852dd6f01371909135ba9d</string>
+  <string name="default_android_client_id" translatable="false">598938331304-lses4s122elg81335tfn182jh1009k2s.apps.googleusercontent.com</string>
+  <string name="default_web_client_id" translatable="false">598938331304-nt0tg1rlqnflnn2evnga4ffck698c88v.apps.googleusercontent.com</string>
+</resources>

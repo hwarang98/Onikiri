@@ -32,6 +32,31 @@ namespace Onikiri.EditorTools
         public const string Person = "glyph_person";
         public const string Paw = "glyph_paw";
 
+        /**
+         * @brief 트로피 (#15). 상단 바의 랭킹 칩.
+         *
+         * 그전에는 "랭킹" 두 글자가 칩 안에 들어 있었다. 상단 바에서 글자를
+         * 쓰는 것은 재화 수치뿐이고(38단계 아이콘화), 그 줄에서 유일하게
+         * 남아 있던 글자 버튼이 이것이었다.
+         *
+         * 다른 글리프와 같은 규칙으로 흰색으로 굽는다 - 금빛은 쓰는 쪽이
+         * Image.color로 입힌다(UiSkin.Gold). 색을 구워버리면 잠금·비활성
+         * 상태에서 톤을 낮출 방법이 없다.
+         */
+        public const string Trophy = "glyph_trophy";
+
+        /**
+         * @brief 알림 점 (#4). **진짜 동그라미다.**
+         *
+         * 처음에는 9-슬라이스 판(UiSkin.Row 계열)을 정사각으로 눌러 썼는데,
+         * 그 판은 모서리가 둥근 **사각형**이라 28px에서도 사각형으로 읽혔다.
+         * 점은 점이어야 한다 - 알림의 표준 모양이고, 사각형은 "작은 버튼"으로
+         * 보인다.
+         *
+         * 다른 글리프처럼 흰색으로 굽고 쓰는 쪽이 붉게 물들인다.
+         */
+        public const string Dot = "glyph_dot";
+
         [MenuItem("Onikiri/Art/Build UI Glyphs")]
         public static void Build()
         {
@@ -43,9 +68,11 @@ namespace Onikiri.EditorTools
             WriteGlyph(Flag, FromRows(FlagRows));
             WriteGlyph(Person, FromRows(PersonRows));
             WriteGlyph(Paw, FromRows(PawRows));
+            WriteGlyph(Trophy, FromRows(TrophyRows));
+            WriteGlyph(Dot, DotPixels());
 
             AssetDatabase.Refresh();
-            Debug.Log("[Onikiri] UI glyphs built: gear/lock/skull/flag/person/paw -> " + Folder);
+            Debug.Log("[Onikiri] UI glyphs built: gear/lock/skull/flag/person/paw/trophy -> " + Folder);
         }
 
         public static Sprite Load(string name)
@@ -83,6 +110,33 @@ namespace Onikiri.EditorTools
                         if (local <= 24f * 0.5f || local >= 45f - 24f * 0.5f)
                             pixels[y, x] = true;
                     }
+                }
+
+            return pixels;
+        }
+
+        /**
+         * @brief 꽉 찬 원 (#4). 톱니처럼 **수식으로** 만든다.
+         *
+         * 문자열 그림으로 원을 그리면 대칭이 눈으로는 맞아 보여도 반드시
+         * 한두 칸이 어긋나고, 그 어긋남이 28px로 줄면 한쪽이 눌린 타원으로
+         * 보인다. 반지름 하나면 대칭이 공짜다.
+         *
+         * 7.2는 16칸 격자에 들어가는 가장 큰 원이다(중심 7.5, 가장자리까지
+         * 7.5). 0.3칸을 남기는 이유는 픽셀 아트에서 원이 캔버스에 딱 붙으면
+         * 사방 끝이 평평하게 잘려 다시 사각형처럼 읽히기 때문이다.
+         */
+        private static bool[,] DotPixels()
+        {
+            var pixels = new bool[16, 16];
+            const float center = 7.5f;
+            const float radius = 7.2f;
+
+            for (int y = 0; y < 16; y++)
+                for (int x = 0; x < 16; x++)
+                {
+                    float dx = x - center, dy = y - center;
+                    pixels[y, x] = dx * dx + dy * dy <= radius * radius;
                 }
 
             return pixels;
@@ -188,6 +242,38 @@ namespace Onikiri.EditorTools
             "....XXXXXXXX....",
             "................",
             "................"
+        };
+
+        /**
+         * @brief 우승컵 (#15). 손잡이 둘 · 잔 · 목 · 받침.
+         *
+         * 16px에서 트로피가 트로피로 읽히려면 **손잡이가 몸통에서 떨어져
+         * 있어야** 한다. 붙여 그리면 잔이 그냥 넓어진 모양이 되고, 그때는
+         * 성배·자루·모래시계와 구분되지 않는다. 그래서 3~5행에서 양옆 두 칸을
+         * 비워 고리를 만든다.
+         *
+         * 받침은 두 단이다(넓은 바닥 + 좁은 목). 한 단이면 아래가 잘린 잔으로
+         * 읽히는데, 이 칩은 하단 바가 아니라 상단 바에 있어서 아래쪽 여백이
+         * 좁다 - 잘림과 디자인이 헷갈리는 자리다.
+         */
+        private static readonly string[] TrophyRows =
+        {
+            "................",
+            "..XXXXXXXXXXXX..",
+            "..XXXXXXXXXXXX..",
+            "XX.XXXXXXXXXX.XX",
+            "XX.XXXXXXXXXX.XX",
+            "XX.XXXXXXXXXX.XX",
+            "XX..XXXXXXXX..XX",
+            ".XX..XXXXXX..XX.",
+            "..XX.XXXXXX.XX..",
+            "......XXXX......",
+            "......XXXX......",
+            "......XXXX......",
+            "....XXXXXXXX....",
+            "....XXXXXXXX....",
+            "..XXXXXXXXXXXX..",
+            "..XXXXXXXXXXXX.."
         };
 
         // ---------------------------------------------------------------- 굽기

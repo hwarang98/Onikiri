@@ -1,6 +1,7 @@
 // using System 을 넣지 않는다. System.Object 와 UnityEngine.Object 가 충돌해서
 // 이 파일 전체의 FindFirstObjectByType 호출이 모호해진다
 using Onikiri.Battle;
+using Onikiri.Cloud;
 using Onikiri.Core;
 using Onikiri.Progression;
 using UnityEditor;
@@ -62,6 +63,22 @@ namespace Onikiri.EditorTools
 
         /** 방치 보상 확인용. 몇 시간 전에 종료한 것으로 꾸밀지 */
         private float offlineHours = 3f;
+
+        /** 랭킹 절(54단계)의 입력들. 조회 결과는 창 안에 그대로 적는다 */
+        private string debugPlayerName = string.Empty;
+        private int debugSubmitStage = 1;
+        private string leaderboardPreview = string.Empty;
+
+        /**
+         * @brief 계정 절(55단계)의 병합 계산기 입력.
+         *
+         * 기본값이 "재설치 직후"다 - 로컬 1층, 버려질 문서 없음(0), 복구된
+         * 문서 171층. 이 스텝이 존재하는 이유가 되는 바로 그 상황이라,
+         * 창을 열면 그 답이 먼저 보이는 편이 맞다.
+         */
+        private int mergeLocal = 1;
+        private int mergeAbandoned;
+        private int mergeRecovered = 171;
 
         /** 공격속도 실측용. 창 길이는 게임 시간으로 잰다 */
         private float rateWindowStart;
@@ -473,6 +490,8 @@ namespace Onikiri.EditorTools
                 DrawLockPreviewTools();
             }
 
+            DrawPolishTools();
+
             DrawSkillTools();
 
             // 오의 바로 다음이다. 둘 다 참격을 PackSlash 풀에서 꺼내 쓰므로,
@@ -481,6 +500,11 @@ namespace Onikiri.EditorTools
             DrawEnemyAnimationTools();
 
             DrawQuestTools();
+
+            // 가이드는 퀘스트 바로 다음이다. 가리키는 것이 위 절의 업적이고
+            // 수령도 그쪽에서 일어나므로, 두 절이 붙어 있으면 "받는다 ->
+            // 카드가 다음 칸으로 넘어간다"를 눈을 안 옮기고 본다
+            DrawGuideQuestTools();
 
             // 장비는 퀘스트 바로 다음이다. 보석이 그쪽에서 나와 이쪽으로
             // 들어가므로, 두 절이 붙어 있으면 루프 전체를 한 화면에서 돌린다
@@ -513,6 +537,62 @@ namespace Onikiri.EditorTools
             DrawPetTools();
 
             DrawSaveTools();
+
+            // 클라우드는 세이브 바로 다음이다. 올라가는 값(도달층)이 세이브가
+            // 들고 있는 값이고, 위 절의 "지금 저장"과 아래 절의 write가 같은
+            // 숫자를 서로 다른 곳에 적는 일이라 나란히 두면 둘이 어긋나는 것이 보인다
+            DrawCloudTools();
+
+            // 인트로는 클라우드 다음이다 - 부팅 게이트가 보는 것(세이브 로드
+            // 결과)과 타이틀 CTA가 부르는 것(계정 연동)이 바로 위 두 절이다
+            DrawIntroTools();
+        }
+
+        /**
+         * @brief 부팅 화면(인트로 스텝)의 상태와 재생.
+         *
+         * 인트로는 한 실행에 한 번이라, 고치고 확인하려면 매번 플레이를
+         * 껐다 켜야 한다 - "다시 보기"가 그 비용을 없앤다. "계정 선택 기록
+         * 지우기"는 첫 실행(계정 선택 화면)을 재현하는 스위치다.
+         */
+        private void DrawIntroTools()
+        {
+            EditorGUILayout.LabelField("인트로 (부팅 화면)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                var flow = Object.FindFirstObjectByType<Onikiri.UI.IntroFlow>(
+                    FindObjectsInactive.Include);
+
+                bool chosen = PlayerPrefs.GetInt(Onikiri.UI.IntroFlow.AccountChosenKey, 0) == 1;
+                Row("계정 선택 기록", chosen
+                    ? "있음 (타이틀 = 터치하여 시작)"
+                    : "없음 (타이틀 = 구글/게스트 선택)");
+                Row("세이브 로드 결과", SaveSystem.LastOutcome.ToString());
+                Row("오버레이", flow == null ? "(씬에 없음 - 빌더를 돌리세요)"
+                    : flow.gameObject.activeInHierarchy ? "떠 있음" : "내려감 (게임 진입됨)");
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("계정 선택 기록 지우기 (첫 실행 재현)"))
+                    {
+                        PlayerPrefs.DeleteKey(Onikiri.UI.IntroFlow.AccountChosenKey);
+                        PlayerPrefs.Save();
+                    }
+
+                    using (new EditorGUI.DisabledScope(flow == null))
+                    {
+                        if (GUILayout.Button("다시 보기")) flow.Replay();
+                        if (GUILayout.Button("건너뛰기")) flow.SkipToGame();
+                    }
+                }
+
+                EditorGUILayout.HelpBox(
+                    "부팅 순서: 스플래시(202 STUDIO -> ONIKIRI, 탭 스킵) -> 타이틀 -> 게임.\n"
+                    + "게임 진입은 세이브 적용 뒤에만 열립니다(로딩 게이트). Firebase는 게이트에 없어\n"
+                    + "오프라인·초기화 실패에도 게스트 진입이 됩니다. 구글 CTA는 실기 전용입니다.",
+                    MessageType.Info);
+            }
         }
 
         /**
@@ -591,6 +671,190 @@ namespace Onikiri.EditorTools
                             }
                         }
                     }
+                }
+            }
+        }
+
+        /**
+         * @brief 플레이 화면 가이드 카드.
+         *
+         * ## 왜 이 절이 필요한가
+         *
+         * 이 카드가 말하는 네 상태 중 셋은 **기다려야만 오는 상태**다.
+         * 완료 가능은 목표치를 채워야 오고, 수령 완료는 그다음 1.4초뿐이며,
+         * "표시할 가이드 없음"은 열네 칸을 전부 받아야 온다. 눈으로 확인하려면
+         * 실제로 그만큼 플레이해야 하는데, 그 준비가 확인보다 몇십 배 길다.
+         *
+         * `한 칸 넘기기`는 지금 카드가 가리키는 업적을 **정식 경로로 받는다**
+         * (QuestSystem.TryClaim). 조건을 안 채웠으면 못 받으므로, 그때는
+         * 위 절의 `카운터 채우기`나 아래 `조건 채우기`를 먼저 누른다 -
+         * 치트가 가이드만의 뒷문을 여는 것이 아니라 퀘스트와 같은 문으로
+         * 들어간다는 것이 이 절의 규칙이다.
+         *
+         * ## 표가 아니라 실물을 읽는다
+         *
+         * 어느 칸이 떠 있는지를 표에서 유추하지 않고 씬의 컴포넌트가 지금
+         * 들고 있는 값(CurrentStep·CurrentState)을 읽는다. 카드가 화면에
+         * 그린 것과 여기 뜨는 것이 어긋나면 그것이 곧 버그다.
+         */
+        private void DrawGuideQuestTools()
+        {
+            EditorGUILayout.LabelField("가이드 퀘스트 (플레이 화면 카드)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                var quests = Onikiri.Progression.QuestSystem.Instance;
+                if (quests == null)
+                {
+                    EditorGUILayout.HelpBox(
+                        "씬에 QuestSystem이 없습니다. Onikiri/Scene/Build Combat Content 를 실행하세요.",
+                        MessageType.Warning);
+                    return;
+                }
+
+                var card = Object.FindFirstObjectByType<Onikiri.UI.GuideQuestCard>(
+                    FindObjectsInactive.Include);
+
+                if (card == null)
+                    EditorGUILayout.HelpBox(
+                        "씬에 GuideQuestCard가 없습니다. Onikiri/Scene/Build Combat Content 를 "
+                        + "실행하면 전투 화면 오른쪽(퀘스트 아이콘 아래)에 세워집니다.",
+                        MessageType.Warning);
+
+                // 진행선이 지금 고르는 칸. 카드와 같은 함수를 부르므로
+                // 화면에 뜬 것과 여기 뜬 것이 다르면 카드 쪽이 안 듣고 있다는 뜻이다
+                var view = Onikiri.Progression.GuideQuestLine.Resolve(quests);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(
+                        view.Step < 0
+                            ? string.Format("진행선 {0}칸 · 남은 칸 없음", view.StepCount)
+                            : string.Format("{0}/{1}번째 · {2} · {3} {4}/{5} · 보석 {6}",
+                                view.Step + 1, view.StepCount, view.State,
+                                view.Title,
+                                Onikiri.Progression.GuideQuestLine.FormatCount(view.Progress),
+                                Onikiri.Progression.GuideQuestLine.FormatCount(view.Target),
+                                view.Gems),
+                        EditorStyles.miniLabel);
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(
+                        card != null
+                            ? string.Format("카드 표시: {0}칸 · {1}", card.CurrentStep + 1, card.CurrentState)
+                            : "카드 없음",
+                        GUILayout.Width(220f));
+
+                    using (new EditorGUI.DisabledScope(!Application.isPlaying || view.Step < 0))
+                    {
+                        // 지금 칸의 조건만 채운다. 카드가 "완료 가능"(금빛)으로
+                        // 바뀌는 순간을 보는 경로다. 스테이지·레벨 지표는
+                        // 카운터가 아니라 지금 상태를 읽으므로 여기서 못 민다 -
+                        // 그때는 위쪽 치트(스테이지 이동·레벨업)를 쓴다
+                        if (GUILayout.Button("조건 채우기"))
+                        {
+                            quests.DebugFillCounters();
+                            Debug.Log("[Onikiri] 가이드: 카운터를 채웠다. 스테이지·레벨 지표는 "
+                                      + "카운터가 아니라 지금 상태라 안 움직인다 - 그 칸은 "
+                                      + "스테이지 이동/레벨업 치트로 넘긴다. 새로 완료된 "
+                                      + "퀘스트는 퀘스트 아이콘의 빨간 배지가 알린다.");
+                        }
+
+                        // 정식 경로다. 못 받는 상태면 false가 돌아온다
+                        if (GUILayout.Button("한 칸 넘기기"))
+                        {
+                            var current = Onikiri.Progression.GuideQuestCatalog.Steps[view.Step];
+                            bool claimed = quests.TryClaim(current.Kind, current.Index);
+                            Debug.Log(claimed
+                                ? "[Onikiri] 가이드: " + view.Title + " 수령. 카드가 1.4초 동안 "
+                                  + "'보상 수령 완료'를 세운 뒤 다음 칸으로 넘어간다."
+                                : "[Onikiri] 가이드: " + view.Title + " 은 아직 조건 미달이라 "
+                                  + "못 받는다. 조건을 먼저 채워라.");
+                        }
+                    }
+
+                    using (new EditorGUI.DisabledScope(!Application.isPlaying))
+                    {
+                        // "표시할 가이드 없음"(카드가 사라지는 상태)까지 한 번에 간다
+                        if (GUILayout.Button("전부 받기", GUILayout.Width(80f)))
+                        {
+                            int claimed = 0;
+                            foreach (var line in Onikiri.Progression.GuideQuestCatalog.Steps)
+                            {
+                                if (line.Index < 0) continue;
+                                while (quests.TryClaim(line.Kind, line.Index)) claimed++;
+                            }
+                            Debug.Log("[Onikiri] 가이드: " + claimed + "칸 수령. 남은 칸이 없으면 "
+                                      + "카드가 알파 0으로 사라진다(오브젝트는 켜져 있다).");
+                        }
+
+                        /**
+                         * @brief 진행선을 처음으로 되감는다.
+                         *
+                         * 위 절의 `진행 초기화`(DebugResetProgress)와 다르다 -
+                         * 그쪽은 일일·반복·업적을 통째로 비우고 **누적 카운터까지
+                         * 0으로 만든다.** 가이드만 다시 보려는데 그렇게 하면 그
+                         * 뒤에 뜨는 화면은 확인하려던 화면이 아니라 새 계정이다.
+                         *
+                         * 여기서는 **가이드가 가리키는 14칸의 수령 기록만** 지운다.
+                         * 카운터·잔액·다른 퀘스트는 그대로다.
+                         *
+                         * ⚠️ 가이드는 자기 상태를 안 갖는다 - 수령 기록의 원본은
+                         * 업적이다(GuideQuestCatalog 머리 주석). 그래서 이 버튼은
+                         * **퀘스트 화면의 그 업적들도 함께 되돌린다.** 두 화면이
+                         * 같은 사실을 보고 있다는 뜻이고, 그것이 이 설계의 요점이다.
+                         * 되감은 보상은 다시 받을 수 있다 - 테스트 패널 전용인 이유다.
+                         */
+                        if (GUILayout.Button("가이드 초기화", GUILayout.Width(96f)))
+                        {
+                            int cleared = 0;
+                            foreach (var line in Onikiri.Progression.GuideQuestCatalog.Steps)
+                            {
+                                if (line.Index < 0) continue;
+
+                                // 반복은 수령 기록이 불리언이 아니라 티어 수다
+                                bool had = line.Kind == Onikiri.Progression.QuestKind.Repeat
+                                    ? quests.RepeatTier(line.Index) > 0
+                                    : quests.IsClaimed(line.Kind, line.Index);
+                                if (!had) continue;
+
+                                quests.DebugUnclaim(line.Kind, line.Index);
+                                cleared++;
+                            }
+                            Debug.Log("[Onikiri] 가이드: " + cleared + "칸의 수령 기록을 지웠다. "
+                                      + "카드가 1번째 칸부터 다시 선다. 카운터·잔액은 안 건드렸고, "
+                                      + "가리키는 업적이 퀘스트 화면에서도 함께 미수령으로 돌아간다 "
+                                      + "- 가이드는 자기 상태를 안 갖는다.");
+                        }
+                    }
+                }
+
+                // 진행선 전체. 어느 칸이 막혀 있는지가 한눈에 보여야 순서를
+                // 고친 결과를 확인할 수 있다
+                foreach (var step in Onikiri.Progression.GuideQuestCatalog.Steps)
+                {
+                    if (step.Index < 0)
+                    {
+                        EditorGUILayout.LabelField(
+                            "  ! " + step.QuestId + " - QuestCatalog에 없음",
+                            EditorStyles.miniLabel);
+                        continue;
+                    }
+
+                    var spec = Onikiri.Progression.QuestCatalog.Of(step.Kind)[step.Index];
+                    bool done = quests.IsClaimed(step.Kind, step.Index);
+                    bool ready = !done && quests.ClaimableCount(step.Kind, step.Index) > 0;
+
+                    EditorGUILayout.LabelField(
+                        string.Format("  {0} {1}  ({2})  {3}/{4}",
+                            done ? "받음" : ready ? "받을 수 있음" : "진행 중",
+                            spec.Title, step.Action,
+                            Onikiri.Progression.GuideQuestLine.FormatCount(
+                                quests.ProgressOf(step.Kind, step.Index)),
+                            Onikiri.Progression.GuideQuestLine.FormatCount(spec.Target)),
+                        EditorStyles.miniLabel);
                 }
             }
         }
@@ -1750,9 +2014,11 @@ namespace Onikiri.EditorTools
             // 스트립의 두 상태 - 절반 채움(옥색이 반쯤 물든 경계선)과 대기
             // (레벨업 버튼 등장 + 스트립 맥동) - 를 화면에 세울 방법이 없었다.
             // 여기는 붓기만 하고 청구하지 않는다.
-            // 2b: 레벨업 버튼은 이제 상단 바가 아니라 **성장 패널 헤더의 스트립
-            // 라인 오른쪽**에 뜬다. 등장 위치 확인도 이 버튼으로 한다. 상단 바
-            // 초상 배지(Lv.n)가 같은 값으로 함께 갱신되는지도 여기서 본다
+            // 개선안 v2: 레벨업 버튼은 이제 **캐릭터 패널의 레벨 헤더**
+            // (스트립 아래 "Lv · EXP" 줄의 오른쪽 끝)에 뜬다. 미청구 상태에서
+            // 함께 확인할 것 셋: 헤더의 버튼 등장, 상단 초상화와 하단 캐릭터
+            // 탭의 빨간 점(LevelUpNoticeBadge), 초상화 탭 -> 캐릭터 패널이
+            // 열리는 홈 동작. 청구하면 셋 다 꺼져야 한다
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.LabelField("스트립", GUILayout.Width(64f));
@@ -1764,6 +2030,12 @@ namespace Onikiri.EditorTools
                     character.AddExp(character.ExpRequired * BigDouble.FromDouble(0.5));
                 if (GUILayout.Button("+1렙 미청구 (맥동)"))
                     character.AddExp(character.ExpRequired);
+
+                // 알림 점의 지금 상태. 화면의 점과 이 값이 어긋나면 배지가
+                // CharacterLevel.Changed를 놓치고 있다는 뜻이다
+                EditorGUILayout.LabelField(
+                    character.PendingLevelUps > 0 ? "알림 점 ON" : "알림 점 OFF",
+                    EditorStyles.miniLabel, GUILayout.Width(90f));
             }
         }
 
@@ -1787,7 +2059,10 @@ namespace Onikiri.EditorTools
          *
          * 이 구역이 생긴 이유는 "자동 시전을 켰는데 나가는지 모르겠다"였다. 화면에
          * 쿨다운 표시가 없고 전용 모션도 없어서, 오의가 도는지 확인할 자리가
-         * 어디에도 없었다.
+         * 어디에도 없었다. 이제 장착 슬롯 칩에 쿨타임 오버레이가 붙었다
+         * (SkillCooldownOverlay - 마스크 + 남은 초). 여기의 진행률과 화면의
+         * 숫자가 어긋나면 오버레이가 다른 시계를 보고 있다는 뜻이다 - 둘 다
+         * 같은 SkillSystem 값을 읽으므로 절대 어긋나면 안 된다.
          *
          * 세 가지를 나눠 보여준다 - 셋이 서로 다른 실패를 가리키기 때문이다.
          *
@@ -1996,10 +2271,168 @@ namespace Onikiri.EditorTools
                 // 실제 코드가 돌아야 하므로 상태를 직접 바꾸지 않는다
                 using (new EditorGUI.DisabledScope(boss.Current != BossFight.Phase.Fighting))
                     if (GUILayout.Button("시간 소진")) boss.DebugExpireTimer();
+
+                /**
+                 * @brief 지금 서 있는 보스를 그 자리에서 벤다.
+                 *
+                 * 도전 다음에 곧바로 누르면 보스가 **달려오는 중에** 죽는다.
+                 * 진행이 통째로 막혔던 경로가 그것이다 - 사무라이의 사거리는
+                 * 전선보다 앞까지 닿아서 강한 빌드의 첫 타격이 접근 구간에
+                 * 떨어지는데, 그 처치가 버려져 스테이지가 안 올랐다
+                 * (BossFight.CountsAsClear).
+                 *
+                 * 상태를 바꾸지 않고 실제 피해로 죽인다. 그래야 확인하려던
+                 * 경로(Enemy.Killed -> 스포너 -> BossFight)가 그대로 돈다 -
+                 * "시간 소진"이 상태를 직접 안 바꾸는 것과 같은 이유다.
+                 */
+                using (new EditorGUI.DisabledScope(boss.Boss == null || !boss.Boss.IsAlive))
+                    if (GUILayout.Button("즉시 처치"))
+                        boss.Boss.TakeDamage(boss.Boss.MaxHealth * Onikiri.Core.BigDouble.FromDouble(2d));
             }
+
+            // 접근 구간에서는 보스의 위치를 함께 보여준다. 사무라이 사거리 안에
+            // 들어왔는데 아직 Fighting이 아닌 그 구간이 진행 정지의 현장이었다
+            if (boss.Current == BossFight.Phase.Approaching && boss.Boss != null)
+                EditorGUILayout.LabelField(
+                    string.Format("    달려오는 중  x = {0:F2}  (전선 도달 시 전투 시작)",
+                                  boss.Boss.CurrentX),
+                    EditorStyles.miniLabel);
 
             if (boss.Current == BossFight.Phase.Failed && !string.IsNullOrEmpty(boss.FailureMessage))
                 EditorGUILayout.HelpBox(boss.FailureMessage, MessageType.Warning);
+        }
+
+        /**
+         * @brief 폴리싱 배치 (UX 15항목).
+         *
+         * ## 왜 한 절이 필요한가
+         *
+         * 이 배치의 대부분은 **화면에만 있는 것**이라 테스트가 잡을 수 있는
+         * 것이 거의 없다. 그렇다고 눈으로만 확인하려면 조건을 만드는 데
+         * 시간이 걸린다 - 일괄 수령을 보려면 보상이 쌓여 있어야 하고,
+         * 배수 구매를 보려면 골드가 있어야 하고, 팝업 넷은 각각 다른 곳에서
+         * 열린다.
+         *
+         * 그 조건 만들기와 진입을 여기 모은다. 48단계의 요괴 애니 절이
+         * "눈으로 볼 일을 30분 기다리지 않고 하는 것"이라 적은 것과 같은
+         * 이유이고, 같은 방식이다.
+         */
+        private void DrawPolishTools()
+        {
+            EditorGUILayout.LabelField("폴리싱 (UX 15항목)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                // ---- #9 배수 구매
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("#9 배수", GUILayout.Width(80f));
+                    EditorGUILayout.LabelField(
+                        Onikiri.UI.UpgradeBatchSelector.IsMax
+                            ? "최대"
+                            : "×" + Onikiri.UI.UpgradeBatchSelector.Current,
+                        GUILayout.Width(60f));
+
+                    var upgrades = Object.FindFirstObjectByType<UpgradeSystem>(FindObjectsInactive.Include);
+                    using (new EditorGUI.DisabledScope(!Application.isPlaying || upgrades == null))
+                    {
+                        // 공격력 축(0)에 실제로 배수 구매를 걸어본다. 총액이
+                        // 한 칸씩 산 것과 같아야 한다는 계약은 테스트가 재고
+                        // (UpgradeBatchTests), 여기서는 화면이 따라오는지를 본다
+                        if (GUILayout.Button("공격력 ×10"))
+                            upgrades.TryPurchaseMany(0, 10);
+                        if (GUILayout.Button("공격력 최대"))
+                        {
+                            var track = upgrades.GetTrack(0);
+                            var wallet = PlayerWallet.Instance;
+                            if (track != null)
+                                upgrades.TryPurchaseMany(0, track.AffordableLevels(wallet, 0));
+                        }
+                    }
+                }
+
+                // ---- #5 일괄 수령
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("#5 수령", GUILayout.Width(80f));
+
+                    var quests = QuestSystem.Instance;
+                    EditorGUILayout.LabelField(
+                        quests != null ? "받을 것 " + quests.TotalClaimable + "개" : "-",
+                        GUILayout.Width(120f));
+
+                    using (new EditorGUI.DisabledScope(!Application.isPlaying || quests == null))
+                    {
+                        // 쌓인 상태를 만든다. 반복 퀘스트는 카운터에서 티어가
+                        // 유도되므로 카운터를 밀면 여러 개가 한꺼번에 열린다 -
+                        // 백 개가 쌓인 화면이 이 버튼의 실제 대상이다
+                        if (GUILayout.Button("보상 쌓기"))
+                            for (int n = 0; n < 200; n++) quests.ReportMobKill();
+
+                        if (GUILayout.Button("일괄 수령"))
+                            Debug.Log("[Onikiri] 일괄 수령: " + quests.ClaimAll() + "개");
+                    }
+                }
+
+                // ---- 팝업 넷 (#1 · #12 · #14)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("팝업", GUILayout.Width(80f));
+                    using (new EditorGUI.DisabledScope(!Application.isPlaying))
+                    {
+                        if (GUILayout.Button("설정")) TogglePopup("SettingsPanel");
+                        if (GUILayout.Button("랭킹")) TogglePopup("LeaderboardPanel");
+                        if (GUILayout.Button("스킬 정보")) OpenSkillPopup();
+                    }
+                }
+
+                // ---- #2 경험치 줄 / 가이드 카드 (완료 토스트는 제거됐다 -
+                //      완료 신호는 카드와 퀘스트 아이콘 배지 둘로 충분하다)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("상시 HUD", GUILayout.Width(80f));
+                    EditorGUILayout.LabelField(
+                        "경험치 줄 " + LayerStateOf("ExpStrip")
+                        + " · 가이드 카드 " + LayerStateOf(BattleContentBuilder.GuideCardName),
+                        EditorStyles.miniLabel);
+                }
+            }
+        }
+
+        /** SafeArea 아래의 판 하나를 켜고 끈다 */
+        private static void TogglePopup(string name)
+        {
+            var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+            var found = safeArea != null ? safeArea.Find(name) : null;
+            if (found == null) { Debug.LogWarning("[Onikiri] " + name + " 없음"); return; }
+            found.gameObject.SetActive(!found.gameObject.activeSelf);
+        }
+
+        /** 첫 오의로 정보 팝업을 연다 (#14) */
+        private static void OpenSkillPopup()
+        {
+            var popup = Object.FindFirstObjectByType<Onikiri.UI.SkillInfoPopup>(
+                FindObjectsInactive.Include);
+            if (popup == null) { Debug.LogWarning("[Onikiri] SkillInfoPopup 없음"); return; }
+            popup.Open(0);
+        }
+
+        /**
+         * @brief 그 HUD가 지금 어느 층에 서 있는가 (#2).
+         *
+         * 층위가 틀리면 증상이 "가끔 안 보인다"라 눈으로 재현하기 어렵다 -
+         * 어느 화면을 열었느냐에 따라 갈리기 때문이다. 값으로 읽어둔다.
+         */
+        private static string LayerStateOf(string name)
+        {
+            var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+            var found = safeArea != null ? safeArea.Find(name) : null;
+            if (found == null) return "없음";
+
+            var canvas = found.GetComponent<Canvas>();
+            return canvas != null && canvas.overrideSorting
+                ? "층 " + canvas.sortingOrder
+                : "층 없음(파묻힘)";
         }
 
         /**
@@ -2281,7 +2714,9 @@ namespace Onikiri.EditorTools
             {
                 EditorGUILayout.LabelField("무한 구간", GUILayout.Width(64f));
 
-                foreach (int target in new[] { 51, 100, 200 })
+                // 52단계에 st500(거버넌스 끝)과 st550(f2p 벽 실측)이 늘었다 -
+                // 계약 경계의 화면을 눈으로 볼 수 있어야 한다
+                foreach (int target in new[] { 51, 100, 200, 500, 550 })
                 {
                     if (GUILayout.Button("st" + target))
                     {
@@ -2298,6 +2733,16 @@ namespace Onikiri.EditorTools
                 EditorGUILayout.LabelField(
                     "지역 " + region + " (세트 " + contentRegion + ")", EditorStyles.miniLabel);
             }
+
+            // 도달층 기록 (52단계). 이 값이 곧 리더보드 점수가 된다 -
+            // StageProgress.MaxStageReached 주석. 새니티 상한도 함께 적는다
+            EditorGUILayout.LabelField(string.Format(
+                "도달층(리더보드 예정) st{0} · 계약 st{1}~{2} · 새니티 캡 {3:N0}",
+                stage.MaxStageReached,
+                Onikiri.Progression.StageSimulation.ReachContractFrom,
+                Onikiri.Progression.StageSimulation.ReachContractTo,
+                Onikiri.Progression.StageProgress.ReachSanityCap),
+                EditorStyles.miniLabel);
         }
 
         /**
@@ -2408,6 +2853,280 @@ namespace Onikiri.EditorTools
             SaveSystem.Save(data);
 
             session.ReloadFromDisk();
+        }
+
+        /**
+         * @brief Firebase 스파이크 - 도달층 write/read 왕복.
+         *
+         * 여기서 되는 것이 증명의 전부는 아니다. **에디터의 Firestore는 데스크톱
+         * 네이티브이고 폰의 Firestore는 Play 서비스 위에서 돈다** - 여기서 초록불이
+         * 떠도 기기에서 의존성 확인이 막히는 경우가 실제로 있다. 그래서 이 절은
+         * "코드가 맞게 짜였는가"까지만 답하고, 진짜 답은 기기의 오버레이 버튼과
+         * logcat에 있다 (CloudSpikeOverlay).
+         *
+         * 단계별 버튼을 따로 둔 이유는 실패 지점이 네 군데로 뚜렷하게 갈리기
+         * 때문이다 - 의존성(Play 서비스), 로그인(콘솔의 익명 인증 설정), write
+         * (보안 규칙), read(네트워크). 한 버튼만 있으면 어디서 멈췄는지 로그를
+         * 거슬러 올라가야 한다.
+         */
+        private void DrawCloudTools()
+        {
+            EditorGUILayout.LabelField("클라우드 (Firebase 스파이크)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("상태", CloudScores.Status);
+                Row("uid", string.IsNullOrEmpty(CloudScores.Uid) ? "(로그인 전)" : CloudScores.Uid);
+                Row("도달층", stage != null
+                    ? string.Format("로컬 {0}   /   서버 {1}", stage.MaxStageReached,
+                        CloudScores.LastReadStage >= 0
+                            ? CloudScores.LastReadStage.ToString() : "(안 읽음)")
+                    : "(StageProgress 없음)");
+                Row("문서", CloudScores.Collection + "/"
+                    + (string.IsNullOrEmpty(CloudScores.Uid) ? "{uid}" : CloudScores.Uid));
+
+                using (new EditorGUI.DisabledScope(CloudScores.IsBusy))
+                {
+                    if (GUILayout.Button("Firebase: 초기화→로그인→write→read", GUILayout.Height(26f)))
+                        CloudScores.RunSpike();
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("초기화")) Forget(CloudScores.InitializeAsync());
+                        if (GUILayout.Button("로그인")) Forget(CloudScores.SignInAnonymouslyAsync());
+                        if (GUILayout.Button("write"))
+                            Forget(CloudScores.SubmitReachAsync(CloudScores.CurrentReach()));
+                        if (GUILayout.Button("read")) Forget(CloudScores.FetchReachAsync());
+                    }
+
+                    // 오프라인 안전은 이 게임에서 부가 기능이 아니다 - 방치형은
+                    // 네트워크가 없는 곳에서도 계속 돌아야 하고, Firebase가 그것을
+                    // 막으면 그 순간 곁다리가 본체를 죽인 것이다. 끄고 나서 위
+                    // 버튼들을 눌러보는 것이 이 절의 마지막 검사다
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField("오프라인", GUILayout.Width(64f));
+                        if (GUILayout.Button("네트워크 끄기"))
+                            Forget(CloudScores.SetNetworkEnabledAsync(false));
+                        if (GUILayout.Button("네트워크 켜기"))
+                            Forget(CloudScores.SetNetworkEnabledAsync(true));
+                    }
+                }
+
+                EditorGUILayout.HelpBox(
+                    "여기는 스파이크 경로(무조건 write)입니다. 게임이 실제로 쓰는 경로는 "
+                    + "아래 랭킹 절의 '조건부 제출'입니다.\n"
+                    + "실기 확인: Onikiri/Build/폰으로 빌드 + 설치 (개발 빌드) -> "
+                    + "화면 좌상단 Firebase 버튼 -> adb logcat -s Unity", MessageType.Info);
+            }
+
+            DrawLeaderboardTools();
+        }
+
+        /**
+         * @brief 랭킹 (54단계). 스파이크 절 바로 다음이다 - 같은 문서를 쓴다.
+         *
+         * 이 절이 없으면 확인 비용이 확인보다 커지는 자리가 셋이다:
+         *
+         *   디바운스 20초  기다려야만 제출이 나간다. "지금 제출"이 그것을 건너뛴다
+         *   후퇴 거부      낮은 값이 거부되는 것을 보려면 서버보다 낮은 도달층이
+         *                  필요한데, 도달층은 내려가지 않는다(52단계 단조성).
+         *                  그래서 **임의 값 제출**을 둔다 - 이 버튼만이 규칙을
+         *                  시험할 수 있다(정상 경로로는 낮은 값이 나올 수 없다)
+         *   첫 진입 이름   이름을 한 번 정하면 되돌릴 방법이 게임 안에 없다
+         */
+        private void DrawLeaderboardTools()
+        {
+            EditorGUILayout.LabelField("랭킹 (리더보드)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("내 이름", PlayerProfile.Name
+                    + (PlayerProfile.HasChosenName ? "" : "  (아직 안 정함)"));
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    debugPlayerName = EditorGUILayout.TextField("이름 바꾸기", debugPlayerName);
+                    if (GUILayout.Button("적용", GUILayout.Width(60f)))
+                    {
+                        if (!PlayerProfile.SetName(debugPlayerName))
+                            Debug.LogWarning("[Onikiri] 빈 이름은 저장되지 않습니다.");
+                    }
+                    if (GUILayout.Button("지우기", GUILayout.Width(60f))) PlayerProfile.Clear();
+                }
+
+                var submitter = Object.FindFirstObjectByType<Onikiri.Cloud.LeaderboardSubmitter>();
+                Row("자동 제출기", submitter != null ? "배선됨 (Battle)" : "없음 - 랭킹 패널을 다시 빌드하세요");
+
+                using (new EditorGUI.DisabledScope(submitter == null))
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("지금 제출 (디바운스 건너뜀)"))
+                    {
+                        submitter.ForgetLastAttempt();
+                        submitter.Submit("테스트 패널");
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("임의 값", GUILayout.Width(64f));
+                    debugSubmitStage = EditorGUILayout.IntField(debugSubmitStage);
+                    // 후퇴 거부를 눈으로 보는 유일한 경로다. 정상 플레이에서는
+                    // 서버보다 낮은 값이 애초에 만들어지지 않는다
+                    if (GUILayout.Button("조건부 제출", GUILayout.Width(100f)))
+                        Forget(CloudScores.SubmitIfHigherAsync(debugSubmitStage));
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("상위 10 조회")) FetchTopForPanel(10);
+                    if (GUILayout.Button("내 순위"))
+                        Forget(CloudScores.FetchRankAsync(CloudScores.CurrentReach()));
+                }
+
+                if (!string.IsNullOrEmpty(leaderboardPreview))
+                    EditorGUILayout.HelpBox(leaderboardPreview, MessageType.None);
+
+                EditorGUILayout.HelpBox(
+                    "제출은 도달층이 오른 뒤 " + Onikiri.Cloud.LeaderboardPolicy.DebounceSeconds
+                    + "초 조용하면 자동으로, 앱이 뒤로 갈 때 한 번 더 나갑니다.\n"
+                    + "서버 규칙(4-B)이 같은 검사를 한 겹 더 합니다 - 남의 문서·범위 밖·"
+                    + "내려가는 값은 거부됩니다. 값의 진위 검증(Cloud Functions)은 다음 스텝입니다.",
+                    MessageType.Info);
+            }
+
+            DrawAccountTools();
+        }
+
+        /**
+         * @brief 계정 연동 (55단계). **에디터에서 확인할 수 있는 것과 없는 것을 가른다.**
+         *
+         * 구글 로그인은 안드로이드 네이티브(Credential Manager)라 에디터에서는
+         * 아예 돌지 않는다 - 여기서 "연동" 버튼을 눌러 봐야 "이 기기에서는 쓸
+         * 수 없습니다"만 나온다. 그래서 이 절이 하는 일은 셋이다:
+         *
+         *   상태 표시    지금 정체성이 무엇인지 (Unknown / Guest / Linked)
+         *   병합 계산기  **이 스텝에서 에디터로 검사 가능한 유일한 알맹이.**
+         *                재설치·다기기의 숫자 조합을 손으로 넣어 어느 값이
+         *                살아남는지 본다. 실기에서는 그 상황을 만드는 데
+         *                재설치 한 번이 통째로 든다
+         *   분기표       어떤 실패가 어느 갈래로 가는지. 특히 **취소가
+         *                복구로 새지 않는다**는 것을 눈으로 확인하는 자리
+         *
+         * 진짜 검증은 실기다: 개발 빌드 → 화면 좌상단 Firebase ▼ → 구글 연동.
+         */
+        private void DrawAccountTools()
+        {
+            EditorGUILayout.LabelField("계정 연동 (구글)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("상태", Onikiri.Cloud.AccountLink.State.ToString()
+                    + (Onikiri.Cloud.AccountLink.State == Onikiri.Cloud.AccountState.Unknown
+                        ? "  (Firebase 초기화 전)" : string.Empty));
+                Row("마지막 갈래", Onikiri.Cloud.AccountLink.LastPlan.ToString());
+
+                string linked = Onikiri.Cloud.AccountLink.LinkedLabel;
+                Row("연동 계정", string.IsNullOrEmpty(linked) ? "(없음)" : linked);
+
+                var google = Onikiri.Cloud.AuthProviders.Google;
+                Row("공급자", google.DisplayName + " (" + google.Id + ")   사용가능 = "
+                    + google.IsAvailable);
+                Row("애플 자리", Onikiri.Cloud.AuthProviders.Apple.Id + "   사용가능 = "
+                    + Onikiri.Cloud.AuthProviders.Apple.IsAvailable + "  (스텁 - 다음 스텝)");
+
+                using (new EditorGUI.DisabledScope(Onikiri.Cloud.AccountLink.IsBusy))
+                {
+                    if (GUILayout.Button("구글 연동 시도 (에디터에서는 실패가 정답)"))
+                        Forget(Onikiri.Cloud.AccountLink.LinkAsync(google));
+                }
+
+                if (!string.IsNullOrEmpty(Onikiri.Cloud.AccountLink.Status))
+                    EditorGUILayout.HelpBox(Onikiri.Cloud.AccountLink.Status, MessageType.None);
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("병합 계산기 (복구할 때 어느 값이 남는가)",
+                                           EditorStyles.miniBoldLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    mergeLocal = EditorGUILayout.IntField("로컬", mergeLocal);
+                    mergeAbandoned = EditorGUILayout.IntField("버릴 문서", mergeAbandoned);
+                    mergeRecovered = EditorGUILayout.IntField("복구 문서", mergeRecovered);
+                }
+
+                int merged = Onikiri.Cloud.AccountLinkPolicy.MergedStage(
+                    mergeLocal, mergeAbandoned, mergeRecovered);
+                bool writes = Onikiri.Cloud.AccountLinkPolicy.ShouldMergeAfterRecovery(
+                    merged, mergeRecovered);
+
+                Row("결과", merged + "층 유지   /   서버에 쓰는가 = "
+                    + (writes ? "예" : "아니오 (복구된 값이 이미 최고)"));
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("재설치 직후 (1 / 0 / 171)"))
+                    { mergeLocal = 1; mergeAbandoned = 0; mergeRecovered = 171; }
+                    if (GUILayout.Button("익명으로 더 감 (500 / 500 / 171)"))
+                    { mergeLocal = 500; mergeAbandoned = 500; mergeRecovered = 171; }
+                    if (GUILayout.Button("백업 복원 (12 / 500 / 171)"))
+                    { mergeLocal = 12; mergeAbandoned = 500; mergeRecovered = 171; }
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("분기표 (실패 -> 계획)", EditorStyles.miniBoldLabel);
+
+                foreach (Onikiri.Cloud.AuthFailure failure
+                         in System.Enum.GetValues(typeof(Onikiri.Cloud.AuthFailure)))
+                {
+                    if (failure == Onikiri.Cloud.AuthFailure.None) continue;
+                    Row(failure.ToString(),
+                        "연동 실패 시 -> "
+                        + Onikiri.Cloud.AccountLinkPolicy.PlanAfterLinkFailure(failure)
+                        + "     /     자격증명 실패 시 -> "
+                        + Onikiri.Cloud.AccountLinkPolicy.PlanAfterAcquireFailure(failure));
+                }
+
+                EditorGUILayout.HelpBox(
+                    "구글 로그인은 **안드로이드 실기 전용**입니다 (Credential Manager 네이티브).\n"
+                    + "실기 확인: Onikiri/Build/폰으로 빌드 + 설치 (개발 빌드) -> "
+                    + "좌상단 Firebase ▼ -> 구글 연동 -> adb logcat -s Unity | grep AccountLink\n"
+                    + "★ 이 스텝의 진짜 검증은 **앱 삭제 후 재설치 -> 구글 로그인 -> "
+                    + "도달층 복구**입니다. AlreadyInUse -> Recover 갈래를 밟는지 보세요.",
+                    MessageType.Info);
+            }
+        }
+
+        /** 조회 결과를 패널 안에 그대로 적는다 - 콘솔과 화면을 오가지 않게 */
+        private void FetchTopForPanel(int count)
+        {
+            leaderboardPreview = "조회 중...";
+            CloudScores.FetchTopAsync(count).ContinueWith(task =>
+            {
+                var entries = task.Result;
+                if (entries == null) { leaderboardPreview = "조회 실패 (콘솔 참고)"; return; }
+                if (entries.Length == 0) { leaderboardPreview = "아직 아무도 없습니다"; return; }
+
+                var text = new System.Text.StringBuilder();
+                for (int i = 0; i < entries.Length; i++)
+                    text.AppendFormat("{0,3}위  {1,-14} {2}층{3}\n", i + 1, entries[i].Name,
+                        entries[i].MaxStage, entries[i].IsMe ? "  <- 나" : string.Empty);
+                leaderboardPreview = text.ToString().TrimEnd();
+            }, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
+        /**
+         * @brief 반환된 Task를 버리되 예외는 관측한다.
+         *
+         * 그냥 버리면 실패한 Task가 GC될 때 UnobservedTaskException으로 뒤늦게
+         * 떠서, 어느 버튼이 원인인지 알 수 없는 로그가 콘솔에 남는다. CloudScores가
+         * 내부에서 이미 다 잡지만, 이 창은 그 약속에 기대지 않는다.
+         */
+        private static void Forget(System.Threading.Tasks.Task task)
+        {
+            task.ContinueWith(t => Debug.LogWarning("[Onikiri] 클라우드 호출 실패: " + t.Exception),
+                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
         }
 
         private void DrawScreenTools()

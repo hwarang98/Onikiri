@@ -223,7 +223,7 @@ namespace Onikiri.Tests
          * @brief 기준 구성이 **부동소수점 잡음이 아니라 표 순서**로 정해진다.
          *
          * 다섯의 기여는 설계상 같은 값이지만 `배율 / 쿨다운`을 따로 적어 나눈
-         * 결과라 double의 마지막 비트가 갈린다(2.88/16과 1.98/11이 정확히 같은
+         * 결과라 double의 마지막 비트가 갈린다(1.44/8과 0.99/5.5가 정확히 같은
          * double이 아니다). 맨 부등호로 고르면 그 잡음이 장착 순서를 정하고,
          * 실제로 그렇게 나왔다 - 혈파동 대신 낙혈이 뽑혔다.
          *
@@ -416,16 +416,10 @@ namespace Onikiri.Tests
                 "4번 자리를 안 쓴 무과금이 {0:P2}밖에 안 느리다 - 자리를 하나 열어 준 것이 "
                 + "화면에만 있고 진행에는 없다", gain));
 
-            // 두 번째 자: 같은 시간 예산으로 몇 스테이지까지 가는가
-            double budget = TotalSeconds(with, 1, 400);
-            int reach = 0;
-            double spent = 0d;
-            foreach (var row in without)
-            {
-                spent += row.MobSeconds + row.BossKillSeconds;
-                if (spent > budget) break;
-                reach = row.Stage;
-            }
+            // 두 번째 자: 같은 시간 예산으로 몇 스테이지까지 가는가.
+            // 걷기는 52단계에 StageSimulation.ReachedStage로 승격됐다
+            double budget = StageSimulation.CombatSeconds(with, 1, 400);
+            int reach = StageSimulation.ReachedStage(without, budget, 1);
 
             Assert.LessOrEqual(reach, 390, string.Format(
                 "같은 시간에 4번 자리 없이도 st{0}까지 간다 - 도달층으로도 차이가 없다", reach));

@@ -42,6 +42,13 @@ namespace Onikiri.Progression
         private float autoSaveTimer;
         private bool loaded;
 
+        /**
+         * @brief 세이브 적용이 끝났는가. 인트로의 로딩 게이트가 읽는다.
+         *
+         * 쓰기는 이 클래스만 한다 - 게이트는 관측이지 조종이 아니다.
+         */
+        public bool IsLoaded { get { return loaded; } }
+
         private void Start()
         {
             Load();
@@ -159,6 +166,10 @@ namespace Onikiri.Progression
             // 다른 축과 같은 결이다(상태 먼저, 그 상태를 읽는 것은 나중)
             if (petSystem != null)
                 petSystem.Restore(data.petIds, data.petUnlocked, data.petLevels, data.activePetId);
+
+            // 이름은 순서 제약이 없다 - 게임의 어떤 값도 이것을 읽지 않는다
+            // (54단계). 리더보드 제출과 랭킹표만 본다
+            PlayerProfile.Restore(data.playerName);
 
             // 퀘스트는 **맨 마지막**이다. 업적이 스테이지·레벨·강화 총합을 읽으므로
             // 그 셋이 이미 복원돼 있어야 한다 - 먼저 돌면 전부 초기값으로 읽혀서
@@ -303,6 +314,9 @@ namespace Onikiri.Progression
                 // activePetId는 레거시(단일 출전 시절)라 더 적지 않는다 -
                 // 남아 있는 값은 그대로 실려 다니고 아무도 읽지 않는다
             }
+
+            // 안 정했으면 빈 문자열이 그대로 적힌다(SaveData.playerName 주석)
+            data.playerName = PlayerProfile.Collect();
 
             // 퀘스트가 보석 잔액까지 함께 적는다. 지갑을 따로 읽지 않는 이유는
             // 둘이 한 시스템이기 때문이다 - 보석은 퀘스트 말고 들어올 곳이 없다

@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// ONIKIRI 도달층 랭킹 - 4-B (54단계, 테스트 모드 해제).
+//
+// 4-A(전면 개방)는 스파이크가 왕복을 증명하는 동안만 유효한 임시 규칙이었다.
+// 이 규칙이 그것을 대체한다. 만료일이 없다 - 만료로 닫히는 규칙은 그날
+// 랭킹이 통째로 죽는다는 뜻이고, 그건 출시 후에 있을 수 없는 일이다.
+//
+// ## 이 규칙이 강제하는 것 / 못 하는 것
+//
+//   강제한다   남의 문서에 못 쓴다 · 문서 ID와 uid가 어긋나면 못 쓴다
+//              범위 밖(음수·10만 초과)·잘못된 타입은 못 쓴다
+//              **도달층은 내려갈 수 없다**(단조)
+//
+//   못 한다    값의 **진위**. 개조 클라가 "나는 99,999층"이라고 주장하면
+//              위 검사를 전부 통과한다. 도달층은 세이브 상태에서 결정론적으로
+//              재계산되는 값이라(52단계) 서버가 다시 시뮬레이션하면 잡히지만,
+//              그 계산은 Cloud Functions가 필요하고 Functions는 Blaze 요금제가
+//              필요하다. 다음 스텝의 일이고, 그때 이 규칙은 "함수가 쓴 값만
+//              허용"으로 한 번 더 조인다.
+//
+// 즉 지금은 **구조적 잠금**까지다. 아무나 아무 문서나 쓰던 상태에서, 자기
+// 문서에 유효 범위의 오르는 값만 쓰는 상태로.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // 문서에 이 넷 말고는 없어야 한다. 클라가 임의 필드를 붙일 수 있으면
+    // 그것은 무료 저장소이고, 언젠가 누군가 그것을 쓴다
+    function hasOnlyLeaderboardFields() {
+      return request.resource.data.keys().hasOnly(['uid', 'name', 'maxStage', 'updatedAt']);
+    }
+
+    function isValidPayload(uid) {
+      return request.resource.data.uid == uid
+             && request.resource.data.maxStage is int
+             // 상한은 StageProgress.ReachSanityCap과 **같은 값**이다. 갈리면
+             // 로컬에서 통과한 값이 서버에서 조용히 거부된다
+             && request.resource.data.maxStage >= 0
+             && request.resource.data.maxStage <= 100000
+             && request.resource.data.name is string
+             && request.resource.data.name.size() > 0
+             // PlayerProfile.MaxLength와 같은 값
+             && request.resource.data.name.size() <= 12
+             // 서버 타임스탬프여야 한다. 클라 시계를 그대로 받으면 동점
+             // tie-break("먼저 도달한 사람이 위")를 시계 조작으로 이길 수 있다
+             && request.resource.data.updatedAt == request.time;
+    }
+
+    match /scores/{uid} {
+
+      // 읽기는 공개다. 랭킹은 로그인하지 않은 사람에게도 보여야 하고
+      // (익명 로그인 전의 첫 화면), 여기 있는 것은 이름과 층수뿐이다
+      allow read: if true;
+
+      allow create: if isOwner(uid)
+                    && hasOnlyLeaderboardFields()
+                    && isValidPayload(uid);
+
+      // 갱신은 오르는 방향으로만. 이것이 재설치·후퇴로 기록이 지워지는 것을
+      // 막는 마지막 겹이다(클라도 검사하지만 클라는 조작될 수 있다)
+      allow update: if isOwner(uid)
+                    && hasOnlyLeaderboardFields()
+                    && isValidPayload(uid)
+                    && request.resource.data.maxStage >= resource.data.maxStage;
+
+      // 지울 이유가 없다. 계정 삭제 요청은 서버(콘솔·함수)가 처리한다 -
+      // 클라에 삭제 권한을 주면 남의 uid를 알아낸 사람이 아니라 **자기
+      // 기록을 실수로 날린 사람**이 먼저 생긴다
+      allow delete: if false;
+    }
+
+    // 그 밖의 모든 것은 거부. 4-A에서 열려 있던 나머지 컬렉션이 여기서 닫힌다
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

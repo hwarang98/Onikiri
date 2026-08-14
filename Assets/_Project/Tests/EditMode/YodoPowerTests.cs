@@ -348,11 +348,14 @@ namespace Onikiri.Tests
          * 검사가 닿지 않는 구간에서 몫을 밀어 올린다 - 실제로 st200의 몫이
          * 0.34에서 0.41로 올랐다.
          *
-         * 계약 구간(st200)까지만 검사한다. 그 밖에서는 상한 티어로 갈수록
-         * 몫이 계속 오르고(st500 가속 플레이어 0.57) 자동 공격이 소수가
-         * 되는데, 그 구간은 아직 어떤 밴드도 지키지 않는다 - 44단계가
-         * "계약 밖(st201~500)은 사실만 적어 둔다"고 한 것과 같은 처리이고,
-         * 밴드를 st500까지 늘리는 스텝이 이 값도 함께 봐야 한다.
+         * 계약 구간(st200)까지만 검사한다. 그 밖은 52단계가 실측으로 답을
+         * 냈다 - **50%는 꼬리에서 지켜지지 않고, 지켜질 수도 없다.** st500
+         * 기준 플레이어 몫이 0.646인데, 그것을 미는 것은 과금 층이 아니라
+         * **무과금도 그대로 받는 티어 성장**이다(무과금 몫이 st290 언저리에서
+         * 0.5를 넘고 st500에 0.569다). 꼬리에서 이 계약을 강제하려면 44·45
+         * 단계의 티어 곡선 자체를 걷어내야 하고, 그것은 무과금의 유일한
+         * 후반 축을 죽인다. 그래서 꼬리의 계약은 50%가 아니라 **유한 상한**
+         * 이다 - 아래 TailShare_StaysBounded가 그 자다.
          */
         [Test]
         public void Affinity_DoesNotFlipTheAutoAttackWithinTheContract()
@@ -365,6 +368,64 @@ namespace Onikiri.Tests
                     + "장식으로 만들고 있다 (rate {2:F2}, 공격속도 {3:F2})",
                     stage, rows[stage - 1].SkillDpsShare, rows[stage - 1].SkillRate,
                     rows[stage - 1].AttacksPerSecond));
+        }
+
+        /**
+         * @brief 꼬리(st201~500)의 오의 몫 계약 - **유한 상한** (52단계).
+         *
+         * 위 검사의 주석이 근거다. 50% 대신 상한 0.68을 계약으로 둔다:
+         * 실측 최대 0.646(기준 플레이어, st441)에 5% 헤드룸이고, 자동
+         * 공격이 어느 층에서도 DPS의 3분의 1 아래로 내려가지 않는다는
+         * 보증이다. 미는 축이 전부 하드캡이라(티어 10 · 혼격 4 · 전설 4)
+         * 이 상한은 재기준이 필요 없는 종류다 - 뚫린다면 그것은 성장이
+         * 아니라 상한 없는 새 괄호 안 축이 생긴 것이다.
+         */
+        [Test]
+        public void TailShare_StaysBounded()
+        {
+            var policies = new[]
+            {
+                StageSimulation.Policy.Default,
+                new StageSimulation.Policy { GemsFromQuestsOnly = true }
+            };
+
+            foreach (var policy in policies)
+            {
+                var rows = StageSimulation.Run(StageSimulation.ReachContractTo, Field(), policy);
+
+                for (int stage = 201; stage <= StageSimulation.ReachContractTo; stage++)
+                    Assert.Less(rows[stage - 1].SkillDpsShare, 0.68d, string.Format(
+                        "st{0}에서 오의 몫이 {1:P1}다 - 꼬리의 유한 상한(68%)을 넘었다. "
+                        + "상한 없는 괄호 안 축이 생겼다는 뜻이다",
+                        stage, rows[stage - 1].SkillDpsShare));
+            }
+        }
+
+        /**
+         * @brief 꼬리의 성장 축이 실제로 **포화하는가.** 유한 상한의 증인.
+         *
+         * st900의 기준 플레이어는 티어·혼격·전설이 전부 하드캡에 서 있어야
+         * 한다. 그래야 위의 0.68과 도달층 리드 압축이 "아직 안 자란 것"이
+         * 아니라 "**다 자란 것**"에서 잰 값이 된다 - 포화 전에 재면 다음
+         * 스텝에서 조용히 자라 뚫는다.
+         */
+        [Test]
+        public void TailGrowth_ActuallySaturates()
+        {
+            var rows = StageSimulation.Run(900, Field());
+            var last = rows[899];
+
+            for (int i = 0; i < last.YodoTiers.Length; i++)
+                Assert.AreEqual(YodoCurve.MaxTier, last.YodoTiers[i],
+                    "st900에서 " + i + "번 요도의 티어가 상한이 아니다 - 포화 가정이 깨진다");
+
+            for (int i = 0; i < last.YodoRarities.Length; i++)
+                Assert.AreEqual(YodoRarityCurve.MaxRarity, last.YodoRarities[i],
+                    "st900에서 " + i + "번 요도의 혼격이 상한이 아니다");
+
+            // 몫도 포화한다 - st700과 st900이 1%p 안이면 더 자랄 것이 없다
+            Assert.AreEqual(rows[699].SkillDpsShare, rows[899].SkillDpsShare, 0.01d,
+                "st700과 st900의 오의 몫이 갈린다 - 아직 자라는 축이 남아 있다");
         }
 
         /**

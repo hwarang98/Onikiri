@@ -391,6 +391,33 @@ namespace Onikiri.Tests
             UnityEngine.Object.DestroyImmediate(go);
         }
 
+        /**
+         * @brief 변조 세이브의 도달층은 새니티 상한에서 잘린다 (52단계).
+         *
+         * 도달층이 리더보드 점수가 되므로(StageProgress.MaxStageReached 주석)
+         * 터무니없는 값이 로컬 UI·퀘스트 산수를 오염시키지 않아야 한다.
+         * 진짜 거부는 서버 재검증의 몫이고, 여기는 오염 방지다 - 세이브
+         * 전체를 거부하지 않고 값만 자른다.
+         */
+        [Test]
+        public void SetProgress_ClampsATamperedFrontier()
+        {
+            var go = new UnityEngine.GameObject("~TestStage");
+            var progress = go.AddComponent<StageProgress>();
+
+            progress.SetProgress(7, 0, 6, 99999999);
+            Assert.AreEqual(StageProgress.ReachSanityCap, progress.MaxStageReached,
+                "a tampered frontier should clamp to the sanity cap");
+
+            // 현재 스테이지 쪽으로 우회해도 같은 상한에 걸린다 - 최전선은
+            // stage보다 작게 보고하지 않으므로 stage를 안 자르면 도로 오염된다
+            progress.SetProgress(99999999, 0, 6, 1);
+            Assert.AreEqual(StageProgress.ReachSanityCap, progress.Stage);
+            Assert.AreEqual(StageProgress.ReachSanityCap, progress.MaxStageReached);
+
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+
         // ---------------------------------------------------------------- 보스
 
         /**

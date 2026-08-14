@@ -2301,6 +2301,71 @@ namespace Onikiri.Progression
             return total;
         }
 
+        // ---------------------------------------------------------------- 52단계: 도달층 자
+
+        /**
+         * @brief 도달층 계약의 구간. **st51부터 st500까지다.**
+         *
+         * st1~50(코리더·가속)은 여유 밴드가 그대로 지킨다 - 그 구간은 여유가
+         * 1.5~4.5라 배수 자가 여전히 정밀하다. st51부터는 여유가 스무 배를
+         * 넘어 배수 자가 정밀도를 잃고(47단계: 천장이 실제 이득보다 8배
+         * 빠르게 부푼다), 이 구간의 계약은 **도달층**으로 잰다 - 같은 시간에
+         * 몇 층을 가는가. 그 값이 그대로 리더보드(무한층 도달)의 점수이기도
+         * 하다. 밴드와 랭킹이 같은 자를 쓰는 것이 이 전환의 이득이다.
+         */
+        public const int ReachContractFrom = 51;
+        public const int ReachContractTo = 500;
+
+        /**
+         * @brief 구간의 전투 시간 합 (초). **도달층 자의 예산이 이 값이다.**
+         *
+         * TotalSeconds와 달리 등장 연출·달려가는 시간(고정 6.3초/층)을 뺀다.
+         * 예산을 재는 쪽과 쓰는 쪽이 같은 정의면 고정 비용은 양변에서
+         * 상쇄되는데, 굳이 빼는 이유는 **뜻**이다 - 도달층 자는 "빌드가 산
+         * 시간"을 재는 자이고, 연출은 빌드와 무관하게 층당 상수라 리드에
+         * 아무 정보도 더하지 않는다. 47단계의 도달층 자(GachaTests)가 처음
+         * 그렇게 쟀고, 이 함수는 그 정의를 단일 출처로 승격한 것이다.
+         */
+        public static double CombatSeconds(List<StageResult> rows, int fromStage, int toStage)
+        {
+            double total = 0d;
+            for (int i = fromStage - 1; i < rows.Count && i < toStage; i++)
+                total += rows[i].MobSeconds + rows[i].BossKillSeconds;
+            return total;
+        }
+
+        /**
+         * @brief 이 예산으로 fromStage부터 몇 층까지 가는가. **도달층 자다.**
+         *
+         * 여유(BossMargin)가 아니라 진짜 진행을 잰다. 심층에서 여유는 이미
+         * 스무 배라 DPS 한 겹이 여유를 30% 밀어도 시간은 3%밖에 안 주는데,
+         * 층으로 세면 그 겹이 몇 층을 당기는지가 그대로 보인다(47단계가
+         * Ladder_MovesTheReachedStage에서 세운 자).
+         *
+         * ## 결정론
+         *
+         * 시뮬레이션과 이 걷기는 같은 입력에서 언제나 같은 값을 낸다 - 난수도
+         * 시계도 없다. 도달층이 리더보드 점수가 되려면 서버가 같은 계산을
+         * 재현할 수 있어야 하고(Firebase 다음 스텝), 그 성질을 여기서 확보한다.
+         *
+         * @return 예산 안에서 **완주한** 마지막 스테이지. 첫 층도 못 끝내면
+         *         fromStage - 1
+         */
+        public static int ReachedStage(List<StageResult> rows, double budgetSeconds, int fromStage)
+        {
+            int reached = fromStage - 1;
+            double spent = 0d;
+
+            for (int i = fromStage - 1; i < rows.Count; i++)
+            {
+                double seconds = rows[i].MobSeconds + rows[i].BossKillSeconds;
+                if (spent + seconds > budgetSeconds) break;
+                spent += seconds;
+                reached = rows[i].Stage;
+            }
+            return reached;
+        }
+
         /**
          * @brief 골드가 되는 대로, 지금 골드당 DPS 이득이 가장 큰 축을 산다.
          *

@@ -112,7 +112,8 @@ namespace Onikiri.EditorTools
                 return null;
             }
 
-            var panel = EnsurePanel(safeArea);
+            RectTransform root;
+            var panel = EnsurePanel(safeArea, font, out root);
             BuildHeader(panel, font);
 
             var pages = new GameObject[Kinds.Length];
@@ -123,8 +124,9 @@ namespace Onikiri.EditorTools
 
             BuildTabs(panel, font, pages);
 
-            // 판은 꺼진 채로 저장된다. 하단 탭이 켠다 - 스킬 패널과 같은 규칙
-            panel.gameObject.SetActive(false);
+            // 판은 꺼진 채로 저장된다. **플레이 화면의 퀘스트 아이콘이 켠다**
+            // (#16) - 하단 탭이 아니다
+            root.gameObject.SetActive(false);
 
             Debug.Log(string.Format(
                 "[Onikiri] Quest panel built: 일일 {0} / 반복 {1} / 업적 {2} = {3}줄, "
@@ -132,7 +134,9 @@ namespace Onikiri.EditorTools
                 QuestCatalog.DailyCount, QuestCatalog.RepeatCount, QuestCatalog.AchievementCount,
                 QuestCatalog.TotalCount, TallestPageHeight, ViewportHeight));
 
-            // 판을 새로 만들었으니 하단 탭을 다시 물린다 (RelinkScreenTabs 주석)
+            // 판을 새로 만들었으니 여는 쪽을 다시 물린다. #16 뒤로 그것은
+            // 하단 탭이 아니라 플레이 화면의 퀘스트 아이콘이다 - 그 배선은
+            // BattleContentBuilder가 들고 있다(BuildQuestButton)
             BattleContentBuilder.RelinkScreenTabs();
 
             return system;
@@ -180,13 +184,28 @@ namespace Onikiri.EditorTools
 
         // ---------------------------------------------------------------- 판
 
+        /**
+         * @brief 창 높이 / 디자인 높이 (#16 팝업화).
+         *
+         * ## 어느 탭에 맞추는가
+         *
+         * 탭 셋의 길이가 제각각이다 - 일일 5줄(600px), 반복 3줄, 업적 14줄
+         * (1764px). 고정 높이라 어딘가는 반드시 어긋나는데, **가장 자주 보는
+         * 탭**에 맞춘다.
+         *
+         * 처음에 랭킹과 같은 0.62(1190px)로 잡았다가 실기에서 되돌렸다 -
+         * 일일 탭에서 목록 아래가 **700px 비었다.** 업적을 다 담으려던 값인데,
+         * 업적은 어차피 어떤 높이에서도 스크롤되므로 그 여유가 사는 것은
+         * 업적 하나뿐이고 나머지 둘이 값을 치른다.
+         *
+         * 0.42(806px) = 머리(152) + 일일 다섯 줄(600) + 여백. 44단계의
+         * 규칙 그대로다 - **상자를 내용에 맞춘다.**
+         */
+        private const float WindowFraction = 0.42f;
+
         private static float BandHeight
         {
-            get
-            {
-                return DisplayConfig.DesignHeight
-                       * (DisplayConfig.GrowthPanelTop - DisplayConfig.BottomTabBarTop);
-            }
+            get { return PopupBuilder.WindowHeight(WindowFraction); }
         }
 
         private static float ViewportHeight
@@ -209,31 +228,27 @@ namespace Onikiri.EditorTools
             }
         }
 
-        private static RectTransform EnsurePanel(Transform safeArea)
+        /**
+         * @brief 퀘스트는 **화면이 아니라 팝업이다** (#16).
+         *
+         * ## 왜 하단 탭에서 내려왔는가
+         *
+         * 하단 탭은 **키우는 것들**의 줄이다 - 캐릭터·스킬·장비·동료·상점은
+         * 전부 "내 것을 키우러 들어가는" 화면이고, 거기서 무언가를 사고 끼운다.
+         * 퀘스트는 그 층위가 아니다. 받고 나오는 화면이고, 열어야 할 이유는
+         * **받을 것이 생겼을 때** 뿐이다.
+         *
+         * 그래서 진입점이 플레이 화면의 아이콘으로 간다(BuildQuestButton).
+         * 알림 점이 거기 붙으므로 "받을 것이 있다 → 그 자리를 누른다"가 한
+         * 동작이 되고, 진행도 줄(#13)이 바로 옆에 있어 "지금 뭘 하는 중인가 →
+         * 받으러 간다"가 같은 자리에서 이어진다.
+         *
+         * 컨테이너만 바뀐다. 목록·수령·탭·배지 로직은 한 줄도 안 옮겼다.
+         */
+        private static RectTransform EnsurePanel(Transform safeArea, TMP_FontAsset font,
+                                                 out RectTransform root)
         {
-            var existing = safeArea.Find(PanelName);
-            if (existing != null) Object.DestroyImmediate(existing.gameObject);
-
-            var go = new GameObject(PanelName, typeof(RectTransform));
-            go.transform.SetParent(safeArea, false);
-
-            var rect = (RectTransform)go.transform;
-            rect.anchorMin = new Vector2(0f, DisplayConfig.BottomTabBarTop);
-            rect.anchorMax = new Vector2(1f, DisplayConfig.GrowthPanelTop);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-
-            // 자기 바탕. 뒤의 성장 패널이 비쳐 보이면 두 목록이 겹친 것으로 읽힌다
-            var backdrop = go.AddComponent<Image>();
-            backdrop.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(BackdropTextureBuilder.WashiPath);
-            backdrop.type = Image.Type.Tiled;
-            backdrop.color = UiSkin.PanelInk;
-            backdrop.raycastTarget = true;
-
-            // 화지 위의 벚가지 (39단계). 스킬 패널과 같은 헬퍼 - 한 결로 읽힌다
-            BackdropTextureBuilder.AddSakuraBranch(rect);
-
-            return rect;
+            return PopupBuilder.Ensure(safeArea, PanelName, font, WindowFraction, out root);
         }
 
         /**
@@ -272,7 +287,10 @@ namespace Onikiri.EditorTools
             timerRect.anchorMin = new Vector2(0.35f, 0f);
             timerRect.anchorMax = new Vector2(1f, 1f);
             timerRect.offsetMin = Vector2.zero;
-            timerRect.offsetMax = new Vector2(-24f, 0f);
+            // 팝업의 닫기 X가 창 오른쪽 위 모서리에 앉으므로 그만큼 물러난다
+            // (#16). 안 물러나면 "초기화까지 00:00:00"의 끝자리가 X 밑으로
+            // 들어간다 - 팝업 뼈대가 공용이라 이 여백도 공용 상수에서 온다
+            timerRect.offsetMax = new Vector2(-(PopupBuilder.CloseSize + 16f), 0f);
             timer.color = DimColor;
             timer.text = "초기화까지 00:00:00";
 
@@ -345,6 +363,18 @@ namespace Onikiri.EditorTools
             rect.sizeDelta = new Vector2(0f, PageHeight(kind));
             rect.anchoredPosition = Vector2.zero;
 
+            // 탭별 독립 스크롤 (#6). 퀘스트 안쪽 탭 셋이 한 스크롤을 공유해서
+            // 한 탭에서 내린 위치가 다른 탭에 그대로 남았고, Content 높이도
+            // 가장 긴 탭에 고정이라 짧은 탭에서는 목록이 끝난 뒤로도 계속
+            // 스크롤됐다 - "목록이 안 보일 때까지 스크롤되는" 것이 그것이다
+            var memory = go.AddComponent<Onikiri.UI.ScrollPageMemory>();
+            var memorySo = new UnityEditor.SerializedObject(memory);
+            memorySo.FindProperty("scroll").objectReferenceValue =
+                content.GetComponentInParent<ScrollRect>();
+            memorySo.FindProperty("content").objectReferenceValue = content;
+            memorySo.FindProperty("pageHeight").floatValue = PageHeight(kind);
+            memorySo.ApplyModifiedPropertiesWithoutUndo();
+
             var specs = QuestCatalog.Of(kind);
             for (int i = 0; i < specs.Length; i++)
                 BuildRow(rect, system, font, kind, i);
@@ -393,11 +423,7 @@ namespace Onikiri.EditorTools
             progress.text = "0 / " + spec.Target;
 
             // 아랫줄: 진행바(왼쪽) + 보상(오른쪽)
-            var reward = CreateLabel(go.transform, font, "Reward", TextAlignmentOptions.Right);
-            UiFonts.Demote(reward);
-            PlaceStretched((RectTransform)reward.transform, 24f, ClaimWidth + 24f, 58f, 50f);
-            reward.color = DimColor;
-            reward.text = "보석 " + spec.Gems;
+            var reward = BuildRewardGroup(go.transform, font, spec);
 
             var track = new GameObject("Track", typeof(RectTransform));
             track.transform.SetParent(go.transform, false);
@@ -508,8 +534,10 @@ namespace Onikiri.EditorTools
                 var go = new GameObject("Tab" + i, typeof(RectTransform));
                 go.transform.SetParent(bar.transform, false);
 
+                // 탭 셋이 줄의 왼쪽 ClaimAllLeft만큼을 나눠 쓴다. 오른쪽
+                // 나머지는 [일괄 수령] 자리다 (#5)
                 var rect = (RectTransform)go.transform;
-                float slice = 1f / Kinds.Length;
+                float slice = ClaimAllLeft / Kinds.Length;
                 rect.anchorMin = new Vector2(i * slice, 0f);
                 rect.anchorMax = new Vector2((i + 1) * slice, 1f);
                 rect.offsetMin = new Vector2(6f, 0f);
@@ -544,23 +572,206 @@ namespace Onikiri.EditorTools
                     badge.GetComponentInChildren<TMP_Text>(true);
             }
 
+            BuildClaimAll(bar.transform, font);
+
             so.FindProperty("selectedText").colorValue = TextColor;
             so.FindProperty("unselectedText").colorValue = DimColor;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /**
-         * @brief 빨간 원형 배지. 성장 탭의 것과 같은 모양이다.
+         * @brief 탭 줄에서 탭 셋이 쓰는 몫 (#5). 나머지가 [일괄 수령] 자리다.
+         *
+         * 0.72 = 984px의 708px. 탭 하나가 236px이라 "일일"·"반복"·"업적"
+         * 두 글자(74px)가 넉넉히 들어간다. 남는 276px에 "일괄 수령"
+         * (다섯 글자, 캡션 37px 기준 185px)이 좌우 여백과 함께 선다.
+         */
+        private const float ClaimAllLeft = 0.72f;
+
+        /**
+         * @brief [일괄 수령] (#5). 탭 줄의 오른쪽 끝.
+         *
+         * ## 왜 탭 줄인가
+         *
+         * 스크롤 밖이라 목록이 어디에 있든 제자리이고, 세 탭 어디에서나
+         * 같은 자리에 있다 - 받을 것은 탭마다 따로 쌓이는데 버튼이 탭 안에
+         * 있으면 세 번 눌러야 한다. 이 버튼 하나가 셋을 전부 받는다
+         * (QuestSystem.ClaimAll).
+         *
+         * 목록 위에 띄우는 방법도 있었는데, 그러면 마지막 줄의 받기 버튼을
+         * 덮는다 - 백 번 누르지 않게 하려고 만든 것이 한 번 누르는 것을
+         * 막는 모양이 된다.
+         *
+         * 받을 것이 없으면 흐려진다. 숨기지 않는 이유는 자리가 사라지면
+         * 탭 셋의 폭이 그때마다 바뀌기 때문이다.
+         */
+        private static void BuildClaimAll(Transform bar, TMP_FontAsset font)
+        {
+            var go = new GameObject("ClaimAll", typeof(RectTransform));
+            go.transform.SetParent(bar, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(ClaimAllLeft, 0f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.offsetMin = new Vector2(6f, 0f);
+            rect.offsetMax = new Vector2(-6f, 0f);
+
+            var image = go.AddComponent<Image>();
+            // 동작 버튼이라 행(Row)이 아니라 강조판이다. 받는 것은 이 화면에서
+            // 가장 하고 싶은 일이고, 초록은 이 게임에서 "좋은 것"이다
+            UiSkin.ApplyPanel(image, UiSkin.Panel, UiSkin.Good);
+
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, image);
+
+            var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(label);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(0f, -6f);
+            labelRect.offsetMax = new Vector2(0f, 6f);
+            label.text = "일괄 수령";
+
+            var component = go.AddComponent<Onikiri.UI.QuestClaimAllButton>();
+            var so = new SerializedObject(component);
+            so.FindProperty("button").objectReferenceValue = button;
+            so.FindProperty("label").objectReferenceValue = label;
+            so.FindProperty("idleLabel").stringValue = "일괄 수령";
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 글자가 칸을 넘지 않는지 빌드가 검산한다 (이 프로젝트의 규칙)
+            float width = (Onikiri.Core.DisplayConfig.DesignWidth - SidePadding * 2f)
+                          * (1f - ClaimAllLeft) - 12f;
+            float text = label.GetPreferredValues("일괄 수령", 0f, 0f).x;
+            if (text > width)
+                Debug.LogWarning(string.Format(
+                    "[Onikiri] '일괄 수령' is {0:F0}px but its slot is {1:F0}px"
+                    + " - widen the slot (ClaimAllLeft) or shorten the label.", text, width));
+        }
+
+        /**
+         * @brief 보상 표기 = **아이콘 + 수량** (#11).
+         *
+         * 그전에는 글자였다: "보석 20 <size=75%>·골드 ·EXP</size>". 세 가지가
+         * 걸렸다 - 재화 이름을 매번 읽어야 하고, 곁가지를 75%로 줄여 넣는
+         * 편법이 필요했고, 그 문구가 380px을 먹어 진행바를 밀어냈다.
+         *
+         * 아이콘은 이 게임의 다른 곳에서 이미 그 재화를 뜻한다(상단 바
+         * 트레이의 보석·골드가 같은 스프라이트다). 같은 그림을 여기서도
+         * 쓰면 읽는 것이 아니라 알아보는 것이 된다.
+         *
+         * ## 배치
+         *
+         * 오른쪽 끝에서 왼쪽으로 쌓는다: `[EXP][골드][보석][수량]`. 수량이
+         * 오른쪽 끝인 이유는 자릿수가 자라는 쪽이 고정 모서리에 붙어야
+         * 나머지가 안 흔들리기 때문이다(비용 칸과 같은 규칙).
+         *
+         * 골드·EXP에는 수량이 없다. 업적의 그 둘은 **받는 순간의 스테이지**로
+         * 환산되므로(QuestSystem.GrantAchievementSpoils) 빌드 시점에 적을 수
+         * 있는 수가 아니다 - 아이콘만으로 "이것도 준다"를 말한다.
+         */
+        private static TMP_Text BuildRewardGroup(Transform row, TMP_FontAsset font, QuestSpec spec)
+        {
+            var groupObject = new GameObject("Reward", typeof(RectTransform));
+            groupObject.transform.SetParent(row, false);
+            PlaceStretched((RectTransform)groupObject.transform, 24f, ClaimWidth + 24f, 58f, 50f);
+
+            var count = CreateLabel(groupObject.transform, font, "Count", TextAlignmentOptions.Right);
+            UiFonts.Demote(count);
+            var countRect = (RectTransform)count.transform;
+            countRect.anchorMin = countRect.anchorMax = new Vector2(1f, 0.5f);
+            countRect.pivot = new Vector2(1f, 0.5f);
+            countRect.sizeDelta = new Vector2(RewardCountWidth, 50f);
+            countRect.anchoredPosition = Vector2.zero;
+            count.color = DimColor;
+            count.text = spec.Gems.ToString();
+
+            float x = -(RewardCountWidth + 6f);
+            AddRewardIcon(groupObject.transform, UiIcons.LoadItem(UiIcons.GemSprite), x);
+
+            // 곁가지는 보석 왼쪽으로. 순서는 골드 -> EXP인데, 왼쪽으로 쌓으므로
+            // 화면에서는 [EXP][골드][보석]이 된다 - 주 보상이 수량에 가장 가깝다
+            if (spec.GoldMobs > 0d)
+            {
+                x -= RewardIconStride;
+                AddRewardIcon(groupObject.transform, UiIcons.Load(UiIcons.GoldIcon), x);
+            }
+            if (spec.ExpBosses > 0d)
+            {
+                x -= RewardIconStride;
+                AddRewardIcon(groupObject.transform, UiIcons.Load(UiIcons.ExpIcon), x);
+            }
+
+            return count;
+        }
+
+        private static void AddRewardIcon(Transform parent, Sprite sprite, float x)
+        {
+            var go = new GameObject("Icon", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.sizeDelta = new Vector2(RewardIconSize, RewardIconSize);
+            rect.anchoredPosition = new Vector2(x, 0f);
+
+            var image = go.AddComponent<Image>();
+            image.sprite = sprite;
+            image.color = UiIcons.Tint;
+            image.raycastTarget = false;
+            image.preserveAspect = true;
+            // 스프라이트가 없으면 흰 사각형이 뜬다 - 없는 것보다 나쁘다
+            image.enabled = sprite != null;
+        }
+
+        /** 보상 수량 칸. 두 자리("20")가 넉넉히 들어가는 폭 */
+        private const float RewardCountWidth = 74f;
+        private const float RewardIconSize = 36f;
+
+        /** 아이콘 하나가 왼쪽으로 먹는 몫 */
+        private const float RewardIconStride = RewardIconSize + 6f;
+
+        /**
+         * @brief 빨간 **점**. 숫자를 적지 않는다 (#4).
          *
          * 탭 버튼의 **자식**이라 페이지가 꺼져 있어도 보인다 - 배지의 존재
          * 이유가 그것이다(GrowthPanelTabs 주석).
+         *
+         * ## 왜 숫자를 버렸는가
+         *
+         * 배지가 답하는 질문은 **"열어볼 이유가 있는가"** 하나다. 그 답은
+         * 예/아니오이고, 수량은 그 답을 더 정확하게 만들지 않는다 - 3개든
+         * 100개든 해야 할 일은 "열어서 받는다"로 같다.
+         *
+         * 그런데 수량을 적으면 값을 치른다. 52px 판에 세 자리가 들어가면
+         * 글자가 판을 넘고(실제로 100개에서 그랬다), 두 자리와 세 자리의
+         * 폭이 달라 탭 줄이 미세하게 흔들린다. 답하지 않아도 될 질문에
+         * 레이아웃을 내주는 셈이다.
+         *
+         * 점은 28px 정사각이라 자릿수와 무관하게 같은 자리를 쓴다. 정확한
+         * 수량은 안에 들어가면 목록이 그대로 보여준다.
          */
         public static Image BuildBadge(Transform parent, TMP_FontAsset font)
         {
-            // 같은 이름이 있으면 지우고 다시 만든다. 안 지우면 빌드할 때마다
-            // 배지가 한 장씩 쌓인다 - EnsurePage와 같은 규칙이다
-            var stale = parent.Find("Badge");
-            if (stale != null) Object.DestroyImmediate(stale.gameObject);
+            /**
+             * @brief 같은 이름을 **전부** 지운다. 하나가 아니라.
+             *
+             * `Find`는 첫 하나만 찾는다. 그래서 이 함수는 빌드마다 한 장을
+             * 지우고 한 장을 새로 만들었는데, 어느 시점에 두 장 이상이
+             * 생기면 그 뒤로는 영영 줄지 않는다 - 실기 세이브의 씬에서
+             * 하단 탭 하나에 배지가 **여든 장 넘게** 쌓여 있었다.
+             *
+             * 겹쳐 있어서 화면에서는 한 장으로 보인다. 그래서 이 배치에서
+             * 배지를 원으로 바꿨을 때 "원 11 / 사각 81"로 드러났다 - 새로
+             * 만든 것만 원이고 쌓인 옛것들이 그 아래 그대로 있었다.
+             */
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                var child = parent.GetChild(i);
+                if (child.name == "Badge") Object.DestroyImmediate(child.gameObject);
+            }
 
             var go = new GameObject("Badge", typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -569,28 +780,35 @@ namespace Onikiri.EditorTools
             rect.anchorMin = new Vector2(1f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(52f, 52f);
-            rect.anchoredPosition = new Vector2(6f, 12f);
+            rect.sizeDelta = new Vector2(BadgeDotSize, BadgeDotSize);
+            // 숫자 판이었을 때보다 작아졌으므로 모서리에 더 가까이 붙는다.
+            // 예전 자리(6, 12)에 그대로 두면 점이 탭 안쪽으로 들어와 보인다
+            rect.anchoredPosition = new Vector2(2f, 4f);
 
             var image = go.AddComponent<Image>();
-            UiSkin.ApplyPanel(image, new Color32(0xC8, 0x32, 0x32, 0xFF));
+
+            // **9-슬라이스 판이 아니라 원 스프라이트다** (#4). 판을 정사각으로
+            // 눌러 쓰면 모서리가 둥근 사각형이 나오고, 28px에서도 그것은
+            // 사각형으로 읽힌다 - 알림 점은 점이어야 한다
+            image.sprite = UiGlyphBuilder.Load(UiGlyphBuilder.Dot);
+            image.type = Image.Type.Simple;
+            image.color = new Color32(0xC8, 0x32, 0x32, 0xFF);
             image.raycastTarget = false;
 
-            var label = CreateLabel(go.transform, font, "Count", TextAlignmentOptions.Center);
-            // 배지 숫자는 캡션 크기(38단계). 52px 판에 44pt 숫자는 두 자리부터
-            // 빡빡했다
-            UiFonts.Demote(label);
-            var labelRect = (RectTransform)label.transform;
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(0f, -4f);
-            labelRect.offsetMax = new Vector2(0f, 4f);
-            label.text = "0";
-            label.color = Color.white;
-
+            // 글자 칸이 없다 (#4). 배지 컴포넌트들은 라벨 참조가 비어 있으면
+            // 아무것도 안 적는다 - 넷 다 `label != null`을 먼저 본다
             go.SetActive(false);
             return image;
         }
+
+        /**
+         * @brief 알림 점의 지름 (#4).
+         *
+         * 28px = 탭 아이콘(64)의 절반보다 작다. 눈에 걸리되 읽는 것이
+         * 아니어야 하는 크기다 - 더 키우면 아이콘과 다투고, 더 줄이면
+         * 픽셀 격자에서 원이 아니라 얼룩으로 보인다.
+         */
+        public const float BadgeDotSize = 28f;
 
         // ---------------------------------------------------------------- 조각
 

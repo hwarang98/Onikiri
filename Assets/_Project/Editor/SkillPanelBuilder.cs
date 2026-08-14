@@ -123,6 +123,10 @@ namespace Onikiri.EditorTools
             var panel = EnsurePanel(safeArea);
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath);
 
+            // 팝업이 목록보다 먼저다 (#14) - 줄들이 이 팝업을 참조로 들고
+            // 있어야 하고, 참조를 물리려면 대상이 이미 있어야 한다
+            BuildSkillPopup(safeArea, system, font);
+
             BuildHeader(panel, system, font);
             BuildSlotRow(panel, system, font);
 
@@ -151,6 +155,234 @@ namespace Onikiri.EditorTools
 
             return system;
         }
+
+        // ---------------------------------------------------------------- 정보 팝업 (#14)
+
+        public const string SkillPopupName = "SkillInfoPopup";
+
+        /**
+         * @brief 오의 정보 팝업. **정보 한 덩이 + 탭 둘(강화/장착).**
+         *
+         * 공용 팝업 뼈대를 쓴다(PopupBuilder) - 딤, 가운데 창, X, 바깥 탭으로
+         * 닫기가 설정·랭킹과 같은 약속이다. 이 빌더가 아는 것은 창 안의
+         * 배치뿐이다.
+         *
+         * 높이 0.34(653px)는 내용에서 나온다: 이름 72 + 설명 120 + 탭 줄 72 +
+         * 페이지(두 줄 124 + 버튼 88) + 여백. 처음에 0.42로 잡았다가 실기에서
+         * 아래가 200px 넘게 비어 "덜 만든 창"으로 보였다 - 44단계의 규칙대로
+         * **상자를 내용에 맞춘다.**
+         *
+         * 강화 탭과 장착 탭 중 **긴 쪽**에 맞춘다. 탭마다 창 크기가 달라지면
+         * 손가락이 있던 자리에 다른 버튼이 온다.
+         */
+        private static void BuildSkillPopup(Transform safeArea, SkillSystem system,
+                                            TMP_FontAsset font)
+        {
+            RectTransform root;
+            var window = PopupBuilder.Ensure(safeArea, SkillPopupName, font, 0.34f, out root);
+
+            // ---- 머리: 아이콘 + 이름
+            var iconObject = new GameObject("Icon", typeof(RectTransform));
+            iconObject.transform.SetParent(window, false);
+            var iconRect = (RectTransform)iconObject.transform;
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(0f, 1f);
+            iconRect.pivot = new Vector2(0f, 1f);
+            iconRect.sizeDelta = new Vector2(72f, 72f);
+            iconRect.anchoredPosition = new Vector2(28f, -24f);
+            var icon = iconObject.AddComponent<Image>();
+            icon.color = UiIcons.Tint;
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+
+            var nameLabel = CreateLabel(window, font, "Name", TextAlignmentOptions.Left);
+            var nameRect = (RectTransform)nameLabel.transform;
+            nameRect.anchorMin = new Vector2(0f, 1f);
+            nameRect.anchorMax = new Vector2(1f, 1f);
+            nameRect.pivot = new Vector2(0.5f, 1f);
+            nameRect.offsetMin = new Vector2(112f, 0f);
+            nameRect.offsetMax = new Vector2(-(PopupBuilder.CloseSize + 20f), 0f);
+            nameRect.sizeDelta = new Vector2(nameRect.sizeDelta.x, 72f);
+            nameRect.anchoredPosition = new Vector2(nameRect.anchoredPosition.x, -24f);
+            nameLabel.text = "오의";
+
+            // ---- 설명. 두 줄이라 높이를 넉넉히 준다
+            var description = CreateLabel(window, font, "Description", TextAlignmentOptions.TopLeft);
+            UiFonts.Demote(description);
+            var descRect = (RectTransform)description.transform;
+            descRect.anchorMin = new Vector2(0f, 1f);
+            descRect.anchorMax = new Vector2(1f, 1f);
+            descRect.pivot = new Vector2(0.5f, 1f);
+            descRect.offsetMin = new Vector2(28f, 0f);
+            descRect.offsetMax = new Vector2(-28f, 0f);
+            descRect.sizeDelta = new Vector2(descRect.sizeDelta.x, 120f);
+            descRect.anchoredPosition = new Vector2(0f, -112f);
+            description.color = DimColor;
+            description.text = "";
+
+            // ---- 탭 둘
+            Button upgradeTab, equipTab;
+            TMP_Text upgradeTabLabel, equipTabLabel;
+            Image upgradeTabBg, equipTabBg;
+            BuildPopupTab(window, font, "강화", 0f, 0.5f, out upgradeTab, out upgradeTabLabel, out upgradeTabBg);
+            BuildPopupTab(window, font, "장착", 0.5f, 1f, out equipTab, out equipTabLabel, out equipTabBg);
+
+            // ---- 강화 페이지
+            var upgradePage = BuildPopupPage(window, "UpgradePage");
+
+            var levelLabel = CreateLabel(upgradePage, font, "Level", TextAlignmentOptions.Left);
+            PlacePopupLine(levelLabel, 0);
+            var valueLabel = CreateLabel(upgradePage, font, "Value", TextAlignmentOptions.Left);
+            UiFonts.Demote(valueLabel);
+            PlacePopupLine(valueLabel, 1);
+            var costLabel = CreateLabel(upgradePage, font, "Cost", TextAlignmentOptions.Right);
+            PlacePopupLine(costLabel, 1);
+
+            var upgradeButton = BuildPopupAction(upgradePage, font, "강화", UiSkin.Good);
+
+            // ---- 장착 페이지
+            var equipPage = BuildPopupPage(window, "EquipPage");
+
+            var equipState = CreateLabel(equipPage, font, "State", TextAlignmentOptions.Left);
+            UiFonts.Demote(equipState);
+            PlacePopupLine(equipState, 0);
+
+            var equipAction = BuildPopupAction(equipPage, font, "장착", UiSkin.GemAction);
+
+            // ---- 컴포넌트
+            var popup = root.gameObject.AddComponent<Onikiri.UI.SkillInfoPopup>();
+            var so = new SerializedObject(popup);
+            so.FindProperty("system").objectReferenceValue = system;
+            so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
+            so.FindProperty("icon").objectReferenceValue = icon;
+
+            // 오의별 아이콘. 카탈로그 순서 그대로 - 팝업이 index로 집는다
+            var iconSprites = SkillIcons();
+            var iconArray = so.FindProperty("icons");
+            iconArray.arraySize = iconSprites.Length;
+            for (int i = 0; i < iconSprites.Length; i++)
+                iconArray.GetArrayElementAtIndex(i).objectReferenceValue = iconSprites[i];
+
+            so.FindProperty("descriptionLabel").objectReferenceValue = description;
+            so.FindProperty("upgradeTab").objectReferenceValue = upgradeTab;
+            so.FindProperty("upgradeTabLabel").objectReferenceValue = upgradeTabLabel;
+            so.FindProperty("upgradeTabBackground").objectReferenceValue = upgradeTabBg;
+            so.FindProperty("upgradePage").objectReferenceValue = upgradePage.gameObject;
+            so.FindProperty("equipTab").objectReferenceValue = equipTab;
+            so.FindProperty("equipTabLabel").objectReferenceValue = equipTabLabel;
+            so.FindProperty("equipTabBackground").objectReferenceValue = equipTabBg;
+            so.FindProperty("equipPage").objectReferenceValue = equipPage.gameObject;
+            so.FindProperty("levelLabel").objectReferenceValue = levelLabel;
+            so.FindProperty("valueLabel").objectReferenceValue = valueLabel;
+            so.FindProperty("costLabel").objectReferenceValue = costLabel;
+            so.FindProperty("upgradeButton").objectReferenceValue = upgradeButton;
+            so.FindProperty("upgradeButtonLabel").objectReferenceValue =
+                upgradeButton.GetComponentInChildren<TMP_Text>(true);
+            so.FindProperty("equipStateLabel").objectReferenceValue = equipState;
+            so.FindProperty("equipButton").objectReferenceValue = equipAction;
+            so.FindProperty("equipButtonLabel").objectReferenceValue =
+                equipAction.GetComponentInChildren<TMP_Text>(true);
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            root.gameObject.SetActive(false);
+        }
+
+        /** 팝업 탭 하나. 설명 아래, 페이지 위 */
+        private static void BuildPopupTab(RectTransform window, TMP_FontAsset font, string text,
+                                          float left, float right,
+                                          out Button button, out TMP_Text label, out Image background)
+        {
+            var go = new GameObject("Tab_" + text, typeof(RectTransform));
+            go.transform.SetParent(window, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(left, 1f);
+            rect.anchorMax = new Vector2(right, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(28f + (left > 0f ? 6f : 0f), 0f);
+            rect.offsetMax = new Vector2(-(28f + (right < 1f ? 6f : 0f)), 0f);
+            rect.sizeDelta = new Vector2(rect.sizeDelta.x, PopupTabHeight);
+            rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, -PopupTabTop);
+
+            background = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(background, UiSkin.Row);
+
+            button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, background);
+
+            label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(label);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(0f, -6f);
+            labelRect.offsetMax = new Vector2(0f, 6f);
+            label.text = text;
+        }
+
+        /** 탭이 켜고 끄는 페이지. 둘이 같은 자리에 겹친다 */
+        private static RectTransform BuildPopupPage(RectTransform window, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(window, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.offsetMin = new Vector2(28f, 24f);
+            rect.offsetMax = new Vector2(-28f, -(PopupTabTop + PopupTabHeight + 16f));
+            return rect;
+        }
+
+        /** 페이지 안의 한 줄. 위에서 아래로 쌓인다 */
+        private static void PlacePopupLine(TMP_Text label, int line)
+        {
+            var rect = (RectTransform)label.transform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(4f, 0f);
+            rect.offsetMax = new Vector2(-4f, 0f);
+            rect.sizeDelta = new Vector2(rect.sizeDelta.x, PopupLineHeight);
+            rect.anchoredPosition = new Vector2(0f, -line * PopupLineHeight);
+        }
+
+        /** 페이지 아래쪽에 붙는 동작 버튼 하나 */
+        private static Button BuildPopupAction(RectTransform page, TMP_FontAsset font,
+                                               string text, Color tint)
+        {
+            var go = new GameObject("Action", typeof(RectTransform));
+            go.transform.SetParent(page, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.offsetMin = new Vector2(4f, 0f);
+            rect.offsetMax = new Vector2(-4f, 0f);
+            rect.sizeDelta = new Vector2(rect.sizeDelta.x, PopupActionHeight);
+            rect.anchoredPosition = Vector2.zero;
+
+            var image = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Panel, tint);
+
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, image);
+
+            var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(0f, -8f);
+            labelRect.offsetMax = new Vector2(0f, 8f);
+            label.text = text;
+
+            return button;
+        }
+
+        private const float PopupTabTop = 244f;
+        private const float PopupTabHeight = 72f;
+        private const float PopupLineHeight = 62f;
+        private const float PopupActionHeight = 88f;
 
         // ---------------------------------------------------------------- 화면 연출
 
@@ -1554,6 +1786,81 @@ namespace Onikiri.EditorTools
             labelRect.sizeDelta = new Vector2(0f, 44f);
             labelRect.anchoredPosition = Vector2.zero;
 
+            /**
+             * @brief 쿨타임 표시 (슬레이어식). 아이콘과 같은 자리에 얹는다.
+             *
+             * 칩(SkillSlotChip)에 직접 넣지 않고 별도 컴포넌트로 두는 이유:
+             * 칩은 이벤트(Changed)로만 다시 그리는데 쿨다운은 매 프레임
+             * 변하는 값이라 갱신 리듬이 다르다. 섞으면 칩 전체가 폴링으로
+             * 끌려간다. 아이콘 색을 만지지 않는 것도 같은 이유다 - 두
+             * 컴포넌트가 한 색을 다투면 마지막에 쓴 쪽이 이긴다. 어둡게는
+             * 아이콘 위의 그늘 판이 한다.
+             *
+             * 세 그림 다 시작은 꺼진 상태로 저장한다. 씬을 연 첫 프레임에
+             * 쿨다운이 돌고 있을 리 없고, 돌기 시작하면 오버레이가 켠다.
+             */
+            var cool = new GameObject("Cooldown", typeof(RectTransform));
+            cool.transform.SetParent(go.transform, false);
+            var coolRect = (RectTransform)cool.transform;
+            coolRect.anchorMin = new Vector2(0.5f, 1f);
+            coolRect.anchorMax = new Vector2(0.5f, 1f);
+            coolRect.pivot = new Vector2(0.5f, 1f);
+            coolRect.sizeDelta = new Vector2(SlotIconSize, SlotIconSize);
+            coolRect.anchoredPosition = new Vector2(0f, -10f);
+
+            var shadeObject = new GameObject("Shade", typeof(RectTransform));
+            shadeObject.transform.SetParent(cool.transform, false);
+            var shadeRect = (RectTransform)shadeObject.transform;
+            shadeRect.anchorMin = Vector2.zero;
+            shadeRect.anchorMax = Vector2.one;
+            shadeRect.offsetMin = Vector2.zero;
+            shadeRect.offsetMax = Vector2.zero;
+            var shade = shadeObject.AddComponent<Image>();
+            shade.color = new Color(0f, 0f, 0f, 0.38f);
+            shade.raycastTarget = false;
+            shade.enabled = false;
+
+            var maskObject = new GameObject("Mask", typeof(RectTransform));
+            maskObject.transform.SetParent(cool.transform, false);
+            var maskRect = (RectTransform)maskObject.transform;
+            // 폭만 잡아 두고 높이(anchorMin.y)는 런타임이 남은 비율로 민다
+            maskRect.anchorMin = new Vector2(0f, 1f);
+            maskRect.anchorMax = Vector2.one;
+            maskRect.offsetMin = Vector2.zero;
+            maskRect.offsetMax = Vector2.zero;
+            var maskImage = maskObject.AddComponent<Image>();
+            maskImage.color = new Color(0f, 0f, 0f, 0.6f);
+            maskImage.raycastTarget = false;
+            maskImage.enabled = false;
+
+            var time = CreateLabel(cool.transform, font, "Time", TextAlignmentOptions.Center);
+            // 캡션 티어(33pt)로 내린다. 44pt는 80px 아이콘 위에서 그림을 반쯤
+            // 덮었다 - 숫자는 확인하는 값이지 칸의 주인공이 아니다. 크기는
+            // 아틀라스에 구운 단만 쓸 수 있다(PixelFontSizes)
+            UiFonts.Demote(time);
+            var timeRect = (RectTransform)time.transform;
+            timeRect.anchorMin = Vector2.zero;
+            timeRect.anchorMax = Vector2.one;
+            timeRect.offsetMin = Vector2.zero;
+            timeRect.offsetMax = Vector2.zero;
+            // 상자는 아이콘 폭(80). "16.7"(33pt)도 그 안에 들지만, 폰트 단이
+            // 바뀌어도 잘리지 않게 흘린다 - 가운데 정렬이라 양옆으로 균등하게
+            // 넘치고, 칩 폭(약 240) 안에는 넉넉히 든다
+            time.overflowMode = TextOverflowModes.Overflow;
+            time.color = TextColor;
+            time.raycastTarget = false;
+            time.enabled = false;
+
+            var overlay = cool.AddComponent<Onikiri.UI.SkillCooldownOverlay>();
+            var overlaySo = new SerializedObject(overlay);
+            overlaySo.FindProperty("system").objectReferenceValue = system;
+            overlaySo.FindProperty("slot").intValue = slot;
+            overlaySo.FindProperty("shade").objectReferenceValue = shade;
+            overlaySo.FindProperty("mask").objectReferenceValue = maskRect;
+            overlaySo.FindProperty("maskImage").objectReferenceValue = maskImage;
+            overlaySo.FindProperty("label").objectReferenceValue = time;
+            overlaySo.ApplyModifiedPropertiesWithoutUndo();
+
             var chip = go.AddComponent<Onikiri.UI.SkillSlotChip>();
             var so = new SerializedObject(chip);
             so.FindProperty("system").objectReferenceValue = system;
@@ -1803,6 +2110,15 @@ namespace Onikiri.EditorTools
             so.FindProperty("unaffordableColor").colorValue = DimColor;
             so.FindProperty("normalRowTint").colorValue = UiSkin.Row;
             so.FindProperty("iconTint").colorValue = UiIcons.Tint;
+
+            // 줄을 누르면 여는 정보 팝업 (#14). 팝업은 패널보다 먼저 세워지므로
+            // 여기서 이미 찾을 수 있다 - 비어 있으면 SkillButton이 예전처럼
+            // 곧바로 강화한다
+            var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+            var popupObject = safeArea != null ? safeArea.Find(SkillPopupName) : null;
+            so.FindProperty("popup").objectReferenceValue = popupObject != null
+                ? popupObject.GetComponent<Onikiri.UI.SkillInfoPopup>() : null;
+
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

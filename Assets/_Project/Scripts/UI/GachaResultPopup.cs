@@ -95,6 +95,66 @@ namespace Onikiri.UI
         private Color[] rowColors;
         private bool[] rowWide;
 
+        /** 줄의 등급. 열리는 연출의 세기가 여기서 나온다 (#12) */
+        private int[] rowGrades;
+
+        // ---------------------------------------------------------------- 열림 연출 (#12)
+
+        /**
+         * @brief 줄이 **하나씩 열린다.** 대신 아주 빠르게.
+         *
+         * ## 46단계의 규칙을 어기지 않는다
+         *
+         * 이 판의 머리 주석은 "하나씩 열어 보이는 연출은 이 게임에 맞지
+         * 않는다 - 10연이 30초짜리 사건이 되면 다음에 또 하고 싶지 않아진다"
+         * 고 적어뒀고, 그 판단은 지금도 옳다. 어긴 적이 없다.
+         *
+         * 여기서 하는 것은 **0.7초짜리**다. 열 줄이 70ms 간격으로 켜지고
+         * 끝난다 - 흘깃 보는 시간 안에 끝나므로 "기다림"이 되지 않으면서,
+         * 열 줄이 한 프레임에 통째로 나타날 때는 없던 것이 생긴다: 눈이
+         * 줄을 따라 내려가고, 금색 줄이 **언제** 나오는지가 사건이 된다.
+         *
+         * 30초 연출과 이것을 가르는 것은 방향이 아니라 시간이다.
+         *
+         * ## 기다릴 수 없으면 건너뛴다
+         *
+         * 연출 중에 확인 버튼을 누르면 닫히는 대신 **전부 열린다.** 0.7초도
+         * 참지 못하는 순간이 있고(백 번째 10연), 그때 연출이 손을 막으면
+         * 그것이 정확히 46단계가 피하려던 상태다.
+         */
+        [Header("열림 연출 (#12)")]
+        [Tooltip("줄과 줄 사이(초). 실시간이다 - 히트스톱이 걸려도 같은 속도로 열린다")]
+        [SerializeField] private float revealInterval = 0.07f;
+
+        [Tooltip("한 줄이 제 크기로 내려앉는 시간(초)")]
+        [SerializeField] private float revealPunchSeconds = 0.16f;
+
+        /**
+         * @brief 등급별 튀어나오는 배율. 높을수록 크게 튄다 (#12).
+         *
+         * 인덱스가 곧 등급이다(GachaCurve.Grade). 배열이 비어 있거나 짧으면
+         * 1.15배로 떨어진다 - 배선이 빠져도 연출이 아예 없어지지는 않는다.
+         *
+         * ★1~★2는 거의 안 튄다(1.10). 열 줄 중 여덟이 그것이라 크게 튀면
+         * 판 전체가 덜컹거리고, 그러면 정작 금색 줄이 튀는 것이 안 보인다 -
+         * 화려함은 **대비**이지 총량이 아니다.
+         */
+        [SerializeField] private float[] revealPunchByGrade = { 1.10f, 1.12f, 1.22f, 1.45f, 1.75f };
+
+        [Tooltip("★3 이상이 열릴 때 흰색에서 제 색으로 물든다. 0이면 안 쓴다")]
+        [SerializeField] private float revealFlashSeconds = 0.12f;
+
+        /** 지금 열고 있는 줄. count 이상이면 연출이 끝났다 */
+        private int revealed;
+
+        /** 다음 줄이 열리는 시각(unscaled). 0이면 연출 중이 아니다 */
+        private float nextRevealAt;
+
+        /** 이번 판에 실제로 그려진 줄 수 */
+        private int revealCount;
+
+        private bool Revealing { get { return nextRevealAt > 0f; } }
+
         private void EnsureRowScratch()
         {
             if (lines == null) return;
@@ -103,6 +163,7 @@ namespace Onikiri.UI
             rowTexts = new string[lines.Length];
             rowColors = new Color[lines.Length];
             rowWide = new bool[lines.Length];
+            rowGrades = new int[lines.Length];
         }
 
         /**
@@ -217,21 +278,182 @@ namespace Onikiri.UI
 
             visual.SetActive(true);
             visual.transform.SetAsLastSibling();
+
+            BeginReveal(count);
+        }
+
+        /**
+         * @brief 줄을 전부 숨기고 하나씩 여는 연출을 시작한다 (#12).
+         *
+         * 숨기는 방법은 **크기 0**이다. 알파를 쓰지 않는 이유는 TMP의 색을
+         * 건드리면 등급 색을 다시 계산해야 하고(줄마다 다르다), 열릴 때
+         * 튀어나오는 연출도 어차피 크기로 하기 때문이다 - 한 가지 값으로
+         * 숨김과 등장을 다 처리하면 중간에 끊겨도 어긋나지 않는다.
+         */
+        private void BeginReveal(int count)
+        {
+            revealCount = count;
+            revealed = 0;
+
+            if (lines == null) return;
+
+            for (int i = 0; i < lines.Length; i++)
+                if (lines[i] != null) lines[i].transform.localScale = Vector3.zero;
+
+            // 첫 줄은 다음 프레임에 바로 연다. 첫 줄까지 기다리게 하면
+            // 판이 빈 채로 떠 있는 순간이 생기고, 그것은 고장으로 읽힌다
+            nextRevealAt = Time.unscaledTime;
+        }
+
+        private void Update()
+        {
+            if (!Revealing) return;
+
+            // unscaled다. 히트스톱이 timeScale을 0으로 붙드는 게임이라
+            // 스케일 시간으로 재면 뽑기 연출이 전투 타이밍에 따라 늘어난다
+            while (Revealing && Time.unscaledTime >= nextRevealAt)
+            {
+                RevealNext();
+                if (revealed >= revealCount) { nextRevealAt = 0f; break; }
+                nextRevealAt += revealInterval;
+            }
+        }
+
+        /**
+         * @brief 다음 줄 하나를 연다. 등급이 셀수록 크게 튄다.
+         *
+         * 코루틴을 쓰지 않는다 - 판이 꺼졌다 켜지는 사이에 코루틴이 살아
+         * 있으면 다음 판의 줄을 지난 판의 연출이 건드린다. 상태를 필드에
+         * 두면 판이 꺼질 때(Close) 그냥 멈춘다.
+         */
+        private void RevealNext()
+        {
+            int index = revealed++;
+            if (lines == null || index < 0 || index >= lines.Length) return;
+
+            var line = lines[index];
+            if (line == null) return;
+
+            line.transform.localScale = Vector3.one * PunchOf(index);
+            StartShrink(index);
+
+            // ★3 이상은 흰빛에서 제 색으로 물든다. 아래 등급까지 물들이면
+            // 열 줄이 다 반짝여서 무엇이 좋은 결과인지가 안 보인다
+            if (revealFlashSeconds > 0f && rowGrades != null && index < rowGrades.Length
+                && rowGrades[index] >= (int)GachaCurve.Grade.Rare)
+                line.color = Color.white;
+        }
+
+        private float PunchOf(int index)
+        {
+            if (rowGrades == null || index >= rowGrades.Length) return 1.15f;
+
+            int grade = rowGrades[index];
+            if (revealPunchByGrade == null || grade < 0 || grade >= revealPunchByGrade.Length)
+                return 1.15f;
+
+            return revealPunchByGrade[grade];
+        }
+
+        /**
+         * @brief 튀어나온 줄을 제 크기로 되돌린다.
+         *
+         * 줄마다 시작 시각이 다르므로 리스트로 들고 매 프레임 민다. 코루틴을
+         * 안 쓰는 이유는 RevealNext와 같다.
+         */
+        private void StartShrink(int index)
+        {
+            if (shrinking == null) shrinking = new List<int>();
+            if (shrinkStart == null) shrinkStart = new float[lines.Length];
+
+            shrinkStart[index] = Time.unscaledTime;
+            if (!shrinking.Contains(index)) shrinking.Add(index);
+        }
+
+        private List<int> shrinking;
+        private float[] shrinkStart;
+
+        private void LateUpdate()
+        {
+            if (shrinking == null || shrinking.Count == 0) return;
+
+            for (int n = shrinking.Count - 1; n >= 0; n--)
+            {
+                int index = shrinking[n];
+                if (lines == null || index >= lines.Length || lines[index] == null)
+                {
+                    shrinking.RemoveAt(n);
+                    continue;
+                }
+
+                float t = revealPunchSeconds <= 0f
+                    ? 1f
+                    : (Time.unscaledTime - shrinkStart[index]) / revealPunchSeconds;
+
+                if (t >= 1f)
+                {
+                    lines[index].transform.localScale = Vector3.one;
+                    if (rowColors != null && index < rowColors.Length)
+                        lines[index].color = rowColors[index];
+                    shrinking.RemoveAt(n);
+                    continue;
+                }
+
+                float punch = PunchOf(index);
+                lines[index].transform.localScale = Vector3.one * Mathf.Lerp(punch, 1f, t);
+
+                // 흰빛에서 제 색으로. 크기보다 빨리 끝난다 - 색이 오래
+                // 남아 있으면 등급 색이 헷갈린다
+                if (revealFlashSeconds > 0f && rowColors != null && index < rowColors.Length)
+                {
+                    float ct = (Time.unscaledTime - shrinkStart[index]) / revealFlashSeconds;
+                    if (ct < 1f) lines[index].color = Color.Lerp(Color.white, rowColors[index], ct);
+                }
+            }
+        }
+
+        /** 남은 줄을 그 자리에서 전부 연다. 연출을 못 기다리는 순간을 위한 문 */
+        private void RevealAll()
+        {
+            while (revealed < revealCount) RevealNext();
+            nextRevealAt = 0f;
         }
 
         private void Start()
         {
-            if (confirmButton != null) confirmButton.onClick.AddListener(Close);
+            if (confirmButton != null) confirmButton.onClick.AddListener(OnConfirm);
             Close();
         }
 
         private void OnDestroy()
         {
-            if (confirmButton != null) confirmButton.onClick.RemoveListener(Close);
+            if (confirmButton != null) confirmButton.onClick.RemoveListener(OnConfirm);
+        }
+
+        /**
+         * @brief 확인 버튼. **연출 중이면 닫지 않고 전부 연다** (#12).
+         *
+         * 연출이 도는 동안 이 버튼이 판을 닫으면, 급해서 누른 사람은 자기가
+         * 무엇을 뽑았는지 못 본 채로 판을 잃는다. 첫 탭은 건너뛰기, 두 번째
+         * 탭이 닫기다 - 뽑기 화면의 표준이고, 0.7초라 두 번 누를 일도 드물다.
+         */
+        private void OnConfirm()
+        {
+            if (Revealing) { RevealAll(); return; }
+            Close();
         }
 
         public void Close()
         {
+            // 열리다 만 상태로 꺼지면 다음 판이 그 상태를 이어받는다.
+            // 크기 0인 줄이 남아 있는 판이 바로 그것이다
+            nextRevealAt = 0f;
+            if (shrinking != null) shrinking.Clear();
+
+            if (lines != null)
+                foreach (var line in lines)
+                    if (line != null) line.transform.localScale = Vector3.one;
+
             if (visual != null) visual.SetActive(false);
         }
 
@@ -262,6 +484,9 @@ namespace Onikiri.UI
 
                 rowTexts[i] = TextFor(result, yodo);
                 rowColors[i] = ColorOf(grade);
+
+                // 열리는 세기가 등급에서 나온다 (#12)
+                rowGrades[i] = (int)grade;
 
                 // ★4 이상이 전 폭 줄이다 - 오의 배너와 **같은 자**다 (50b).
                 // 처음에 전설만 넓혔다가 실기에서 물렸다: ★4의 미끄러짐 줄
@@ -428,6 +653,11 @@ namespace Onikiri.UI
                 // 으로 칠하면 전 폭 줄이 바닥 색을 입어 "넓은데 수수한" 줄이
                 // 되고, 그것은 신호 둘이 서로를 지우는 것이다
                 rowColors[i] = ColorOf(GachaCurve.GradeOf[(int)result.Rolled]);
+
+                // 색과 같은 자에서 나온다 - 굴린 등급이다 (#12). 미끄러져
+                // XP로 떨어진 ★5도 ★5만큼 크게 튄다: 그 줄이 기록하는 사건이
+                // 도착지가 아니라 출발지이기 때문이다(위 rowWide와 같은 판단)
+                rowGrades[i] = (int)GachaCurve.GradeOf[(int)result.Rolled];
             }
 
             Render(count, SkillHeadline(xp, counts), ColorOf(best),

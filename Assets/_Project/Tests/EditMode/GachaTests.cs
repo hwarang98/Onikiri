@@ -1105,17 +1105,10 @@ namespace Onikiri.Tests
             var without = StageSimulation.Run(600, field,
                 new StageSimulation.Policy { SkipRarity = true, SkipLegendary = true });
 
-            double budget = TotalSeconds(with, 51, 400);
-
-            int reached = 50;
-            double spent = 0d;
-            for (int i = 50; i < without.Count; i++)
-            {
-                double seconds = without[i].MobSeconds + without[i].BossKillSeconds;
-                if (spent + seconds > budget) break;
-                spent += seconds;
-                reached = without[i].Stage;
-            }
+            // 52단계에 걷기가 StageSimulation.ReachedStage로 승격됐다 - 이
+            // 검사가 처음 세운 자가 이제 밴드 계약의 자이기도 하다
+            double budget = StageSimulation.CombatSeconds(with, 51, 400);
+            int reached = StageSimulation.ReachedStage(without, budget, 51);
 
             Assert.Less(reached, 390, string.Format(
                 "사다리를 빼도 같은 시간에 st{0}까지 간다 - st400과 차이가 없으면 "

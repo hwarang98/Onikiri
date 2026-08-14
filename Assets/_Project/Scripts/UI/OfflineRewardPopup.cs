@@ -82,6 +82,10 @@ namespace Onikiri.UI
         private void OnDestroy()
         {
             if (claimButton != null) claimButton.onClick.RemoveListener(Hide);
+
+            // static 이벤트라 구독을 남기면 씬을 다시 열어도 죽은 객체가 붙어
+            // 있는다
+            if (waiting) IntroFlow.Entered -= OnIntroEntered;
         }
 
         /**
@@ -91,6 +95,60 @@ namespace Onikiri.UI
          * 플레이어는 12시간 자리를 비우고도 8시간치만 받은 이유를 알 수 없다.
          */
         public void Show(BigDouble amount, TimeSpan awayFor, bool capped)
+        {
+            /**
+             * @brief **게임에 들어오기 전에는 뜨지 않는다.**
+             *
+             * 이 팝업은 세이브를 읽는 순간 뜬다(GameSession.GrantOfflineReward).
+             * 그런데 그 순간은 아직 부팅 오버레이가 화면을 덮고 있는 때라,
+             * 로고와 "터치하여 시작" 위에 "2시간 방치 +147K 골드"가 떴다 -
+             * 시작하지도 않은 게임이 보상부터 내미는 화면이다.
+             *
+             * 지급은 그대로 둔다. 미루는 것은 **보여주는 일**뿐이고, 그것이
+             * 이 클래스의 머리 주석("지급은 여기서 하지 않는다")과 같은 결이다 -
+             * 팝업을 못 띄운 경우에도 골드는 이미 지갑에 있다.
+             *
+             * 인트로가 없는 씬에서는 IntroFlow.HasEntered가 처음부터 참이라
+             * 예전 그대로 즉시 뜬다.
+             */
+            if (!IntroFlow.HasEntered)
+            {
+                pending = true;
+                pendingAmount = amount;
+                pendingAway = awayFor;
+                pendingCapped = capped;
+
+                // 두 번 달지 않는다. 한 판에 Show가 두 번 오는 경로는 없지만,
+                // 이벤트 구독은 새는 쪽이 조용하다
+                if (!waiting)
+                {
+                    waiting = true;
+                    IntroFlow.Entered += OnIntroEntered;
+                }
+                return;
+            }
+
+            ShowNow(amount, awayFor, capped);
+        }
+
+        private bool pending;
+        private bool waiting;
+        private BigDouble pendingAmount;
+        private TimeSpan pendingAway;
+        private bool pendingCapped;
+
+        private void OnIntroEntered()
+        {
+            IntroFlow.Entered -= OnIntroEntered;
+            waiting = false;
+
+            if (!pending) return;
+            pending = false;
+
+            ShowNow(pendingAmount, pendingAway, pendingCapped);
+        }
+
+        private void ShowNow(BigDouble amount, TimeSpan awayFor, bool capped)
         {
             Wire();
 

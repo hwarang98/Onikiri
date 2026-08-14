@@ -37,6 +37,17 @@ namespace Onikiri.UI
         [SerializeField] private Button levelUpButton;
         [SerializeField] private TMP_Text levelUpLabel;
 
+        /**
+         * @brief 성장 패널 헤더의 "Lv.56 · EXP 72%" 라벨 (개선안 v2).
+         *
+         * 레벨업 버튼이 전투 화면을 떠나 패널 헤더로 들어오면서, 버튼 옆에
+         * 숫자가 함께 선다 - 슬레이어의 "Lv / EXP / LEVEL UP" 한 줄과 같은
+         * 구성이다. 스트립은 여전히 숫자가 없고(연속량은 몇 px 높이로 충분),
+         * 정확한 값이 필요한 순간은 이 줄이 맡는다.
+         */
+        [Tooltip("성장 패널 헤더의 레벨·경험치 라벨. 없으면 안 쓴다")]
+        [SerializeField] private TMP_Text headerLabel;
+
         [Tooltip("남은 스탯 포인트. 상단이 아니라 증폭 행 근처에 두는 라벨이지만, " +
                  "값의 출처가 CharacterLevel 하나뿐이라 여기서 함께 갱신한다")]
         [SerializeField] private TMP_Text pointsLabel;
@@ -112,6 +123,10 @@ namespace Onikiri.UI
             if (character == null) return;
 
             if (levelLabel != null) levelLabel.text = levelPrefix + character.Level;
+
+            if (headerLabel != null)
+                headerLabel.text = levelPrefix + character.Level + " · EXP "
+                    + Mathf.FloorToInt(Mathf.Clamp01(character.ExpFraction) * 100f) + "%";
 
             if (expFill != null)
             {

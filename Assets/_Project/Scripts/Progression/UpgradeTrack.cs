@@ -234,6 +234,97 @@ namespace Onikiri.Progression
         }
 
         /**
+         * @brief 배수 구매의 상한. **최대**가 무한 루프가 되지 않게 하는 안전장치다.
+         *
+         * 비용은 어느 축이든 지수(최소 1.12배/레벨)라, 잔액이 아무리 커도 살 수
+         * 있는 칸 수는 로그로 묶인다 - 1골드에서 double이 표현할 수 있는 끝
+         * (약 1e308)까지가 1.12배 기준 6천 칸 남짓이다. 그 열 배를 상한으로 둔다.
+         *
+         * 이 값에 실제로 걸리는 상황은 곡선이 망가졌을 때뿐이고(costGrowth가 1에
+         * 가까워지는 등), 그때 프레임이 멈추는 대신 여기서 끊긴다.
+         */
+        public const int MaxBatchLevels = 65536;
+
+        /**
+         * @brief 지금 잔액으로 **몇 칸까지 살 수 있는가.** 사지는 않는다.
+         *
+         * "최대" 버튼의 수량과, 배수 버튼이 실제로 몇 칸을 살지 미리 보여주는 데
+         * 함께 쓴다. 값을 여기서 한 번 계산하고 구매도 이 수를 따라가므로,
+         * 화면에 뜬 수와 실제로 사는 수가 갈리지 않는다.
+         *
+         * **할인은 없다.** 칸마다 CostAtLevel을 그대로 더한다 - 한 번에 사든
+         * 백 번 눌러서 사든 총액이 같아야 하고, 그것이 배수 구매가 편의이지
+         * 밸런스가 아니라는 말의 뜻이다(9단계 이후로 곡선은 신성하다).
+         *
+         * @param wallet 잔액. null이면 0칸
+         * @param limit  최대 몇 칸까지 볼 것인가. 0 이하면 살 수 있는 데까지
+         */
+        public int AffordableLevels(PlayerWallet wallet, int limit)
+        {
+            if (wallet == null) return 0;
+
+            int ceiling = limit > 0 ? Mathf.Min(limit, MaxBatchLevels) : MaxBatchLevels;
+
+            var budget = wallet.Gold;
+            int count = 0;
+
+            while (count < ceiling)
+            {
+                // 최대 레벨에서 멈춘다. IsMaxed와 같은 판정을 미래 레벨에 적용한다
+                if (maxLevel > 0 && level + count >= maxLevel) break;
+
+                var cost = CostAtLevel(level + count);
+                if (cost > budget) break;
+
+                budget -= cost;
+                count++;
+            }
+
+            return count;
+        }
+
+        /**
+         * @brief 이 칸 수를 사는 데 드는 총액. 버튼이 가격으로 보여준다.
+         *
+         * AffordableLevels가 센 것과 같은 합이다 - 두 식이 갈리면 "살 수 있다"고
+         * 표시된 수량이 결제에서 한 칸 모자라는 상태가 생긴다.
+         */
+        public BigDouble CostOfNextLevels(int count)
+        {
+            var total = BigDouble.Zero;
+            for (int i = 0; i < count; i++)
+            {
+                if (maxLevel > 0 && level + i >= maxLevel) break;
+                total += CostAtLevel(level + i);
+            }
+            return total;
+        }
+
+        /**
+         * @brief 여러 칸을 한 번에 산다. **살 수 있는 데까지만.**
+         *
+         * 실제로 오른 칸 수를 돌려준다. 골드가 모자라면 거기서 멈추고, 그때까지
+         * 산 것은 그대로 남는다 - 전부 아니면 전무로 만들면 "×100을 눌렀는데
+         * 아무 일도 안 일어난다"가 되고, 그게 이 버튼을 넣는 이유(탭 횟수 절약)를
+         * 정면으로 배신한다.
+         *
+         * 한 칸씩 TryPurchase를 도는 것과 결과가 같아야 하므로 지불도 칸마다
+         * 한다. 합계를 미리 계산해 한 번에 빼면 반올림(UpgradeCost.Quantize)이
+         * 한 번만 걸려 총액이 갈릴 수 있다.
+         */
+        public int TryPurchaseMany(PlayerWallet wallet, int count)
+        {
+            if (wallet == null || count <= 0) return 0;
+
+            int target = Mathf.Min(count, MaxBatchLevels);
+            int bought = 0;
+
+            while (bought < target && TryPurchase(wallet)) bought++;
+
+            return bought;
+        }
+
+        /**
          * @brief 세이브/로드용. 저장된 레벨을 **자르지 않는다**.
          *
          * 예전에는 maxLevel로 잘랐다. 그러면 상한이 내려간 업데이트에서 플레이어가

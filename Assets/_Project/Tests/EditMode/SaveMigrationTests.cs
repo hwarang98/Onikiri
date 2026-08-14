@@ -49,7 +49,7 @@ namespace Onikiri.Tests
             Assert.IsTrue(SaveData.Migrate(data));
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(18, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
+            Assert.AreEqual(19, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
 
             Assert.AreEqual(SkillCatalog.Count, data.skillIds.Length,
                 "v6 -> v7이 오의 칸을 다 만들지 않았다");
@@ -674,7 +674,7 @@ namespace Onikiri.Tests
 
             Assert.IsTrue(SaveData.Migrate(data));
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(18, SaveData.CurrentVersion, "세이브 버전이 v18이 아니다");
+            Assert.AreEqual(19, SaveData.CurrentVersion, "세이브 버전이 v19가 아니다");
 
             Assert.AreEqual(0, data.gachaPity, "천장 카운터를 소급해 줬다");
             Assert.AreEqual(0, data.gachaTotalPulls);

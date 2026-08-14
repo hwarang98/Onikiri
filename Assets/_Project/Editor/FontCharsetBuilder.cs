@@ -95,6 +95,20 @@ namespace Onikiri.EditorTools
                 foreach (var quest in Onikiri.Progression.QuestCatalog.Of(kind))
                     yield return quest.Title;
 
+            // 플레이 화면 가이드 카드의 행동 문구도 코드(GuideQuestCatalog)에
+            // 있다. 퀘스트 제목과 같은 이유로 여기서 끌어온다 - 그 문구는
+            // **전투 화면에 상시로 떠 있는 글자**라, 한 음절이라도 빠지면
+            // 신규 플레이어가 가장 먼저 보는 안내가 □이 된다.
+            //
+            // 실제로 한 번 밟았다: "넘·뚫·쌓·끝·밀·붙·져·노"가 이 표에만 있고
+            // 아틀라스에 없었다. 지금 문구는 전부 이미 구워진 글자로 다시
+            // 썼지만, 표를 고치는 다음 사람이 그 제약을 알 이유는 없다
+            foreach (var step in Onikiri.Progression.GuideQuestCatalog.Steps)
+                yield return step.Action;
+
+            foreach (var word in Onikiri.Progression.GuideQuestCatalog.StateWords)
+                yield return word;
+
             // 장비 이름도 코드(EquipmentCatalog)에 있다. 슬롯 이름 둘과 등급
             // 이름 열이고, **등급 이름은 화면의 제목 자리에 뜬다** - 빠지면
             // "오니키리"가 ㅁㅁㅁㅁ이 된다. 오의·퀘스트와 같은 규칙이다

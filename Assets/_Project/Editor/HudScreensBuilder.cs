@@ -158,14 +158,24 @@ namespace Onikiri.EditorTools
                 return;
             }
 
-            // 현재 위치 한 줄
+            // 현재 위치 한 줄. 오른쪽 절반은 스테이지 단위 이동 버튼이다 (#8)
             var currentRow = EnsureRow(panel, "Current", 0);
             currentRow.GetComponent<Image>().enabled = false;
             var current = CreateLabel(currentRow, font, "Label", TextAlignmentOptions.Left);
             UiFonts.Demote(current);
-            StretchInside(current, 24f, 1f);
+            // 왼쪽 44%까지만. 나머지는 버튼 넷의 자리다 - 라벨이 폭 전체를
+            // 차지하면 "현재 172 스테이지 (최전선)"이 버튼 밑으로 흘러 들어간다
+            StretchInside(current, 24f, 0.44f);
             current.color = DimColor;
             current.text = "현재 1 스테이지";
+
+            // 한 칸씩 옮기는 버튼 넷 (#8). 지역 줄은 큰 이동이고 이쪽이 미세
+            // 조정이다 - 별도 행을 쓰지 않는 이유는 행 하나를 더 넣으면 이 패널이
+            // 밴드 높이(672px)를 10px 넘기 때문이다. 현재 위치 줄의 오른쪽은
+            // 원래 비어 있었다
+            Button minusTen, minusOne, plusOne, plusTen;
+            BuildStageSteppers(currentRow, font,
+                               out minusTen, out minusOne, out plusOne, out plusTen);
 
             // 지역 줄들 + 무한 구간 한 줄(42단계)
             var rowData = new Onikiri.UI.RegionSelectPanel.Row[roster.regions.Length + 1];
@@ -288,6 +298,10 @@ namespace Onikiri.EditorTools
             so.FindProperty("currentLabel").objectReferenceValue = current;
             so.FindProperty("frontierButton").objectReferenceValue = frontierButton;
             so.FindProperty("frontierLabel").objectReferenceValue = frontierLabel;
+            so.FindProperty("minusTenButton").objectReferenceValue = minusTen;
+            so.FindProperty("minusOneButton").objectReferenceValue = minusOne;
+            so.FindProperty("plusOneButton").objectReferenceValue = plusOne;
+            so.FindProperty("plusTenButton").objectReferenceValue = plusTen;
 
             var rowsProperty = so.FindProperty("rows");
             rowsProperty.arraySize = rowData.Length;
@@ -307,11 +321,84 @@ namespace Onikiri.EditorTools
             panel.gameObject.SetActive(false);
         }
 
+        /**
+         * @brief 스테이지 단위 이동 버튼 넷 (#8). 현재 위치 줄의 오른쪽에 선다.
+         *
+         * 순서는 화면의 방향과 같다: -10 -1 +1 +10. 왼쪽이 뒤로, 오른쪽이
+         * 앞으로다 - 목록이 위에서 아래로 자라는 것과 같은 종류의 약속이라
+         * 화살표 글리프 없이도 읽힌다.
+         *
+         * 폭은 넷이 같다. "+10"이 "-1"보다 한 글자 길지만 글자에 맞춰 재면
+         * 넷의 크기가 제각각이 되고, 그러면 어느 것을 눌렀는지가 위치로 안
+         * 잡힌다(배수 줄과 같은 규칙 - UpgradePanelBuilder.BuildBatchRow).
+         */
+        private static void BuildStageSteppers(RectTransform row, TMP_FontAsset font,
+                                               out Button minusTen, out Button minusOne,
+                                               out Button plusOne, out Button plusTen)
+        {
+            string[] names = { "-10", "-1", "+1", "+10" };
+            var made = new Button[names.Length];
+
+            // 오른쪽 절반(0.46~1.0)을 넷으로 나눈다. 라벨이 0.44까지 쓰므로
+            // 그 사이 0.02가 둘을 가르는 여백이다
+            const float Left = 0.46f;
+            float slice = (1f - Left) / names.Length;
+
+            for (int i = 0; i < names.Length; i++)
+            {
+                var go = new GameObject("Step" + names[i], typeof(RectTransform));
+                go.transform.SetParent(row, false);
+
+                var rect = (RectTransform)go.transform;
+                rect.anchorMin = new Vector2(Left + i * slice, 0f);
+                rect.anchorMax = new Vector2(Left + (i + 1) * slice, 1f);
+                rect.offsetMin = new Vector2(4f, 2f);
+                rect.offsetMax = new Vector2(-4f, -2f);
+
+                var image = go.AddComponent<Image>();
+                UiSkin.ApplyPanel(image, UiSkin.Row);
+
+                var button = go.AddComponent<Button>();
+                UiSkin.ApplyButton(button, image);
+
+                var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+                UiFonts.Demote(label);
+                StretchInside(label, 0f, 1f);
+                label.text = names[i];
+
+                made[i] = button;
+            }
+
+            minusTen = made[0];
+            minusOne = made[1];
+            plusOne = made[2];
+            plusTen = made[3];
+        }
+
         // ---------------------------------------------------------------- 설정
 
+        /**
+         * @brief 설정 = 계정의 상시 거처 (인트로 스텝).
+         *
+         * 타이틀은 진입 순간의 선택만 맡고(연동 유저는 그 화면을 다시 안
+         * 본다), 게임 도중의 계정 관리는 전부 여기다: 상태 한 줄 · [구글 연동]
+         * (게스트의 뒤늦은 주 경로) · 닉네임 변경(54단계 랭킹 것을 상시
+         * 자리로 모음 - 랭킹 첫 진입 입력은 그대로 남는다).
+         *
+         * 연동 버튼은 GoogleLinkButton 한 벌이다 - 타이틀 CTA와 같은 컴포넌트,
+         * 같은 숨김 규칙(에디터·이미 연동이면 버튼째 사라진다).
+         */
+        /**
+         * @brief 설정은 이제 **팝업**이다 (#1). 내용은 한 줄도 안 바뀐다.
+         *
+         * 높이는 내용에서 나온다: 제목 + 여섯 줄(음소거·계정·이름·입력·상태·
+         * 버전) = 484px. 0.30(576px)이면 그 위아래로 숨 쉴 자리가 남는다.
+         * 랭킹처럼 크게 띄우면 여섯 줄 아래가 텅 빈 창이 된다.
+         */
         private static void BuildSettingsPanel(Transform safeArea, TMP_FontAsset font)
         {
-            var panel = EnsurePanel(safeArea, SettingsPanelName);
+            RectTransform root;
+            var panel = PopupBuilder.Ensure(safeArea, SettingsPanelName, font, 0.30f, out root);
             BuildTitle(panel, font, "설정");
 
             var muteRow = EnsureRow(panel, "Mute", 0);
@@ -324,7 +411,46 @@ namespace Onikiri.EditorTools
             StretchInside(muteLabel, 0f, 1f);
             muteLabel.text = "효과음  켜짐";
 
-            var versionRow = EnsureRow(panel, "Version", 1);
+            // -- 계정 상태 + 연동. 상태 라벨은 동적 폰트다 - 연동되면 남이
+            //    지은 구글 표시 이름이 들어온다 (LeaderboardPanelBuilder와 같은 규칙)
+            var accountRow = EnsureRow(panel, "Account", 1);
+            var accountLabel = CreateLabel(accountRow, font, "State", TextAlignmentOptions.Left);
+            StretchInside(accountLabel, 24f, 0.7f);
+            UseNameFont(accountLabel);
+            accountLabel.text = "계정 확인 중...";
+
+            var linkButton = CreateRowButton(accountRow, font, "LinkButton", "구글 연동", 240f);
+            var link = linkButton.gameObject.AddComponent<Onikiri.UI.GoogleLinkButton>();
+            var linkSo = new SerializedObject(link);
+            linkSo.FindProperty("button").objectReferenceValue = linkButton;
+            linkSo.FindProperty("hideRoot").objectReferenceValue = linkButton.gameObject;
+            linkSo.ApplyModifiedPropertiesWithoutUndo();
+
+            // -- 이름 한 줄 + 변경
+            var nameRow = EnsureRow(panel, "Name", 2);
+            var nameLabel = CreateLabel(nameRow, font, "Name", TextAlignmentOptions.Left);
+            StretchInside(nameLabel, 24f, 0.62f);
+            UseNameFont(nameLabel);
+            nameLabel.text = Onikiri.Progression.PlayerProfile.DefaultName;
+
+            var editButton = CreateRowButton(nameRow, font, "EditButton", "이름 변경", 200f);
+
+            // -- 이름 입력 줄. 기본은 꺼져 있다 (자리는 남긴다 - 아래 줄이 안 뛴다)
+            var editRow = EnsureRow(panel, "NameEdit", 3);
+            var input = BuildNameInput(editRow, font);
+            var confirmButton = CreateRowButton(editRow, font, "Confirm", "확인", 200f);
+            editRow.gameObject.SetActive(false);
+
+            // -- 상태줄 (이름 확정·연동 진행의 피드백)
+            var statusRow = EnsureRow(panel, "Status", 4);
+            statusRow.GetComponent<Image>().enabled = false;
+            var status = CreateLabel(statusRow, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(status);
+            StretchInside(status, 0f, 1f);
+            status.color = DimColor;
+            status.gameObject.SetActive(false);
+
+            var versionRow = EnsureRow(panel, "Version", 5);
             versionRow.GetComponent<Image>().enabled = false;
             var version = CreateLabel(versionRow, font, "Label", TextAlignmentOptions.Center);
             UiFonts.Demote(version);
@@ -332,16 +458,123 @@ namespace Onikiri.EditorTools
             version.color = DimColor;
             version.text = "버전 0.0";
 
-            var settings = panel.gameObject.GetComponent<Onikiri.UI.SettingsPanel>();
-            if (settings == null) settings = panel.gameObject.AddComponent<Onikiri.UI.SettingsPanel>();
+            // 컴포넌트는 **루트**에 붙는다. 여는 쪽(HudScreenButton)이 켜고 끄는
+            // 것이 루트이므로, 창에 붙이면 OnEnable이 팝업이 열릴 때 안 돈다
+            var settings = root.gameObject.GetComponent<Onikiri.UI.SettingsPanel>();
+            if (settings == null) settings = root.gameObject.AddComponent<Onikiri.UI.SettingsPanel>();
 
             var so = new SerializedObject(settings);
             so.FindProperty("muteButton").objectReferenceValue = muteButton;
             so.FindProperty("muteLabel").objectReferenceValue = muteLabel;
             so.FindProperty("versionLabel").objectReferenceValue = version;
+            so.FindProperty("accountLabel").objectReferenceValue = accountLabel;
+            so.FindProperty("googleLink").objectReferenceValue = link;
+            so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
+            so.FindProperty("nameEditButton").objectReferenceValue = editButton;
+            so.FindProperty("nameEditGroup").objectReferenceValue = editRow.gameObject;
+            so.FindProperty("nameInput").objectReferenceValue = input;
+            so.FindProperty("nameConfirmButton").objectReferenceValue = confirmButton;
+            so.FindProperty("statusLabel").objectReferenceValue = status;
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            panel.gameObject.SetActive(false);
+            root.gameObject.SetActive(false);
+        }
+
+        /**
+         * @brief 이름 입력칸. LeaderboardPanelBuilder의 것과 같은 구조다.
+         *
+         * 입력칸 글자도 동적 폰트다 - 자기 이름을 치는 동안 글자가 네모로
+         * 보이면 그 이름을 못 쓴다고 읽는다.
+         */
+        private static TMP_InputField BuildNameInput(RectTransform row, TMP_FontAsset font)
+        {
+            var fieldObject = new GameObject("Input", typeof(RectTransform));
+            fieldObject.transform.SetParent(row, false);
+            var fieldRect = (RectTransform)fieldObject.transform;
+            fieldRect.anchorMin = new Vector2(0f, 0f);
+            fieldRect.anchorMax = new Vector2(0.62f, 1f);
+            fieldRect.offsetMin = new Vector2(16f, 8f);
+            fieldRect.offsetMax = new Vector2(-8f, -8f);
+
+            var fieldImage = fieldObject.AddComponent<Image>();
+            // 입력칸은 눌리는 것이 아니라 파인 것이다 - 재화 트레이와 같은 언어
+            fieldImage.color = UiSkin.BarTrack;
+
+            var text = CreateLabel(fieldObject.transform, font, "Text", TextAlignmentOptions.Left);
+            UseNameFont(text);
+            var textRect = (RectTransform)text.transform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(12f, 0f);
+            textRect.offsetMax = new Vector2(-12f, 0f);
+            text.text = string.Empty;
+
+            var placeholder = CreateLabel(fieldObject.transform, font, "Placeholder",
+                                          TextAlignmentOptions.Left);
+            UiFonts.Demote(placeholder);
+            var placeholderRect = (RectTransform)placeholder.transform;
+            placeholderRect.anchorMin = Vector2.zero;
+            placeholderRect.anchorMax = Vector2.one;
+            placeholderRect.offsetMin = new Vector2(12f, 0f);
+            placeholderRect.offsetMax = new Vector2(-12f, 0f);
+            placeholder.color = DimColor;
+            placeholder.text = "이름 (" + Onikiri.Progression.PlayerProfile.MaxLength + "자까지)";
+
+            var input = fieldObject.AddComponent<TMP_InputField>();
+            input.textViewport = fieldRect;
+            input.textComponent = text;
+            input.placeholder = placeholder;
+            input.characterLimit = Onikiri.Progression.PlayerProfile.MaxLength;
+            // 줄바꿈이 이름에 끼면 랭킹 한 줄이 두 줄이 된다
+            input.lineType = TMP_InputField.LineType.SingleLine;
+
+            return input;
+        }
+
+        /** 행 오른쪽에 붙는 버튼. LeaderboardPanelBuilder.CreateButton과 같은 규칙 */
+        private static Button CreateRowButton(RectTransform row, TMP_FontAsset font,
+                                              string name, string text, float width)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(row, false);
+
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(1f, 0.5f);
+            rect.anchorMax = new Vector2(1f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.sizeDelta = new Vector2(width, 44f);
+            rect.anchoredPosition = new Vector2(-16f, 0f);
+
+            var image = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Chrome);
+
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, image);
+
+            var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(label);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(0f, -8f);
+            labelRect.offsetMax = new Vector2(0f, 8f);
+            label.text = text;
+
+            return button;
+        }
+
+        /**
+         * @brief 남이 지은 글자가 오는 라벨만 동적 폰트로 (LeaderboardPanelBuilder와 같은 규칙).
+         */
+        private static void UseNameFont(TMP_Text label)
+        {
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(
+                PixelFontAssetBuilder.NameFontPath);
+            if (label == null || font == null) return;
+
+            label.font = font;
+            label.fontSharedMaterial = font.material;
+            label.fontSize = Onikiri.UI.PixelFontSizes.GalmuriCaption;
         }
 
         // ---------------------------------------------------------------- 배선
@@ -359,10 +592,47 @@ namespace Onikiri.EditorTools
             if (topBar == null) return;
 
             WireScreenButton(topBar, "StageButton", safeArea, RegionSelectPanelName, true);
-            // 2b: 스탯 창 입구가 레벨 칩에서 캐릭터 초상으로 바뀌었다. 경로는
-            // 그대로다 - "캐릭터에 관한 것"의 입구가 캐릭터 그림인 것이 더 곧다
-            WireScreenButton(topBar, "PortraitButton", safeArea, StatsPanelName, false);
+
+            // 개선안 v2: 초상은 **캐릭터 화면(홈)**을 연다 - 덮고 있는 다른
+            // 화면들을 닫아 바탕(GrowthPanel)을 드러낸다. 레벨업 알림 점이
+            // 초상에 붙으므로(LevelUpNoticeBadge) 신호와 입구가 같은 자리다.
+            // 스탯 창 입구는 성장 패널 헤더의 "Lv · EXP" 라벨이 물려받았다 -
+            // "정확한 값이 필요한 사람은 레벨 칩을 누른다"(LevelHud)의 그
+            // 칩이 패널 안으로 들어간 것이다
+            WireHomeButton(topBar, "PortraitButton");
+
+            var growthPanel = MainSceneBuilder.FindBand("GrowthPanel");
+            if (growthPanel != null
+                && growthPanel.Find(UpgradePanelBuilder.LevelHeaderName) != null)
+                WireScreenButton(growthPanel, UpgradePanelBuilder.LevelHeaderName,
+                                 safeArea, StatsPanelName, false);
+            else
+                Debug.LogWarning("[Onikiri] LevelHeader missing - run Build Combat Content "
+                                 + "so the stats screen keeps an entrance.");
+
             WireScreenButton(topBar, "SettingsButton", safeArea, SettingsPanelName, false);
+        }
+
+        /** 홈 버튼 배선. 화면 참조 없이 다른 화면 닫기만 한다(HudScreenButton.homeButton) */
+        private static void WireHomeButton(Transform topBar, string buttonName)
+        {
+            var buttonObject = topBar.Find(buttonName);
+            if (buttonObject == null)
+            {
+                Debug.LogError("[Onikiri] Cannot wire home button " + buttonName);
+                return;
+            }
+
+            var control = buttonObject.GetComponent<Onikiri.UI.HudScreenButton>();
+            if (control == null)
+                control = buttonObject.gameObject.AddComponent<Onikiri.UI.HudScreenButton>();
+
+            var so = new SerializedObject(control);
+            so.FindProperty("button").objectReferenceValue = buttonObject.GetComponent<Button>();
+            so.FindProperty("screen").objectReferenceValue = null;
+            so.FindProperty("homeButton").boolValue = true;
+            so.FindProperty("needsReselect").boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void WireScreenButton(Transform topBar, string buttonName,
@@ -384,6 +654,9 @@ namespace Onikiri.EditorTools
             so.FindProperty("button").objectReferenceValue = buttonObject.GetComponent<Button>();
             so.FindProperty("screen").objectReferenceValue = screen.gameObject;
             so.FindProperty("needsReselect").boolValue = needsReselect;
+            // 홈 모드는 WireHomeButton만 켠다. 초상이 스탯 창을 열던 세대의
+            // 값이 남지 않게 화면을 여는 배선은 항상 끈다
+            so.FindProperty("homeButton").boolValue = false;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

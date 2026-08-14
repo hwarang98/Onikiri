@@ -1014,8 +1014,9 @@ namespace Onikiri.Progression
         /**
          * @brief 쿨다운 진행률 (0~1). 1이면 다음 프레임에 나간다.
          *
-         * 테스트 패널이 읽는다. 화면에 쿨다운 표시가 없는 동안 **"돌고 있는가"를
-         * 확인할 수 있는 유일한 자리**다.
+         * 테스트 패널과 장착 슬롯의 쿨타임 표시(SkillCooldownOverlay)가 읽는다.
+         * UI는 자기 타이머를 만들지 않고 **이 값만** 그린다 - 시계가 둘이면
+         * 반드시 어긋난다.
          */
         public float CooldownFraction(int index)
         {

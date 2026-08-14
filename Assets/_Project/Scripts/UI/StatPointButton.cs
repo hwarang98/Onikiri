@@ -58,6 +58,9 @@ namespace Onikiri.UI
             if (button != null) button.onClick.AddListener(OnClick);
             if (character != null) character.Changed += Refresh;
 
+            // 배수가 바뀌면 이 줄의 대가와 증가폭이 통째로 달라진다
+            UpgradeBatchSelector.Changed += Refresh;
+
             Refresh();
         }
 
@@ -65,11 +68,40 @@ namespace Onikiri.UI
         {
             if (button != null) button.onClick.RemoveListener(OnClick);
             if (character != null) character.Changed -= Refresh;
+            UpgradeBatchSelector.Changed -= Refresh;
+        }
+
+        /**
+         * @brief 이번에 찍을 점 수. 강화 목록과 **같은 배수 줄**을 읽는다 (#3 후속).
+         *
+         * 성장 탭에도 배수가 필요한 이유는 강화와 같다 - 포인트는 레벨업으로
+         * 쌓이고 레벨업은 방치로 밀리므로, 오래 안 열어본 사람의 화면에는
+         * 수십 점이 쌓여 있다.
+         *
+         * 배수 줄을 하나 더 만들지 않고 그것을 그대로 읽는다. 두 줄이 있으면
+         * "지금 ×100인 것이 어느 쪽인가"를 화면에서 확인해야 하고, 그 확인이
+         * 배수를 고르는 값보다 비싸다(UpgradeBatchSelector 머리 주석의
+         * "배수는 목록 전체의 모드"가 여기서도 그대로다).
+         *
+         * 남은 포인트가 모자라면 거기까지 줄인다 - 화면에 뜬 수와 실제로
+         * 나가는 포인트가 같아야 한다.
+         */
+        private int PlannedPoints()
+        {
+            if (character == null) return 0;
+            return character.SpendableInto(axisId, UpgradeBatchSelector.Current);
         }
 
         private void OnClick()
         {
-            if (character != null) character.TrySpendPoint(axisId);
+            if (character == null) return;
+
+            int planned = PlannedPoints();
+
+            // 한 점이면 예전 경로 그대로. 배수 줄이 없는 씬도 여기로 떨어진다
+            if (planned <= 1) { character.TrySpendPoint(axisId); return; }
+
+            character.TrySpendPoints(axisId, planned);
         }
 
         private void Refresh()
@@ -81,22 +113,31 @@ namespace Onikiri.UI
 
             if (nameLabel != null) nameLabel.text = displayName + "  Lv." + points;
 
+            // 이번에 찍을 점 수 (#3 후속). 배수가 ×1이면 예전과 같은 한 점이다
+            int planned = maxed ? 0 : PlannedPoints();
+
             if (valueLabel != null)
             {
                 // 강화 행과 같은 "지금 → 다음" 모양. 포인트당 0.5%는 한 줄로 보면
                 // 작지만, 이 표시가 없으면 찍었을 때 무엇이 달라졌는지 화면 어디에도
                 // 나타나지 않는다 - 증폭은 다른 축의 값에 곱해져 들어가기 때문이다
+                //
+                // 배수로 찍을 때는 **그만큼 간 값**을 보여준다. 되돌릴 수 없는
+                // 재화라 누르기 전에 결과가 화면에 있어야 한다
                 string now = Format(StatPointCurve.Multiplier(points));
                 valueLabel.text = maxed
                     ? now
-                    : now + " → " + Format(StatPointCurve.Multiplier(points + 1));
+                    : now + " → " + Format(StatPointCurve.Multiplier(points + Mathf.Max(1, planned)))
+                      + (planned > 1 ? "   +" + planned : string.Empty);
             }
 
             bool affordable = character.UnspentPoints > 0;
 
             if (costLabel != null)
             {
-                costLabel.text = maxed ? "MAX" : "1";
+                // 값은 이번에 나가는 **포인트 수**다. 예전에는 늘 "1"이었는데,
+                // 배수가 붙으면 그 숫자가 곧 대가의 크기다
+                costLabel.text = maxed ? "MAX" : Mathf.Max(1, planned).ToString();
                 costLabel.color = maxed || affordable ? affordableColor : unaffordableColor;
             }
 

@@ -26,6 +26,17 @@ namespace Onikiri.UI
         [Tooltip("재선택이 열려야(최전선 st11) 눌리는 버튼인가")]
         [SerializeField] private bool needsReselect;
 
+        /**
+         * @brief 홈 버튼 모드 (개선안 v2 - 초상화가 캐릭터 패널을 연다).
+         *
+         * 하단 캐릭터 탭(LockedTab.homeTab)과 같은 규칙이다: 자기 화면을
+         * 토글하지 않고 **덮고 있는 다른 화면들만 닫는다.** 바탕(GrowthPanel)은
+         * 밴드의 바닥층이라 끌 수 없고, 모두 닫힌 상태가 곧 캐릭터 화면이다.
+         * screen 참조는 비워 둔다.
+         */
+        [Tooltip("홈 버튼. 화면을 토글하지 않고 다른 화면들만 닫는다")]
+        [SerializeField] private bool homeButton;
+
         /** 열 때 닫을 다른 화면들. 하단 탭과 같은 상호 배타 규칙 (38단계) */
         [SerializeField] private GameObject[] otherScreens;
 
@@ -51,8 +62,17 @@ namespace Onikiri.UI
 
         private void Toggle()
         {
-            if (screen == null) return;
             if (needsReselect && (progress == null || !progress.IsReselectUnlocked)) return;
+
+            if (homeButton)
+            {
+                if (otherScreens != null)
+                    foreach (var other in otherScreens)
+                        if (other != null && other.activeSelf) other.SetActive(false);
+                return;
+            }
+
+            if (screen == null) return;
 
             bool opening = !screen.activeSelf;
 

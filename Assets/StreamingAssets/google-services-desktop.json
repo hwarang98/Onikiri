@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "598938331304",
+    "project_id": "onikiri-9cc18",
+    "storage_bucket": "onikiri-9cc18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598938331304:android:852dd6f01371909135ba9d",
+        "android_client_info": {
+          "package_name": "com.studio202.onikiri"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "598938331304-lses4s122elg81335tfn182jh1009k2s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.studio202.onikiri",
+            "certificate_hash": "2086e9d253382ad61007ae5a171b71a3025b8c86"
+          }
+        },
+        {
+          "client_id": "598938331304-nt0tg1rlqnflnn2evnga4ffck698c88v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBocS5bvSWxJY1WOs6sNUcwMwTI0gu8CNA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "598938331304-nt0tg1rlqnflnn2evnga4ffck698c88v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

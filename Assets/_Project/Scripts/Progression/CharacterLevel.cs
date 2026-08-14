@@ -191,6 +191,49 @@ namespace Onikiri.Progression
             return true;
         }
 
+        /**
+         * @brief 이 축에 **몇 점까지 찍을 수 있는가.** 찍지는 않는다.
+         *
+         * 남은 포인트와 축 상한 중 작은 쪽이다. "최대" 버튼의 수량과 실제로
+         * 찍히는 수가 같아야 하므로 둘이 이 함수 하나를 본다(강화 배수의
+         * UpgradeTrack.AffordableLevels와 같은 규칙).
+         */
+        public int SpendableInto(string axisId, int limit)
+        {
+            int room = StatPointCurve.MaxPoints - PointsIn(axisId);
+            if (room <= 0) return 0;
+
+            int affordable = Math.Min(UnspentPoints, room);
+            if (limit > 0) affordable = Math.Min(affordable, limit);
+            return affordable > 0 ? affordable : 0;
+        }
+
+        /**
+         * @brief 한 축에 여러 점을 한 번에 찍는다 (#3 후속 - 성장 탭 배수).
+         *
+         * 실제로 찍힌 수를 돌려준다. 한 점씩 TrySpendPoint를 도는 것뿐이라
+         * 곡선도 상한도 그대로다 - 강화 배수 구매(UpgradeSystem.TryPurchaseMany)와
+         * 같은 판단이고, 같은 이유로 새로 생기는 힘이 없다.
+         *
+         * ## 왜 이쪽에도 필요한가
+         *
+         * 포인트는 레벨업으로 쌓이고 레벨업은 방치로 밀린다. 오래 안 열어본
+         * 사람의 성장 탭에는 수십 점이 쌓여 있는데, 한 점씩 찍는 규칙에서
+         * 그것은 수십 번의 탭이다 - 강화 목록에서 배수 버튼을 만든 이유가
+         * 여기서 그대로 성립한다.
+         *
+         * 되돌릴 수 없는 재화라(StatPointButton 주석) 배수는 **화면이 정확히
+         * 몇 점을 쓰는지 보여준 뒤에** 눌려야 한다. 그 표시는 버튼 쪽 일이다.
+         */
+        public int TrySpendPoints(string axisId, int count)
+        {
+            if (count <= 0) return 0;
+
+            int spent = 0;
+            while (spent < count && TrySpendPoint(axisId)) spent++;
+            return spent;
+        }
+
         public int PointsIn(string axisId)
         {
             if (axisId == AttackAmpId) return attackPoints;

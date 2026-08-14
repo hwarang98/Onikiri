@@ -117,14 +117,36 @@ namespace Onikiri.UI
 
             selected = Mathf.Clamp(index, 0, pages.Length - 1);
 
+            /**
+             * @brief **끄기가 전부 끝난 뒤에 켠다.**
+             *
+             * 한 오브젝트가 두 탭의 roots에 동시에 들어갈 수 있게 되면서
+             * 순서가 규칙이 됐다(강화·성장이 배수 줄 하나를 공유한다).
+             * 한 탭씩 켜고 끄면, 켜는 탭이 먼저 처리될 때 뒤따라오는 끄는
+             * 탭이 방금 켠 것을 도로 끈다 - 성장에서 강화로 옮길 때 정확히
+             * 그 순서가 된다(0을 켜고 1을 끈다).
+             *
+             * 두 단계로 나누면 "선택된 탭이 켜는 것"이 언제나 이긴다.
+             */
+            for (int i = 0; i < pages.Length; i++)
+            {
+                if (i == selected) continue;
+
+                var page = pages[i];
+                if (page.roots == null) continue;
+
+                foreach (var root in page.roots)
+                    if (root != null && root.activeSelf) root.SetActive(false);
+            }
+
             for (int i = 0; i < pages.Length; i++)
             {
                 var page = pages[i];
                 bool active = i == selected;
 
-                if (page.roots != null)
+                if (active && page.roots != null)
                     foreach (var root in page.roots)
-                        if (root != null && root.activeSelf != active) root.SetActive(active);
+                        if (root != null && !root.activeSelf) root.SetActive(true);
 
                 if (page.tabLabel != null)
                     page.tabLabel.color = active ? selectedText : unselectedText;

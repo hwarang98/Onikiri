@@ -48,6 +48,22 @@ namespace Onikiri.Battle
         /** 실패한 이유. 문구가 갈린다 */
         public enum FailureReason { TimeOut, Death }
 
+        /**
+         * @brief **보스가 이 상태에서 죽으면 클리어로 세는가.**
+         *
+         * 보스가 실제로 필드에 서 있는 두 상태다. 달려오는 중(Approaching)과
+         * 싸우는 중(Fighting) - 사무라이의 사거리가 전선보다 앞까지 닿기 때문에
+         * 접근 구간에서도 보스는 맞고 죽는다(OnEnemyKilled 머리 주석).
+         *
+         * 판정을 순수 함수로 빼둔 이유는 이 집합이 틀렸을 때의 증상이
+         * **진행 정지**이기 때문이다. 씬도 풀도 없이 검사할 수 있어야 회귀가
+         * 테스트에서 걸린다(BossClearTests).
+         */
+        public static bool CountsAsClear(Phase phase)
+        {
+            return phase == Phase.Fighting || phase == Phase.Approaching;
+        }
+
         [Header("참조")]
         [SerializeField] private EnemySpawner spawner;
         [SerializeField] private StageProgress progress;
@@ -417,6 +433,12 @@ namespace Onikiri.Battle
                     // 제한 시간이 아니라 **안전장치**다 - 어떤 이유로 보스가
                     // 영영 도달하지 못하면(스폰 실패, 이동 속도 0) 접근 상태에
                     // 갇히므로, 그때는 그냥 전투를 시작해 정상 경로로 흘려보낸다
+                    //
+                    // 이 줄은 **스폰이 실패한 경우**만 잡는다. 달려오다 맞아
+                    // 죽은 보스는 OnEnemyKilled가 먼저 받아 클리어로 보내므로
+                    // (같은 프레임에 phase가 Cleared로 바뀐다) 여기 오지 않는다.
+                    // 한때는 그 처치가 버려져 이 줄이 스테이지를 안 올린 채
+                    // 파밍으로 되돌렸고, 그것이 진행이 막히는 증상이었다
                     if (boss == null || !boss.IsAlive) { ReturnToFarming(); break; }
                     if (boss.CurrentState == Enemy.State.Engaged || timer <= 0f) BeginFight();
                     break;
@@ -558,7 +580,36 @@ namespace Onikiri.Battle
          */
         private void OnEnemyKilled(Enemy enemy)
         {
-            if (phase != Phase.Fighting || enemy == null || !enemy.IsBoss || enemy != boss) return;
+            if (enemy == null || !enemy.IsBoss || enemy != boss) return;
+
+            /**
+             * @brief **달려오는 중에 죽은 보스도 클리어다.**
+             *
+             * 여기는 한때 `phase != Phase.Fighting`이면 그냥 돌아갔다. 그 조건은
+             * "보스가 죽는 것은 전투 중뿐"이라는 가정 위에 서 있었는데, 그 가정이
+             * 참인 적이 없었다.
+             *
+             * 접근(Approaching)이 끝나는 지점은 보스가 **전선에 닿는** 순간이다
+             * (frontLineX = 0.05, Enemy.State.Engaged). 그런데 사무라이의 사거리는
+             * 자기 자리(x = -1.2)에서 2.0이라 **x = 0.8까지 닿는다.** 그 사이
+             * 0.75칸 - 동료(사거리 2.2~3.5)와 스킬까지 더하면 더 넓다 - 는 보스가
+             * 아직 접근 상태인데 이미 맞고 있는 구간이다.
+             *
+             * 그 구간에서 보스가 죽으면 옛 조건이 처치를 버렸다. 그러면
+             * `Update`의 접근 분기가 시체를 보고 파밍으로 되돌리고, 화면에서는
+             * **보스를 벴는데 아무 일도 일어나지 않는다** - 스테이지도 안 오르고
+             * 클리어 보너스도 혼도 없다. 강할수록 첫 타격이 그 구간에 떨어지므로,
+             * 앞서 나간 플레이어일수록 진행이 확실하게 막혔다.
+             *
+             * 밸런스는 그대로다. 접근 구간의 피해는 원래부터 들어가고 있었고
+             * (그래서 거기서 죽을 수 있었다), 보스는 같은 피해를 받고 같은 순간에
+             * 죽는다. 달라지는 것은 그 죽음을 세는가뿐이다.
+             *
+             * 나머지 상태에서는 여전히 돌아간다. Intro에는 보스가 아직 없고,
+             * Cleared·Failed·Farming에서는 boss가 null이라 위의 동일성 검사에서
+             * 이미 걸리지만, 그 사실에 기대지 않고 여기서 명시한다.
+             */
+            if (!CountsAsClear(phase)) return;
 
             int clearedStage = CurrentStage;
             ClearedStage = clearedStage;

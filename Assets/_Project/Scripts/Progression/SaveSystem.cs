@@ -5,6 +5,28 @@ using UnityEngine;
 namespace Onikiri.Progression
 {
     /**
+     * @brief 마지막 Load가 어떻게 끝났는가. 인트로 타이틀이 읽는다.
+     *
+     * 그 전까지는 손상된 세이브가 **조용히** 새 게임이 됐다(로그 한 줄뿐).
+     * 출시 앱에서 그것은 "진행이 사라졌는데 아무도 말해주지 않았다"가 된다 -
+     * 타이틀 화면이 생기면서 처음으로 이것을 사람에게 적을 자리가 생겼다.
+     */
+    public enum SaveLoadOutcome
+    {
+        /** 파일이 없다. 첫 실행의 정상 경로 */
+        NoFile = 0,
+
+        /** 그대로 읽혔다 (마이그레이션 포함) */
+        Loaded,
+
+        /** 못 읽었다 (빈 파일·깨진 JSON). 원본은 백업했다 */
+        Corrupt,
+
+        /** 이 빌드보다 새 버전. 다운그레이드 - 원본은 백업했다 */
+        FutureVersion,
+    }
+
+    /**
      * @brief 세이브 파일 읽기/쓰기.
      *
      * 파일 하나에 JSON으로 담는다. 이 규모에서 PlayerPrefs를 쓸 이유는 없고(안드로이드는
@@ -26,6 +48,40 @@ namespace Onikiri.Progression
         public static bool Exists
         {
             get { return File.Exists(Path); }
+        }
+
+        /**
+         * @brief 마지막 Load의 결과. Load를 아직 안 불렀으면 NoFile.
+         *
+         * 세이브 데이터가 아니라 **이번 실행의 관측**이라 static 필드다.
+         * 세이브에 적으면 "손상됐었다"가 영구 기록이 되는데, 그 사실은
+         * 다음 정상 저장이 오면 더는 참이 아니다.
+         */
+        public static SaveLoadOutcome LastOutcome { get; private set; } = SaveLoadOutcome.NoFile;
+
+        /** 읽지 못한 원본을 치워 두는 곳. 문의가 오면 이 파일이 증거다 */
+        public static string BackupPath
+        {
+            get { return Path + ".broken"; }
+        }
+
+        /**
+         * @brief 못 읽는 원본을 옆에 치워 둔다. **다음 Save가 덮어쓰기 전에.**
+         *
+         * 새 게임으로 시작한 첫 자동 저장(30초)이 원본을 지운다 - 백업이
+         * 없으면 "읽지 못했다"가 30초 뒤 "복구할 수도 없다"로 굳는다.
+         * 복사 실패는 삼킨다. 백업은 최선의 노력이지 게이트가 아니다.
+         */
+        private static void BackUpBrokenFile()
+        {
+            try
+            {
+                if (File.Exists(Path)) File.Copy(Path, BackupPath, true);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Onikiri] Could not back up the broken save: " + exception.Message);
+            }
         }
 
         public static void Save(SaveData data)
@@ -60,7 +116,11 @@ namespace Onikiri.Progression
          */
         public static SaveData Load()
         {
-            if (!File.Exists(Path)) return SaveData.NewGame();
+            if (!File.Exists(Path))
+            {
+                LastOutcome = SaveLoadOutcome.NoFile;
+                return SaveData.NewGame();
+            }
 
             try
             {
@@ -70,6 +130,8 @@ namespace Onikiri.Progression
                 if (data == null)
                 {
                     Debug.LogWarning("[Onikiri] Save file was empty; starting a new game.");
+                    BackUpBrokenFile();
+                    LastOutcome = SaveLoadOutcome.Corrupt;
                     return SaveData.NewGame();
                 }
 
@@ -81,17 +143,22 @@ namespace Onikiri.Progression
                     // 시도하면 엉뚱한 값으로 진행을 덮어쓴다
                     Debug.LogWarning("[Onikiri] Save version " + loadedVersion + " is newer than " +
                                      SaveData.CurrentVersion + "; starting a new game.");
+                    BackUpBrokenFile();
+                    LastOutcome = SaveLoadOutcome.FutureVersion;
                     return SaveData.NewGame();
                 }
 
                 if (loadedVersion != SaveData.CurrentVersion)
                     Debug.Log("[Onikiri] Migrated save v" + loadedVersion + " -> v" + SaveData.CurrentVersion + ".");
 
+                LastOutcome = SaveLoadOutcome.Loaded;
                 return data;
             }
             catch (Exception exception)
             {
                 Debug.LogError("[Onikiri] Save file unreadable, starting a new game: " + exception.Message);
+                BackUpBrokenFile();
+                LastOutcome = SaveLoadOutcome.Corrupt;
                 return SaveData.NewGame();
             }
         }

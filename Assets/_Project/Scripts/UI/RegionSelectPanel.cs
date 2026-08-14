@@ -49,6 +49,31 @@ namespace Onikiri.UI
         [SerializeField] private Button frontierButton;
         [SerializeField] private TMP_Text frontierLabel;
 
+        /**
+         * @brief 스테이지 단위 이동 (#8). 지역 줄 위에 얹힌 미세 조정이다.
+         *
+         * ## 왜 지역 줄만으로는 부족했는가
+         *
+         * 37단계의 판단은 "골드/초는 최전선이 늘 최적이므로 세부 스테이지
+         * 선택에 실익이 없다"였고, 그 수치는 지금도 맞다. 그런데 되돌아가는
+         * 이유가 수치만이 아니다 - 어느 스테이지의 요괴를 다시 보고 싶은가,
+         * 지금 빌드로 몇 층까지 안 죽고 도는가 같은 것은 지역의 첫 칸으로만
+         * 이동할 수 있으면 확인할 수 없다. 지역 줄은 **큰 이동**, 이 버튼들은
+         * **한 칸씩**이다.
+         *
+         * ## 앞지르기는 여기서 막지 않는다
+         *
+         * 클램프는 StageProgress.SelectStage 안에 있다(최전선 상한). 이
+         * 화면이 스스로 자르면 규칙이 두 곳에 생기고, 언젠가 한쪽만 고쳐진다.
+         * 여기서 하는 것은 **누를 수 없게 흐리는 것**뿐이고, 그것은 규칙이
+         * 아니라 규칙을 보여주는 일이다.
+         */
+        [Header("스테이지 단위 이동 (#8)")]
+        [SerializeField] private Button minusTenButton;
+        [SerializeField] private Button minusOneButton;
+        [SerializeField] private Button plusOneButton;
+        [SerializeField] private Button plusTenButton;
+
         [SerializeField] private Row[] rows;
 
         [Header("색")]
@@ -63,6 +88,13 @@ namespace Onikiri.UI
             if (progress != null) progress.Changed += Refresh;
 
             if (frontierButton != null) frontierButton.onClick.AddListener(OnFrontier);
+
+            // 한 칸/열 칸 이동 (#8). 목적지는 늘 현재 위치 기준이라 눌린
+            // 시점에 계산한다 - 배선 시점에 굳히면 첫 이동 뒤로 전부 틀린다
+            if (minusTenButton != null) minusTenButton.onClick.AddListener(() => Step(-10));
+            if (minusOneButton != null) minusOneButton.onClick.AddListener(() => Step(-1));
+            if (plusOneButton != null) plusOneButton.onClick.AddListener(() => Step(1));
+            if (plusTenButton != null) plusTenButton.onClick.AddListener(() => Step(10));
 
             if (rows != null)
                 foreach (var row in rows)
@@ -107,6 +139,19 @@ namespace Onikiri.UI
             MoveTo(row.firstStage);
         }
 
+        /**
+         * @brief 지금 위치에서 delta칸. 클램프는 SelectStage가 한다.
+         *
+         * 열 칸 이동이 최전선을 넘어가면 **최전선에 선다.** 아무 일도 일어나지
+         * 않는 대신 갈 수 있는 데까지 가는 쪽이 맞다 - 이 버튼을 누르는 사람이
+         * 원하는 것은 정확히 열 칸이 아니라 "많이"이기 때문이다.
+         */
+        private void Step(int delta)
+        {
+            if (progress == null) return;
+            MoveTo(Mathf.Clamp(progress.Stage + delta, 1, progress.MaxStageReached));
+        }
+
         private void Refresh()
         {
             if (progress == null) return;
@@ -122,6 +167,18 @@ namespace Onikiri.UI
                 frontierLabel.text = "최전선으로  (" + frontier + ")";
             if (frontierButton != null)
                 frontierButton.interactable = !progress.IsAtFrontier;
+
+            // 한 칸 이동 버튼 (#8). 갈 곳이 없는 방향은 흐린다 - 규칙 자체는
+            // SelectStage가 들고 있고 여기서는 그것을 화면에 비출 뿐이다.
+            //
+            // 재선택이 아직 안 열렸으면(최전선 11 미만) 넷 다 꺼진다. 그 게이트도
+            // SelectStage가 지키지만, 눌리는데 아무 일도 안 일어나는 버튼은
+            // 고장으로 읽힌다
+            bool canMove = progress.IsReselectUnlocked;
+            if (minusTenButton != null) minusTenButton.interactable = canMove && stage > 1;
+            if (minusOneButton != null) minusOneButton.interactable = canMove && stage > 1;
+            if (plusOneButton != null) plusOneButton.interactable = canMove && stage < frontier;
+            if (plusTenButton != null) plusTenButton.interactable = canMove && stage < frontier;
 
             if (rows == null) return;
 

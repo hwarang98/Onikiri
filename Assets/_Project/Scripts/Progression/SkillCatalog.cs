@@ -379,27 +379,43 @@ namespace Onikiri.Progression
         /**
          * 배율과 쿨다운의 크기를 고른 근거.
          *
-         *   연참 x1.26 / 7초  = 0.180   자주 터지는 잔 오의. 상한에서 평타 4대 몫
-         *   일섬 x3.25 /13초  = 0.250   중간.               상한에서 평타 10대 몫
-         *   귀참 x7.04 /22초  = 0.320   가장 무겁다.        상한에서 평타 23대 몫
+         *   연참 x0.54 / 3초  = 0.180   자주 터지는 잔 오의
+         *   일섬 x1.50 / 6초  = 0.250   중간
+         *   귀참 x3.52 /11초  = 0.320   가장 무겁다
          *
-         * **쿨다운을 20초 안팎에 묶어둔 것이 먼저다.** 방치형에서 오의는 화면을
-         * 흘깃 볼 때 보여야 하고, 한 스테이지가 30~60초이므로 그보다 긴 쿨다운은
-         * 스테이지 하나를 통째로 지나쳐버린다. 배율은 그 쿨다운에 맞춰 뒤에
-         * 정해진 값이다 - 반대 순서로 잡으면 "배율은 큰데 아무도 못 보는 스킬"이
-         * 나온다.
+         * ## 밸런스 리듬 재조정 - 배율과 쿨다운을 같은 비로 눌렀다
+         *
+         * 처음 값은 연참 1.26/7초 · 일섬 3.25/13초 · 귀참 7.04/22초였다.
+         * "쿨다운 20초 안팎" 규칙으로 잡았는데 실전에서는 **전투가 답답했다** -
+         * 슬롯 두엇의 초반 구성에서 오의가 4~5초에 한 번 나왔다.
+         *
+         * 그래서 각 오의의 배율과 쿨다운을 **같은 비율로** 절반 안팎으로
+         * 눌렀다(연참 3/7, 일섬 6/13, 귀참 1/2). 비를 지키면 초당 기여
+         * (BaseRate = 배율/쿨)가 소수 그대로 보존되므로:
+         *
+         *   - 스킬 DPS 총량이 안 움직인다 (해금 몫 4~5%, 상한 합 2.40 그대로)
+         *   - 밴드·시뮬레이션·보스 게이트가 이 축에서 아무것도 못 느낀다
+         *   - 골드 효율(BaseCost = BaseRate x 150 x 골드 배수)도 저절로 그대로다
+         *
+         * 바뀐 것은 리듬뿐이다: 초반 구성(연참, +일섬)에서 2~3초에 한 번,
+         * 한 방은 가벼워지고 자주 터진다. 역할 순서(빠름 -> 무거움)와 상대
+         * 강약은 그대로다 - 귀참은 여전히 11초에 한 번 오는 결정타다.
          *
          * 합이 0.75다. 해금 시점에는 공격속도가 이미 상한(3.88)이라 스킬 하나가
          * 열릴 때 DPS의 4~5%를 맡고, 그것이 **한 칸의 체감이 0.5%를 넘는 최소
          * 크기**다(SkillCurve.CeilingRatio 주석의 산수).
          *
          * 상한(x3.2)에서 합이 2.40이 되어 공격속도 상한 3.88 아래에 머문다.
+         *
+         * 쿨다운의 하한은 이펙트다 - 클립이 쿨다운의 25% 안에 끝나야 한다는
+         * 검사(SkillVfxTests)가 있어서, 0.36초짜리 whip을 쓰는 혈조도 1.5초
+         * 밑으로는 못 내려간다. 2.5초는 그 위에 여유를 둔 값이다.
          */
         public static readonly SkillSpec[] Skills =
         {
             new SkillSpec {
                 Id = ChainSlashId, DisplayName = "연참",
-                BaseMultiplier = 1.26d, CooldownSeconds = 7d,
+                BaseMultiplier = 0.54d, CooldownSeconds = 3d,
                 UnlockLevel = 10, UnlockStage = 8,
                 IconFile = "Icon076",           // 붉은 타일 + 흰 삼연 참격
                 SlashRgba = 0xA8D8FFFFu,        // 창백한 청백 (평타 #FFF4D6 과 거리 0.39)
@@ -407,7 +423,7 @@ namespace Onikiri.Progression
             },
             new SkillSpec {
                 Id = FlashId, DisplayName = "일섬",
-                BaseMultiplier = 3.25d, CooldownSeconds = 13d,
+                BaseMultiplier = 1.50d, CooldownSeconds = 6d,
                 UnlockLevel = 15, UnlockStage = 15,
                 IconFile = "Icon140",           // 어두운 타일 + 붉은 단발 참격
                 SlashRgba = 0xFF4A3AFFu,        // 선명한 적 (처치 #FF8A7A 과 거리 0.36)
@@ -415,7 +431,7 @@ namespace Onikiri.Progression
             },
             new SkillSpec {
                 Id = OniCleaveId, DisplayName = "귀참",
-                BaseMultiplier = 7.04d, CooldownSeconds = 22d,
+                BaseMultiplier = 3.52d, CooldownSeconds = 11d,
                 UnlockLevel = 20, UnlockStage = 21,
                 IconFile = "Icon118",           // 오니 뿔
                 SlashRgba = 0xFF9500FFu,        // 깊은 호박빛 금 (치명타 #FFD34D 과 거리 0.39)
@@ -425,14 +441,16 @@ namespace Onikiri.Progression
             // ---------------------------------------------------------- 49단계
             //
             // 다섯 다 `배율/쿨 = 0.180`이다. 표에서는 안 보이므로 옆에 적어 둔다.
+            // (리듬 재조정에서 다섯 모두 배율·쿨을 같은 비 1/2로 눌렀다 -
+            //  비가 같으므로 0.180 동률이 소수 그대로 남는다)
             //
-            //   혈파동  2.88/16 = 0.180   지면 파동 (Screen)     등롱 가족
-            //   낙혈    1.98/11 = 0.180   전방 관통 (Pierce)     처형인 가족
-            //   혈륜    1.62/ 9 = 0.180   회전 다타 (MultiHit)   적안 가족
-            //   혈폭    3.42/19 = 0.180   단발 버스트            가챠 몫
-            //   혈조    1.08/ 6 = 0.180   원거리 단타            가챠 몫
+            //   혈파동  1.44/8.0 = 0.180   지면 파동 (Screen)     등롱 가족
+            //   낙혈    0.99/5.5 = 0.180   전방 관통 (Pierce)     처형인 가족
+            //   혈륜    0.81/4.5 = 0.180   회전 다타 (MultiHit)   적안 가족
+            //   혈폭    1.71/9.5 = 0.180   단발 버스트            가챠 몫
+            //   혈조    0.45/2.5 = 0.180   원거리 단타            가챠 몫
             //
-            // 쿨다운이 6·9·11·16·19초라 기존 셋(7·13·22)의 사이를 메운다.
+            // 쿨다운이 2.5·4.5·5.5·8·9.5초라 기존 셋(3·6·11)의 사이를 메운다.
             // 해금은 앞의 셋이 **코리더 안**(st12/18/27, 49b)이고 뒤의 둘은
             // **뽑기**다(50단계, GachaGated). 어느 쪽도 레벨 게이트가 아니라
             // 자리를 열지 않는다 - 코리더와 가속 구간을 비트 단위로 지키는
@@ -440,7 +458,7 @@ namespace Onikiri.Progression
 
             new SkillSpec {
                 Id = BloodWaveId, DisplayName = "혈파동",
-                BaseMultiplier = 2.88d, CooldownSeconds = 16d,
+                BaseMultiplier = 1.44d, CooldownSeconds = 8d,
                 UnlockLevel = 0, UnlockStage = BloodWaveStage,
                 IconFile = "Icon058",           // 붉은 타일 + 사방으로 퍼지는 방사
                 SlashRgba = 0xE8446EFFu,        // 선명한 로즈
@@ -449,7 +467,7 @@ namespace Onikiri.Progression
             },
             new SkillSpec {
                 Id = BloodFallId, DisplayName = "낙혈",
-                BaseMultiplier = 1.98d, CooldownSeconds = 11d,
+                BaseMultiplier = 0.99d, CooldownSeconds = 5.5d,
                 UnlockLevel = 0, UnlockStage = BloodFallStage,
                 IconFile = "Icon056",           // 위에서 떨어지는 핏줄기
                 SlashRgba = 0xB02060FFu,        // 짙은 자적
@@ -458,7 +476,7 @@ namespace Onikiri.Progression
             },
             new SkillSpec {
                 Id = BloodWheelId, DisplayName = "혈륜",
-                BaseMultiplier = 1.62d, CooldownSeconds = 9d,
+                BaseMultiplier = 0.81d, CooldownSeconds = 4.5d,
                 UnlockLevel = 0, UnlockStage = BloodWheelStage,
                 IconFile = "Icon062",           // 회전하는 톱니 고리
                 SlashRgba = 0xC8304CFFu,        // 하베스트의 중심색
@@ -471,7 +489,7 @@ namespace Onikiri.Progression
             // (SkillSpec.GachaGated 주석).
             new SkillSpec {
                 Id = BloodBurstId, DisplayName = "혈폭",
-                BaseMultiplier = 3.42d, CooldownSeconds = 19d,
+                BaseMultiplier = 1.71d, CooldownSeconds = 9.5d,
                 UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon083",           // 터져 오르는 폭발 기둥
                 SlashRgba = 0xD81E7AFFu,        // 자홍
@@ -480,7 +498,7 @@ namespace Onikiri.Progression
             },
             new SkillSpec {
                 Id = BloodWhipId, DisplayName = "혈조",
-                BaseMultiplier = 1.08d, CooldownSeconds = 6d,
+                BaseMultiplier = 0.45d, CooldownSeconds = 2.5d,
                 UnlockLevel = 0, UnlockStage = GachaCurve.UnlockStage, GachaGated = true,
                 IconFile = "Icon082",           // 휘어 감기는 갈고리
                 SlashRgba = 0x96285EFFu,        // 어두운 자적
@@ -754,7 +772,7 @@ namespace Onikiri.Progression
                     // **동률 판정에 여유를 둔다.** 신규 다섯의 초당 기여는
                     // 설계상 정확히 같은 값이지만(ExpansionRate), 배율과
                     // 쿨다운을 따로 적어 나눈 결과라 부동소수점에서 마지막
-                    // 비트가 갈린다 - 2.88/16과 1.98/11이 정확히 같은 double이
+                    // 비트가 갈린다 - 1.44/8과 0.99/5.5가 정확히 같은 double이
                     // 아니다. 맨 부등호로 두면 그 잡음이 장착 순서를 정하게
                     // 되고, 실제로 그렇게 나왔다(혈파동 대신 낙혈이 뽑혔다).
                     //

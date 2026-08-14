@@ -38,10 +38,11 @@ namespace Onikiri.Progression
          *   16 47단계. 희귀도 사다리 - 자루별 혼격과 전설 妖刀 보유
          *   17 49단계. 오의 장착 슬롯 - 어느 오의를 어느 자리에 끼웠는가
          *   18 50단계. 오의 뽑기 - 스킬 XP · 가챠 몫 보유 · 그 배너의 천장/무료 쿨
+         *   19 54단계. 리더보드 - 플레이어가 정한 이름
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 18;
+        public const int CurrentVersion = 19;
 
         public int version = CurrentVersion;
 
@@ -381,6 +382,21 @@ namespace Onikiri.Progression
 
         /** 마지막으로 오의 무료 뽑기를 쓴 퀘스트일. 요도 쪽과 같은 형식·같은 경계 */
         public long skillGachaFreePullDayTicks;
+
+        // ---------------------------------------------------------------- 54단계
+
+        /**
+         * @brief 플레이어가 정한 이름 (v19, 리더보드).
+         *
+         * **안 정했으면 빈 문자열이다.** 기본 이름("이름없는 무사")을 여기에
+         * 적지 않는 이유는 그 순간 "안 정한 사람"과 "기본 이름을 직접 고른
+         * 사람"이 구분되지 않아, 랭킹 첫 진입에서 입력을 띄울지 판단할 근거가
+         * 사라지기 때문이다. 표시는 PlayerProfile.Name이 대신한다.
+         *
+         * 도달층은 여기 없다 - maxStageReached가 이미 그 값이다(52단계).
+         * 리더보드가 새로 저장하는 상태는 이름 하나뿐이다.
+         */
+        public string playerName = string.Empty;
 
         public static SaveData NewGame()
         {
@@ -815,6 +831,23 @@ namespace Onikiri.Progression
                 }
 
                 data.version = 18;
+            }
+
+            if (data.version == 18)
+            {
+                // v18에는 이름이 없었다. **빈 문자열로 둔다** - 지어내지
+                // 않는다는 규칙(49단계 skillEquipped)과 같은 자리다.
+                //
+                // 여기서 기본 이름을 적어 넣으면 옛 플레이어 전원이 "이름을
+                // 직접 고른 사람"이 되어, 랭킹 첫 진입에서 이름 입력을 띄우는
+                // 판단(PlayerProfile.HasChosenName)이 그들에게만 영원히 거짓이
+                // 된다. 표시할 이름이 필요한 자리는 PlayerProfile.Name이
+                // 기본값으로 채운다 - 세이브가 그 값을 굳힐 이유가 없다.
+                //
+                // 밸런스·진행은 한 글자도 안 바뀐다. 도달층은 v12부터 있던
+                // maxStageReached 그대로이고, 리더보드는 그것을 읽기만 한다.
+                data.playerName = string.Empty;
+                data.version = 19;
             }
 
             data.version = CurrentVersion;

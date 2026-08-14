@@ -121,3 +121,7 @@ InitTestScene*.unity*
 /dev/
 
 /Artifacts
+
+# GitHub 100MB 제한 초과 - macOS 에디터용 Firebase 데스크톱 번들 (Windows는 .dll 사용)
+Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*.bundle
+Assets/Firebase/Plugins/x86_64/FirebaseCppApp-*.bundle.meta

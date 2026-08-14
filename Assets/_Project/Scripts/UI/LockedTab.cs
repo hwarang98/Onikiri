@@ -238,6 +238,45 @@ namespace Onikiri.UI
                 if (other != null && other.activeSelf) other.SetActive(false);
         }
 
+        /**
+         * @brief 잠금 상태에 따라 심볼을 가운데로 옮겼다 되돌린다 (#10).
+         *
+         * 열린 탭은 아이콘 위 · 글자 아래의 2층 구성이고(빌더가 잡아둔 자리),
+         * 잠긴 탭은 글자가 없으니 심볼 하나가 가운데 서는 것이 맞다.
+         *
+         * 원래 자리는 **처음 한 번만** 기억한다. 매번 현재 값을 기준으로
+         * 옮기면 잠금/해금이 오갈 때마다 조금씩 밀린다.
+         */
+        private void CenterIconWhileLocked(bool locked)
+        {
+            var rect = icon != null ? icon.rectTransform : null;
+            if (rect == null) return;
+
+            if (normalIconAnchor == null)
+            {
+                normalIconAnchor = rect.anchorMin;
+                normalIconPivot = rect.pivot;
+                normalIconPosition = rect.anchoredPosition;
+            }
+
+            if (locked)
+            {
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = Vector2.zero;
+            }
+            else
+            {
+                rect.anchorMin = rect.anchorMax = normalIconAnchor.Value;
+                rect.pivot = normalIconPivot;
+                rect.anchoredPosition = normalIconPosition;
+            }
+        }
+
+        private Vector2? normalIconAnchor;
+        private Vector2 normalIconPivot;
+        private Vector2 normalIconPosition;
+
         private void Refresh()
         {
             bool unlocked = IsUnlocked;
@@ -253,10 +292,24 @@ namespace Onikiri.UI
 
             if (label != null)
             {
-                // 잠겨 있으면 이름 대신 **조건만** 적는다(38단계). 이름과 조건을
-                // 함께 적던 시절("동료 31스테이지")에는 5탭 폭에서 글자가 넘쳤다.
-                // 잠겼다는 사실은 자물쇠 아이콘이 말하므로 글자는 조건 하나면 된다
-                if (!unlocked) label.text = Requirement;
+                /**
+                 * @brief 잠긴 탭은 **자물쇠뿐이다** (#10).
+                 *
+                 * 38단계에 "이름 + 조건"에서 "조건만"으로 줄였고, 이제 그 조건도
+                 * 지운다. 조건 문구가 바깥에 필요 없는 이유는 **안에 들어가면
+                 * 어차피 나오기 때문이다** - 잠긴 화면은 미리보기로 열리고
+                 * (41단계), 그 안에 해금 조건 배너가 선다(PanelLockBanner).
+                 *
+                 * 같은 사실을 두 곳에 적으면 둘이 갈라진다. 실제로 갈라져 있었다:
+                 * 탭은 "11스테이지", 배너는 그 지역 이름까지 적은 문장이다.
+                 * 바깥은 **잠겼다**만 말하고, 무엇이 필요한지는 안에서 한 번만
+                 * 말한다.
+                 *
+                 * 조건 자체는 Requirement에 그대로 남는다 - 지운 것은 표시이지
+                 * 사실이 아니고, 잠긴 탭 다섯이 나란히 선 하단 바는 글자가
+                 * 빠질수록 읽힌다.
+                 */
+                if (!unlocked) label.text = string.Empty;
                 else label.text = pending ? pendingLabel : displayName;
 
                 label.color = available ? unlockedColor : lockedColor;
@@ -268,6 +321,10 @@ namespace Onikiri.UI
                 icon.sprite = sprite;
                 icon.enabled = sprite != null;
                 icon.color = available ? unlockedColor : lockedColor;
+
+                // 글자가 빠졌으므로 자물쇠는 탭 한가운데 선다 (#10). 위쪽에
+                // 그대로 두면 아래 절반이 빈 채로 남아 탭이 잘린 것처럼 읽힌다
+                CenterIconWhileLocked(!unlocked);
             }
 
             if (background != null)

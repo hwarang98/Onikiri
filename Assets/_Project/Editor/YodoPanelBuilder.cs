@@ -534,6 +534,27 @@ namespace Onikiri.EditorTools
             rect.offsetMax = Vector2.zero;
             rect.sizeDelta = new Vector2(0f, height);
             rect.anchoredPosition = Vector2.zero;
+
+            /**
+             * @brief 탭별 독립 스크롤 (#6·#7).
+             *
+             * 이 헬퍼를 쓰는 패널이 전부 같은 구조다 - 한 ScrollRect 아래에
+             * 페이지 여럿이 겹쳐 있고 탭이 그중 하나만 켠다. 그래서 고칠
+             * 자리도 하나다: 페이지가 켜질 때 콘텐츠를 자기 높이로 줄이고
+             * 자기 스크롤 위치로 되돌린다.
+             *
+             * 여기 붙여두면 대장간·요도·도감이 함께 고쳐지고, 앞으로 이
+             * 헬퍼로 만드는 페이지도 처음부터 그렇게 된다 - 목록마다 따로
+             * 붙이면 언젠가 하나를 빠뜨린다.
+             */
+            var memory = go.AddComponent<Onikiri.UI.ScrollPageMemory>();
+            var so = new SerializedObject(memory);
+            so.FindProperty("scroll").objectReferenceValue =
+                content.GetComponentInParent<UnityEngine.UI.ScrollRect>();
+            so.FindProperty("content").objectReferenceValue = content;
+            so.FindProperty("pageHeight").floatValue = height;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
             return rect;
         }
 

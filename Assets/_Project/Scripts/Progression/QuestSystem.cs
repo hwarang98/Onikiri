@@ -388,6 +388,46 @@ namespace Onikiri.Progression
         }
 
         /**
+         * @brief 열려 있는 것을 **전부 받는다** (#5). 받은 횟수를 돌려준다.
+         *
+         * ## 왜 필요한가
+         *
+         * TryClaim 머리 주석은 "한 번에 하나씩이라야 누를 때마다 보상이 뜬다"고
+         * 적어뒀고, 그 말은 세 개가 밀렸을 때 참이다. **백 개에서는 거짓이
+         * 된다** - 백 번의 탭은 보람이 아니라 노동이고, 그 백 번 동안 화면에
+         * 뜨는 것은 매번 같은 숫자다. 방치형은 오래 안 열어보는 것이 정상이라
+         * 반복 퀘스트의 티어는 실제로 그만큼 쌓인다.
+         *
+         * ## 무엇이 바뀌지 않는가
+         *
+         * 지급 경로다. 한 칸씩 TryClaim을 도는 것뿐이라 **보상량도 순서도
+         * 같다** - 업적의 골드/경험치가 받는 순간의 스테이지로 환산되는 것
+         * (GrantAchievementSpoils)까지 그대로다. 배수 구매(#9)와 같은 규칙이고,
+         * 같은 이유로 새로 생기는 이득이 없다.
+         *
+         * 한 판에 도는 횟수는 막아둔다. 반복 티어는 카운터에서 유도되므로
+         * (opened - claimed) 세이브가 망가지면 큰 수가 나올 수 있고, 그때
+         * 프레임이 멈추는 대신 여기서 끊긴다.
+         */
+        public int ClaimAll()
+        {
+            const int Guard = 4096;
+
+            int claimed = 0;
+
+            for (int i = 0; i < QuestCatalog.DailyCount && claimed < Guard; i++)
+                while (claimed < Guard && TryClaim(QuestKind.Daily, i)) claimed++;
+
+            for (int i = 0; i < QuestCatalog.RepeatCount && claimed < Guard; i++)
+                while (claimed < Guard && TryClaim(QuestKind.Repeat, i)) claimed++;
+
+            for (int i = 0; i < QuestCatalog.AchievementCount && claimed < Guard; i++)
+                while (claimed < Guard && TryClaim(QuestKind.Achievement, i)) claimed++;
+
+            return claimed;
+        }
+
+        /**
          * @brief 업적의 골드/경험치. **여기가 밴드를 건드리는 유일한 지점이다.**
          *
          * 잡몹 평균 골드를 스포너에서 읽는다 - StageSimulation도 같은 값
@@ -559,6 +599,41 @@ namespace Onikiri.Progression
             for (int i = 0; i < dailyClaimed.Length; i++) dailyClaimed[i] = false;
             for (int i = 0; i < repeatClaimed.Length; i++) repeatClaimed[i] = 0;
             for (int i = 0; i < achievementClaimed.Length; i++) achievementClaimed[i] = false;
+
+            Raise();
+        }
+
+        /**
+         * @brief 이 퀘스트 **하나의 수령 기록만** 되돌린다. 카운터도 잔액도 안 건드린다.
+         *
+         * DebugResetProgress가 이미 있는데 이것을 따로 두는 이유는 **되돌릴 범위**다.
+         * 그쪽은 세 종류를 통째로 비우고 카운터까지 0으로 만든다 - 가이드
+         * 진행선(GuideQuestCatalog)만 처음으로 되감아 보고 싶을 때 일일·반복과
+         * 누적 카운터까지 함께 날아가면, 그 뒤에 보는 화면은 확인하려던 화면이
+         * 아니라 새 계정이다.
+         *
+         * 지급한 것을 회수하지 않는다. DebugResetProgress 주석이 적은 규칙 그대로다 -
+         * 이미 받은 보석을 뺏는 것은 초기화가 아니라 몰수이고, 그래서 이 경로로
+         * 되감으면 **같은 보상을 한 번 더 받을 수 있다.** 테스트 패널 전용인
+         * 이유가 그것이다.
+         *
+         * 반복은 티어 수를 0으로 되돌린다. 열린 티어는 누적 카운터에서 유도되므로
+         * (ClaimableCount) 카운터를 안 건드려도 다시 열린다.
+         */
+        public void DebugUnclaim(QuestKind kind, int index)
+        {
+            if (kind == QuestKind.Daily)
+            {
+                if (index >= 0 && index < dailyClaimed.Length) dailyClaimed[index] = false;
+            }
+            else if (kind == QuestKind.Achievement)
+            {
+                if (index >= 0 && index < achievementClaimed.Length) achievementClaimed[index] = false;
+            }
+            else
+            {
+                if (index >= 0 && index < repeatClaimed.Length) repeatClaimed[index] = 0;
+            }
 
             Raise();
         }

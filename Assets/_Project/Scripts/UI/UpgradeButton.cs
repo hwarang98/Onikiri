@@ -154,6 +154,9 @@ namespace Onikiri.UI
             progress = StageProgress.Instance;
             if (progress != null) progress.Changed += Refresh;
 
+            // 배수가 바뀌면 이 줄의 가격과 증가폭이 통째로 달라진다 (#9)
+            UpgradeBatchSelector.Changed += Refresh;
+
             Refresh();
         }
 
@@ -163,6 +166,7 @@ namespace Onikiri.UI
             if (system != null) system.Changed -= Refresh;
             if (wallet != null) wallet.GoldChanged -= OnGoldChanged;
             if (progress != null) progress.Changed -= Refresh;
+            UpgradeBatchSelector.Changed -= Refresh;
         }
 
         private StageProgress progress;
@@ -172,9 +176,46 @@ namespace Onikiri.UI
             Refresh();
         }
 
+        /**
+         * @brief 이번에 살 칸 수. 배수 줄이 고른 값을 이 줄에 적용한 결과다 (#9).
+         *
+         * "최대"(0)는 **이 축의** 최대다. 잔액과 이 축의 곡선이 함께 정하므로
+         * 축마다 다른 수가 나오고, 그것이 맞다 - 싼 축은 많이, 비싼 축은 적게.
+         *
+         * 배수가 정해준 수보다 잔액이 모자라면 살 수 있는 데까지로 줄인다.
+         * 화면에 뜬 가격과 실제로 나가는 골드가 같아야 하기 때문이다 -
+         * ×100인데 열두 칸만 살 수 있으면 이 줄은 열두 칸의 가격을 보여준다.
+         */
+        private int PlannedLevels(UpgradeTrack track)
+        {
+            int wanted = UpgradeBatchSelector.Current;
+            int affordable = track.AffordableLevels(wallet, wanted);
+
+            // 한 칸도 못 사면 1로 둔다. 0칸의 가격("0")을 보여주면 공짜로
+            // 읽히고, 이 줄이 원래 하던 일(다음 한 칸이 얼마인가)도 사라진다
+            return affordable > 0 ? affordable : 1;
+        }
+
         private void OnClick()
         {
-            if (system != null) system.TryPurchase(trackIndex);
+            if (system == null) return;
+
+            var track = system.GetTrack(trackIndex);
+            if (track == null) return;
+
+            int count = UpgradeBatchSelector.Current;
+
+            // 한 칸이면 예전 경로 그대로다. 배수 줄이 없는 씬(전투 전용 테스트)도
+            // 여기로 떨어진다
+            if (count == 1) { system.TryPurchase(trackIndex); return; }
+
+            // "최대"는 잔액이 감당하는 데까지. 여기서 수를 확정해 넘기지 않고
+            // 0을 그대로 넘기면 시스템 쪽이 다시 잔액을 읽어야 하고, 그 사이
+            // 골드가 들어오면(방치 수익은 계속 돈다) 화면에 뜬 수보다 더 산다
+            if (count <= 0) count = track.AffordableLevels(wallet, 0);
+            if (count <= 0) return;
+
+            system.TryPurchaseMany(trackIndex, count);
         }
 
         private void Refresh()
@@ -228,6 +269,9 @@ namespace Onikiri.UI
             // 바뀌어 상한만 올라간 경우에는 거짓이면서 값은 여전히 막혀 있을 수 있다
             bool capped = track.IsMaxed || track.IsValueCapped;
 
+            // 이번 구매가 몇 칸인가 (#9). 배수가 1이면 예전과 똑같은 한 칸이다
+            int planned = capped ? 0 : PlannedLevels(track);
+
             if (valueLabel != null)
             {
                 // Format이 아니라 FormatStat이다. Format은 1000 미만을 정수로 읽어서
@@ -236,12 +280,19 @@ namespace Onikiri.UI
                 //
                 // 소수 둘째 자리까지 두는 이유도 같다. 첫째 자리로는 공격속도의
                 // 1.15 -> 1.27이 둘 다 1.2로 뭉개진다
+                //
+                // 배수 구매면 **그 칸 수만큼 간 값**을 보여준다. 다음 한 칸의 값을
+                // 보여주면서 백 칸의 가격을 받으면 화면이 거짓말을 한다
                 valueLabel.text = capped
                     ? track.Format(track.Value)
-                    : track.Format(track.Value) + " → " + track.Format(track.ValueAtLevel(track.Level + 1));
+                    : track.Format(track.Value) + " → " + track.Format(track.ValueAtLevel(track.Level + planned))
+                      + (planned > 1 ? "   +" + planned : string.Empty);
             }
 
-            bool affordable = wallet != null && wallet.CanAfford(track.Cost);
+            // 배수 구매의 가격은 그 칸들의 **합**이다. 한 칸 가격만 보여주면
+            // 누르는 순간 예상보다 훨씬 많은 골드가 나간다
+            var price = planned > 1 ? track.CostOfNextLevels(planned) : track.Cost;
+            bool affordable = wallet != null && wallet.CanAfford(price);
 
             if (costLabel != null)
             {
@@ -251,7 +302,7 @@ namespace Onikiri.UI
                 // (AttackSpeedCurve) 실제로 여기 도달한다
                 // 비용은 언제나 정수 골드다(E-3 수정, UpgradeCost) - 43단계의
                 // 소수 표기는 규칙과 함께 사라졌다. Format의 정수 축약이 맞다
-                costLabel.text = capped ? masteredLabel : NumberFormatter.Format(track.Cost);
+                costLabel.text = capped ? masteredLabel : NumberFormatter.Format(price);
                 costLabel.color = capped ? masteredColor
                                 : affordable ? affordableColor : unaffordableColor;
             }
