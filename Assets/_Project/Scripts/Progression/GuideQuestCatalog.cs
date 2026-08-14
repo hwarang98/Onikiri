@@ -109,6 +109,16 @@ namespace Onikiri.Progression
     public static class GuideQuestCatalog
     {
         /**
+         * @brief 온보딩 칸이 카드에 적는 **완료 조건**.
+         *
+         * 퀘스트를 안 가리키는 칸이라 제목을 가져올 곳이 없다. 여기 두는
+         * 이유는 출처가 하나여야 하기 때문이다 - 화면(GuideQuestLine)과
+         * 폭 검산(BattleContentBuilder)이 같은 문자열을 봐야 "칸에 든다"는
+         * 검사가 실제로 뜨는 글자를 잰다.
+         */
+        public const string IntroTitle = "무료 10회 뽑기";
+
+        /**
          * @brief 행동 문구는 **이미 구워진 글리프로만** 적는다.
          *
          * 이 게임의 폰트 아틀라스는 완성형 11,172자가 아니라 실제로 쓰는
@@ -137,8 +147,12 @@ namespace Onikiri.Progression
             //
             // 보상이 없다. 무료 10연 자체가 보상이라 그 위에 보석을 더 얹으면
             // 같은 사건에 값이 두 번 매겨진다
-            Gate("상점에서 무료 스킬 10회를 받아라",
-                 GuideGate.SkillGachaIntro, ShopCurve.UnlockStage),
+            // 문구가 아홉 자인 것은 **카드 폭이 정한 것**이다. 설계 초안은
+            // "상점에서 무료 스킬 10회를 받아라"(열일곱 자)였는데 빌드 검산이
+            // 잡았다 - 505px이 필요한데 칸이 264px이다. 아틀라스가 구워져
+            // 있어 카드를 못 넓히므로(BattleContentBuilder의 그 검사) 말을
+            // 줄인다. 어디서 받는지는 상점 배지가 이미 가리킨다
+            Gate("무료 뽑기를 받아라", GuideGate.SkillGachaIntro, ShopCurve.UnlockStage),
 
             // 오의는 Lv.10에 열린다(SkillCatalog.PanelUnlockLevel). 레벨 칸
             // 뒤에 두어야 "열린 것을 곧바로 써 본다"가 된다 - 열리기 전에

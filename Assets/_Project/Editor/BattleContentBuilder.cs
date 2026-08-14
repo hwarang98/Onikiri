@@ -1544,6 +1544,19 @@ namespace Onikiri.EditorTools
 
             foreach (var step in Onikiri.Progression.GuideQuestCatalog.Steps)
             {
+                // 퀘스트를 안 가리키는 칸은 이 검산의 대상이 아니다. 완료를
+                // 세이브에서 직접 읽으므로(GuideGate) 가리킬 퀘스트가 없고,
+                // 카드에 뜨는 제목·보상도 GuideQuestLine이 직접 적는다
+                if (step.Gate != Onikiri.Progression.GuideGate.Quest)
+                {
+                    // 카드에 뜨는 것은 행동 문구와 **완료 조건**이다. 둘 다
+                    // 재는 이유는 둘 다 실제로 그려지기 때문이다
+                    CheckCardLabelFits(card, "Detail",
+                        Onikiri.Progression.GuideQuestCatalog.IntroTitle,
+                        detailBoxClaim, problems);
+                    continue;
+                }
+
                 if (step.Index < 0)
                 {
                     problems.Add("Guide step '" + step.QuestId + "' points at a quest that is "

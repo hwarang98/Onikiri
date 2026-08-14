@@ -184,8 +184,20 @@ namespace Onikiri.Battle
             [Tooltip("Field 장판의 세로 폭")]
             public float fieldHeight = 2.6f;
 
-            [Tooltip("Pull이 대상을 찾는 전방 거리. 화면 우단까지가 4.575u다")]
-            public float pullRange = 5.0f;
+            /**
+             * @brief Pull이 대상을 찾는 전방 거리.
+             *
+             * **가장 짧은 판정 창(회월참의 반경 3.0u)을 넘으면 안 된다.** 처음에
+             * 5.0u로 잡았다가 실측이 거절했다 - 화면 우단까지 훑으니 멀리 있던
+             * 잡몹이 짧은 창 안으로 들어와, 흡인이 **없던 사거리를 만들었다.**
+             * 타격 수가 21에서 25로 늘어 클리어가 16% 빨라졌고, 그 순간 이
+             * 오의만 초당 기여 저울 밖에 선다(AbyssPullReachTests).
+             *
+             * 3.0u면 **이미 모두가 닿는 대상만** 모은다. 위치는 바뀌는데
+             * 누가 맞는지는 안 바뀌고, 그것이 "유틸리티는 팔되 파워는 안 판다"의
+             * 실제 모습이다.
+             */
+            public float pullRange = 3.0f;
 
             [Tooltip("Pull이 대상을 옮길 자리 (시전자 기준 전방 오프셋). " +
                      "평타 사거리 2.9u 안이라 끌어모은 뒤 모든 오의가 닿는다")]
@@ -410,7 +422,8 @@ namespace Onikiri.Battle
 
             // 흡인은 **시전 순간에** 목록을 굳힌다. 폭발(타격 프레임)보다 먼저다 -
             // 그 사이에 스폰된 적이 목록에 끼면 "끌어모은 것만 맞는다"가 거짓이 된다
-            if (spec.Special == SkillSpecial.Pull) CapturePullTargets(started, spec, choreography);
+            if (spec.Special == SkillSpecial.Pull && SpecialsEnabled)
+                CapturePullTargets(started, spec, choreography);
 
             active.Add(started);
 
@@ -620,6 +633,23 @@ namespace Onikiri.Battle
          * 흡인 도중 스폰된 적이 끼어들어 "끌어모은 것만 맞는다"가 거짓이 되고,
          * 상한(PullTargetCount)도 그 순간의 수가 되어 뜻이 흐려진다.
          */
+        /**
+         * @brief 특수 거동(흡인·처형)을 끄는 **테스트 전용 스위치**. 기본은 켜짐.
+         *
+         * ## 왜 필요한가 - 대조군이 있어야 잰다
+         *
+         * 나락인력의 합격 기준은 "흡인이 잡몹 클리어를 2% 넘게 못 바꾼다"인데,
+         * 그것을 재려면 **흡인만 빼고 나머지가 전부 같은** 세계가 필요하다.
+         * 배율·쿨·레벨·대상 수가 다르면 무엇 때문에 달라졌는지 말할 수 없다.
+         *
+         * 카탈로그에 대조용 오의를 하나 더 두는 안도 있었지만, 그러면 로스터가
+         * 열여섯이 되어 계열별 다섯 계약이 깨지고 세이브 칸도 는다 - 재려고
+         * 만든 것이 재는 대상을 바꾸는 자리다.
+         *
+         * **런타임에서는 아무도 이 값을 안 만진다.** 검사만 껐다 켠다.
+         */
+        public static bool SpecialsEnabled = true;
+
         private void CapturePullTargets(ActiveCast cast, SkillSpec spec, Choreography c)
         {
             cast.captured.Clear();

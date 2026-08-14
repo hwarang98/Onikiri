@@ -1159,7 +1159,7 @@ namespace Onikiri.EditorTools
                 hitStop: 2.6f, shake: 2.5f, perHitShake: 0f,
                 numberSize: 2, flash: false,
                 extra: Extra(SkillCatalog.AbyssPullId,
-                             pullRange: 5.0f, pullDestination: 1.6f, pullSeconds: 0.25f));
+                             pullRange: 3.0f, pullDestination: 1.6f, pullSeconds: 0.25f));
 
             // 참수 - 처형의 한 방. **즉사가 아니다.**
             //

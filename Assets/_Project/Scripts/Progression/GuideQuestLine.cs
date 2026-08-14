@@ -158,7 +158,7 @@ namespace Onikiri.Progression
                 // 맞다 - 열 번을 나눠 받는 것이 아니라 한 번에 받는 사건이다
                 view.Step = step;
                 view.Action = steps[step].Action;
-                view.Title = "무료 10회 뽑기";
+                view.Title = GuideQuestCatalog.IntroTitle;
                 view.Target = 1d;
                 view.Progress = 0d;
                 view.Gems = 0;
