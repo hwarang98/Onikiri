@@ -78,14 +78,22 @@ namespace Onikiri.UI
         private PlayerWallet wallet;
         private CharacterLevel character;
 
+        /** 온보딩 강조가 이 줄을 가리키는지 물어볼 곳. 없으면 강조가 없다 */
+        private SkillGachaSystem gacha;
+
+        /** 깜빡임. 씬에 안 적혀 있으므로 처음 쓸 때 붙인다 */
+        private IntroHighlight highlight;
+
         private void Start()
         {
             wallet = PlayerWallet.Instance;
             character = CharacterLevel.Instance;
+            gacha = SkillGachaSystem.Instance;
 
             if (button != null) button.onClick.AddListener(OnClick);
             if (equipButton != null) equipButton.onClick.AddListener(OnEquip);
             if (system != null) system.Changed += Refresh;
+            if (gacha != null) gacha.Changed += Refresh;
             if (wallet != null) wallet.GoldChanged += OnGoldChanged;
 
             // 해금은 레벨업으로 일어난다. 골드 이벤트만 듣고 있으면 잠긴 줄이
@@ -106,6 +114,7 @@ namespace Onikiri.UI
         private void OnEnable()
         {
             if (wallet == null) wallet = PlayerWallet.Instance;
+            if (gacha == null) gacha = SkillGachaSystem.Instance;
             Refresh();
         }
 
@@ -114,6 +123,7 @@ namespace Onikiri.UI
             if (button != null) button.onClick.RemoveListener(OnClick);
             if (equipButton != null) equipButton.onClick.RemoveListener(OnEquip);
             if (system != null) system.Changed -= Refresh;
+            if (gacha != null) gacha.Changed -= Refresh;
             if (wallet != null) wallet.GoldChanged -= OnGoldChanged;
             if (character != null) character.Changed -= Refresh;
         }
@@ -261,6 +271,43 @@ namespace Onikiri.UI
                 if (system.EquippedAt(open) < 0) { hasRoom = true; break; }
 
             ShowEquip(true, !equipped && hasRoom, equipped ? "장착 중" : "장착");
+
+            // 온보딩 판정은 줄 색을 정한 **다음**이다. 강조는 쉬는 색 위에
+            // 얹히므로, 먼저 켜면 깜빡임 값이 쉬는 색으로 저장된다
+            LightIntro();
+        }
+
+        /**
+         * @brief 온보딩이 이 줄의 강화 버튼을 가리키는가.
+         *
+         * 가리키는 것은 **혈조 줄 하나뿐**이다. 두 걸음에서 켜진다 -
+         * 아직 약할 때(Upgrade, 강화 버튼)와 자리가 비었을 때(Equip,
+         * 장착 버튼). 그 사이의 교체 단계에서는 여기가 꺼지고 자리
+         * 쪽(SkillSlotChip)이 켜진다 - **한 번에 한 곳이다.**
+         */
+        private void LightIntro()
+        {
+            bool on = false;
+
+            if (gacha != null)
+            {
+                var advice = SkillIntroGuide.Resolve(system, gacha.IntroClaimed,
+                                                     gacha.IntroEquipDone);
+                on = (advice.Hint == SkillIntroHint.Upgrade
+                      || advice.Hint == SkillIntroHint.Equip)
+                     && advice.SkillIndex == slotIndex;
+            }
+
+            // 켤 일이 없으면 부품을 만들지도 않는다. 열다섯 줄 중 최대 하나만
+            // 붙게 되고, 안 붙은 줄에는 Update가 아예 없다
+            if (highlight == null)
+            {
+                if (!on || rowBackground == null) return;
+                highlight = gameObject.AddComponent<IntroHighlight>();
+                highlight.Configure(rowBackground);
+            }
+
+            highlight.Set(on);
         }
 
         /**

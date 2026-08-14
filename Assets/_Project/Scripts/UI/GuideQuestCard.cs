@@ -114,6 +114,16 @@ namespace Onikiri.UI
         private UpgradeSystem upgrades;
         private SkillSystem skills;
 
+        /**
+         * @brief 뽑기. **퀘스트가 아닌 칸 하나를 이것 없이는 못 푼다.**
+         *
+         * 온보딩 칸(GuideGate.SkillGachaIntro)의 완료는 QuestSystem에 없다 -
+         * 세이브의 `skillGachaIntroClaimed`가 안다. 그것을 안 넘기면
+         * 무인수 Resolve의 기본값(`introClaimed: false`)이 그대로 쓰여
+         * **받은 뒤에도 그 칸이 영영 서 있는다.**
+         */
+        private SkillGachaSystem gacha;
+
         /** 지금 화면에 그려져 있는 것 */
         private GuideQuestView shown;
 
@@ -186,6 +196,11 @@ namespace Onikiri.UI
             skills = SkillSystem.Instance;
             if (skills != null) skills.Changed += OnChanged;
 
+            // 무료 10연을 받는 순간 온보딩 칸이 빠져야 한다. 그 사실은
+            // 위 넷 중 어느 것도 안 알린다 - 뽑기만 안다
+            gacha = SkillGachaSystem.Instance;
+            if (gacha != null) gacha.Changed += OnChanged;
+
             Refresh();
         }
 
@@ -196,7 +211,9 @@ namespace Onikiri.UI
             if (character != null) character.Changed -= OnChanged;
             if (upgrades != null) upgrades.Changed -= OnChanged;
             if (skills != null) skills.Changed -= OnChanged;
+            if (gacha != null) gacha.Changed -= OnChanged;
 
+            gacha = null;
             quests = null;
             stage = null;
             character = null;
@@ -215,7 +232,7 @@ namespace Onikiri.UI
         {
             if (quests == null || holding) return;
 
-            var next = GuideQuestLine.Resolve(quests);
+            var next = Current();
 
             if (next.Step != shown.Step || next.State != shown.State)
             {
@@ -239,7 +256,26 @@ namespace Onikiri.UI
         private void Refresh()
         {
             if (quests == null || holding) return;
-            Apply(GuideQuestLine.Resolve(quests));
+            Apply(Current());
+        }
+
+        /**
+         * @brief 지금 칸을 푼다. **게이트 칸에 필요한 둘을 여기서만 넘긴다.**
+         *
+         * 무인수 Resolve는 `frontierStage: int.MaxValue, introClaimed: false`로
+         * 부른다 - 실기에서 그것을 쓰면 온보딩 칸이 st1부터 뜨고 받은 뒤에도
+         * 안 사라진다. 세 자리(OnChanged · Refresh · HoldClaimed)가 전부
+         * 이 함수를 지나야 셋이 같은 것을 본다.
+         *
+         * 참조가 없을 때의 기본값은 **칸을 감추는 쪽**이다. 뽑기가 없는
+         * 씬(테스트 하네스 등)에서 완료할 수 없는 칸을 세우는 것보다,
+         * 안 보이는 편이 덜 틀린다.
+         */
+        private GuideQuestView Current()
+        {
+            int frontier = stage != null ? stage.MaxStageReached : 0;
+            bool claimed = gacha == null || gacha.IntroClaimed;
+            return GuideQuestLine.Resolve(quests, frontier, claimed);
         }
 
         /**
@@ -279,7 +315,7 @@ namespace Onikiri.UI
             // 가능"인 채라 같은 판정이 다시 서고, 그 자리에서 무한히 돈다
             if (done.Step < 0)
             {
-                var fallback = GuideQuestLine.Resolve(quests);
+                var fallback = Current();
                 shown = fallback;
                 Paint(fallback);
                 yield break;

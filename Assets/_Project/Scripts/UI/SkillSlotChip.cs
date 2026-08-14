@@ -61,16 +61,25 @@ namespace Onikiri.UI
         /** 오의별 아이콘. 빌더가 카탈로그 순서로 적어 준다 */
         [SerializeField] private Sprite[] skillIcons;
 
+        /** 온보딩 교체 안내가 이 자리를 가리키는지 물어볼 곳 */
+        private Onikiri.Progression.SkillGachaSystem gacha;
+
+        /** 깜빡임. 가리켜질 때 처음 붙는다 */
+        private IntroHighlight highlight;
+
         private void Start()
         {
             icons = skillIcons;
+            gacha = Onikiri.Progression.SkillGachaSystem.Instance;
             if (button != null) button.onClick.AddListener(OnClick);
             if (system != null) system.Changed += Refresh;
+            if (gacha != null) gacha.Changed += Refresh;
             Refresh();
         }
 
         private void OnEnable()
         {
+            if (gacha == null) gacha = Onikiri.Progression.SkillGachaSystem.Instance;
             Refresh();
         }
 
@@ -78,6 +87,40 @@ namespace Onikiri.UI
         {
             if (button != null) button.onClick.RemoveListener(OnClick);
             if (system != null) system.Changed -= Refresh;
+            if (gacha != null) gacha.Changed -= Refresh;
+        }
+
+        /**
+         * @brief 온보딩이 이 자리를 비우라고 가리키는가.
+         *
+         * 여기가 켜지는 것은 혈조가 **이 자리의 것보다 세진 다음**이다
+         * (SkillIntroGuide). 눌러서 비우면 혈조 줄의 장착 버튼이 서고,
+         * 끼우는 순간 강조 전체가 영영 꺼진다(introEquipDone).
+         *
+         * 잠긴 자리·빈 자리에서는 안 부른다. 그쪽은 Refresh가 먼저
+         * 돌아가는데, 비어 있으면 애초에 교체할 것이 없으므로 조언도
+         * Swap이 아니다.
+         */
+        private void LightIntro()
+        {
+            bool on = false;
+
+            if (gacha != null)
+            {
+                var advice = Onikiri.Progression.SkillIntroGuide.Resolve(
+                    system, gacha.IntroClaimed, gacha.IntroEquipDone);
+                on = advice.Hint == Onikiri.Progression.SkillIntroHint.Swap
+                     && advice.SlotIndex == slot;
+            }
+
+            if (highlight == null)
+            {
+                if (!on || background == null) return;
+                highlight = gameObject.AddComponent<IntroHighlight>();
+                highlight.Configure(background);
+            }
+
+            highlight.Set(on);
         }
 
         private void OnClick()
@@ -98,6 +141,7 @@ namespace Onikiri.UI
                 // 넷째는 스테이지. 상수를 여기 적으면 곡선과 갈린다
                 if (label != null) { label.text = SkillCurve.GateTextFor(slot); label.color = dimColor; }
                 if (button != null) button.interactable = false;
+                LightIntro();
                 return;
             }
 
@@ -114,6 +158,10 @@ namespace Onikiri.UI
                 }
                 if (label != null) { label.text = "비어 있음"; label.color = dimColor; }
                 if (button != null) button.interactable = false;
+
+                // 방금 비운 자리가 여기일 수 있다. 그때 조언은 Swap이 아니라
+                // Equip으로 넘어가 있으므로 이 호출이 강조를 **끈다**
+                LightIntro();
                 return;
             }
 
@@ -132,6 +180,9 @@ namespace Onikiri.UI
                 label.color = textColor;
             }
             if (button != null) button.interactable = true;
+
+            // 자리 색을 정한 다음이다 - 강조는 쉬는 색 위에 얹힌다
+            LightIntro();
         }
     }
 }

@@ -76,9 +76,23 @@ namespace Onikiri.Progression
      */
     public static class GuideQuestLine
     {
+        /**
+         * @brief 퀘스트만 보고 고른다. **게이트 칸은 안 나온다.**
+         *
+         * 기본값이 "감춘다"인 것은 고른 것이다. 반대(`int.MaxValue, false`)로
+         * 두면 넘기는 것을 잊은 호출자에게 온보딩 칸이 **st1부터 뜨고 받은
+         * 뒤에도 안 사라진다** - 실제로 GuideQuestCard가 그 상태로 한동안
+         * 있었고, 카드가 못 깨는 칸을 영영 가리켰다.
+         *
+         * 두 기본값 다 틀릴 수 있는데, 틀리는 방향이 다르다. 감추는 쪽은
+         * 안내 한 줄이 없는 것이고, 띄우는 쪽은 **완료할 수 없는 안내**다.
+         * 후자가 더 나쁘다.
+         *
+         * 게이트 칸이 필요한 호출자는 아래 3인수 판을 쓴다.
+         */
         public static GuideQuestView Resolve(QuestSystem quests)
         {
-            return Resolve(quests, int.MaxValue, false);
+            return Resolve(quests, 0, true);
         }
 
         /**

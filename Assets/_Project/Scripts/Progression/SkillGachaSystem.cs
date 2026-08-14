@@ -171,14 +171,42 @@ namespace Onikiri.Progression
 
             // 재고는 오의의 상태에서 유도된다. 장착을 바꾸거나 레벨을 사면
             // 배너가 열리고 닫히므로 구독하지 않으면 화면이 한 박자 늦는다
-            if (skills != null) skills.Changed += Raise;
+            if (skills != null) skills.Changed += OnSkillsChanged;
 
-            Raise();
+            OnSkillsChanged();
         }
 
         private void OnDisable()
         {
-            if (skills != null) skills.Changed -= Raise;
+            if (skills != null) skills.Changed -= OnSkillsChanged;
+        }
+
+        /**
+         * @brief 오의가 바뀌었다. 재고를 다시 알리기 전에 **온보딩이 끝났는지 본다.**
+         *
+         * 장착 버튼이 직접 부르게 두지 않는 이유는 장착 경로가 하나가
+         * 아니기 때문이다 - 빈 칸이 있으면 `GrantGachaSkill`이 부르는
+         * `FillEmptySlots`가 사람 손 없이 끼운다. 그 경로를 놓치면 온보딩
+         * 안내가 이미 끝난 일을 계속 가리킨다.
+         *
+         * 여기서 듣는 것이 맞는 또 하나의 이유는 **이미 듣고 있기 때문이다** -
+         * 새 구독을 만들지 않으므로 비용이 정수 비교 몇 개뿐이고, 재고
+         * 갱신과 같은 순간에 판정되므로 둘이 갈릴 수가 없다.
+         */
+        private void OnSkillsChanged()
+        {
+            if (introClaimed && !introEquipDone && skills != null)
+            {
+                int intro = SkillCatalog.IndexOf(SkillCatalog.BloodWhipId);
+                if (intro >= 0 && skills.IsEquipped(intro))
+                {
+                    // Raise를 자기가 부르므로 아래에서 또 부르지 않는다
+                    MarkIntroEquipDone();
+                    return;
+                }
+            }
+
+            Raise();
         }
 
         // ---------------------------------------------------------------- 해금 · 재고
