@@ -708,9 +708,16 @@ namespace Onikiri.UI
             // 미끄러진 칸을 **출발점부터 하나씩** 적는다. ★5가 두 칸 내려간
             // 줄은 "오의 개안 → 오의 해금 → XP +240"이 되고, 그 줄 하나로
             // 200회에 한 번의 결과가 무엇이었고 왜 그것이 안 됐는지가 읽힌다
-            for (var at = result.Rolled; at != result.Outcome;
-                 at = SkillGachaCurve.SlideFor(at))
-                prefix += NameOfOutcome(at) + " → ";
+            //
+            // **먼저 미끄러졌는지 묻는다.** 굴린 칸과 받은 칸이 다른 이유가
+            // 둘이기 때문이다 - 미끄러짐(위 -> 아래)과 **천장**(아래 -> 위)이다.
+            // 천장이 덮은 회차에서 아래로 걸으면 도착점에 영영 못 닿는다.
+            // 그 경우 적을 경로가 없다 - 사다리를 안 탔기 때문이고, 그 회차가
+            // 무엇이었는지는 "천장!" 표시가 이미 말한다
+            if (SkillGachaCurve.SlidesTo(result.Rolled, result.Outcome))
+                for (var at = result.Rolled; at != result.Outcome;
+                     at = SkillGachaCurve.SlideFor(at))
+                    prefix += NameOfOutcome(at) + " → ";
 
             switch (result.Outcome)
             {

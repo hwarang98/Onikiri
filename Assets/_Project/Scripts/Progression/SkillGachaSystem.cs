@@ -75,6 +75,11 @@ namespace Onikiri.Progression
              * 곳의 이름으로만 적으면 플레이어는 등급이 내려간 것을 모르고,
              * 출발한 곳의 이름으로만 적으면 화면과 실제가 갈린다. 두 이름을
              * 다 적는 것이 44단계의 "버려지는 드랍 0"을 문구로 지키는 방법이다.
+             *
+             * **`Rolled != Outcome` 으로 재면 안 된다.** 둘이 갈리는 이유가
+             * 둘이기 때문이다 - 미끄러짐(위 -> 아래)과 천장(아래 -> 위).
+             * 천장 회차를 미끄러짐으로 적으면 화면이 "내려갔다"고 말하는데
+             * 실제로는 올라간 것이다. 판정은 사다리가 한다(SlidesTo).
              */
             public bool Downgraded;
         }
@@ -523,7 +528,10 @@ namespace Onikiri.Progression
 
                 // 등급은 **도착한 칸**의 것이다. 화면의 색이 실제로 받은
                 // 것을 말해야 하고, 출발점은 Rolled가 따로 적는다
-                Downgraded = rolled != outcome
+                //
+                // 미끄러짐은 **아래로 걸어 닿았을 때만**이다. 천장이 위로
+                // 덮은 회차는 사다리를 안 탔다
+                Downgraded = rolled != outcome && SkillGachaCurve.SlidesTo(rolled, outcome)
             };
         }
 
