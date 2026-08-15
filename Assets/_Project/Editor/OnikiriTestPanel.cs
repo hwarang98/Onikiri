@@ -64,6 +64,17 @@ namespace Onikiri.EditorTools
         /** 방치 보상 확인용. 몇 시간 전에 종료한 것으로 꾸밀지 */
         private float offlineHours = 3f;
 
+        /**
+         * @brief 보석 주입량. **골드처럼 배수 버튼으로 못 때우는 재화다.**
+         *
+         * 골드는 +1K/+1M/+1T로 충분하다 - 쓰는 곳이 강화 하나라 자릿수만
+         * 맞으면 된다. 보석은 다르다. 오의 10연이 정확히 얼마, 장비 파편이
+         * 얼마, 요도 단연이 얼마인지가 **곡선이 정한 값**이고, 확인하고
+         * 싶은 것은 대개 "그 값에서 하나 모자랄 때"와 "딱 맞을 때"다.
+         * 배수 버튼으로는 그 경계에 못 선다.
+         */
+        private long debugGemAmount = 1000L;
+
         /** 랭킹 절(54단계)의 입력들. 조회 결과는 창 안에 그대로 적는다 */
         private string debugPlayerName = string.Empty;
         private int debugSubmitStage = 1;
@@ -375,6 +386,97 @@ namespace Onikiri.EditorTools
             }
         }
 
+        /**
+         * @brief 보석을 **입력한 값 그대로** 넣거나 잔액을 그 값으로 세운다.
+         *
+         * ## 왜 넣기와 세우기가 둘 다 있는가
+         *
+         * 묻는 것이 다르다. `+ 넣기`는 **획득 경로**를 탄다(`GemWallet.Add`) -
+         * 넘침 방어까지 그대로 지나므로 "퀘스트 보상이 들어왔다"와 같은 길이다.
+         * `= 세우기`는 **잔액 복원**이다(`SetBalance`) - 세이브에서 올라온
+         * 것과 같은 문이고, 0으로 내려 "모자랄 때 버튼이 안 눌리는가"를
+         * 확인할 수 있는 유일한 길이다. `Add`로는 못 내린다.
+         *
+         * ## 곡선이 정한 값을 그대로 집어 준다
+         *
+         * 오의 10연 값을 외워서 치게 하면 곡선이 바뀐 날 조용히 틀린 값을
+         * 넣게 된다. 옆 버튼이 그 순간의 실제 비용을 읽어 칸에 적는다 -
+         * 화면의 버튼과 같은 출처(`SkillGachaSystem.CostFor`)다.
+         *
+         * 확인하려는 자리는 대개 **경계**다. 딱 맞을 때와 하나 모자랄 때
+         * 버튼이 다르게 서야 하는데, 배수 버튼으로는 그 두 자리에 못 선다.
+         */
+        private void DrawGemCheat()
+        {
+            var gems = Onikiri.Progression.GemWallet.Instance;
+
+            using (new EditorGUI.DisabledScope(gems == null))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("보석", GUILayout.Width(64f));
+
+                    EditorGUILayout.LabelField(
+                        gems != null ? gems.Gems.ToString("N0") : "-",
+                        EditorStyles.miniLabel, GUILayout.Width(80f));
+
+                    // 음수는 안 받는다. Add가 조용히 무시하고 SetBalance는 0으로
+                    // 깎으므로, 칸에 남은 숫자와 실제로 일어난 일이 갈린다
+                    debugGemAmount = System.Math.Max(0L,
+                        (long)EditorGUILayout.LongField(debugGemAmount, GUILayout.Width(90f)));
+
+                    if (GUILayout.Button("+ 넣기", GUILayout.Width(56f)))
+                    {
+                        gems.Add(debugGemAmount);
+                        Debug.Log("[Onikiri] 보석 " + debugGemAmount.ToString("N0")
+                                  + "개를 넣었다. 잔액 " + gems.Gems.ToString("N0")
+                                  + " - 획득 경로(Add)라 넘침 방어를 그대로 지난다.");
+                    }
+
+                    if (GUILayout.Button("= 세우기", GUILayout.Width(64f)))
+                    {
+                        gems.SetBalance(debugGemAmount);
+                        Debug.Log("[Onikiri] 보석 잔액을 " + gems.Gems.ToString("N0")
+                                  + "으로 세웠다. 세이브 복원과 같은 경로(SetBalance)다.");
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Space(68f);
+
+                    // 자주 서는 자리를 칸에 집어넣는다. 값을 외우게 하지 않는
+                    // 이유는 곡선이 바뀌면 외운 값이 조용히 틀리기 때문이다
+                    if (GUILayout.Button("0", GUILayout.Width(34f))) debugGemAmount = 0L;
+                    if (GUILayout.Button("1K", GUILayout.Width(40f))) debugGemAmount = 1000L;
+                    if (GUILayout.Button("10K", GUILayout.Width(46f))) debugGemAmount = 10000L;
+
+                    var skillGacha = Onikiri.Progression.SkillGachaSystem.Instance;
+                    var yodoGacha = Onikiri.Progression.GachaSystem.Instance;
+
+                    using (new EditorGUI.DisabledScope(skillGacha == null))
+                        if (GUILayout.Button("오의 10연 값", GUILayout.Width(92f)))
+                            debugGemAmount = skillGacha.CostFor(
+                                Onikiri.Progression.SkillGachaCurve.TenPullCount);
+
+                    using (new EditorGUI.DisabledScope(yodoGacha == null))
+                        if (GUILayout.Button("요도 10연 값", GUILayout.Width(92f)))
+                            debugGemAmount = yodoGacha.CostFor(
+                                Onikiri.Progression.GachaCurve.TenPullCount);
+
+                    // 경계 확인용. 딱 맞을 때와 하나 모자랄 때 버튼이 다르게
+                    // 서야 하고, 그 두 자리를 손으로 만드는 것이 이 칸의 목적이다
+                    if (GUILayout.Button("-1", GUILayout.Width(34f)))
+                        debugGemAmount = System.Math.Max(0L, debugGemAmount - 1L);
+                }
+            }
+
+            if (gems == null)
+                EditorGUILayout.HelpBox(
+                    "GemWallet이 아직 없습니다. 플레이 모드에 들어가면 켜집니다.",
+                    MessageType.None);
+        }
+
         private void DrawCheats()
         {
             EditorGUILayout.LabelField("조작", EditorStyles.boldLabel);
@@ -390,6 +492,8 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("+1M")) wallet.Add(BigDouble.FromDouble(1e6d));
                     if (GUILayout.Button("+1T")) wallet.Add(BigDouble.FromDouble(1e12d));
                 }
+
+                DrawGemCheat();
 
                 if (upgrades != null)
                 {
