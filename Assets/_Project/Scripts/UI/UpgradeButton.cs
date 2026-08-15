@@ -209,10 +209,9 @@ namespace Onikiri.UI
             // 여기로 떨어진다
             if (count == 1) { system.TryPurchase(trackIndex); return; }
 
-            // "최대"는 잔액이 감당하는 데까지. 여기서 수를 확정해 넘기지 않고
-            // 0을 그대로 넘기면 시스템 쪽이 다시 잔액을 읽어야 하고, 그 사이
-            // 골드가 들어오면(방치 수익은 계속 돈다) 화면에 뜬 수보다 더 산다
-            if (count <= 0) count = track.AffordableLevels(wallet, 0);
+            // **"최대" 경로는 없앴다.** 여기서 잔액이 감당하는 데까지를 다시
+            // 세던 줄이 화면을 멈추던 것의 절반이다(UpgradeBatchSelector 주석).
+            // 배수 칩은 이제 전부 양수이므로 여기 오는 count 도 양수다
             if (count <= 0) return;
 
             system.TryPurchaseMany(trackIndex, count);

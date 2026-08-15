@@ -51,7 +51,7 @@ namespace Onikiri.UI
         private const string PrefsKey = "onikiri.upgrade.batch";
 
         /**
-         * @brief 지금 고른 배수. **0이면 최대**.
+         * @brief 지금 고른 배수. **언제나 1 이상이다.**
          *
          * static인 이유는 읽는 쪽(UpgradeButton)이 줄을 찾아 헤매지 않게 하기
          * 위해서다. 강화 목록과 배수 줄은 같은 패널 안에 있지만 부모가 다르고,
@@ -59,14 +59,17 @@ namespace Onikiri.UI
          *
          * 줄이 아직 없는 씬(전투 전용 테스트)에서는 기본값 1이라 예전과 똑같이
          * 한 칸씩 산다 - 배수 줄이 없다고 강화가 멈추지는 않는다.
+         *
+         * **0("최대")이 값이던 시절이 있었다.** 그 값을 받은 쪽이 잔액이
+         * 감당하는 데까지 칸을 하나씩 셌고, 강화 행 아홉이 그것을 골드가
+         * 변할 때마다 다시 했다 - 요괴 한 마리에 13.68ms다. 이 속성이 양수만
+         * 돌려주는 것이 그 경로를 막는 첫 관문이고, 두 번째 관문은
+         * `UpgradeTrack.AffordableLevels`가 0을 0칸으로 거절하는 것이다.
          */
         public static int Current { get; private set; }
 
         /** 배수가 바뀌었다. 행들이 비용·증가폭 표시를 다시 그린다 */
         public static event Action Changed;
-
-        /** 지금 배수가 '최대'인가. 행이 문구를 가를 때 쓴다 */
-        public static bool IsMax { get { return Current <= 0; } }
 
         static UpgradeBatchSelector()
         {
@@ -113,6 +116,11 @@ namespace Onikiri.UI
 
         private bool IsValid(int count)
         {
+            // 0 이하는 어떤 칩에도 없어야 하지만, 씬이 옛 배선을 들고 있을
+            // 수 있으므로 여기서도 막는다. 저장된 옛 취향(0 = 최대)이 이
+            // 판정에 걸려 1로 떨어지고, 그것이 마이그레이션 전부다
+            if (count <= 0) return false;
+
             if (choices == null) return count == 1;
             foreach (var choice in choices)
                 if (choice.count == count) return true;
@@ -121,6 +129,8 @@ namespace Onikiri.UI
 
         public void Select(int count)
         {
+            if (count <= 0) return;
+
             Current = count;
             PlayerPrefs.SetInt(PrefsKey, count);
 

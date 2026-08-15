@@ -263,7 +263,18 @@ namespace Onikiri.Progression
         {
             if (wallet == null) return 0;
 
-            int ceiling = limit > 0 ? Mathf.Min(limit, MaxBatchLevels) : MaxBatchLevels;
+            // **상한 없는 호출을 안 받는다.** 예전에는 `limit <= 0`이 "잔액이
+            // 감당하는 데까지"였고 천장이 MaxBatchLevels(65536)였다. 그 경로가
+            // 화면을 멈췄다 - 이 함수는 칸을 하나씩 세는데, 강화 행 아홉이
+            // **골드가 변할 때마다** 그것을 다시 부른다. 요괴 한 마리에
+            // 13.68ms다(UpgradePanelBuilder.BuildBatchRow 주석의 실측).
+            //
+            // 0을 0칸으로 돌려주는 것이 맞다 - 부르는 쪽이 몇 칸을 원하는지
+            // 말하지 않았으면 살 것도 없다. 조용히 65536칸을 세는 것보다
+            // 화면에 "0칸"이 뜨는 편이 훨씬 빨리 눈에 띈다
+            if (limit <= 0) return 0;
+
+            int ceiling = Mathf.Min(limit, MaxBatchLevels);
 
             var budget = wallet.Gold;
             int count = 0;

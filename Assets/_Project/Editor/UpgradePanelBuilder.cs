@@ -1291,7 +1291,29 @@ namespace Onikiri.EditorTools
         }
 
         /**
-         * @brief 강화 배수 줄 - [×1] [×10] [×100] [최대] (#9).
+         * @brief 강화 배수 줄 - [×1] [×10] [×100] (#9).
+         *
+         * ## "최대"를 뺐다 - 그것이 화면을 멈추던 것이다
+         *
+         * 넷째 칩은 0(=잔액이 감당하는 데까지)이었다. 그 값이 어디로 가는지
+         * 보면 이유가 나온다 - `UpgradeTrack.AffordableLevels(wallet, 0)`은
+         * 상한이 `MaxBatchLevels`(65536)라 **칸을 하나씩 끝까지 센다.**
+         *
+         * 강화 행 아홉이 그것을 **골드가 변할 때마다** 다시 센다. 실측:
+         *
+         *   ×1    0.09ms      ×100   0.39ms
+         *   ×10   0.10ms      최대   **13.68ms**
+         *
+         * 골드는 요괴 한 마리마다 변하므로 처치마다 13.68ms가 나갔고,
+         * 실제로 최대를 눌러 8882칸을 사면 칸마다 골드 이벤트가 또 떠서
+         * **2분 가까이 멈췄다.**
+         *
+         * 스탯 포인트 줄도 같은 값을 읽는다(StatPointButton) - 최대일 때
+         * 밀린 포인트를 전부 한 번에 찍어 같은 증상이 났다.
+         *
+         * 상한을 백으로 두면 최악이 0.39ms다. 잃는 것은 "가진 골드로 살 수
+         * 있는 만큼 전부"인데, 그것은 ×100을 몇 번 누르는 것으로 대신된다 -
+         * 이 줄이 원래 줄이려던 것이 **백 번의 두드림**이지 세 번이 아니다.
          *
          * ## 왜 탭 줄 아래의 고정 줄인가
          *
@@ -1303,11 +1325,11 @@ namespace Onikiri.EditorTools
          * 높이다(VerifyPageHeights가 재는 것이 그것이다). 그래서 줄 자신이
          * 켜질 때 뷰포트를 눌렀다가 꺼질 때 되돌린다 - ScrollViewportInset.
          *
-         * ## 칩 넷의 폭이 같은 이유
+         * ## 칩 셋의 폭이 같은 이유
          *
-         * "최대"가 가장 긴 글자인데 칩을 글자에 맞춰 재면 넷의 크기가 제각각이
-         * 되고, 그러면 어느 것이 선택됐는지를 **크기와 색 둘로** 읽어야 한다.
-         * 균등 분할이면 색 하나만 읽으면 된다(탭 줄과 같은 규칙).
+         * 칩을 글자에 맞춰 재면 셋의 크기가 제각각이 되고, 그러면 어느 것이
+         * 선택됐는지를 **크기와 색 둘로** 읽어야 한다. 균등 분할이면 색
+         * 하나만 읽으면 된다(탭 줄과 같은 규칙).
          */
         private static void BuildBatchRow(Transform panel, TMP_FontAsset font,
                                           RectTransform viewport, out GameObject row)
@@ -1328,9 +1350,10 @@ namespace Onikiri.EditorTools
             barRect.anchoredPosition = new Vector2(
                 0f, -(ExpStripStride + LevelHeaderStride + TabRowStride));
 
-            // 0은 "최대"다. 잔액이 감당하는 데까지 사고, 그 수는 축마다 다르다
-            int[] counts = { 1, 10, 100, 0 };
-            string[] names = { "×1", "×10", "×100", "최대" };
+            // **전부 양수다.** 0(=최대)을 다시 넣으면 위 주석의 13.68ms가
+            // 그대로 돌아온다. UpgradeTrack.AffordableLevels 가 0을 거부한다
+            int[] counts = { 1, 10, 100 };
+            string[] names = { "×1", "×10", "×100" };
 
             var selector = barObject.AddComponent<Onikiri.UI.UpgradeBatchSelector>();
             var so = new SerializedObject(selector);

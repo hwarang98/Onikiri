@@ -97,8 +97,13 @@ namespace Onikiri.Tests
             var track = AttackPower();
             var wallet = WalletWith(1e5d);
 
-            int affordable = track.AffordableLevels(wallet, 0);
+            // **예전에는 여기가 `AffordableLevels(wallet, 0)`("최대")였다.**
+            // 그 경로는 없앴다 - 칸을 육만까지 하나씩 세는데 강화 행 아홉이
+            // 골드가 변할 때마다 그것을 불러 화면이 멈췄다(BatchCostTests).
+            // 이제는 화면이 고르는 가장 큰 배수로 재고, 계약은 그대로다
+            int affordable = track.AffordableLevels(wallet, 100);
             Assert.Greater(affordable, 0, "10골드짜리 첫 칸도 못 산다고 한다");
+            Assert.Less(affordable, 100, "이 잔액으로 백 칸이 다 사진다 - 검사 전제가 틀렸다");
 
             // 센 만큼 정확히 사진다
             Assert.AreEqual(affordable, track.TryPurchaseMany(wallet, affordable));
@@ -137,7 +142,7 @@ namespace Onikiri.Tests
 
             Assert.AreEqual(Max, track.Level, "상한을 넘겼다");
             Assert.AreEqual(Max - 1, bought);
-            Assert.AreEqual(0, track.AffordableLevels(wallet, 0), "다 산 축이 아직 살 게 있다고 한다");
+            Assert.AreEqual(0, track.AffordableLevels(wallet, 100), "다 산 축이 아직 살 게 있다고 한다");
 
             Object.DestroyImmediate(wallet.gameObject);
         }
@@ -164,7 +169,9 @@ namespace Onikiri.Tests
             var track = AttackPower();
             var wallet = WalletWith(0d);
 
-            Assert.AreEqual(0, track.AffordableLevels(wallet, 0));
+            // 상한을 양수로 준다. 0을 주면 지갑이 비어서가 아니라 **상한이
+            // 0이라서** 0이 나오고, 그러면 이 검사가 아무것도 안 재게 된다
+            Assert.AreEqual(0, track.AffordableLevels(wallet, 100));
             Assert.AreEqual(0, track.TryPurchaseMany(wallet, 100));
             Assert.AreEqual(1, track.Level);
 

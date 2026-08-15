@@ -168,27 +168,44 @@ namespace Onikiri.Progression
 
         public bool TrySpendPoint(string axisId)
         {
+            if (!AddPoint(axisId)) return false;
+
+            ApplyToStats();
+            Raise();
+            return true;
+        }
+
+        /**
+         * @brief 한 점을 **더하기만** 한다. 알리지 않는다.
+         *
+         * 알림을 빼낸 이유는 여러 점을 찍을 때다 - 한 점마다 Changed를
+         * 올리면 그 한 번이 오의 열다섯 줄·HUD·퀘스트·진화를 전부 다시
+         * 그리고, 실측 **한 점당 0.646ms**다. 일흔여섯 점이면 49ms이고
+         * 방치로 수천 점이 밀린 성장 탭에서는 초 단위로 화면이 멈춘다.
+         *
+         * 값이 바뀌는 규칙은 여기 하나뿐이므로 한 점을 찍든 천 점을 찍든
+         * 상한도 잔량도 같은 문을 지난다.
+         */
+        private bool AddPoint(string axisId)
+        {
             if (UnspentPoints <= 0) return false;
 
             if (axisId == AttackAmpId)
             {
                 if (attackPoints >= StatPointCurve.MaxPoints) return false;
                 attackPoints++;
+                return true;
             }
-            else if (axisId == HealthAmpId)
+
+            if (axisId == HealthAmpId)
             {
                 if (healthPoints >= StatPointCurve.MaxPoints) return false;
                 healthPoints++;
-            }
-            else
-            {
-                Debug.LogWarning("[Onikiri] Unknown stat axis '" + axisId + "'.");
-                return false;
+                return true;
             }
 
-            ApplyToStats();
-            Raise();
-            return true;
+            Debug.LogWarning("[Onikiri] Unknown stat axis '" + axisId + "'.");
+            return false;
         }
 
         /**
@@ -211,9 +228,22 @@ namespace Onikiri.Progression
         /**
          * @brief 한 축에 여러 점을 한 번에 찍는다 (#3 후속 - 성장 탭 배수).
          *
-         * 실제로 찍힌 수를 돌려준다. 한 점씩 TrySpendPoint를 도는 것뿐이라
+         * 실제로 찍힌 수를 돌려준다. 한 점씩 같은 문(AddPoint)을 도는 것뿐이라
          * 곡선도 상한도 그대로다 - 강화 배수 구매(UpgradeSystem.TryPurchaseMany)와
          * 같은 판단이고, 같은 이유로 새로 생기는 힘이 없다.
+         *
+         * ## 알림은 **끝에 한 번**이다
+         *
+         * 처음에는 `TrySpendPoint`를 그대로 돌렸다. 그런데 그 함수는 한 점마다
+         * `Raise()`를 부르고, Changed 하나가 오의 열다섯 줄·HUD·퀘스트·진화를
+         * 전부 다시 그린다 - 실측 **한 점당 0.646ms**다.
+         *
+         *   일흔여섯 점    49ms   한 번의 버벅임
+         *   수천 점        초 단위로 화면이 멈춘다
+         *
+         * 포인트는 레벨업으로 쌓이고 레벨업은 방치로 밀리므로 뒤쪽이 실제로
+         * 온다. 중간 상태를 화면에 알릴 이유도 없다 - 플레이어가 본 것은
+         * "최대"를 한 번 누른 것이고, 사건도 하나다.
          *
          * ## 왜 이쪽에도 필요한가
          *
@@ -230,7 +260,12 @@ namespace Onikiri.Progression
             if (count <= 0) return 0;
 
             int spent = 0;
-            while (spent < count && TrySpendPoint(axisId)) spent++;
+            while (spent < count && AddPoint(axisId)) spent++;
+
+            if (spent == 0) return 0;
+
+            ApplyToStats();
+            Raise();
             return spent;
         }
 

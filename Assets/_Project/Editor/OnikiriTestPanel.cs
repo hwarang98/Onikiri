@@ -2431,10 +2431,9 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("#9 배수", GUILayout.Width(80f));
+                    // "최대"는 없앴다 - 배수는 언제나 양수다
                     EditorGUILayout.LabelField(
-                        Onikiri.UI.UpgradeBatchSelector.IsMax
-                            ? "최대"
-                            : "×" + Onikiri.UI.UpgradeBatchSelector.Current,
+                        "×" + Onikiri.UI.UpgradeBatchSelector.Current,
                         GUILayout.Width(60f));
 
                     var upgrades = Object.FindFirstObjectByType<UpgradeSystem>(FindObjectsInactive.Include);
@@ -2445,13 +2444,12 @@ namespace Onikiri.EditorTools
                         // (UpgradeBatchTests), 여기서는 화면이 따라오는지를 본다
                         if (GUILayout.Button("공격력 ×10"))
                             upgrades.TryPurchaseMany(0, 10);
-                        if (GUILayout.Button("공격력 최대"))
-                        {
-                            var track = upgrades.GetTrack(0);
-                            var wallet = PlayerWallet.Instance;
-                            if (track != null)
-                                upgrades.TryPurchaseMany(0, track.AffordableLevels(wallet, 0));
-                        }
+                        // 여기만 상한 없이 살 수 있다. **화면에는 이 버튼이
+                        // 없다**(배수 칩은 ×100까지다) - 확인용으로 한 축을
+                        // 끝까지 밀어야 할 때가 있어 남기되, 한 번에 천 칸으로
+                        // 끊는다. 무한정 세던 것이 게임을 멈추던 것이다
+                        if (GUILayout.Button("공격력 +1000"))
+                            upgrades.TryPurchaseMany(0, 1000);
                     }
                 }
 
