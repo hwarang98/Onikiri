@@ -53,9 +53,14 @@ namespace Onikiri.EditorTools
             WireSession(system);
             BakeAppearance(samurai);
 
+            // 값과 해금 레벨은 3단계에 사라졌다 - 승급은 귀문 돌파로 무료다.
+            // 대신 문의 자리를 적는다: 그것이 이제 티어를 정하는 유일한 표다
             Debug.Log(string.Format(
-                "[Onikiri] Evolution content built: {0} tiers + base, unlock Lv.{1}, gems total {2}.",
-                EvolutionCatalog.Count, EvolutionCurve.UnlockLevel, EvolutionCurve.TotalGems));
+                "[Onikiri] Evolution content built: {0} tiers + base, free via trial gates st{1}~{2}.",
+                EvolutionCatalog.Count,
+                Onikiri.Progression.PromotionTrialCatalog.GateStages[0],
+                Onikiri.Progression.PromotionTrialCatalog.GateStages[
+                    Onikiri.Progression.PromotionTrialCatalog.GateCount - 1]));
             return system;
         }
 

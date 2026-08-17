@@ -637,6 +637,11 @@ namespace Onikiri.EditorTools
             // 전직도 보석 소비처라 장비 바로 다음이다 (33단계)
             DrawEvolutionTools();
 
+            // 귀문은 전직 **바로 다음**이다. 3단계가 끝나면 위 절의 "진화"
+            // 버튼이 사라지고 이 절이 그 자리를 받는다 - 두 절이 나란히
+            // 서 있으면 그 교체가 한눈에 보인다
+            DrawPromotionTrialTools();
+
             // 동료도 보석 소비처(해금)라 전직 다음이다. 레벨은 골드다
             DrawPetTools();
 
@@ -1884,9 +1889,7 @@ namespace Onikiri.EditorTools
                 {
                     EditorGUILayout.LabelField(string.Format(
                         "{0}  ·  {1}티어 {2}  공격 ×{3:F2} 체력 ×{4:F2}",
-                        evolution.IsUnlocked
-                            ? "개방"
-                            : "잠김 (Lv." + Onikiri.Progression.EvolutionCurve.UnlockLevel + " 필요)",
+                        evolution.IsUnlocked ? "개방" : "잠김",
                         evolution.Tier, evolution.TierName,
                         evolution.AttackMultiplier, evolution.HealthMultiplier),
                         GUILayout.Width(430f));
@@ -1901,20 +1904,137 @@ namespace Onikiri.EditorTools
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUI.DisabledScope(!evolution.CanEvolve))
-                    {
-                        string next = string.Format("진화 → {0} (보석 {1} + 골드 {2})",
-                            evolution.NextTierName, evolution.GemCostNow,
-                            Onikiri.Core.NumberFormatter.Format(evolution.GoldCostNow));
+                    // 구매 버튼은 **없다.** 승급의 값이 0이 되면서 살 것이
+                    // 사라졌다(승인 A-1) - 다음 경지는 아래 귀문 절에서 연다
+                    int nextGate = Onikiri.Progression.PromotionTrialCatalog.NextGateStage(evolution.Tier);
 
-                        if (GUILayout.Button(next, GUILayout.Width(340f)))
-                            evolution.TryEvolve();
-                    }
+                    EditorGUILayout.LabelField(evolution.IsMaxTier
+                            ? "최종 경지 — 더 오를 문이 없다"
+                            : string.Format("다음 경지 {0} — 귀문 st{1} 돌파로 무료",
+                                evolution.NextTierName, nextGate),
+                        GUILayout.Width(340f));
 
                     // 재화를 무시하고 한 칸. 연출까지 함께 확인하는 경로다
                     using (new EditorGUI.DisabledScope(evolution.IsMaxTier))
                         if (GUILayout.Button("한 칸 올리기", GUILayout.Width(96f)))
                             evolution.DebugSetTier(evolution.Tier + 1);
+                }
+            }
+        }
+
+        /**
+         * @brief 귀문(승급전) - **2단계에서는 읽기 전용이다.**
+         *
+         * ## 왜 버튼이 없는가
+         *
+         * 2단계가 만든 것은 표와 순수 판정뿐이고 전투가 없다. "귀문 입장"
+         * 버튼을 지금 달면 눌러도 아무 일이 안 일어나거나, 더 나쁘게는
+         * 티어만 올려 주는 치트가 되어 **진행을 여는 판정과 값을 주는 경로가
+         * 갈린다** - 이 재설계에서 가장 나쁜 중간 상태다.
+         *
+         * 그래서 지금은 세 가지를 **보여 주기만** 한다:
+         *
+         *   표        게이트·M·시간 규칙. 3단계의 전투가 읽을 값 그대로다
+         *   판정      지금 최전선이 어느 문 앞이고, 다음 문이 어디인가
+         *   미리보기  v21 마이그레이션이 이 세이브에 무엇을 할 것인가
+         *
+         * 마지막 줄이 이 절의 값어치다. 라이브 세이브를 아직 안 올리므로
+         * (`SaveData.CurrentVersion`은 20이다), 올리기 **전에** 결과를 눈으로
+         * 확인할 수 있는 자리가 여기 하나뿐이다. 실기 테스트의 v20 백업 절차도
+         * 이 값을 보고 판단한다.
+         *
+         * 3단계가 전투를 붙이면 이 절에 입장·승리·실패·재도전 버튼이 들어오고,
+         * 위 전직 절의 "진화 → (보석+골드)" 버튼이 사라진다.
+         */
+        private void DrawPromotionTrialTools()
+        {
+            EditorGUILayout.LabelField("귀문 (승급전) — 2단계: 읽기 전용",
+                EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.HelpBox(
+                    "전투는 3단계에서 붙습니다. 지금은 카탈로그와 판정만 표시합니다 — "
+                    + "누를 수 있는 것이 없는 것이 의도입니다.",
+                    MessageType.Info);
+
+                // ---- 표
+                var gates = new System.Text.StringBuilder();
+                for (int g = 0; g < Onikiri.Progression.PromotionTrialCatalog.GateCount; g++)
+                    gates.AppendFormat("{0}문 st{1} ×{2:F3}   ",
+                        g + 1,
+                        Onikiri.Progression.PromotionTrialCatalog.GateStages[g],
+                        Onikiri.Progression.PromotionTrialCatalog.TotalHealthMultiple[g]);
+
+                EditorGUILayout.LabelField(gates.ToString(), EditorStyles.wordWrappedMiniLabel);
+
+                EditorGUILayout.LabelField(string.Format(
+                    "3연전 0.25/0.25/0.50 · 전환 {0:F0}s · 격노 {1:F0}s부터 {2:F0}s마다 ×{3:F1} · 폐쇄 {4:F0}s · 소프트캡 k={5:F2}(후보)",
+                    Onikiri.Progression.PromotionTrialCatalog.SwapSeconds,
+                    Onikiri.Progression.PromotionTrialCatalog.EnrageSeconds,
+                    Onikiri.Progression.PromotionTrialCatalog.EnrageIntervalSeconds,
+                    Onikiri.Progression.PromotionTrialCatalog.EnrageMultiplierPerStep,
+                    Onikiri.Progression.PromotionTrialCatalog.CloseSeconds,
+                    Onikiri.Progression.PromotionTrialCatalog.SoftCapExponent),
+                    EditorStyles.wordWrappedMiniLabel);
+
+                EditorGUILayout.LabelField("승급 비용: 보석 0 · 골드 0 (귀문 돌파로 무료)",
+                    EditorStyles.miniLabel);
+
+                // ---- 판정
+                var progress = Onikiri.Progression.StageProgress.Instance;
+                if (progress == null)
+                    progress = Object.FindFirstObjectByType<Onikiri.Progression.StageProgress>(
+                        FindObjectsInactive.Include);
+
+                var evolution = Onikiri.Progression.EvolutionSystem.Instance;
+                if (evolution == null)
+                    evolution = Object.FindFirstObjectByType<Onikiri.Progression.EvolutionSystem>(
+                        FindObjectsInactive.Include);
+
+                if (progress == null || evolution == null)
+                {
+                    EditorGUILayout.LabelField("씬에 StageProgress / EvolutionSystem 이 없어 판정을 못 보여줍니다.",
+                        EditorStyles.miniLabel);
+                }
+                else
+                {
+                    int frontier = progress.MaxStageReached;
+                    int tier = evolution.Tier;
+                    int required = Onikiri.Progression.PromotionTrialCatalog
+                        .RequiredGateAfterClearing(progress.Stage, tier);
+                    int next = Onikiri.Progression.PromotionTrialCatalog.NextGateStage(tier);
+
+                    EditorGUILayout.LabelField(string.Format(
+                        "최전선 st{0} · 현재 st{1} · 티어 {2}  |  게이트 기준 티어 {3}  |  다음 문 {4}  |  지금 막힐 문 {5}",
+                        frontier, progress.Stage, tier,
+                        Onikiri.Progression.PromotionTrialCatalog.TierAtFrontier(frontier),
+                        next < 0 ? "없음(전부 통과)" : "st" + next,
+                        required == 0 ? "없음" : required + "문"),
+                        EditorStyles.wordWrappedMiniLabel);
+                }
+
+                // ---- v21 미리보기 (**적용하지 않는다**)
+                var save = Onikiri.Progression.SaveSystem.Load();
+                if (save == null)
+                {
+                    EditorGUILayout.LabelField("세이브가 없어 v21 미리보기를 못 만듭니다.",
+                        EditorStyles.miniLabel);
+                }
+                else
+                {
+                    int wouldBe = Onikiri.Progression.SaveData.GateEvolutionTierFor(
+                        save.evolutionTier,
+                        Mathf.Max(save.maxStageReached, save.stage));
+
+                    EditorGUILayout.LabelField(string.Format(
+                        "v21 미리보기: 세이브 v{0} · 최전선 st{1} · 티어 {2} → {3} ({4})   "
+                        + "* 지금 적용되지 않습니다 (CurrentVersion={5})",
+                        save.version, Mathf.Max(save.maxStageReached, save.stage),
+                        save.evolutionTier, wouldBe,
+                        Onikiri.Progression.EvolutionCatalog.NameOf(wouldBe),
+                        Onikiri.Progression.SaveData.CurrentVersion),
+                        EditorStyles.wordWrappedMiniLabel);
                 }
             }
         }

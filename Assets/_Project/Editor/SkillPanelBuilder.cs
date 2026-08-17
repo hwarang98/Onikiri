@@ -214,6 +214,15 @@ namespace Onikiri.EditorTools
             var performer = WirePerformer(samurai, combat, nameFlash, screenFlash);
             WriteSlots(system, combat, performer);
 
+            // 판을 새로 만들었으니 하단 탭을 다시 물린다 (RelinkScreenTabs 주석).
+            // **장비·동료·퀘스트·상점 빌더는 전부 이 줄을 갖고 있었고 스킬만
+            // 빠져 있었다.** 그래서 이 빌더가 단독으로(또는 Build Combat Content가
+            // WireLockedTabs 앞에서 끊겨) 돌면 스킬 탭이 조용히 죽는다 -
+            // LockedTab.screen이 파괴된 옛 판을 가리키다 null이 되고, 탭은
+            // 밝게 보이는데 눌러도 아무 일도 안 일어난다. 실기에서 그 상태로
+            // 잡혔다(3단계 실기 §9.9)
+            BattleContentBuilder.RelinkScreenTabs();
+
             Debug.Log(string.Format(
                 "[Onikiri] Skill panel built: {0} skills / {1} slots, list {2:F0}px scrolling in "
                 + "a {3:F0}px viewport (band {4:F0}px).",

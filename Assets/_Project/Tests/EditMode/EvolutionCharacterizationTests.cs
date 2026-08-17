@@ -11,10 +11,13 @@ namespace Onikiri.Tests
      *
      * 재설계가 약속하는 것은 "코리더가 거의 안 움직인다"가 아니라 **한 비트도
      * 안 움직인다**이다. 그 약속은 계수가 아니라 구조에서 온다 - 첫 귀문이
-     * `st30 클리어`라 `ExpectedTierAtStage(30) = 0`이 유지되고, 그러면
-     * `EvolutionCompensation(1..30) = Math.Pow(1.0, 0.42)`가 **정확히** 1.0이라
-     * 곱셈이 항등이 된다. 시뮬레이션은 결정론이므로 항등원을 곱한 결과는
-     * 비트까지 같아야 한다.
+     * `st30 클리어`라 `ExpectedTierAtStage(30) = 0`이 유지되고, 그러면 이
+     * 구간의 전직 배수가 정확히 1.0이라 곱셈이 항등이 된다. 시뮬레이션은
+     * 결정론이므로 항등원을 곱한 결과는 비트까지 같아야 한다.
+     *
+     * **2단계에는 그 곱조차 사라졌다** - 보정항 자체를 지웠으므로(지수 0.00
+     * 승인) 코리더가 지나는 곱이 하나 줄었다. 아래 표가 그 변경 뒤에도
+     * 그대로라는 것이 이 파일의 이번 판 성과다.
      *
      * 상대오차를 쓰면 그 약속이 "1e-9 안에서 같다"로 조용히 약해지고, 그 폭
      * 안에는 **기대 티어 곡선이 st30에서 한 칸 새는** 실수가 통째로 들어간다.
@@ -214,29 +217,45 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 코리더에 전직 보정이 **곱셈 항등원**으로 걸려 있다.
+         * @brief 코리더에 전직이 **구조적으로** 없다. 2단계에 근거가 바뀌었다.
          *
-         * 위 비트 동일이 성립하는 **이유**를 따로 못 박는다. 값이 1.0에
-         * 가까운 것으로는 부족하다 - 1.0000000001을 곱하면 비트가 움직이고,
-         * 그때 실패하는 것은 이 검사가 아니라 위의 넷이라 원인이 안 보인다.
+         * ## 1.6단계에는 "보정이 곱셈 항등원"이었다
+         *
+         * 그때 `EvolutionCompensation(1..30)`이 `Math.Pow(1.0, 0.42)`라 정확히
+         * 1.0이었고, 그 항등성이 위 비트 동일의 이유였다. 검사도 그 값의
+         * 비트를 봤다 - 1.0000000001을 곱하면 코리더가 움직이기 때문이다.
+         *
+         * ## 2단계에 그 항이 **사라졌다**
+         *
+         * 지수 0.00이 승인되면서 `BossHealthForStage`에서 곱 자체를 지웠다.
+         * 그래서 이제 잴 값이 없다 - 곱하지 않는 것은 1.0을 곱하는 것보다
+         * 강한 보장이고, "1.0에 가까운 값"이 새어 들어올 경로가 아예 없다.
+         *
+         * 남은 근거는 하나다: **첫 문이 st30 클리어**라 코리더 서른 줄이 문을
+         * 한 번도 지나지 않는다. 그것을 여기서 못 박는다 - 게이트가 앞으로
+         * 내려오면 위의 넷보다 이 검사가 먼저 실패해야 원인이 보인다.
          */
         [Test]
-        public void CorridorCompensation_IsExactlyTheMultiplicativeIdentity()
+        public void CorridorHasNoPromotionAtAll()
         {
             for (int stage = 1; stage <= CorridorStages; stage++)
             {
-                double compensation = StageCurve.EvolutionCompensation(stage);
-
-                Assert.AreEqual(BitConverter.DoubleToInt64Bits(1d),
-                    BitConverter.DoubleToInt64Bits(compensation), string.Format(
-                    "stage {0}: 전직 보정이 {1:R}이다. 1.0에 가까운 것으로는 부족하다 - "
-                    + "곱셈 항등원이 아니면 코리더의 비트가 움직인다",
-                    stage, compensation));
+                Assert.AreEqual(0, PromotionTrialCatalog.TierAtFrontier(stage), string.Format(
+                    "stage {0}: 지나온 문이 {1}개다 - 코리더에 귀문이 새어 들어왔다",
+                    stage, PromotionTrialCatalog.TierAtFrontier(stage)));
 
                 Assert.AreEqual(0, EvolutionCurve.ExpectedTierAtStage(stage), string.Format(
-                    "stage {0}: 기대 티어가 {1}이다 - 코리더에 전직이 새어 들어왔다",
-                    stage, EvolutionCurve.ExpectedTierAtStage(stage)));
+                    "stage {0}: 기대 티어가 {1}이다", stage, EvolutionCurve.ExpectedTierAtStage(stage)));
+
+                // 배수도 정확히 1이다. 곱해질 값이 항등원이라는 사실은
+                // 여전히 필요하다 - 티어 0의 배수가 1.0000001이면 코리더가 움직인다
+                Assert.AreEqual(BitConverter.DoubleToInt64Bits(1d),
+                    BitConverter.DoubleToInt64Bits(EvolutionCurve.ExpectedPowerAtStage(stage)),
+                    string.Format("stage {0}: 티어 0의 배수가 정확히 1이 아니다", stage));
             }
+
+            Assert.GreaterOrEqual(PromotionTrialCatalog.GateStages[0], CorridorStages,
+                "첫 귀문이 코리더 안으로 들어왔다 - 위 비트 표를 다시 구워야 한다");
         }
     }
 }

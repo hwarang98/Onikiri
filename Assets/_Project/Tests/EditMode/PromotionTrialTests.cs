@@ -1,5 +1,7 @@
 using System;
 using NUnit.Framework;
+using Onikiri.Core;
+using Onikiri.Progression;
 
 namespace Onikiri.Tests
 {
@@ -324,13 +326,29 @@ namespace Onikiri.Tests
         // ------------------------------------------------------------ k 후보
 
         /**
-         * @brief k 후보 셋 중 **0.45만** 모든 기준을 만족한다.
+         * @brief k 후보 셋이 **전부** 기준을 만족한다. **1.6단계의 판정이 뒤집혔다.**
          *
-         * 0.35는 강한 플레이어를 30초까지 끌어올리지만 일반과의 차이가 거의
-         * 사라지고, 0.60은 강한 플레이어가 23.0초로 25초 바닥을 못 넘는다.
+         * ## 무엇이 바뀌었는가 - 격차가 3.61에서 1.91로 무너졌다
+         *
+         * 1.6단계에는 0.45가 **유일한** 답이었다. 0.60에서 곡선 추종이 23.0초로
+         * 25초 바닥을 못 넘었기 때문이고, 그 검사가 "0.45보다 큰 k는 반드시
+         * 실패한다"를 단언했다.
+         *
+         * 그 단언이 성립하던 이유는 두 플레이어의 DPS 격차가 **x3.61**이었기
+         * 때문이다. 승급이 무료가 되면서 하한 플레이어도 같은 티어를 받고,
+         * 격차가 **x1.91**로 줄었다. 좁아진 격차는 어떤 k로도 크게 벌어지지
+         * 않으므로 0.60에서도 곡선 추종이 31.8초에 선다.
+         *
+         * **그래서 이 검사는 이제 반대를 잰다** - 셋 다 통과한다는 사실과,
+         * 그럼에도 캡이 여전히 필요하다는 사실. 후보를 가르는 것은 이제 밴드가
+         * 아니라 체감이고, 그것은 PlayMode에서만 잴 수 있다. 그것이
+         * `SoftCapExponent`를 "후보 확정값"이라고만 적어 둔 이유다.
+         *
+         * 옛 단언을 살려 두면 통과할 수 없다 - 재는 세계가 사라졌기 때문이다.
+         * 그 사실을 여기 남기는 것이 지우는 것보다 낫다.
          */
         [Test]
-        public void SoftCapExponent_ZeroFortyFive_IsTheOnlyCandidateThatFitsEveryRule()
+        public void EverySoftCapCandidate_NowFitsTheBand_AndTheChoiceMovesToPlayMode()
         {
             foreach (var k in new[] { 0.35d, 0.45d, 0.60d })
             {
@@ -347,20 +365,35 @@ namespace Onikiri.Tests
                     if (floor.Seconds > slowest) slowest = floor.Seconds;
                 }
 
-                if (k == PromotionTrialFixture.SoftCapExponent)
-                {
-                    Assert.GreaterOrEqual(strongest, StrongPlayerFloorSeconds,
-                        string.Format("k={0}: 강한 플레이어 최속 {1:F1}초", k, strongest));
-                    Assert.LessOrEqual(slowest, GeneralBandHigh,
-                        string.Format("k={0}: 하한 최장 {1:F1}초", k, slowest));
-                }
-                else if (k > PromotionTrialFixture.SoftCapExponent)
-                {
-                    Assert.Less(strongest, StrongPlayerFloorSeconds, string.Format(
-                        "k={0}에서 강한 플레이어가 {1:F1}초다 - 25초 바닥을 넘으면 "
-                        + "0.45를 고른 근거가 사라지므로 후보를 다시 비교해야 한다", k, strongest));
-                }
+                Assert.GreaterOrEqual(strongest, StrongPlayerFloorSeconds, string.Format(
+                    "k={0}: 강한 플레이어 최속 {1:F1}초가 25초 바닥 아래다", k, strongest));
+                Assert.LessOrEqual(slowest, GeneralBandHigh, string.Format(
+                    "k={0}: 하한 최장 {1:F1}초", k, slowest));
             }
+
+            // **그래도 캡은 필요하다.** 캡을 뺀 세계(k=1)에서 곡선 추종이
+            // 25초 바닥에 얼마나 붙는지를 함께 잰다 - 이 여유가 사라지는 날
+            // 캡의 존재 이유가 다시 단독으로 성립한다
+            double uncapped = double.MaxValue;
+            for (int gate = 1; gate <= Gates; gate++)
+            {
+                int stage = PromotionTrialFixture.GateStages[gate - 1];
+                var lead = RunGate(PromotionTrialFixture.PlayerAt(PromotionTrialFixture.Lead(), stage), gate, 1d);
+                if (lead.Seconds < uncapped) uncapped = lead.Seconds;
+            }
+
+            double capped = double.MaxValue;
+            for (int gate = 1; gate <= Gates; gate++)
+            {
+                int stage = PromotionTrialFixture.GateStages[gate - 1];
+                var lead = RunGate(PromotionTrialFixture.PlayerAt(PromotionTrialFixture.Lead(), stage),
+                                   gate, PromotionTrialFixture.SoftCapExponent);
+                if (lead.Seconds < capped) capped = lead.Seconds;
+            }
+
+            Assert.Greater(capped, uncapped, string.Format(
+                "캡을 걸었는데 강한 플레이어가 더 빨라졌다 (캡 {0:F1}초 / 무캡 {1:F1}초)",
+                capped, uncapped));
         }
 
         // ------------------------------------------------------------ 구조
@@ -440,6 +473,121 @@ namespace Onikiri.Tests
                 Assert.That(ratio, Is.InRange(0.7d, 1.5d), string.Format(
                     "게이트 {0}(st{1}): 보스 DPS / 재생 = {2:F3}", gate, stage, ratio));
             }
+        }
+
+        /**
+         * @brief **M 표가 45초 앵커를 따라간다.** 값이 아니라 규칙이 설계라는 말의 코드다.
+         *
+         * 카탈로그의 표는 구운 값이고, 그 값을 낳은 규칙은
+         *
+         *     M(gate) = 41초 / 하한 플레이어의 그 게이트 보스 처치 시간
+         *
+         * 이다. 곡선이 움직이면 규칙의 답이 움직이고, 표는 그대로 남는다 -
+         * 그 벌어짐을 여기서 잰다. 2단계에 실제로 이 일이 일어났다: 지수를
+         * 0.42에서 0.00으로 내리자 v1.5의 표가 최대 x2.1까지 어긋났고,
+         * 그대로 뒀다면 하한 플레이어가 육문을 23.6초에 끝냈다.
+         *
+         * 허용 오차 0.5%는 굽는 자리의 반올림(소수 넷째 자리) 몫이다.
+         */
+        [Test]
+        public void HealthMultiple_TracksTheFortyFiveSecondAnchor()
+        {
+            for (int gate = 1; gate <= Gates; gate++)
+            {
+                double baked = PromotionTrialCatalog.TotalHealthMultiple[gate - 1];
+                double derived = PromotionTrialFixture.DerivedHealthMultiple(gate);
+
+                Assert.AreEqual(derived, baked, derived * 0.005d, string.Format(
+                    "문{0}: 구운 M {1:F4}, 규칙이 요구하는 M {2:F4} (비 {3:F4}). "
+                    + "곡선이 움직였으면 표를 같은 규칙으로 다시 구워라 - 값을 "
+                    + "고집하면 하한 플레이어의 45초 앵커가 무너진다",
+                    gate, baked, derived, baked / derived));
+            }
+        }
+
+        /**
+         * @brief **하한의 0.50배는 문1에서만 실패한다.** 파밍 민감도 표의 근거다.
+         *
+         * 장부(`PromotionEconomyFixture.FarmAtGateOne`)가 파밍 시간을 문1에만
+         * 넣는 이유가 이 실측이다. 여섯 문에 일괄로 넣으면 그 세계보다 다섯 배
+         * 비관적인 도달일이 나오고, 그 표로 게이트 배치를 판단하면 필요 없이
+         * 흔들게 된다.
+         *
+         * 문1만 실패하는 것은 우연이 아니다 - st30에는 지나온 문이 없어서
+         * 하한 플레이어가 유일하게 **0티어로** 서는 자리다.
+         */
+        [Test]
+        public void HalfPowerFloor_OnlyFailsAtTheFirstGate()
+        {
+            for (int gate = 1; gate <= Gates; gate++)
+            {
+                int stage = PromotionTrialFixture.GateStages[gate - 1];
+                var half = PromotionTrialFixture.PlayerAt(PromotionTrialFixture.GemFloor(), stage);
+                half.Dps *= 0.50d;
+
+                var result = RunGate(half, gate, PromotionTrialFixture.SoftCapExponent);
+                bool cleared = result.Outcome == PromotionTrialSimulation.Outcome.Cleared;
+
+                Assert.AreEqual(gate > 1, cleared, string.Format(
+                    "문{0}: 하한의 50% 화력이 {1} ({2:F1}초). 실패하는 문의 자리가 "
+                    + "바뀌면 파밍 민감도 표(FarmAtGateOne)도 함께 옮겨야 한다",
+                    gate, result.Outcome, result.Seconds));
+            }
+        }
+
+        /**
+         * @brief 실패한 시도의 시간이 **격노와 폐쇄 사이**에 있다. 장부의 입력이다.
+         *
+         * 90초 밑이면 격노를 보기 전에 결판이 난 것이고(격노가 아무 일도 안
+         * 한다), 180초면 폐쇄가 유일한 종료 수단이 된 것이다. 둘 다 이 설계가
+         * 의도한 상태가 아니다 - 격노는 "못 넘는 시도를 앞당겨 끝내는" 장치다.
+         */
+        [Test]
+        public void TrialFailureSeconds_AreMeasuredNotGuessed()
+        {
+            var measured = PromotionEconomyFixture.TrialFailureSecondsFloor;
+
+            Assert.AreEqual(Gates, measured.Length, "실패 시간 표의 길이가 문의 수와 다르다");
+
+            for (int gate = 1; gate <= Gates; gate++)
+            {
+                Assert.That(measured[gate - 1],
+                    Is.InRange(PromotionTrialCatalog.EnrageSeconds, PromotionTrialCatalog.CloseSeconds),
+                    string.Format("문{0}: 실패 시도가 {1:F1}초다", gate, measured[gate - 1]));
+
+                // 실패는 성공보다 **두 배 넘게** 걸린다. 그 사실이 곱하기 모형을
+                // 폐기한 이유이고, 여기가 그 크기를 붙잡는 자리다
+                Assert.Greater(measured[gate - 1], PromotionEconomyFixture.TrialSecondsFloor[gate - 1] * 2d,
+                    string.Format("문{0}: 실패 {1:F1}초가 성공 {2:F1}초의 두 배도 안 된다 - "
+                        + "그러면 재도전 비용을 성공 시간에 곱해도 큰 차이가 없고, "
+                        + "이 항을 둘 이유가 없다",
+                        gate, measured[gate - 1], PromotionEconomyFixture.TrialSecondsFloor[gate - 1]));
+            }
+        }
+
+        /**
+         * @brief 시뮬레이션의 규칙이 **프로덕션 카탈로그에서 온다.**
+         *
+         * 승인 과정에서 격노 간격이 15초 -> 10초, 배수가 x2 -> x1.3으로 바뀌었다.
+         * 그때 시뮬레이션만 고치고 카탈로그를 안 고쳤다면 3단계의 전투가 다른
+         * 리듬을 돌리고, EditMode는 끝까지 초록이었을 것이다.
+         */
+        [Test]
+        public void TrialRules_ComeFromTheProductionCatalog()
+        {
+            var rules = Rules();
+
+            Assert.AreEqual(PromotionTrialCatalog.SwapSeconds, rules.SwapSeconds, 0d, "전환");
+            Assert.AreEqual(PromotionTrialCatalog.EnrageSeconds, rules.EnrageStartSeconds, 0d, "격노 시작");
+            Assert.AreEqual(PromotionTrialCatalog.EnrageIntervalSeconds, rules.EnrageStepSeconds, 0d, "격노 간격");
+            Assert.AreEqual(PromotionTrialCatalog.EnrageMultiplierPerStep, rules.EnrageAttackStep, 0d, "격노 배수");
+            Assert.AreEqual(PromotionTrialCatalog.CloseSeconds, rules.CloseSeconds, 0d, "폐쇄");
+
+            // 격노 산수도 두 곳이 같은 답을 낸다
+            foreach (var t in new[] { 0d, 89.9d, 90d, 90.1d, 100.1d, 179.9d })
+                Assert.AreEqual(PromotionTrialSimulation.EnrageMultiplier(rules, t),
+                    PromotionTrialCatalog.EnrageMultiplierAt(t), 1e-12d,
+                    string.Format("{0:F1}초의 격노 배수가 두 곳에서 다르다", t));
         }
 
         /** 총 체력 배수가 게이트마다 커진다 (심층 여유 발산을 따라간다) */

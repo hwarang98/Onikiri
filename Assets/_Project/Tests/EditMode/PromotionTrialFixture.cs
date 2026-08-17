@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using Onikiri.Battle;
 using Onikiri.Core;
 using Onikiri.Progression;
-using UnityEditor;
 
 namespace Onikiri.Tests
 {
@@ -19,38 +17,23 @@ namespace Onikiri.Tests
      */
     public static class PromotionTrialFixture
     {
-        private const string DataFolder = "Assets/_Project/Data";
-
-        /** 귀문 여섯의 게이트 스테이지. `PromotionEconomyFixture`와 같은 표다 */
-        public static int[] GateStages { get { return PromotionEconomyFixture.GateStages; } }
+        /** 귀문 여섯의 게이트 스테이지. **표의 출처는 프로덕션이다** */
+        public static int[] GateStages { get { return PromotionTrialCatalog.GateStages; } }
 
         // ---------------------------------------------------------------- 필드
 
+        /**
+         * @brief 에셋에서 만든 시뮬레이션 입구. **본체는 `DevSimField`로 올라갔다.**
+         *
+         * 5.0단계에 옮겼다. 프리셋 세이브를 찍는 Editor 메뉴가 같은 값을 봐야
+         * 하는데 그쪽은 테스트 어셈블리를 참조할 수 없어서, 함수를 양쪽이 다
+         * 보이는 에디터 전용 어셈블리로 올리고 여기는 부르기만 한다 - 두 벌이
+         * 되면 프리셋이 밴드와 다른 잡몹 평균에서 유도되고 그 어긋남은 어디에도
+         * 안 적힌다(그 함수 머리 주석).
+         */
         public static StageSimulation.Field FieldFromAssets()
         {
-            BigDouble healthSum = BigDouble.Zero;
-            BigDouble goldSum = BigDouble.Zero;
-            double totalWeight = 0d;
-
-            foreach (var guid in AssetDatabase.FindAssets("t:EnemyDefinition", new[] { DataFolder }))
-            {
-                var definition = AssetDatabase.LoadAssetAtPath<EnemyDefinition>(
-                    AssetDatabase.GUIDToAssetPath(guid));
-                if (definition == null || definition.spawnWeight <= 0f) continue;
-
-                healthSum += definition.maxHealth * BigDouble.FromDouble(definition.spawnWeight);
-                goldSum += definition.goldReward * BigDouble.FromDouble(definition.spawnWeight);
-                totalWeight += definition.spawnWeight;
-            }
-
-            return new StageSimulation.Field
-            {
-                AverageMobHealth = totalWeight > 0d
-                    ? (healthSum / BigDouble.FromDouble(totalWeight)).ToDouble() : 0d,
-                AverageMobGold = totalWeight > 0d
-                    ? (goldSum / BigDouble.FromDouble(totalWeight)).ToDouble() : 0d,
-                SpawnInterval = 1.1d
-            };
+            return Onikiri.DevTools.DevSimField.FieldFromAssets();
         }
 
         static readonly Dictionary<string, List<StageSimulation.StageResult>> cache =
@@ -118,49 +101,54 @@ namespace Onikiri.Tests
         // ---------------------------------------------------------------- 적
 
         /**
-         * @brief 게이트별 **총 체력 배수** M. 지역 보스 체력에 곱한 값이 셋의 합이다.
+         * @brief 게이트별 **총 체력 배수** M. **표의 출처는 프로덕션이다.**
          *
-         * ## 왜 게이트마다 다른가 - 고정 배수로는 시험이 안 된다
+         * 1.6단계에는 이 표가 여기 있었다. 2단계에 `PromotionTrialCatalog`으로
+         * 옮긴 이유는 3단계의 전투가 그 표를 읽어야 하기 때문이다 - 테스트에만
+         * 있는 표는 게임이 같은 값을 스폰한다는 보장이 없다.
          *
-         * 보스 여유가 심층에서 발산한다(곡선 추종 실측: st31 2.72 -> st151 24.2).
-         * 고정 배수를 쓰면 뒷문이 앞문보다 압도적으로 쉬워져, 사다리의 마지막이
-         * 가장 쉬운 시험이 된다. 그래서 M을 **규칙에서 유도한다.**
-         *
-         * ## 앵커는 하한 플레이어다 (v1.4에 뒤집었다)
-         *
-         *   M(gate) = (45초 - 전환 4초) / **보석 하한 플레이어**의 그 게이트 보스 처치 시간
-         *
-         * v1.3까지는 곡선 추종을 42초에 맞췄는데, 귀문이 진행을 막는 구조에서
-         * 그 앵커는 하한 플레이어에게 **벽**이 된다(사문~육문에서 사망). 진행이
-         * 막히지 않는다는 보장이 곧 하한 앵커다.
-         *
-         * **곡선이 움직이면 이 표도 같은 규칙으로 다시 굽는다** - 값이 아니라
-         * 규칙이 설계다.
+         * 유도 규칙(45초 하한 앵커)은 그 파일 주석에 있고, 규칙과 값이 어긋나면
+         * `PromotionTrialTests.HealthMultiple_TracksTheFortyFiveSecondAnchor`가
+         * 잡는다.
          */
-        public static readonly double[] TotalHealthMultiple = { 1.74d, 1.68d, 1.49d, 1.91d, 4.75d, 5.36d };
+        public static double[] TotalHealthMultiple
+        {
+            get { return PromotionTrialCatalog.TotalHealthMultiple; }
+        }
 
         // ---------------------------------------------------------------- 소프트캡
 
-        /**
-         * @brief 소프트캡 지수. **과잉 화력만 완만하게 줄인다.**
-         *
-         * 하한 앵커만으로는 곡선 추종이 15초에 끝나 시험이 형식이 된다. 캡을
-         * 얹으면 두 플레이어를 동시에 밴드 안에 넣을 수 있다 - 캡 없이는
-         * 불가능하다는 것이 산수로 증명된다(격차 x3.61 > 밴드 비 1.571).
-         *
-         * k=0.45의 실측: 곡선 추종 27.0~43.0초 / 중간 34.8~44.0초 / 하한 45.0초.
-         */
-        public const double SoftCapExponent = 0.45d;
+        /** 소프트캡 지수. **후보 확정값**이고 출처는 프로덕션이다 */
+        public const double SoftCapExponent = PromotionTrialCatalog.SoftCapExponent;
 
         /** 이 게이트의 기준 화력 = 귀문 총 체력 / 기준 시간 */
         public static double ReferencePowerForGate(int gateNumber)
         {
             var field = FieldFromAssets();
+            return PromotionTrialCatalog.ReferencePowerForGate(
+                BigDouble.FromDouble(field.AverageMobHealth), gateNumber);
+        }
+
+        /**
+         * @brief 45초 앵커가 요구하는 M을 **지금 곡선에서 다시 유도한다.**
+         *
+         * 표가 아니라 규칙이 설계라는 말을 코드로 옮긴 것이다. 곡선이 움직이면
+         * 이 값이 움직이고, 카탈로그의 표와 벌어지면 검사가 그 벌어짐을 잰다.
+         *
+         *     M(gate) = (45초 - 전환 2회) / 하한 플레이어의 그 게이트 보스 처치 시간
+         */
+        public static double DerivedHealthMultiple(int gateNumber)
+        {
+            var field = FieldFromAssets();
             int stage = GateStages[gateNumber - 1];
+
             double bossHealth = StageCurve.BossHealthForStage(
                 BigDouble.FromDouble(field.AverageMobHealth), stage).ToDouble();
+            double dps = PlayerAt(GemFloor(), stage).Dps;
 
-            return TrialPowerScore.ReferencePower(bossHealth * TotalHealthMultiple[gateNumber - 1]);
+            // 전환 두 번이 시계 안에서 흐르므로 전투에 쓸 수 있는 시간은
+            // 45초가 아니라 41초다. TrialPowerScore.ReferenceSeconds와 같은 값
+            return TrialPowerScore.ReferenceSeconds / (bossHealth / dps);
         }
 
         /** 소프트캡을 지난 플레이어. 입장 시 한 번 계산한 공통 배율을 곱한다 */
@@ -171,10 +159,6 @@ namespace Onikiri.Tests
             player.Dps = TrialPowerScore.EffectivePower(player.Dps, reference, k);
             return player;
         }
-
-        /** 셋의 체력 배분. 3체가 절반이라 "마지막이 본체"가 성립한다 */
-        public const double FirstFoeShare = 0.25d;
-        public const double ThirdFoeShare = 0.50d;
 
         /**
          * @brief 3체의 공격력·간격 계수. **둘 다 지역 보스와 같다(1.0 / 2.0초).**
@@ -195,80 +179,55 @@ namespace Onikiri.Tests
          * 문서에도 솔직히 적는다.
          */
         public const double ThirdFoeAttackFactor = 1d;
-        public const double ThirdFoeAttackInterval = 2d;
-
-        /** 등장 후 첫 타격까지의 지연. 게임의 보스 접근 시간과 같은 자리다 */
-        public const double FirstAttackDelay = 2d;
 
         /**
-         * @brief 이 게이트의 적 셋. 1·2체는 지역 보스, 3체는 **얻으려는 경지**다.
+         * @brief 문 번호(1부터)의 적 셋. **체력은 프로덕션 카탈로그가 낸다.**
          *
-         * 체력은 `StageCurve.BossHealthForStage` - 게임이 실제로 스폰할 때
-         * 부르는 그 함수다. 여기서 곱셈을 따로 하면 "계산상으로는 통과하는데
-         * 실제로는 실패하는" 상태가 만들어진다(그 주석의 규칙 그대로).
+         * `FoesAt`이 아니라 `PromotionTrialCatalog.FoeHealth`를 지나는 것이
+         * 요점이다 - 3단계의 스포너가 부를 함수와 시뮬레이션이 재는 함수가
+         * 같아야, 계산이 통과하는데 화면에서 실패하는 상태가 안 생긴다.
          */
-        public static PromotionTrialSimulation.Foe[] FoesAt(int gateStage, double totalMultiple)
-        {
-            var field = FieldFromAssets();
-            double bossHealth = StageCurve.BossHealthForStage(
-                BigDouble.FromDouble(field.AverageMobHealth), gateStage).ToDouble();
-            double bossAttack = BossCurve.AttackDamageForStage(gateStage);
-
-            return new[]
-            {
-                new PromotionTrialSimulation.Foe {
-                    Health = bossHealth * totalMultiple * FirstFoeShare,
-                    AttackDamage = bossAttack,
-                    AttackInterval = BossCurve.AttackIntervalSeconds,
-                    FirstAttackDelay = FirstAttackDelay
-                },
-                new PromotionTrialSimulation.Foe {
-                    Health = bossHealth * totalMultiple * FirstFoeShare,
-                    AttackDamage = bossAttack,
-                    AttackInterval = BossCurve.AttackIntervalSeconds,
-                    FirstAttackDelay = FirstAttackDelay
-                },
-                new PromotionTrialSimulation.Foe {
-                    Health = bossHealth * totalMultiple * ThirdFoeShare,
-                    AttackDamage = bossAttack * ThirdFoeAttackFactor,
-                    AttackInterval = ThirdFoeAttackInterval,
-                    FirstAttackDelay = FirstAttackDelay
-                }
-            };
-        }
-
-        /** 문 번호(1부터)의 적 셋 */
         public static PromotionTrialSimulation.Foe[] FoesForGate(int gateNumber)
         {
-            return FoesAt(GateStages[gateNumber - 1], TotalHealthMultiple[gateNumber - 1]);
+            var mobHealth = BigDouble.FromDouble(FieldFromAssets().AverageMobHealth);
+            int stage = GateStages[gateNumber - 1];
+            double bossAttack = BossCurve.AttackDamageForStage(stage);
+
+            var foes = new PromotionTrialSimulation.Foe[PromotionTrialCatalog.FoeCount];
+            for (int i = 0; i < foes.Length; i++)
+            {
+                bool third = i == PromotionTrialCatalog.FoeCount - 1;
+
+                foes[i] = new PromotionTrialSimulation.Foe
+                {
+                    Health = PromotionTrialCatalog.FoeHealth(mobHealth, gateNumber, i).ToDouble(),
+                    AttackDamage = third ? bossAttack * ThirdFoeAttackFactor : bossAttack,
+                    AttackInterval = PromotionTrialCatalog.FoeAttackIntervalSeconds,
+                    FirstAttackDelay = PromotionTrialCatalog.FirstAttackDelaySeconds
+                };
+            }
+            return foes;
         }
 
         // ---------------------------------------------------------------- 규칙
 
-        /** 적 교체 시간(초). 시계는 흐르고 재생도 계속된다 */
-        public const double SwapSeconds = 2d;
-
-        /** 격노 시작(초) */
-        public const double EnrageStartSeconds = 90d;
-
-        /** 격노 단계 간격(초) */
-        public const double EnrageStepSeconds = 15d;
-
-        /** 단계마다 적 공격력에 곱하는 값 */
-        public const double EnrageAttackStep = 2d;
-
-        /** 귀문이 닫히는 시각(초) */
-        public const double CloseSeconds = 180d;
-
+        /**
+         * @brief 시간 규칙 넷의 **출처는 프로덕션 카탈로그다.**
+         *
+         * 1.6단계에는 여기 상수 넷이 서 있었고(격노 90 / 15초마다 x2 / 폐쇄
+         * 180), 승인 과정에서 간격과 배수가 10초 / x1.3으로 바뀌었다. 그때
+         * 시뮬레이션만 고치고 카탈로그를 안 고치면 3단계의 전투가 다른 리듬을
+         * 돌린다 - 값을 두 벌 두지 않는 것이 그것을 구조적으로 막는다.
+         */
         public static PromotionTrialSimulation.Rules DefaultRules()
         {
             return new PromotionTrialSimulation.Rules
             {
-                SwapSeconds = SwapSeconds,
-                EnrageStartSeconds = EnrageStartSeconds,
-                EnrageStepSeconds = EnrageStepSeconds,
-                EnrageAttackStep = EnrageAttackStep,
-                CloseSeconds = CloseSeconds,
+                SwapSeconds = PromotionTrialCatalog.SwapSeconds,
+                EnrageStartSeconds = PromotionTrialCatalog.EnrageSeconds,
+                EnrageStepSeconds = PromotionTrialCatalog.EnrageIntervalSeconds,
+                EnrageAttackStep = PromotionTrialCatalog.EnrageMultiplierPerStep,
+                CloseSeconds = PromotionTrialCatalog.CloseSeconds,
                 TimeStep = 0.02d
             };
         }

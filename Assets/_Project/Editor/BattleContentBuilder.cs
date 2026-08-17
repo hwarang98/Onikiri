@@ -3490,6 +3490,14 @@ namespace Onikiri.EditorTools
             so.FindProperty("normalColor").colorValue = UiSkin.Text;
             so.FindProperty("dimColor").colorValue = UiSkin.TextDim;
             so.FindProperty("readyColor").colorValue = UiSkin.Gold;
+
+            // 귀문 대기 중에는 이 카드가 문 입구가 된다 (4단계 §3).
+            // 셋을 함께 물린다 - 셋 중 하나라도 비면 카드는 평소처럼만 굴러
+            // 조용히 실패한다(LockedTab.screen이 비었을 때와 같은 종류의 사고)
+            so.FindProperty("fight").objectReferenceValue =
+                Object.FindFirstObjectByType<BossFight>();
+            so.FindProperty("cardButton").objectReferenceValue = cardButton;
+            so.FindProperty("cardScreenButton").objectReferenceValue = opener;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // 상시 HUD 층. 경험치 줄과 같은 층이라 어느 하단 탭을 열어도

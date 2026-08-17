@@ -1751,22 +1751,66 @@ namespace Onikiri.Tests
          * 밴드 재현부터 확인하는 규칙(프롬프트 E3-3)이 이 테스트다.
          */
         [Test]
-        public void MasteryNeutralized_ReproducesTheStep42World()
+        public void MasteryNeutralized_ReproducesCurrentPreMasteryBaseline()
         {
             var policy = new StageSimulation.Policy { NeutralizeMastery = true };
             var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
 
-            // 43단계 미세화 재기준 앵커(1.5232/1.4880/1.3777/2.3365)를 E-3
-            // 수정(비용 x3.5 + 정수화 + 완화 곡선)이 다시 기준했다. 차는
-            // st10 -0.1% / st30 -3.0% / st40 -0.04% / st50 +0.2% - st30만
-            // 완화 마디(st25~30 구간)가 f2p 천장을 함께 지키느라 기준 여유보다
-            // 조금 낮게 앉은 잔차이고, 일반 밴드(1.5~3.0) 안이다.
-            // "비트 불변"은 비용 격자가 바뀐 순간 정의상 불가능하고, 이
-            // 앵커가 새 격자의 기준이다
+            // ---- 앵커 넷. **승급 재설계 2.1.1단계에 다시 구웠다**
+            //
+            // 옛 값 (42단계 세계):  1.5222 / 1.4438 / 1.3771 / 2.3413
+            // 새 값 (지금 세계):    1.5222 / 1.4437 / 1.6664 / 1.9525
+            //
+            // st10·st30은 **비트 수준으로 그대로다**(차 0.0000 / -0.0001).
+            // 조율 코리더라 승급이 구조적으로 없고, 그 불변이 재설계가
+            // 설계대로 갔다는 증거다.
+            //
+            // st40·st50만 움직였다. 그 자리는 **가속 구간**이고 승인된 재설계가
+            // 두 가지로 그 구간을 다시 만들었다:
+            //
+            //   A-1  전역 EvolutionCompensation 삭제 - 보스가 그만큼 가벼워졌다
+            //   B    게이트 무료 티어 - 플레이어가 st31/st41에 티어를 받는다
+            //        (옛 세계는 Lv.30 도달 + 보석·골드 구매였다)
+            //
+            // 승급 골드 비용이 사라진 몫도 여기 들어 있다 - 옛 세계는 st37~47에
+            // 누적 7.41e12 골드를 전직에 썼고 그만큼 화력이 낮았다.
+            //
+            // ---- 다시 굽기 전에 정책 확장을 먼저 시도했고, 실패했다
+            //
+            // `NeutralizeEvolution = true`를 더해 승급 층을 통째로 걷어내 봤다:
+            //
+            //   st10  1.5222  (옛 1.5222, 차  0.0000)   복원
+            //   st30  1.4437  (옛 1.4438, 차 -0.0001)   복원
+            //   st40  1.5149  (옛 1.3771, 차 +0.1378)   **미복원**
+            //   st50  1.6136  (옛 2.3413, 차 -0.7277)   **미복원**
+            //
+            // 방향이 서로 반대인 것이 핵심이다. st50은 옛 세계가 갖고 있던
+            // 티어(구매분)가 사라져 **낮게** 앉고, st40은 옛 세계가 실제 티어보다
+            // 무겁게 걸던 보정(기대 티어 2 기준)이 사라져 **높게** 앉는다.
+            // 하나의 정책 플래그로 두 방향을 동시에 되돌릴 수 없다 - 옛 세계는
+            // "티어가 있고 보정도 있는" 세계였고, 중립화는 "둘 다 없는" 세계만
+            // 만들 수 있기 때문이다.
+            //
+            // ---- 그래서 이 검사가 재는 세계를 바꿨다
+            //
+            //   옛 뜻   "42단계 세계를 재현한다"
+            //   새 뜻   "**지금 세계에서 심화 축만 걷어낸 기준선**을 재현한다"
+            //
+            // 이름도 함께 바꿨다. 숫자만 갈아 끼우면 이 검사는 "새 값을 복사해
+            // 둔 장식"이 되고, 반년 뒤에 무엇을 지키는지 아무도 모른다.
+            //
+            // ---- 기준 산출 정책 / 헤드룸 / 무엇이 이 검사를 깨야 하는가
+            //
+            //   정책      Policy { NeutralizeMastery = true } 하나. 승급은 **안** 걷는다 -
+            //             "지금 세계"의 기준선이므로 승급은 그 세계의 일부다
+            //   헤드룸    앵커 +-0.01 (절대). 옛 판의 자를 그대로 쓴다
+            //   깨야 함   심화 축(초월·연격)이 조율/가속 구간으로 새어 들어오는 변경,
+            //             승급 게이트 표·티어 스텝 변경, 강화 비용 격자 변경
+            //   안 깨야 함 심층(st51+)만 건드리는 변경 - 그쪽은 아래 상한이 잡는다
             Assert.AreEqual(1.5222d, results[9].BossMargin, 0.01d, "st10");
-            Assert.AreEqual(1.4438d, results[29].BossMargin, 0.01d, "st30");
-            Assert.AreEqual(1.3771d, results[39].BossMargin, 0.01d, "st40");
-            Assert.AreEqual(2.3413d, results[49].BossMargin, 0.01d, "st50");
+            Assert.AreEqual(1.4437d, results[29].BossMargin, 0.01d, "st30");
+            Assert.AreEqual(1.6664d, results[39].BossMargin, 0.01d, "st40");
+            Assert.AreEqual(1.9525d, results[49].BossMargin, 0.01d, "st50");
 
             // 심층 상한. **42단계의 6.5가 아니다 - 45단계에 재기준했다.**
             //
@@ -1789,11 +1833,74 @@ namespace Onikiri.Tests
             // 그대로 들어온다(실측 9.74 -> 12.50). 세 스텝 연속 같은 이유로
             // 같은 방향이므로, 이 상한은 이제 "요도 쪽에서 무엇이 얹혔는가"를
             // 뒤따라 적는 값이라고 봐야 한다.
+            //
+            // 2.1.1단계에 13.6 -> 15.44. 같은 이유의 네 번째다 - 게이트 무료
+            // 티어가 이 세계에도 그대로 들어온다(승급은 심화 축이 아니다).
+            // 실측 15.13에 x1.02 헤드룸이고, **심층 보정(B-1)이 이미 잡은 뒤의
+            // 값**이다 - 보정이 없던 2단계에는 18.06이었다.
+            //
+            // 상한이 계약으로 남는 근거는 아래 부등호다: 개방된 세계의 심층
+            // 최대가 26.98이므로 이 세계가 그보다 확실히 낮다는 사실을 15.44가
+            // 붙잡는다. 그 간격(x1.78)이 심화 축의 크기다.
+            const double PreMasteryDeepCeiling = 15.44d;
+
             for (int i = DeepZoneFrom - 1; i < results.Count; i++)
-                Assert.LessOrEqual(results[i].BossMargin, 13.6d, string.Format(
-                    "stage {0}: 심화 무력화 세계의 여유 {1:F2} - 실측 12.50 위로 " +
+                Assert.LessOrEqual(results[i].BossMargin, PreMasteryDeepCeiling, string.Format(
+                    "stage {0}: 심화 무력화 세계의 여유 {1:F2} - 실측 15.13 위로 " +
                     "번졌다. 심화 축이 아닌 무언가가 이 세계를 밀어 올리고 있다",
                     results[i].Stage, results[i].BossMargin));
+        }
+
+        /**
+         * @brief **민감도 검사** - 위 기준선이 장식이 아니라는 증거.
+         *
+         * 스냅샷 검사의 위험은 "새 숫자를 복사해 두고 아무것도 안 재는" 상태다.
+         * 그것을 두 갈래로 막는다 - 앵커와 심층 상한이 **서로 다른 것**을 재고
+         * 있다는 사실이 이 검사의 내용이다.
+         *
+         * ## 앵커 넷은 심화 축에 반응하지 **않는 것이 옳다**
+         *
+         * 처음에 "NeutralizeMastery를 빼면 앵커가 움직여야 한다"로 썼다가
+         * 실패했다. 발도 개방은 치명타 100% 도달(실측 st59 언저리)에 열리므로
+         * **st10~50에는 존재하지 않는다.** 없는 축을 걷어내도 값이 안 움직이는
+         * 것은 결함이 아니라 구조다.
+         *
+         * 그래서 앵커가 지키는 것은 "심화 축의 크기"가 아니라 **"심화 축이 그
+         * 구간에 새어 들어오지 않았다"**이다 - 두 세계의 값이 자 안에서 같아야
+         * 하고, 갈리는 순간 개방이 해금 스테이지보다 앞으로 내려왔다는 뜻이다.
+         *
+         * ## 심층 상한이 플래그를 실제로 가른다
+         *
+         * 개방된 세계의 심층 최대(26.98)가 중립 세계의 상한(15.44)보다 확실히
+         * 커야 한다. 그 간격 x1.75가 심화 축의 크기이고, 좁아지면 이 축이
+         * 묻히고 있다는 신호다 - 죽은 버튼 검사(`MasteryAxes_MoveProgress`)와
+         * 같은 것을 다른 자로 재는 자리다.
+         */
+        [Test]
+        public void PreMasteryBaseline_IsActuallySensitiveToTheMasteryFlag()
+        {
+            var field = FieldFromAssets();
+            var withMastery = StageSimulation.Run(DeepZoneTo, field);
+            var withoutMastery = StageSimulation.Run(DeepZoneTo, field,
+                new StageSimulation.Policy { NeutralizeMastery = true });
+
+            // ---- 앵커: 두 세계가 같아야 한다 (개방이 st1~50에 없다는 구조)
+            foreach (var index in new[] { 9, 29, 39, 49 })
+                Assert.AreEqual(withoutMastery[index].BossMargin, withMastery[index].BossMargin, 1e-12d,
+                    string.Format(
+                        "stage {0}: 개방을 걷어내자 값이 움직였다 ({1:F4} -> {2:F4}) - "
+                        + "발도 개방이 해금 스테이지보다 앞으로 내려왔다. 앵커 넷은 "
+                        + "그 구간에 심화 축이 **없다**는 것을 재는 자리다",
+                        index + 1, withMastery[index].BossMargin, withoutMastery[index].BossMargin));
+
+            // ---- 심층: 개방된 세계가 중립 세계의 상한보다 확실히 위여야 한다
+            double openMax = 0d;
+            for (int i = DeepZoneFrom - 1; i < withMastery.Count; i++)
+                if (withMastery[i].BossMargin > openMax) openMax = withMastery[i].BossMargin;
+
+            Assert.Greater(openMax, 15.44d, string.Format(
+                "개방된 세계의 심층 최대가 {0:F2}로 중립 세계의 상한(15.44) 아래다 - "
+                + "그 상한은 심화 축을 막고 있지 않다", openMax));
         }
 
         /**

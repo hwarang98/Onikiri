@@ -47,47 +47,61 @@ namespace Onikiri.Tests
      */
     public static class PromotionBandModel
     {
-        /** 귀문 여섯의 게이트 스테이지. 경지는 그 다음 스테이지부터 유효하다 */
-        public static readonly int[] GateStages = { 30, 40, 50, 70, 100, 150 };
+        /** 귀문 여섯의 게이트 스테이지. **표의 출처는 프로덕션이다** */
+        public static int[] GateStages { get { return PromotionTrialCatalog.GateStages; } }
 
         /**
-         * @brief **1.6단계의 권장 지수.** 재유도 결과다.
+         * @brief **이 모형이 재는 지수가 2.1단계에 바뀌었다.**
          *
-         * 후보 일곱(0.00 ~ 1.00)이 밴드와 도달층 계약을 **전부** 통과하므로,
-         * 고를 근거는 승급 체감 하나뿐이다. 0.00이 그것을 최대로 만든다 -
-         * 문 하나가 +10~20%이고, 지수를 올릴수록 그 몫이 보정으로 상쇄된다.
+         *   1.6~2단계   전역 `EvolutionMarginExponent` - 여섯 문 전부에 걸린다
+         *   2.1단계~    `StageCurve.DeepPromotionConvergenceExponent` -
+         *               **문 다섯·여섯에만** 걸린다
          *
-         * 33단계가 0.42를 고른 근거("무과금은 1티어, 과금은 여섯")는 v1.5에서
-         * 전원이 같은 티어를 무료로 받으면서 사라졌다. 값을 유지할 이유가
-         * 남아 있지 않다.
+         * 전역 보정은 지워졌고(승인 A-1), 그 자리를 문제가 실제로 있는 구간에만
+         * 작용하는 다른 항이 대신한다(승인 B-1). 그래서 이 모형의 `exponent`
+         * 인자는 이제 **심층 지수**이고, 문1~4의 체감은 어떤 값에서도 안 움직인다 -
+         * `FeltGainAtGate`가 그 구조를 그대로 담는다.
          *
-         * 0.00은 **보정항 자체를 지운다**는 뜻이기도 하다. `BossHealthForStage`의
-         * 곱이 하나 줄고, 코리더 불변이 계수가 아니라 "항이 없음"으로 지켜진다.
+         * 값은 프로덕션에서 읽는다. 두 벌을 두면 후보 비교표와 실제 곡선이
+         * 갈리고, 그 갈림은 밴드가 아니라 심층에서만 나타난다.
          */
-        public const double RecommendedExponent = 0.00d;
+        public static double ShippedDeepExponent
+        {
+            get { return StageCurve.DeepPromotionConvergenceExponent; }
+        }
+
+        /** 예전 이름. 부르는 쪽을 한꺼번에 안 고치려고 남겨 둔 별칭이다 */
+        public static double RecommendedExponent { get { return ShippedDeepExponent; } }
 
         /** 마일스톤이 되려면 문 하나가 최소 이만큼은 올려야 한다 */
         public const double MinimumFeltGain = 0.05d;
 
-        /** 누적 공격 배수. 인덱스 = 티어 (0 = 로닌) */
-        public static readonly double[] AttackAt =
-        {
-            1d,
-            1.10d,
-            1.10d * 1.10d,
-            1.10d * 1.10d * 1.12d,
-            1.10d * 1.10d * 1.12d * 1.12d,
-            1.10d * 1.10d * 1.12d * 1.12d * 1.15d,
-            1.10d * 1.10d * 1.12d * 1.12d * 1.15d * 1.20d
-        };
+        /**
+         * @brief 누적 공격 배수. 인덱스 = 티어 (0 = 로닌).
+         *
+         * 1.6단계에는 여기 곱셈이 손으로 적혀 있었다. 2단계에 `EvolutionCurve`를
+         * 부르게 바꾼 이유는 카탈로그의 스텝이 움직이는 날 이 모형만 옛 배수를
+         * 재는 것을 막기 위해서다 - 밴드 판정이 조용히 거짓이 되는 경로다.
+         */
+        public static readonly double[] AttackAt = BuildAttackTable();
 
-        /** 이 스테이지에서 전원이 갖는 티어. 게이트를 지났으면 그 티어다 */
+        static double[] BuildAttackTable()
+        {
+            var table = new double[EvolutionCurve.MaxTier + 1];
+            for (int tier = 0; tier < table.Length; tier++)
+                table[tier] = EvolutionCurve.AttackMultiplierAt(tier);
+            return table;
+        }
+
+        /**
+         * @brief 이 스테이지에서 전원이 갖는 티어. **판정도 프로덕션이 한다.**
+         *
+         * `gateStage < stage`다. 등호가 아닌 이유는
+         * `PromotionTrialCatalog.TierAtFrontier` 주석에 있다.
+         */
         public static int TierAtStage(int stage)
         {
-            int tier = 0;
-            for (int g = 0; g < GateStages.Length; g++)
-                if (stage > GateStages[g]) tier = g + 1;
-            return tier;
+            return PromotionTrialCatalog.TierAtFrontier(stage);
         }
 
         public static double AttackMultiplierAtStage(int stage)
@@ -95,11 +109,36 @@ namespace Onikiri.Tests
             return AttackAt[TierAtStage(stage)];
         }
 
-        /** 이 문을 돌파한 직후의 **실질** 전투력 상승률 (보정을 뺀 뒤 남는 몫) */
-        public static double FeltGainAtGate(int gateNumber, double exponent)
+        /**
+         * @brief 이 문을 돌파한 직후의 **실질** 전투력 상승률 (보정을 뺀 뒤 남는 몫).
+         *
+         * 문1~4는 심층 보정이 안 걸리므로 **명목 배수가 통째로 실질**이다 -
+         * 지수가 어떤 값이어도 10/10/12/12%다. 문5·6만 `step^(1-e)`로 눌린다.
+         *
+         * 이 분기가 B-1의 전부이고, `PromotionDomainTests.EveryGate_MovesRealPower...`가
+         * 앞 넷을 엄격한 허용 오차로 고정한다.
+         */
+        public static double FeltGainAtGate(int gateNumber, double deepExponent)
         {
             double step = AttackAt[gateNumber] / AttackAt[gateNumber - 1];
-            return Math.Pow(step, 1d - exponent) - 1d;
+
+            if (!PromotionTrialCatalog.IsDeepGate(gateNumber)) return step - 1d;
+            return Math.Pow(step, 1d - deepExponent) - 1d;
+        }
+
+        /**
+         * @brief 이 스테이지에서 심층 보정이 잡는 배수 (지수를 얹기 **전**의 몫).
+         *
+         * 문 다섯째부터의 스텝만 곱한다. 티어 4 이하면 정확히 1이다 -
+         * `StageCurve.DeepPromotionCompensation`과 같은 규칙, 같은 출처다.
+         */
+        public static double DeepSteppedAtStage(int stage)
+        {
+            int tier = TierAtStage(stage);
+            if (tier < PromotionTrialCatalog.FirstDeepGate) return 1d;
+
+            return EvolutionCurve.AttackMultiplierBetween(
+                PromotionTrialCatalog.FirstDeepGate - 1, tier);
         }
 
         // ---------------------------------------------------------------- 오버레이
@@ -115,13 +154,21 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 중립 런에 지수 `e`의 세계를 얹는다.
+         * @brief 중립 런에 심층 지수 `e`의 세계를 얹는다.
          *
          * `neutral`은 반드시 `Policy.NeutralizeEvolution = true`로 돌린 것이어야
-         * 한다 - 전직 배수도 보정도 없는 세계라야 오버레이가 이중으로 곱해지지
-         * 않는다.
+         * 한다 - 전직 배수도 심층 보정도 없는 세계라야 오버레이가 이중으로
+         * 곱해지지 않는다.
+         *
+         * ## 곱이 둘로 갈렸다 (2.1단계)
+         *
+         *     여유   neutral x (전 티어 배수) / (심층 몫)^e
+         *     시간   neutral 의 보스 시간 x (심층 몫)^e / (전 티어 배수)
+         *
+         * 앞의 곱은 문 여섯 전부의 배수이고 뒤의 나눗셈은 **문 다섯·여섯만**이다.
+         * 하나의 `A^(1-e)`로 쓸 수 없게 된 것이 B-1의 모양 그대로다.
          */
-        public static List<Row> Overlay(List<StageSimulation.StageResult> neutral, double exponent)
+        public static List<Row> Overlay(List<StageSimulation.StageResult> neutral, double deepExponent)
         {
             var rows = new List<Row>(neutral.Count);
             double fixedSeconds = StageSimulation.BossIntroSeconds + StageSimulation.BossWalkInSeconds;
@@ -130,15 +177,17 @@ namespace Onikiri.Tests
             {
                 var n = neutral[i];
                 int tier = TierAtStage(n.Stage);
-                double a = AttackAt[tier];
+
+                double attack = AttackAt[tier];
+                double deep = Math.Pow(DeepSteppedAtStage(n.Stage), deepExponent);
 
                 rows.Add(new Row
                 {
                     Stage = n.Stage,
-                    BossMargin = n.BossMargin * Math.Pow(a, 1d - exponent),
+                    BossMargin = n.BossMargin * attack / deep,
                     SurvivalMargin = n.SurvivalMargin,
                     StageSeconds = n.MobSeconds + fixedSeconds
-                                 + n.BossKillSeconds * Math.Pow(a, exponent - 1d),
+                                 + n.BossKillSeconds * deep / attack,
                     Tier = tier,
                     Class = BossCurve.TierOf(n.Stage)
                 });

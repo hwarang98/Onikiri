@@ -92,10 +92,40 @@ namespace Onikiri.Tests
         [Test]
         public void BatchMultiplier_DefaultsToOne()
         {
-            // static 초기값이라 씬 없이 읽힌다. PlayerPrefs를 지나 되살아난
-            // 값은 Awake에서 검증되므로(IsValid) 여기서 재는 것은 기본값이다
-            Assert.AreEqual(1, UpgradeBatchSelector.Current > 0
-                ? UpgradeBatchSelector.Current : 1);
+            /**
+             * @brief **살아 있는 static을 안 읽는다.** 규칙을 직접 잰다.
+             *
+             * 전에는 `UpgradeBatchSelector.Current`를 읽었다. 그 값은 씬이 한 번
+             * 이라도 돌면 `Awake`가 PlayerPrefs로 덮으므로, **PlayMode를 먼저
+             * 돌린 뒤 EditMode를 돌리면** 그 기기의 취향(실제로 100이었다)이
+             * 그대로 읽혀 검사가 떨어졌다 - 검사 주석이 적어 둔 "씬 없이 읽힌다"
+             * 는 전제가 그때 깨진다.
+             *
+             * 규칙을 순수 함수(`Resolve`)로 내렸으므로 이제 입력을 주고 답을
+             * 본다. 실행 순서도, 이 기기의 PlayerPrefs도 상관이 없다.
+             */
+            var chips = new[] { 1, 10, 100 };
+
+            // 저장된 것이 없을 때(호출자가 기본값을 넘긴다)
+            Assert.AreEqual(1, UpgradeBatchSelector.Resolve(
+                UpgradeBatchSelector.DefaultCount, chips),
+                "취향이 없는 사람의 배수가 1이 아니다");
+
+            // 옛 세대의 '최대'(0)와 음수는 1로 떨어진다
+            Assert.AreEqual(1, UpgradeBatchSelector.Resolve(0, chips),
+                "옛 '최대'(0)가 1로 안 떨어진다 - 첫 탭에서 골드를 통째로 쓴다");
+            Assert.AreEqual(1, UpgradeBatchSelector.Resolve(-5, chips));
+
+            // 지금 줄에 없는 배수도 1로 떨어진다
+            Assert.AreEqual(1, UpgradeBatchSelector.Resolve(50, chips),
+                "없는 배수가 고정되면 어떤 칩도 선택으로 안 보인다");
+
+            // 줄이 아직 없는 씬(전투 전용 하네스)에서는 1만 유효하다
+            Assert.AreEqual(1, UpgradeBatchSelector.Resolve(100, null));
+
+            // 유효한 취향은 그대로 살아난다 - 기본값으로 뭉개면 안 된다
+            Assert.AreEqual(10, UpgradeBatchSelector.Resolve(10, chips));
+            Assert.AreEqual(100, UpgradeBatchSelector.Resolve(100, chips));
         }
 
         // ---------------------------------------------------------------- 성장 탭 배수

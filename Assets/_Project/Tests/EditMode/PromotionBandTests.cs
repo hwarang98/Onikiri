@@ -30,7 +30,21 @@ namespace Onikiri.Tests
 
         const int Horizon = 500;
 
-        static readonly double[] Candidates = { 0.00d, 0.20d, 0.30d, 0.42d, 0.50d, 0.60d, 1.00d };
+        /**
+         * @brief **심층 지수 후보** (2.1.1단계에 아래로 넓혔다).
+         *
+         * 전역 보정은 지워졌으므로(A-1) 이 배열이 훑는 것은
+         * `StageCurve.DeepPromotionConvergenceExponent`의 후보다. 문1~4는 어떤
+         * 값에서도 안 움직이고, 갈리는 것은 문5·6과 심층 밴드뿐이다.
+         *
+         * 2.1단계에는 0.55에서 시작했고, 그래서 "0.55가 가장 낮은 통과값"이라는
+         * 결론이 **배열의 시작점 때문에** 증명되지 않은 상태였다. 아래로
+         * 넓혀 실제 하한을 찾았다 - 수학적 최소는 **0.42**이고(Affinity 시대
+         * 이득이 binding, 정확한 교차점 e ~ 0.4139), 채택값 0.55는 그보다 높다.
+         * 그 선택의 근거는 회귀 여유이고 §보고서에 있다.
+         */
+        static readonly double[] Candidates =
+            { 0.00d, 0.30d, 0.38d, 0.42d, 0.45d, 0.50d, 0.55d, 0.60d, 0.65d, 1.00d };
 
         static List<StageSimulation.StageResult> neutralLead;
         static List<StageSimulation.StageResult> neutralFloor;
@@ -52,33 +66,48 @@ namespace Onikiri.Tests
         /**
          * @brief 오버레이가 **실제 시뮬레이션과 같은 답**을 낸다.
          *
-         * 기본 정책(전직 있음, 지수 0.42)의 실측 여유를, 중립 정책에 그 정책이
-         * 실제로 가진 배수를 얹어 재현한다. 재현이 안 되면 아래 후보 비교는
-         * 전부 근거를 잃는다.
+         * 기본 정책의 실측 여유를, 중립 정책에 그 정책이 실제로 가진 배수를
+         * 얹어 재현한다. 재현이 안 되면 아래 후보 비교는 전부 근거를 잃는다.
          *
-         * 검사 구간이 st51부터인 것은 **전직 골드 도약 비용** 때문이다. st37~47
-         * 에서는 기본 정책이 누적 7.41e12 골드를 전직에 쓰고 그만큼 화력이
-         * 줄어드는데, 오버레이에는 그 항이 없다. v1.4에서 전직 비용이 0이 되면
-         * 그 구간의 어긋남도 사라진다 - 지금 재현이 안 되는 것은 모형의 결함이
-         * 아니라 **재현하려는 세계가 다르다**는 뜻이다.
+         * ## 2단계에 세계가 하나로 합쳐졌다
+         *
+         * 1.6단계에는 프로덕션이 지수 0.42였으므로 이 검사가 `A^0.58`을 얹어
+         * 재현해야 했고, st37~47에서는 **전직 골드 도약 비용**(누적 7.41e12)
+         * 때문에 재현이 안 됐다 - 그래서 검사 구간이 st51부터였다.
+         *
+         * 이제 승급이 무료라 그 항이 없고, 보정도 없어서 지수가 0이다. 즉
+         * 오버레이가 곱하는 것은 `A^1` 하나뿐이고, 그것은 시뮬레이션이 실제로
+         * 곱하는 값과 **같은 수**다. 그래서 구간을 첫 문 뒤(st31)부터로 넓혔다 -
+         * 좁혀 둘 이유였던 항이 사라졌으므로 좁혀 두면 검사가 덜 재게 된다.
+         *
+         * 남는 오차는 하나뿐이다. **생존은 목표값이라 체력 배수가 공짜로 오면
+         * 강화 레벨을 덜 사고, 아낀 골드가 화력으로 간다** - 그 되먹임이
+         * 오버레이에 없다. 아래 `SurvivalMargin_...`이 그 크기를 따로 잰다.
          */
         [Test]
         public void OverlayModel_MatchesTheSimulation()
         {
             var field = PromotionTrialFixture.FieldFromAssets();
             var actual = StageSimulation.Run(Horizon, field);
+            var overlay = PromotionBandModel.Overlay(neutralLead, PromotionBandModel.RecommendedExponent);
 
-            for (int stage = 51; stage <= 200; stage++)
+            for (int stage = 31; stage <= 200; stage++)
             {
                 var a = actual[stage - 1];
-                var n = neutralLead[stage - 1];
-
-                // 그 스테이지에서 기본 정책이 실제로 가진 배수로 오버레이한다
-                double predicted = n.BossMargin
-                    * System.Math.Pow(a.EvolutionAttack, 1d - StageCurve.EvolutionMarginExponent);
+                double predicted = overlay[stage - 1].BossMargin;
                 double error = predicted / a.BossMargin;
 
-                Assert.That(error, Is.InRange(0.95d, 1.02d), string.Format(
+                // 오버레이가 실제로 그 스테이지의 배수를 쓰고 있는지부터 본다.
+                // 티어가 어긋난 채 비만 맞으면 아무것도 못 재는 검사가 된다
+                Assert.AreEqual(a.EvolutionTier, overlay[stage - 1].Tier, string.Format(
+                    "stage {0}: 오버레이 티어 {1}, 실측 {2} - 게이트 표가 두 벌이 됐다",
+                    stage, overlay[stage - 1].Tier, a.EvolutionTier));
+
+                // 실측 오차가 st31~200에서 **1.0000**이다. 지수가 0이라
+                // 오버레이가 곱하는 것과 시뮬레이션이 곱하는 것이 같은
+                // 수이기 때문이고, 그래서 자를 0.95~1.02에서 조였다 -
+                // 느슨하게 두면 되먹임이 새로 생겨도 안 잡힌다
+                Assert.That(error, Is.InRange(0.995d, 1.005d), string.Format(
                     "stage {0}: 오버레이 예측 {1:F3}, 실측 {2:F3} (비 {3:F4}). "
                     + "모형이 시뮬레이션을 재현하지 못하면 지수 후보 비교가 근거를 잃는다",
                     stage, predicted, a.BossMargin, error));
@@ -86,11 +115,22 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 생존 여유는 **목표값이라 배수에 반응하지 않는다.**
+         * @brief 생존 여유는 **거의 목표값이다** - 체력 배수를 대부분 되먹는다.
          *
-         * 생존 루프가 `EffectiveHealth >= 보스 피해 x 1.15`까지만 사기 때문이다.
-         * 이것이 성립하지 않으면 오버레이가 생존을 "그대로" 두는 것이 틀린
-         * 가정이 되고, 지수 후보의 생존 판정이 전부 흔들린다.
+         * 생존 루프가 `EffectiveHealth >= 보스 피해 x 1.15`까지만 사므로, 체력
+         * 배수가 공짜로 와도 강화 레벨을 덜 사서 같은 목표에 닿는다. 그것이
+         * 오버레이가 생존을 "그대로" 두는 근거다.
+         *
+         * ## 2단계에 자를 넓혔다 - 배수가 **계단**이 됐기 때문이다
+         *
+         * 1.6단계에는 비가 0.97~1.03이었다. 그때 티어는 2스테이지에 한 칸씩
+         * 올라 되먹임이 매끄럽게 따라갈 수 있었다. 이제 티어는 문에서만
+         * 오르므로 체력 배수가 st101에서 x1.10 계단으로 뛰고, 그 직후 구간은
+         * **아직 되먹이기 전**이다 - 실측 최대 1.1000이 정확히 한 칸(x1.10)이고
+         * 자리도 문 직후(st152)다.
+         *
+         * 방향이 안전한 쪽이라는 것이 중요하다. 오버레이는 생존을 **과소평가**
+         * 하므로(실제가 더 여유롭다) 바닥 계약이 이 오차로 뚫릴 수 없다.
          */
         [Test]
         public void SurvivalMargin_DoesNotRespondToTheEvolutionMultiplier()
@@ -98,11 +138,14 @@ namespace Onikiri.Tests
             var field = PromotionTrialFixture.FieldFromAssets();
             var actual = StageSimulation.Run(Horizon, field);
 
-            for (int stage = 51; stage <= 200; stage++)
+            for (int stage = 31; stage <= 200; stage++)
             {
                 double ratio = actual[stage - 1].SurvivalMargin / neutralLead[stage - 1].SurvivalMargin;
 
-                Assert.That(ratio, Is.InRange(0.97d, 1.03d), string.Format(
+                // 상한이 체력 스텝 하나(x1.10)에 눈금 2%를 얹은 값이다.
+                // 두 칸이 쌓이면(x1.21) 여기서 걸린다 - 그것은 되먹임이
+                // 실제로 멈췄다는 뜻이고, 오버레이를 다시 세워야 한다
+                Assert.That(ratio, Is.InRange(0.98d, 1.12d), string.Format(
                     "stage {0}: 전직 체력 배수 x{1:F3}인데 생존 여유 비가 {2:F4}다. "
                     + "생존이 목표값이 아니라 파생값이면 오버레이 모형을 다시 세워야 한다",
                     stage, actual[stage - 1].EvolutionHealth, ratio));
@@ -132,8 +175,16 @@ namespace Onikiri.Tests
             }
 
             foreach (var e in Candidates)
-                Assert.AreEqual(1d, System.Math.Pow(PromotionBandModel.AttackMultiplierAtStage(30), 1d - e), 0d,
-                    "지수 " + e + "에서 코리더 보정이 1이 아니다");
+            {
+                Assert.AreEqual(1d, PromotionBandModel.DeepSteppedAtStage(30), 0d,
+                    "코리더에 심층 게이트가 새어 들어왔다");
+
+                // 프로덕션 경로도 같은 답을 낸다. 모형만 1이고 곡선이 아니면
+                // 코리더 비트 불변이 검사되지 않은 채로 통과한다
+                for (int stage = 1; stage <= 30; stage++)
+                    Assert.AreEqual(1d, StageCurve.DeepPromotionCompensation(stage), 0d,
+                        string.Format("stage {0}: 코리더에 심층 보정이 걸렸다 (지수 {1})", stage, e));
+            }
         }
 
         /**

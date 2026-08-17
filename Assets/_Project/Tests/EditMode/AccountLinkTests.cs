@@ -472,12 +472,13 @@ namespace Onikiri.Tests
         [Test]
         public void LinkingAddsNoSaveField()
         {
-            Assert.AreEqual(20, SaveData.CurrentVersion,
+            Assert.AreEqual(21, SaveData.CurrentVersion,
                 "세이브 버전이 올랐다 - 계정 연동은 새 필드를 만들지 않기로 했다. "
                 + "다른 이유로 올랐다면 이 검사를 함께 고칠 것");
             // v20은 15종 재설계가 올렸다(★5 하드 천장 · 온보딩 10연 · 첫 장착).
-            // 계정 연동은 그 셋 중 아무것도 안 만들었으므로 이 검사의 주장은
-            // 그대로다 - 바뀐 것은 비교하는 숫자뿐이다
+            // v21은 승급 재설계가 올렸고 **신규 필드가 없다** - `evolutionTier`의
+            // 뜻만 바뀌었다. 계정 연동은 그 어느 것도 안 만들었으므로 이 검사의
+            // 주장은 그대로다 - 바뀐 것은 비교하는 숫자뿐이다
         }
 
         /**

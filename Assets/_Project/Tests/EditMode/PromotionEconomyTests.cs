@@ -49,6 +49,21 @@ namespace Onikiri.Tests
                     string.Format("stage {0}: 구운 진행 보석 {1}, 실측 {2}",
                         i + 1, PromotionEconomyFixture.ProgressionGems[i], rows[i].GemsEarned));
 
+            // **전투 시간도 함께 잰다.** 1.6단계에는 보석만 봤고, 그래서 2단계에
+            // 곡선이 움직였을 때 누적 시간표가 14% 어긋난 채로 도달일 계약이
+            // 전부 초록이었다. 도달일의 분자가 이 표이므로 여기가 안 잡히면
+            // 장부는 옛 세계의 날짜를 낸다
+            double cumulative = 0d;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                cumulative += rows[i].MobSeconds + StageSimulation.BossIntroSeconds
+                            + StageSimulation.BossWalkInSeconds + rows[i].BossKillSeconds;
+
+                Assert.AreEqual(PromotionEconomyFixture.CumulativeSeconds[i], cumulative, 0.05d,
+                    string.Format("stage {0}: 구운 누적 전투 시간 {1:F1}초, 실측 {2:F1}초",
+                        i + 1, PromotionEconomyFixture.CumulativeSeconds[i], cumulative));
+            }
+
             Assert.AreEqual(1060, 2 * Sum(PromotionEconomyFixture.GradeCosts),
                 "장비 등급업 보석 총합이 바뀌었다 (EquipmentCurve.GradeGems)");
             Assert.AreEqual(PetCatalog.TotalUnlockGems, Sum(PromotionEconomyFixture.PetCosts),
@@ -171,7 +186,7 @@ namespace Onikiri.Tests
                 expected += PromotionEconomyFixture.TrialSecondsFloor[g] + overhead;
 
             Assert.AreEqual(expected, withTrial.TrialSecondsTotal, 1e-9d,
-                "귀문 총 시간이 전투 + 오버헤드의 합과 다르다");
+                "귀문 총 시간이 전투 + 오버헤드의 합과 다르다 (1회 통과라 실패 항이 0이다)");
 
             // 최전선이 실제로 밀린다 - 시간이 장부에 들어갔다는 증거
             bool shifted = false;
@@ -215,6 +230,151 @@ namespace Onikiri.Tests
 
             Assert.Greater(slow.FarmSecondsTotal, 0d, "파밍 시간이 집계되지 않았다");
             Assert.Greater(slow.FarmedGold, 0d, "파밍 골드가 집계되지 않았다");
+        }
+
+        /**
+         * @brief 재도전 시간이 **실패 시간으로 계산된다.** 2단계에 고친 자리다.
+         *
+         * ## 옛 식이 무엇을 틀렸는가
+         *
+         *     (성공 + 오버헤드) x 횟수          <- 1.5회를 "45초짜리 1.5번"으로 읽는다
+         *
+         * 실제 1.5회는 **실패 0.5번 + 성공 1번**이고, 실패는 격노를 지나 죽으므로
+         * 90~99초다. 성공의 두 배가 넘는다 - 옛 식은 재도전 비용을 과소평가했고,
+         * 그 낙관 위에서 도달일과 게이트 배치를 판단하면 두 번 틀린다.
+         *
+         * 이 검사는 셋을 함께 잰다: 새 식이 옛 식보다 **크다**, 그 차이가
+         * 정확히 `(횟수-1) x (실패 - 성공)`이다, 그리고 1회 통과에서는 두 식이
+         * 같은 답을 낸다(고친 식이 기존 계약을 안 흔든다).
+         */
+        [Test]
+        public void RetryCost_UsesFailureSeconds_NotAMultipleOfSuccess()
+        {
+            const double attempts = 1.5d;
+
+            var input = PromotionEconomyFixture.Build(
+                PromotionEconomyFixture.FreePromotion, 0.40d, Horizon,
+                PromotionEconomyFixture.DailyGems, PromotionEconomyFixture.DailyPlaySeconds,
+                PromotionEconomyFixture.TrialSecondsFloor, attempts, PromotionEconomyFixture.NoFarm);
+
+            double overhead = PromotionEconomyFixture.TrialEntrySeconds
+                            + PromotionEconomyFixture.TrialResultSeconds
+                            + PromotionEconomyFixture.TrialReturnSeconds;
+
+            for (int g = 0; g < PromotionTrialCatalog.GateCount; g++)
+            {
+                double success = PromotionEconomyFixture.TrialSecondsFloor[g];
+                double failure = PromotionEconomyFixture.TrialFailureSecondsFloor[g];
+
+                double corrected = PromotionEconomyLedger.TrialSecondsForGate(input, g);
+                double oldModel = (success + overhead) * attempts;
+
+                Assert.AreEqual(success + (attempts - 1d) * failure + attempts * overhead,
+                    corrected, 1e-9d, string.Format("문{0}: 고친 식이 정의와 다르다", g + 1));
+
+                Assert.Greater(corrected, oldModel, string.Format(
+                    "문{0}: 고친 식 {1:F1}초가 옛 식 {2:F1}초보다 작다 - 실패가 성공보다 "
+                    + "짧다는 뜻이고, 그러면 격노가 아무 일도 안 하고 있다",
+                    g + 1, corrected, oldModel));
+            }
+
+            // 1회 통과에서는 두 식이 같다. 고친 식이 기존 계약을 안 흔든다
+            var once = PromotionEconomyFixture.Build(
+                PromotionEconomyFixture.FreePromotion, 0.40d, Horizon);
+
+            for (int g = 0; g < PromotionTrialCatalog.GateCount; g++)
+                Assert.AreEqual(PromotionEconomyFixture.TrialSecondsFloor[g] + overhead,
+                    PromotionEconomyLedger.TrialSecondsForGate(once, g), 1e-9d,
+                    string.Format("문{0}: 1회 통과인데 실패 항이 새어 들어왔다", g + 1));
+        }
+
+        /**
+         * @brief 재도전 교정이 **도달일을 실제로 뒤로 민다.**
+         *
+         * 위 검사는 식을 재고 이것은 결과를 잰다. 식만 고치고 장부가 그 식을
+         * 안 쓰면 아무것도 안 바뀐다 - "상수의 존재는 연결의 증거가 아니다".
+         */
+        [Test]
+        public void RetryCorrection_PushesTheReachDatesBack()
+        {
+            var input = PromotionEconomyFixture.Build(
+                PromotionEconomyFixture.FreePromotion, 0.40d, Horizon,
+                PromotionEconomyFixture.DailyGems, PromotionEconomyFixture.DailyPlaySeconds,
+                PromotionEconomyFixture.TrialSecondsFloor, 1.5d, PromotionEconomyFixture.NoFarm);
+
+            // 실패 시간을 안 준 세계 = 옛 곱하기 모형과 같은 답
+            var oldModel = input;
+            oldModel.TrialFailureSecondsByGate = PromotionEconomyFixture.TrialSecondsFloor;
+
+            var corrected = PromotionEconomyLedger.Run(input);
+            var optimistic = PromotionEconomyLedger.Run(oldModel);
+
+            Assert.Greater(corrected.TrialSecondsTotal, optimistic.TrialSecondsTotal, string.Format(
+                "교정 {0:F0}초가 낙관 {1:F0}초보다 크지 않다",
+                corrected.TrialSecondsTotal, optimistic.TrialSecondsTotal));
+
+            bool pushed = false;
+            for (int day = 1; day <= 60; day++)
+            {
+                Assert.LessOrEqual(corrected.StageOnDay[day], optimistic.StageOnDay[day], string.Format(
+                    "{0}일차: 실패 시간을 넣었는데 최전선이 앞섰다", day));
+                if (corrected.StageOnDay[day] < optimistic.StageOnDay[day]) pushed = true;
+            }
+
+            Assert.IsTrue(pushed,
+                "교정이 어느 날에도 최전선을 안 밀었다 - 장부가 새 항을 안 쓰고 있다");
+        }
+
+        /**
+         * @brief 파밍 민감도는 **문1에만** 넣는다. 0.50배 세계의 실제 모양이다.
+         *
+         * 하한의 0.50배는 문1에서만 실패한다
+         * (`PromotionTrialTests.HalfPowerFloor_OnlyFailsAtTheFirstGate`).
+         * 여섯 문에 일괄로 파밍을 넣으면 그 세계보다 다섯 배 비관적인 표가
+         * 나오고, 그 표로 도달일을 판단하면 게이트 배치를 필요 없이 흔든다.
+         */
+        [Test]
+        public void FarmingSensitivity_IsAppliedOnlyWhereThePlayerActuallyFails()
+        {
+            foreach (var minutes in new[] { 5d, 10d })
+            {
+                double seconds = minutes * 60d;
+
+                var gateOne = PromotionEconomyLedger.Run(
+                    PromotionEconomyFixture.BuildWithFarm(
+                        PromotionEconomyFixture.FarmAtGateOne(seconds), 1d, Horizon));
+                var uniform = PromotionEconomyLedger.Run(
+                    PromotionEconomyFixture.BuildWithFarm(
+                        PromotionEconomyFixture.UniformFarm(seconds), 1d, Horizon));
+                var none = PromotionEconomyLedger.Run(
+                    PromotionEconomyFixture.BuildWithFarm(
+                        PromotionEconomyFixture.NoFarm, 1d, Horizon));
+
+                Assert.AreEqual(seconds, gateOne.FarmSecondsTotal, 1e-9d,
+                    "문1 파밍 시간이 한 문 몫이 아니다");
+                Assert.AreEqual(seconds * PromotionTrialCatalog.GateCount, uniform.FarmSecondsTotal, 1e-9d,
+                    "균일 파밍이 여섯 문 몫이 아니다");
+
+                // 세 세계의 st150 도달일이 순서대로다 - 민감도 표가 실제로
+                // 다른 세계를 재고 있다는 증거
+                int noneDay = DayReaching(none, 150);
+                int gateOneDay = DayReaching(gateOne, 150);
+                int uniformDay = DayReaching(uniform, 150);
+
+                Assert.LessOrEqual(noneDay, gateOneDay, string.Format(
+                    "파밍 {0}분: 파밍 0이 문1 파밍보다 늦다 ({1}일 대 {2}일)",
+                    minutes, noneDay, gateOneDay));
+                Assert.Less(gateOneDay, uniformDay, string.Format(
+                    "파밍 {0}분: 문1만({1}일)과 여섯 문 일괄({2}일)이 같은 답을 낸다 - "
+                    + "그러면 민감도 표를 나눌 이유가 없다", minutes, gateOneDay, uniformDay));
+            }
+        }
+
+        static int DayReaching(PromotionEconomyLedger.Result result, int stage)
+        {
+            for (int day = 1; day < result.StageOnDay.Length; day++)
+                if (result.StageOnDay[day] >= stage) return day;
+            return int.MaxValue;
         }
 
         /**

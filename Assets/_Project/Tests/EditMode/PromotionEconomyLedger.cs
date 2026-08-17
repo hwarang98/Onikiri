@@ -99,8 +99,29 @@ namespace Onikiri.Tests
             /** 전직 패널 복귀(초) */
             public double TrialReturnSeconds;
 
-            /** 평균 도전 횟수. 1.0이면 첫 시도 통과 */
+            /**
+             * @brief 평균 도전 횟수. 1.0이면 첫 시도 통과.
+             *
+             * **성공 시간에 곱하지 않는다.** 1.5회는 "45초짜리를 1.5번" 이
+             * 아니라 "실패 0.5번 + 성공 1번"이고, 실패는 성공보다 두 배 넘게
+             * 걸린다(격노를 지나 죽거나 폐쇄에 닿는다). 곱으로 치면 재도전
+             * 비용이 절반 이하로 과소평가된다 - 2단계에 고친 자리다.
+             */
             public double TrialAttempts;
+
+            /**
+             * @brief 실패한 시도 하나의 시간(초). 게이트별 **실측**이다.
+             *
+             * 성공은 45초에 끝나지만 실패는 그 자리에서 끝나지 않는다 -
+             * 화력이 모자라면 격노(90초)를 지나 죽거나 폐쇄(180초)에 닿는다.
+             * 실측 범위가 90~108초라 성공의 두 배가 넘고, 그래서 이 항이
+             * 없으면 재도전이 있는 세계의 도달일이 통째로 낙관이 된다.
+             *
+             * 비어 있으면 성공 시간으로 대신한다 - 옛 계약(곱하기 모형)과
+             * 같은 답을 내므로, 이 항을 안 채운 호출자가 조용히 다른 세계를
+             * 재는 일이 없다.
+             */
+            public double[] TrialFailureSecondsByGate;
 
             /**
              * @brief 게이트에서 못 넘어 반복 파밍한 시간(초).
@@ -329,12 +350,9 @@ namespace Onikiri.Tests
             // ------------------------------------------------------------ 귀문 시간 보고
             if (input.TrialSecondsByGate != null)
             {
-                double overhead = input.TrialEntrySeconds + input.TrialResultSeconds + input.TrialReturnSeconds;
-                double attempts = input.TrialAttempts > 0d ? input.TrialAttempts : 1d;
-
                 for (int g = 0; g < input.TrialSecondsByGate.Length; g++)
                 {
-                    result.TrialSecondsTotal += (input.TrialSecondsByGate[g] + overhead) * attempts;
+                    result.TrialSecondsTotal += TrialSecondsForGate(input, g);
 
                     if (input.GateFarmSeconds != null && g < input.GateFarmSeconds.Length)
                     {
@@ -367,6 +385,46 @@ namespace Onikiri.Tests
         // ---------------------------------------------------------------- 보조
 
         /**
+         * @brief 이 문 하나에 실제로 들어가는 시간(초). **2단계에 고친 식이다.**
+         *
+         * ## 옛 식이 무엇을 틀렸는가
+         *
+         *     (성공 시간 + 오버헤드) x 도전 횟수          <- 틀림
+         *
+         * `TrialAttempts = 1.5`를 성공 시간에 곱하면 "45초짜리를 1.5번"이 되어
+         * 67.5초가 나온다. 실제로는 **실패 0.5번 + 성공 1번**이고, 실패는
+         * 격노를 지나 죽거나 폐쇄에 닿으므로 90~108초다. 같은 1.5회가
+         * 45 + 0.5 x 99 = 94.5초여서, 옛 식은 재도전 비용을 30% 넘게
+         * 과소평가했다.
+         *
+         * ## 고친 식
+         *
+         *     전투     = 성공 시간 + max(0, 횟수 - 1) x 실패 시간
+         *     오버헤드 = 횟수 x (진입 + 결과 + 복귀)
+         *
+         * 오버헤드에 횟수를 곱하는 것은 옛 식과 같다 - **실패한 시도도 진입
+         * 연출과 결과 화면을 지난다.** 그 항만은 원래 맞았다.
+         */
+        public static double TrialSecondsForGate(Inputs input, int gateIndex)
+        {
+            if (input.TrialSecondsByGate == null) return 0d;
+            if (gateIndex < 0 || gateIndex >= input.TrialSecondsByGate.Length) return 0d;
+
+            double attempts = input.TrialAttempts > 0d ? input.TrialAttempts : 1d;
+            double overhead = input.TrialEntrySeconds + input.TrialResultSeconds + input.TrialReturnSeconds;
+
+            double success = input.TrialSecondsByGate[gateIndex];
+            double failure = input.TrialFailureSecondsByGate != null
+                          && gateIndex < input.TrialFailureSecondsByGate.Length
+                ? input.TrialFailureSecondsByGate[gateIndex]
+                : success;
+
+            return success
+                 + Math.Max(0d, attempts - 1d) * failure
+                 + attempts * overhead;
+        }
+
+        /**
          * @brief 이 스테이지에 **닿기 위해** 지불한 귀문 시간의 합.
          *
          * 귀문은 게이트 스테이지를 클리어한 뒤 다음 스테이지로 넘어갈 때
@@ -377,15 +435,12 @@ namespace Onikiri.Tests
         {
             if (input.TrialSecondsByGate == null) return 0d;
 
-            double overhead = input.TrialEntrySeconds + input.TrialResultSeconds + input.TrialReturnSeconds;
-            double attempts = input.TrialAttempts > 0d ? input.TrialAttempts : 1d;
-
             double total = 0d;
             for (int g = 0; g < input.TrialSecondsByGate.Length; g++)
             {
                 if (input.PromotionGateStage[g] >= stage) continue;
 
-                total += (input.TrialSecondsByGate[g] + overhead) * attempts;
+                total += TrialSecondsForGate(input, g);
                 if (input.GateFarmSeconds != null && g < input.GateFarmSeconds.Length)
                     total += input.GateFarmSeconds[g];
             }

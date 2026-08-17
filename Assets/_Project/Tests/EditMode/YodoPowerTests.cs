@@ -631,7 +631,7 @@ namespace Onikiri.Tests
          * 위에 몇 겹이 쌓였는가"다.
          */
         [Test]
-        public void YodoPowerNeutralized_ReproducesTheStep44World()
+        public void YodoPowerNeutralized_ReproducesCurrentPreYodoPowerBaseline()
         {
             var field = Field();
             // 49단계: **4번 슬롯도 걷어낸다.** 이 세계의 정의가 "44단계를 재현한다"인데
@@ -652,24 +652,110 @@ namespace Onikiri.Tests
                 Assert.AreEqual(full[i].BossMargin, pay[i].BossMargin, 1e-12d,
                     "stage " + (i + 1) + ": 상성·영체 또는 뽑기가 조율 구간을 움직였다");
 
+            // ---- 밴드 여섯. **승급 재설계 2.1.1단계에 다시 구웠다**
+            //
+            //            옛 (44단계 세계)        새 (지금 세계)
+            //   일반     천장 12.10 바닥 1.81    천장 13.0425 바닥 2.6977
+            //   챕터     천장  8.72 바닥 1.49    천장  9.4127 바닥 2.2190
+            //   피날레   천장  6.91 바닥 1.21    천장  7.4271 바닥 1.8241
+            //
+            // 천장이 오르고 바닥이 **더 크게** 올랐다. 게이트 무료 티어가 이
+            // 세계에도 그대로 들어오기 때문이다(승급은 상성·영체 축이 아니다) -
+            // 무과금이 여섯 티어를 전부 받으면서 f2p 바닥이 통째로 떴다.
+            //
+            // ---- 다시 굽기 전에 정책 확장을 먼저 시도했고, 채택하지 않았다
+            //
+            // `NeutralizeEvolution = true`를 더하면 옛 천장·바닥은 **통과한다.**
+            // 그런데 두 가지가 걸렸다:
+            //
+            //   1. 통과가 x0.62로 헐렁하다. 일반 천장 실측이 7.69로 옛 앵커
+            //      12.10보다 38% 아래다 - 44단계를 재현한 것이 아니라 그보다
+            //      훨씬 약한 세계가 우연히 옛 상한 밑에 들어온 것이다.
+            //      그 상태의 상한은 아무것도 안 막는다
+            //   2. 위의 조율 구간 동일성(1e-12)이 깨진다. 비교 대상인 기본
+            //      정책에는 티어가 있고 이쪽에는 없어서 st31~50이 0.576까지
+            //      벌어진다 - 그것을 맞추려면 비교 대상도 함께 중립화해야 하고,
+            //      그러면 이 검사가 재는 세계가 "지금 세계"에서 더 멀어진다
+            //
+            // 그래서 정책은 그대로 두고(지금 세계 - 상성·영체·뽑기·슬롯) 기준을
+            // 다시 구웠다. 조율 구간 동일성이 **현재 정책에서 여전히 정확히 0**
+            // 이라는 사실이 그 선택의 근거다(위 루프).
+            //
+            // ---- 이 검사가 재는 세계가 바뀌었다
+            //
+            //   옛 뜻   "44단계 세계를 재현한다"
+            //   새 뜻   "**지금 세계에서 상성·영체만 걷어낸 기준선**을 재현한다"
+            //
+            // ---- 기준 산출 정책 / 헤드룸 / 무엇이 이 검사를 깨야 하는가
+            //
+            //   정책      NeutralizeYodoPower + SkipGacha + SkipSkillSlot.
+            //             승급은 **안** 걷는다 - "지금 세계"의 일부이기 때문이다
+            //   헤드룸    천장 x1.02 / 바닥 x0.98. 옛 판의 자를 그대로 쓴다
+            //   깨야 함   상성·영체가 이 세계로 새어 들어오는 변경, 승급 게이트
+            //             표·티어 스텝 변경, 심층 보정(B-1) 변경, 요도 티어 곡선 변경
+            //   안 깨야 함 상성·영체 **자신**의 크기 변경 - 그쪽은 죽은 버튼 검사
+            //             둘(Affinity/SpiritSummon)이 재고, 이 검사는 중립 세계만 본다
+            const double CeilingHeadroom = 1.02d;
+            const double FloorHeadroom = 0.98d;
+
             for (int i = 56 - 1; i < 200; i++)
             {
                 var tier = BossCurve.TierOf(pay[i].Stage);
 
-                double ceiling = tier == BossCurve.Tier.Finale ? 6.91d * 1.02d
-                               : tier == BossCurve.Tier.Chapter ? 8.72d * 1.02d
-                               : 12.10d * 1.02d;
-                double floor = tier == BossCurve.Tier.Finale ? 1.21d * 0.98d
-                             : tier == BossCurve.Tier.Chapter ? 1.49d * 0.98d
-                             : 1.81d * 0.98d;
+                double ceiling = (tier == BossCurve.Tier.Finale ? 7.4271d
+                                : tier == BossCurve.Tier.Chapter ? 9.4127d
+                                : 13.0425d) * CeilingHeadroom;
+                double floor = (tier == BossCurve.Tier.Finale ? 1.8241d
+                              : tier == BossCurve.Tier.Chapter ? 2.2190d
+                              : 2.6977d) * FloorHeadroom;
 
                 Assert.LessOrEqual(pay[i].BossMargin, ceiling, string.Format(
-                    "stage {0}: 무력화 세계의 천장 {1:F2} - 44단계 재현이 깨졌다",
+                    "stage {0}: 무력화 세계의 천장 {1:F2} - pre-yodoPower 기준선이 깨졌다",
                     pay[i].Stage, pay[i].BossMargin));
                 Assert.GreaterOrEqual(f2p[i].BossMargin, floor, string.Format(
-                    "stage {0}: 무력화 세계의 f2p 바닥 {1:F2} - 44단계 재현이 깨졌다",
+                    "stage {0}: 무력화 세계의 f2p 바닥 {1:F2} - pre-yodoPower 기준선이 깨졌다",
                     f2p[i].Stage, f2p[i].BossMargin));
             }
+        }
+
+        /**
+         * @brief **민감도 검사** - 위 기준선이 장식이 아니라는 증거.
+         *
+         * `NeutralizeYodoPower`를 빼면 그 기준선을 **재현하지 못해야** 한다.
+         * 못 하면 그 플래그가 아무 일도 안 하고 있다는 뜻이고, 위 검사는
+         * 상성·영체와 무관한 무언가를 재고 있었던 것이 된다.
+         *
+         * 죽은 버튼 검사 둘(`Affinity_IsNotADeadButton` ·
+         * `SpiritSummon_IsNotADeadButton`)이 축의 **크기**를 재고, 이 검사는
+         * 축이 중립 세계에서 실제로 빠졌는지를 잰다 - 두 자가 다른 것을 본다.
+         */
+        [Test]
+        public void PreYodoPowerBaseline_IsActuallySensitiveToTheNeutralizeFlag()
+        {
+            var field = Field();
+
+            var open = StageSimulation.Run(200, field,
+                new StageSimulation.Policy { SkipGacha = true, SkipSkillSlot = true });
+
+            bool broke = false;
+            double worst = 0d; int worstStage = 0;
+
+            for (int i = 56 - 1; i < 200; i++)
+            {
+                var tier = BossCurve.TierOf(open[i].Stage);
+                double ceiling = (tier == BossCurve.Tier.Finale ? 7.4271d
+                                : tier == BossCurve.Tier.Chapter ? 9.4127d
+                                : 13.0425d) * 1.02d;
+
+                double over = open[i].BossMargin / ceiling;
+                if (over > worst) { worst = over; worstStage = open[i].Stage; }
+                if (open[i].BossMargin > ceiling) broke = true;
+            }
+
+            Assert.IsTrue(broke, string.Format(
+                "NeutralizeYodoPower를 빼도 pre-yodoPower 천장 안에 들어온다 "
+                + "(최악 비 {0:F4} @st{1}) - 그 플래그가 아무 일도 안 하거나, "
+                + "위 검사가 상성·영체를 안 재고 있다", worst, worstStage));
         }
 
         /**

@@ -627,6 +627,332 @@ namespace Onikiri.EditorTools
             challenge.SetActive(false);
             fightHud.SetActive(false);
             result.SetActive(false);
+
+            BuildTrialHud(fight, band, safeArea, font);
+        }
+
+        /**
+         * @brief 귀문 HUD만 다시 세운다. **전체 전투 빌드와 독립된 진입점이다.**
+         *
+         * `Build Combat Content`는 VFX 베이커까지 함께 도는데, 그쪽이 서드파티
+         * 텍스처의 meta 잠금으로 실패하면 **HUD 배선에 도달하기 전에 중단된다**
+         * (실제로 그랬다). 귀문 HUD는 그 베이커와 아무 관계가 없으므로 따로
+         * 돌 수 있어야 한다.
+         *
+         * 빌더가 멱등이라 몇 번을 돌려도 같은 결과다(`Replace`가 중복을 치운다).
+         */
+        [MenuItem("Onikiri/Scene/Build Trial Hud")]
+        public static void BuildTrialHudOnly()
+        {
+            var fight = Object.FindFirstObjectByType<BossFight>();
+            if (fight == null)
+            {
+                Debug.LogError("[Onikiri] 씬에 BossFight가 없다 - 귀문 HUD를 세울 수 없다.");
+                return;
+            }
+
+            var safeArea = UpgradePanelBuilder.EnsureSafeArea();
+            var band = MainSceneBuilder.FindBand("BattleArea");
+            if (safeArea == null || band == null)
+            {
+                Debug.LogError("[Onikiri] SafeArea/BattleArea가 없어 귀문 HUD를 세울 수 없다.");
+                return;
+            }
+
+            BuildTrialHud(fight, band, safeArea,
+                AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath));
+
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
+
+            Debug.Log("[Onikiri] Trial HUD built and wired.");
+        }
+
+        /**
+         * @brief 귀문(승급전) HUD를 씬에 세우고 배선한다. **3단계 신규.**
+         *
+         * ## 왜 `BossHud`에 얹지 않았는가
+         *
+         * 그쪽은 "제한 시간 30초 · 보스 하나 · 클리어 보너스"를 그리는 화면이고
+         * 귀문은 셋이 전부 다르다(폐쇄 180초 · 적 셋 · 보상 없음). 같은
+         * 컴포넌트에 두 세계를 넣으면 모든 줄이 `if (trial)`로 갈리고, 그 분기가
+         * 늘어날수록 어느 쪽도 안 읽히는 화면이 된다.
+         *
+         * ## 전투를 가리지 않는다
+         *
+         * 상단에 얇은 띠 하나가 전부다. 3연전은 세 번의 전투라 중앙 대형 패널이
+         * 떠 있으면 그 셋을 볼 수가 없다 - 결과(승리·실패)만 잠깐 가운데에 뜬다.
+         *
+         * 띠는 도전 버튼·보스 체력 바와 **같은 슬롯**(밴드 위쪽)을 쓴다. 셋은
+         * 배타적이므로 겹칠 일이 없고, "보스에 관한 것은 여기 뜬다"가 한 자리로
+         * 유지된다.
+         */
+        private static void BuildTrialHud(BossFight fight, Transform band, Transform safeArea,
+                                          TMP_FontAsset font)
+        {
+            Replace(band, "TrialBanner");
+            Replace(band, "TrialTransition");
+            Replace(safeArea, "TrialNotice");
+            Replace(safeArea, "TrialResult");
+
+            // --- 상단 띠: 문 이름 · 진행 · 시계 · 격노
+            var banner = new GameObject("TrialBanner", typeof(RectTransform));
+            banner.transform.SetParent(band, false);
+            var bannerRect = (RectTransform)banner.transform;
+            bannerRect.anchorMin = bannerRect.anchorMax = new Vector2(0.5f, 1f);
+            bannerRect.pivot = new Vector2(0.5f, 1f);
+            bannerRect.sizeDelta = new Vector2(760f, 96f);
+            bannerRect.anchoredPosition = new Vector2(0f, -24f);
+
+            var bannerImage = banner.AddComponent<Image>();
+            UiSkin.ApplyPanel(bannerImage, UiSkin.Panel, UiSkin.Danger);
+            // 반투명이다. 띠 뒤에서 전투가 계속 보여야 한다
+            bannerImage.color = new Color(bannerImage.color.r, bannerImage.color.g,
+                                          bannerImage.color.b, 0.72f);
+            bannerImage.raycastTarget = false;
+
+            /**
+             * @brief 띠 안이 두 층이 된다 (4단계 §2).
+             *
+             * ```
+             * 위 (0.34~1)   일문 · 귀문      1/3       180초
+             * 아래 (0~0.30) [======체력 바======]  87%
+             * ```
+             *
+             * 새 패널을 만들지 않고 **같은 띠를 늘린다** - 3연전은 180초를 쓰는
+             * 전투라 화면이 덮이면 그 셋을 볼 수가 없다.
+             */
+            const float TextFloor = 0.34f;
+
+            var gateLabel = CreateLabel(banner.transform, font, "Gate",
+                                        PixelFontSizesSmall, TextAlignmentOptions.Left);
+            var gateRect = (RectTransform)gateLabel.transform;
+            gateRect.anchorMin = new Vector2(0f, TextFloor);
+            gateRect.anchorMax = new Vector2(0.42f, 1f);
+            gateRect.offsetMin = new Vector2(24f, 0f);
+            gateRect.offsetMax = Vector2.zero;
+            gateLabel.text = "일문 · 귀문";
+
+            var foeLabel = CreateLabel(banner.transform, font, "Foe",
+                                       PixelFontSizesSmall, TextAlignmentOptions.Center);
+            var foeRect = (RectTransform)foeLabel.transform;
+            foeRect.anchorMin = new Vector2(0.42f, TextFloor);
+            foeRect.anchorMax = new Vector2(0.62f, 1f);
+            foeRect.offsetMin = foeRect.offsetMax = Vector2.zero;
+            foeLabel.text = "1/3";
+
+            var clockLabel = CreateLabel(banner.transform, font, "Clock",
+                                         PixelFontSizesSmall, TextAlignmentOptions.Right);
+            var clockRect = (RectTransform)clockLabel.transform;
+            clockRect.anchorMin = new Vector2(0.62f, TextFloor);
+            clockRect.anchorMax = new Vector2(1f, 1f);
+            clockRect.offsetMin = Vector2.zero;
+            clockRect.offsetMax = new Vector2(-24f, 0f);
+            clockLabel.text = "180초";
+
+            // --- 적 체력: 띠 아랫단. 바 + 백분율 한 칸
+            // 이름이 "Health"가 아니라 "TrialHealth"인 것은 검사 때문이다 -
+            // 씬에 "Health"라는 이름은 여럿 있을 수 있고, 중복 검사가 그것을
+            // 세면 무엇을 재는지 알 수 없게 된다
+            var health = new GameObject("TrialHealth", typeof(RectTransform));
+            health.transform.SetParent(banner.transform, false);
+            var healthRect = (RectTransform)health.transform;
+            healthRect.anchorMin = new Vector2(0f, 0f);
+            healthRect.anchorMax = new Vector2(1f, TextFloor);
+            healthRect.offsetMin = new Vector2(24f, 10f);
+            healthRect.offsetMax = new Vector2(-24f, -2f);
+
+            var healthBack = new GameObject("Track", typeof(RectTransform));
+            healthBack.transform.SetParent(health.transform, false);
+            var healthBackRect = (RectTransform)healthBack.transform;
+            healthBackRect.anchorMin = new Vector2(0f, 0f);
+            // 오른쪽 끝 14%는 백분율 자리다. 바 위에 글자를 겹치면 반투명 띠
+            // 위에서 둘 다 안 읽힌다
+            healthBackRect.anchorMax = new Vector2(0.86f, 1f);
+            healthBackRect.offsetMin = healthBackRect.offsetMax = Vector2.zero;
+            UiSkin.ApplyPanel(healthBack.AddComponent<Image>(), UiSkin.Inlay, UiSkin.InlayTint);
+
+            var healthFill = new GameObject("Fill", typeof(RectTransform));
+            healthFill.transform.SetParent(healthBack.transform, false);
+            Stretch((RectTransform)healthFill.transform);
+            var healthFillImage = healthFill.AddComponent<Image>();
+            healthFillImage.color = HealthColor;
+            // 보스 체력 바와 같은 민짜 채움이다. TrialHud가 anchorMax.x를 민다
+            healthFillImage.sprite = null;
+            healthFillImage.type = Image.Type.Simple;
+            healthFillImage.raycastTarget = false;
+
+            var healthLabel = CreateLabel(health.transform, font, "Percent",
+                                          PixelFontSizesSmall, TextAlignmentOptions.Right);
+            var healthLabelRect = (RectTransform)healthLabel.transform;
+            healthLabelRect.anchorMin = new Vector2(0.86f, 0f);
+            healthLabelRect.anchorMax = new Vector2(1f, 1f);
+            healthLabelRect.offsetMin = healthLabelRect.offsetMax = Vector2.zero;
+            healthLabel.text = "100%";
+
+            // 격노는 띠 **아래**에 붙는 작은 줄. 90초 전에는 숨는다
+            var enrage = new GameObject("Enrage", typeof(RectTransform));
+            enrage.transform.SetParent(banner.transform, false);
+            var enrageRect = (RectTransform)enrage.transform;
+            enrageRect.anchorMin = enrageRect.anchorMax = new Vector2(0.5f, 0f);
+            enrageRect.pivot = new Vector2(0.5f, 1f);
+            enrageRect.sizeDelta = new Vector2(400f, 56f);
+            enrageRect.anchoredPosition = new Vector2(0f, -6f);
+
+            var enrageLabel = CreateLabel(enrage.transform, font, "Label",
+                                          PixelFontSizesSmall, TextAlignmentOptions.Center);
+            Stretch((RectTransform)enrageLabel.transform);
+            enrageLabel.color = BossNameColor;
+            enrageLabel.text = "격노 1단계";
+
+            // --- 전환: 띠 아래 짧은 한 줄
+            var transition = new GameObject("TrialTransition", typeof(RectTransform));
+            transition.transform.SetParent(band, false);
+            var transitionRect = (RectTransform)transition.transform;
+            transitionRect.anchorMin = transitionRect.anchorMax = new Vector2(0.5f, 1f);
+            transitionRect.pivot = new Vector2(0.5f, 1f);
+            transitionRect.sizeDelta = new Vector2(400f, 64f);
+            transitionRect.anchoredPosition = new Vector2(0f, -190f);
+
+            var transitionLabel = CreateLabel(transition.transform, font, "Label",
+                                              PixelFontSizesSmall, TextAlignmentOptions.Center);
+            Stretch((RectTransform)transitionLabel.transform);
+            transitionLabel.text = "다음 적";
+
+            // --- 진입 안내: 규칙을 한 번만 말한다. 화면 가운데 위쪽
+            var notice = new GameObject("TrialNotice", typeof(RectTransform));
+            notice.transform.SetParent(safeArea, false);
+            notice.transform.SetAsLastSibling();
+            Stretch((RectTransform)notice.transform);
+            notice.AddComponent<Image>().color = DimColor;
+
+            var noticeLabel = CreateLabel(notice.transform, font, "Label",
+                                          PixelFontSizesSmall, TextAlignmentOptions.Center);
+            CenterBox((RectTransform)noticeLabel.transform, new Vector2(1000f, 240f),
+                      new Vector2(0f, DisplayConfig.DesignHeight * 0.18f));
+            noticeLabel.textWrappingMode = TextWrappingModes.Normal;
+            noticeLabel.text = "일문\n" + Onikiri.Progression.PromotionTrialCatalog.SoftCapNotice;
+
+            // --- 결과: 승리·사망·폐쇄. 잠깐만 뜬다
+            var result = new GameObject("TrialResult", typeof(RectTransform));
+            result.transform.SetParent(safeArea, false);
+            result.transform.SetAsLastSibling();
+            Stretch((RectTransform)result.transform);
+            result.AddComponent<Image>().color = DimColor;
+
+            var resultTitle = CreateLabel(result.transform, font, "Title",
+                                          PixelFontSizesLarge, TextAlignmentOptions.Center);
+            CenterBox((RectTransform)resultTitle.transform, new Vector2(900f, 140f),
+                      new Vector2(0f, DisplayConfig.DesignHeight * 0.24f));
+            resultTitle.text = "돌파";
+
+            var resultDetail = CreateLabel(result.transform, font, "Detail",
+                                           PixelFontSizesSmall, TextAlignmentOptions.Center);
+            CenterBox((RectTransform)resultDetail.transform, new Vector2(900f, 180f),
+                      new Vector2(0f, DisplayConfig.DesignHeight * 0.12f));
+            resultDetail.textWrappingMode = TextWrappingModes.Normal;
+            resultDetail.text = "무사\n공격 x1.10  체력 x1.10";
+
+            // --- 배선
+            var hud = band.GetComponent<Onikiri.UI.TrialHud>();
+            if (hud == null) hud = band.gameObject.AddComponent<Onikiri.UI.TrialHud>();
+
+            var so = new SerializedObject(hud);
+            so.FindProperty("fight").objectReferenceValue = fight;
+            so.FindProperty("evolution").objectReferenceValue =
+                Object.FindFirstObjectByType<Onikiri.Progression.EvolutionSystem>();
+            so.FindProperty("bannerRoot").objectReferenceValue = banner;
+            so.FindProperty("gateLabel").objectReferenceValue = gateLabel;
+            so.FindProperty("foeLabel").objectReferenceValue = foeLabel;
+            so.FindProperty("clockLabel").objectReferenceValue = clockLabel;
+            so.FindProperty("enrageRoot").objectReferenceValue = enrage;
+            so.FindProperty("enrageLabel").objectReferenceValue = enrageLabel;
+            so.FindProperty("healthRoot").objectReferenceValue = health;
+            so.FindProperty("healthFill").objectReferenceValue = healthFillImage;
+            so.FindProperty("healthLabel").objectReferenceValue = healthLabel;
+            so.FindProperty("noticeRoot").objectReferenceValue = notice;
+            so.FindProperty("noticeLabel").objectReferenceValue = noticeLabel;
+            so.FindProperty("transitionRoot").objectReferenceValue = transition;
+            so.FindProperty("transitionLabel").objectReferenceValue = transitionLabel;
+            so.FindProperty("resultRoot").objectReferenceValue = result;
+            so.FindProperty("resultTitle").objectReferenceValue = resultTitle;
+            so.FindProperty("resultDetail").objectReferenceValue = resultDetail;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 전부 꺼진 채로 저장한다 - 위 보스 HUD와 같은 이유다.
+            // 체력 줄은 띠 안에 살지만 상태가 더 좁으므로(싸우는 동안만) 따로 끈다
+            banner.SetActive(false);
+            transition.SetActive(false);
+            notice.SetActive(false);
+            result.SetActive(false);
+            health.SetActive(false);
+
+            WireGuideCardToTrial(fight, safeArea);
+            WireEvolutionPanelToTrial(fight);
+        }
+
+        /**
+         * @brief 경지 표에 `BossFight`를 물린다 (4단계 §5).
+         *
+         * 가이드 카드와 같은 이유로 여기서 한다 - 성장 패널(`UpgradePanelBuilder`)이
+         * `BossContentBuilder.Wire`보다 먼저 돈다.
+         */
+        private static void WireEvolutionPanelToTrial(BossFight fight)
+        {
+            var panel = Object.FindFirstObjectByType<Onikiri.UI.EvolutionPanel>(
+                FindObjectsInactive.Include);
+            if (panel == null)
+            {
+                Debug.LogWarning("[Onikiri] 씬에 EvolutionPanel이 없다 - 경지 표에 "
+                                 + "귀문 상태를 물리지 못했다.");
+                return;
+            }
+
+            var so = new SerializedObject(panel);
+            so.FindProperty("fight").objectReferenceValue = fight;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /**
+         * @brief 가이드 카드에 `BossFight`를 물린다 (4단계 §3).
+         *
+         * **여기서 하는 이유는 순서다.** 카드를 짓는 `BuildGuideQuestCard`는
+         * `WireWalletAndHud` 안에서 도는데, 그때 씬에 `BossFight`가 아직 없다
+         * (`BossContentBuilder.Wire`가 한참 뒤다). 그쪽에서 찾으면 null이
+         * 들어가고, 카드는 평소처럼만 굴러 **귀문 입구가 조용히 사라진다** -
+         * `LockedTab.screen`이 비었을 때와 정확히 같은 종류의 실패다.
+         *
+         * 판을 만든 쪽이 아니라 **참조를 댈 수 있는 쪽**이 잇는다는 점에서
+         * `RelinkScreenTabs`와 같은 규칙이다.
+         */
+        private static void WireGuideCardToTrial(BossFight fight, Transform safeArea)
+        {
+            if (safeArea == null) return;
+
+            var card = safeArea.Find(BattleContentBuilder.GuideCardName);
+            if (card == null)
+            {
+                Debug.LogWarning("[Onikiri] SafeArea에 " + BattleContentBuilder.GuideCardName
+                                 + "가 없다 - 귀문 입구를 물리지 못했다.");
+                return;
+            }
+
+            var component = card.GetComponent<Onikiri.UI.GuideQuestCard>();
+            if (component == null)
+            {
+                Debug.LogWarning("[Onikiri] 가이드 카드에 GuideQuestCard가 없다 - "
+                                 + "귀문 입구를 물리지 못했다.");
+                return;
+            }
+
+            var so = new SerializedObject(component);
+            so.FindProperty("fight").objectReferenceValue = fight;
+            so.FindProperty("cardButton").objectReferenceValue =
+                card.GetComponent<UnityEngine.UI.Button>();
+            so.FindProperty("cardScreenButton").objectReferenceValue =
+                card.GetComponent<Onikiri.UI.HudScreenButton>();
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /**

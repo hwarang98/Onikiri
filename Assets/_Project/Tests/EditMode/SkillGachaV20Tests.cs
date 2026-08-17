@@ -53,7 +53,9 @@ namespace Onikiri.Tests
             Assert.IsTrue(SaveData.Migrate(data), "v19 세이브를 못 읽는다");
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(20, SaveData.CurrentVersion, "v20이 아니다");
+            // v21로 올랐다(승급 재설계). 이 검사는 v19 -> v20의 세 칸을 재므로
+            // 최신 버전 숫자만 따라 올린다
+            Assert.AreEqual(21, SaveData.CurrentVersion, "세이브 버전이 최신이 아니다");
 
             Assert.AreEqual(0, data.skillGachaAwakenPity,
                 "하드 천장이 소급됐다 - 누적 횟수로는 마지막 ★5 이후를 복원할 수 없다");
