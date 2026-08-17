@@ -61,11 +61,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -137,137 +137,150 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ATTACK 1_0
+      name: ATTACK_1_0
       rect:
         serializedVersion: 2
-        x: 37
-        y: 12
-        width: 31
-        height: 37
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.203125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 0ce1612e858235b70800000000000000
-      internalID: 8886490851947454144
+      spriteID: 82050a0737b562b44bfab47e64525ac7
+      internalID: 1828082761
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1_1
+      name: ATTACK_1_1
       rect:
         serializedVersion: 2
-        x: 124
-        y: 12
-        width: 47
-        height: 37
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.203125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 9921c0a1d48e0ea50800000000000000
-      internalID: 6548489276043825817
+      spriteID: cadb832811a6f0f429f3a975c5e3c471
+      internalID: 2134476739
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1_2
+      name: ATTACK_1_2
       rect:
         serializedVersion: 2
-        x: 218
-        y: 12
-        width: 57
-        height: 35
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.203125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 6b92e3f7e0039f440800000000000000
-      internalID: 4970056502602508726
+      spriteID: f4b6d5cd00364a24f9684b7342b38c0a
+      internalID: 372430716
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1_3
+      name: ATTACK_1_3
       rect:
         serializedVersion: 2
-        x: 312
-        y: 12
-        width: 65
-        height: 44
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 288
+        y: 0
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.203125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c37b9fb4cb25bda10800000000000000
-      internalID: 1935231433567745852
+      spriteID: f1d37bae8e2ed6e4bb15d8d719744876
+      internalID: 1095379493
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1_4
+      name: ATTACK_1_4
       rect:
         serializedVersion: 2
-        x: 416
-        y: 12
-        width: 54
-        height: 45
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.203125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 5a69bbe4b3b544a70800000000000000
-      internalID: 8810267081325647525
+      spriteID: fece22d7176ee3d44865fab70829ca86
+      internalID: 1826854102
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1_5
+      name: ATTACK_1_5
       rect:
         serializedVersion: 2
-        x: 504
-        y: 12
-        width: 49
-        height: 41
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 480
+        y: 0
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.203125}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d9d7e0f018aa8e930800000000000000
-      internalID: 4172772526038875549
+      spriteID: 868b36fa1c4ca2c45b7206f0d3cd0393
+      internalID: -481019907
       vertices: []
       indices: 
       edges: []
@@ -286,12 +299,12 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ATTACK 1_0: 8886490851947454144
-      ATTACK 1_1: 6548489276043825817
-      ATTACK 1_2: 4970056502602508726
-      ATTACK 1_3: 1935231433567745852
-      ATTACK 1_4: 8810267081325647525
-      ATTACK 1_5: 4172772526038875549
+      ATTACK_1_0: 1828082761
+      ATTACK_1_1: 2134476739
+      ATTACK_1_2: 372430716
+      ATTACK_1_3: 1095379493
+      ATTACK_1_4: 1826854102
+      ATTACK_1_5: -481019907
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

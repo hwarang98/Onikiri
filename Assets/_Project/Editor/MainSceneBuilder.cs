@@ -104,8 +104,8 @@ namespace Onikiri.EditorTools
 
             var safeArea = CreateSafeArea(go.transform);
 
-            // 사양서의 화면 4분할. 아래에서 위로 탭바 10%, 성장 35%, 전투 45%, 상단 10%.
-            // 내용물은 나중에 채우므로 의도적으로 비워 둔다
+            // 화면 4분할. 비율은 DisplayConfig가 단일 출처다(41단계부터 탭바
+            // 7.5%). 내용물은 나중에 채우므로 의도적으로 비워 둔다
             CreateBand(safeArea, "BottomTabBar", 0f, DisplayConfig.BottomTabBarTop);
             CreateBand(safeArea, "GrowthPanel", DisplayConfig.BottomTabBarTop, DisplayConfig.GrowthPanelTop);
             CreateBand(safeArea, "BattleArea", DisplayConfig.GrowthPanelTop, DisplayConfig.BattleAreaTop);
@@ -155,6 +155,37 @@ namespace Onikiri.EditorTools
                 if (inside != null) return inside;
             }
             return canvas.transform.Find(name);
+        }
+
+        /**
+         * @brief 씬의 밴드 앵커를 DisplayConfig에 다시 맞춘다 (41단계).
+         *
+         * 밴드는 씬 생성 때 한 번 만들어지고 앵커가 씬 파일에 저장된다.
+         * DisplayConfig의 분할 비율을 바꾸면(탭바 10%→7.5%) 코드와 씬이
+         * 어긋난 채로 남는데, 그것은 값을 두 곳에 적은 것과 같다. Build
+         * Combat Content가 이것을 불러 씬이 항상 코드를 따라오게 한다.
+         *
+         * 내용물은 건드리지 않는다 - 밴드 자식들은 전부 앵커 비율로 서
+         * 있어서 밴드가 늘면 함께 따라온다.
+         */
+        public static void ReassertBands()
+        {
+            SetBandAnchors("BottomTabBar", 0f, DisplayConfig.BottomTabBarTop);
+            SetBandAnchors("GrowthPanel", DisplayConfig.BottomTabBarTop, DisplayConfig.GrowthPanelTop);
+            SetBandAnchors("BattleArea", DisplayConfig.GrowthPanelTop, DisplayConfig.BattleAreaTop);
+            SetBandAnchors("TopBar", DisplayConfig.BattleAreaTop, 1f);
+        }
+
+        static void SetBandAnchors(string name, float anchorMinY, float anchorMaxY)
+        {
+            var band = FindBand(name);
+            if (band == null) return;
+
+            var rt = (RectTransform)band;
+            rt.anchorMin = new Vector2(0f, anchorMinY);
+            rt.anchorMax = new Vector2(1f, anchorMaxY);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
         }
 
         static void CreateBand(Transform parent, string name, float anchorMinY, float anchorMaxY)

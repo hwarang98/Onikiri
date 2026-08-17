@@ -61,11 +61,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -137,137 +137,150 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: IDLE (FLAMING SWORD)_0
+      name: IDLE_(FLAMING_SWORD)_0
       rect:
         serializedVersion: 2
-        x: 48
-        y: 11
-        width: 39
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4ddc2e78ef5720510800000000000000
-      internalID: 1513902160811838932
+      spriteID: 7595d82fa23c28b42a5242a35e953fd5
+      internalID: -605339320
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: IDLE (FLAMING SWORD)_1
+      name: IDLE_(FLAMING_SWORD)_1
       rect:
         serializedVersion: 2
-        x: 176
-        y: 11
-        width: 40
-        height: 52
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d4b698bb22417ba10800000000000000
-      internalID: 1925029505131965261
+      spriteID: 9a33ebfb178749c4893983a8db23791d
+      internalID: 2062248122
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: IDLE (FLAMING SWORD)_2
+      name: IDLE_(FLAMING_SWORD)_2
       rect:
         serializedVersion: 2
-        x: 304
-        y: 11
-        width: 40
-        height: 54
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 173aad462008898e0800000000000000
-      internalID: -1686457312679910543
+      spriteID: 2a1ba492e0f36994aabdbb7ec86068b8
+      internalID: 787513167
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: IDLE (FLAMING SWORD)_3
+      name: IDLE_(FLAMING_SWORD)_3
       rect:
         serializedVersion: 2
-        x: 432
-        y: 11
-        width: 39
-        height: 54
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 92b2274a215aea180800000000000000
-      internalID: -9102156297382253783
+      spriteID: 6973e73c1a71582429a15482a7988cee
+      internalID: 1361305677
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: IDLE (FLAMING SWORD)_4
+      name: IDLE_(FLAMING_SWORD)_4
       rect:
         serializedVersion: 2
-        x: 560
-        y: 11
-        width: 39
-        height: 53
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 512
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 1382a0443d11dcd00800000000000000
-      internalID: 994470691796035633
+      spriteID: 667ced7b7d9158940a21c700448791e3
+      internalID: -474135070
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: IDLE (FLAMING SWORD)_5
+      name: IDLE_(FLAMING_SWORD)_5
       rect:
         serializedVersion: 2
-        x: 688
-        y: 11
-        width: 38
-        height: 51
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 640
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: bc6a3f34c973f5c50800000000000000
-      internalID: 6656099918571349707
+      spriteID: d2ce11a4e8767b54f854da17ce064c9c
+      internalID: 2054821633
       vertices: []
       indices: 
       edges: []
@@ -286,12 +299,12 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      IDLE (FLAMING SWORD)_0: 1513902160811838932
-      IDLE (FLAMING SWORD)_1: 1925029505131965261
-      IDLE (FLAMING SWORD)_2: -1686457312679910543
-      IDLE (FLAMING SWORD)_3: -9102156297382253783
-      IDLE (FLAMING SWORD)_4: 994470691796035633
-      IDLE (FLAMING SWORD)_5: 6656099918571349707
+      IDLE_(FLAMING_SWORD)_0: -605339320
+      IDLE_(FLAMING_SWORD)_1: 2062248122
+      IDLE_(FLAMING_SWORD)_2: 787513167
+      IDLE_(FLAMING_SWORD)_3: 1361305677
+      IDLE_(FLAMING_SWORD)_4: -474135070
+      IDLE_(FLAMING_SWORD)_5: 2054821633
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

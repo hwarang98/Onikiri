@@ -1,0 +1,634 @@
+fileFormatVersion: 2
+guid: deef6c50f10c9cb45a921a081bc5b764
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 6743899582270597636
+    second: ONI_ADVENT_0
+  - first:
+      213: 8202449623644474442
+    second: ONI_ADVENT_1
+  - first:
+      213: 1772385870254757398
+    second: ONI_ADVENT_2
+  - first:
+      213: -8420518673322246780
+    second: ONI_ADVENT_3
+  - first:
+      213: 7902903938316057363
+    second: ONI_ADVENT_4
+  - first:
+      213: 8227316514352851135
+    second: ONI_ADVENT_5
+  - first:
+      213: 1378375977440257995
+    second: ONI_ADVENT_6
+  - first:
+      213: -6290992504876555288
+    second: ONI_ADVENT_7
+  - first:
+      213: -4707941818724396013
+    second: ONI_ADVENT_8
+  - first:
+      213: -8650603415145290864
+    second: ONI_ADVENT_9
+  - first:
+      213: -3786993311148401388
+    second: ONI_ADVENT_10
+  - first:
+      213: -6180597065231908190
+    second: ONI_ADVENT_11
+  - first:
+      213: -8648033192749106937
+    second: ONI_ADVENT_12
+  - first:
+      213: 2548681490022524461
+    second: ONI_ADVENT_13
+  - first:
+      213: -106960336325542224
+    second: ONI_ADVENT_14
+  - first:
+      213: -2861272945817694613
+    second: ONI_ADVENT_15
+  - first:
+      213: 7618551449641562337
+    second: ONI_ADVENT_16
+  - first:
+      213: 8237921072123463700
+    second: ONI_ADVENT_17
+  - first:
+      213: 4067059942378205160
+    second: ONI_ADVENT_18
+  - first:
+      213: -3163082449774720020
+    second: ONI_ADVENT_19
+  - first:
+      213: 2407402473557250882
+    second: ONI_ADVENT_20
+  - first:
+      213: -7955969630638535507
+    second: ONI_ADVENT_21
+  - first:
+      213: 8610823685154927233
+    second: ONI_ADVENT_22
+  - first:
+      213: -7973375583896580271
+    second: ONI_ADVENT_23
+  - first:
+      213: -1900078778965516707
+    second: ONI_ADVENT_24
+  - first:
+      213: -125709014207911179
+    second: ONI_ADVENT_25
+  - first:
+      213: 462916494622854584
+    second: ONI_ADVENT_26
+  - first:
+      213: -7819192875650533597
+    second: ONI_ADVENT_27
+  - first:
+      213: 1201263377633491826
+    second: ONI_ADVENT_28
+  - first:
+      213: 3030897216324061543
+    second: ONI_ADVENT_29
+  - first:
+      213: -5866066659387925193
+    second: ONI_ADVENT_30
+  - first:
+      213: 4281335029707418880
+    second: ONI_ADVENT_31
+  - first:
+      213: 7814257094963606100
+    second: ONI_ADVENT_32
+  - first:
+      213: 2209210178897585790
+    second: ONI_ADVENT_33
+  - first:
+      213: -1299808767079942041
+    second: ONI_ADVENT_34
+  - first:
+      213: 6536264953649973908
+    second: ONI_ADVENT_35
+  - first:
+      213: -646436197012567356
+    second: ONI_ADVENT_36
+  - first:
+      213: 7573907936377373983
+    second: ONI_ADVENT_37
+  - first:
+      213: -6986786081621250073
+    second: ONI_ADVENT_38
+  - first:
+      213: 1935512014906986796
+    second: ONI_ADVENT_39
+  - first:
+      213: 72977186151839703
+    second: ONI_ADVENT_40
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 0
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: ONI_ADVENT_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 40ae42a70f4279d50800000000000000
+      internalID: 6743899582270597636
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_1
+      rect:
+        serializedVersion: 2
+        x: 64
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a4c8d596974f4d170800000000000000
+      internalID: 8202449623644474442
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_2
+      rect:
+        serializedVersion: 2
+        x: 128
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 616d479fe87c89810800000000000000
+      internalID: 1772385870254757398
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_3
+      rect:
+        serializedVersion: 2
+        x: 192
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 48d751461ee442b80800000000000000
+      internalID: -8420518673322246780
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_4
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 31b3d51b241ccad60800000000000000
+      internalID: 7902903938316057363
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_5
+      rect:
+        serializedVersion: 2
+        x: 320
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fb8e4b497cc4d2270800000000000000
+      internalID: 8227316514352851135
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_6
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bc7224606a9f02310800000000000000
+      internalID: 1378375977440257995
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_7
+      rect:
+        serializedVersion: 2
+        x: 448
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e3203ed5a7e1b8a0800000000000000
+      internalID: -6290992504876555288
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_8
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 314d9bf0cd70aaeb0800000000000000
+      internalID: -4707941818724396013
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_9
+      rect:
+        serializedVersion: 2
+        x: 576
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 093eb7bd602e2f780800000000000000
+      internalID: -8650603415145290864
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_10
+      rect:
+        serializedVersion: 2
+        x: 640
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41d183ad5a5e17bc0800000000000000
+      internalID: -3786993311148401388
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_11
+      rect:
+        serializedVersion: 2
+        x: 704
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2a2c70327bb1a3aa0800000000000000
+      internalID: -6180597065231908190
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_12
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 709f66461a30cf780800000000000000
+      internalID: -8648033192749106937
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_13
+      rect:
+        serializedVersion: 2
+        x: 832
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d26e76acf4cbe5320800000000000000
+      internalID: 2548681490022524461
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_14
+      rect:
+        serializedVersion: 2
+        x: 896
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0be724c0420048ef0800000000000000
+      internalID: -106960336325542224
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ONI_ADVENT_15
+      rect:
+        serializedVersion: 2
+        x: 960
+        y: 0
+        width: 64
+        height: 64
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b6ec91b5a67ba48d0800000000000000
+      internalID: -2861272945817694613
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 7021501f254838246a2293f3479448d6
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      ONI_ADVENT_0: 6743899582270597636
+      ONI_ADVENT_1: 8202449623644474442
+      ONI_ADVENT_10: -3786993311148401388
+      ONI_ADVENT_11: -6180597065231908190
+      ONI_ADVENT_12: -8648033192749106937
+      ONI_ADVENT_13: 2548681490022524461
+      ONI_ADVENT_14: -106960336325542224
+      ONI_ADVENT_15: -2861272945817694613
+      ONI_ADVENT_2: 1772385870254757398
+      ONI_ADVENT_3: -8420518673322246780
+      ONI_ADVENT_4: 7902903938316057363
+      ONI_ADVENT_5: 8227316514352851135
+      ONI_ADVENT_6: 1378375977440257995
+      ONI_ADVENT_7: -6290992504876555288
+      ONI_ADVENT_8: -4707941818724396013
+      ONI_ADVENT_9: -8650603415145290864
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

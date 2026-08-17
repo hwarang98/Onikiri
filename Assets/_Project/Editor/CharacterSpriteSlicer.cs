@@ -25,6 +25,57 @@ namespace Onikiri.EditorTools
         private const string SamuraiSpriteFolder = "Assets/ThirdParty/Characters/FULL_Samurai/Sprites";
 
         /**
+         * @brief 다크 사무라이(보스) 시트의 셀. 128x108이고 한 줄로 늘어서 있다.
+         *
+         * FULL_Samurai와 규격이 다르므로 따로 잰다. 팩이 다르면 셀 크기도 다르다는
+         * 것을 상수 이름으로 남겨둔다.
+         */
+        public const int BossCellWidth = 128;
+        public const int BossCellHeight = 108;
+
+        /**
+         * @brief 다크 사무라이 프레임에서 발밑에 있는 빈 줄 수.
+         *
+         * IDLE / HURT / DEATH 세 시트를 픽셀로 훑어 셋 다 12px로 일치하는 것을
+         * 확인했다. 자동 슬라이싱이 만든 타이트 렉트를 쓰면 프레임마다 피벗이 달라져
+         * 보스가 제자리에서 떨리는데, 격자로 자르고 피벗을 이 값에 고정하면 모든
+         * 프레임이 같은 발밑을 공유한다.
+         */
+        public const int BossFeetPadding = 12;
+
+        private const string BossSpriteFolder = "Assets/ThirdParty/Characters/Demon_Samurai/Sprites";
+
+        [MenuItem("Onikiri/Art/Slice Dark Samurai (Boss) Sheets")]
+        public static void SliceBoss()
+        {
+            var pivot = new Vector2(0.5f, BossFeetPadding / (float)BossCellHeight);
+            var paths = new List<string>();
+
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { BossSpriteFolder }))
+                paths.Add(AssetDatabase.GUIDToAssetPath(guid));
+
+            int sliced = 0, skipped = 0;
+            try
+            {
+                AssetDatabase.StartAssetEditing();
+                foreach (var path in paths)
+                {
+                    if (SliceGrid(path, BossCellWidth, BossCellHeight, pivot)) sliced++;
+                    else skipped++;
+                }
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                AssetDatabase.Refresh();
+            }
+
+            Debug.Log(string.Format(
+                "[Onikiri] Sliced {0} dark samurai sheets at {1}x{2}, pivot ({3}, {4:F5}). Skipped {5}.",
+                sliced, BossCellWidth, BossCellHeight, pivot.x, pivot.y, skipped));
+        }
+
+        /**
          * @brief 참격 시트는 64x64의 5x2 격자다.
          *
          * 128 세트가 아니라 64 세트를 쓰는 이유는, 128이 같은 아트의 단순 2배
@@ -83,6 +134,13 @@ namespace Onikiri.EditorTools
                     // 128px 세트는 건드리지 않는다. 직접 색을 바꾼 시트는 이미 64px이다
                     if (!path.Contains("64x64") && !path.StartsWith("Assets/_Project/Art/VFX")) continue;
 
+                    // 요괴에게서 뜯은 조각은 셀이 64가 아니다(114x46, 82x70, 79x82).
+                    // YokaiVfxBaker가 자기 셀로 이미 잘라뒀고, 그 셀은 조각마다
+                    // 다르므로 여기서 한 가지 크기로 다시 자를 수 있는 대상이
+                    // 아니다. 지금은 64로 나누어떨어지지 않아 SliceGrid가 거부하지만,
+                    // 그것은 우연이라 기대고 있을 규칙이 못 된다
+                    if (path.StartsWith(YokaiVfxBaker.OutputFolder)) continue;
+
                     // 그려진 호는 64x64 셀 한가운데에 있지 않다. 그래서 단순 중앙 피벗은
                     // 이펙트를 떨어져야 할 지점에서 벗어나게 한다. 대신 아트의 중심에
                     // 피벗을 둔다. 시트 전체를 합쳐 측정하므로 애니메이션의 모든 프레임이
@@ -131,6 +189,22 @@ namespace Onikiri.EditorTools
             // 9칸만 그려져 있고, 끝에 빈 프레임이 남으면 이펙트 마지막이 끊겨 보인다
             var pixels = LoadReadableCopy(assetPath);
 
+            // 이미 잘려 있던 스프라이트의 GUID를 이름으로 찾아둔다.
+            //
+            // 매번 GUID.Generate()를 부르면 슬라이싱할 때마다 .meta의 spriteID가
+            // 전부 새로 찍힌다. 참조가 깨지지는 않는다 - 실제로 쓰이는 것은
+            // internalID이고 그쪽은 이름 표(ISpriteNameFileIdDataProvider)가
+            // 유지해준다. 하지만 빌더를 돌릴 때마다 의미 없는 diff가 수십 줄씩
+            // 쌓이고, 그 안에 진짜 변경이 섞이면 알아볼 수 없게 된다.
+            //
+            // 빌더는 몇 번을 돌려도 같은 결과여야 한다.
+            var existingIds = new Dictionary<string, GUID>();
+            foreach (var rect in provider.GetSpriteRects())
+            {
+                if (rect != null && !string.IsNullOrEmpty(rect.name))
+                    existingIds[rect.name] = rect.spriteID;
+            }
+
             var rects = new List<SpriteRect>();
             int index = 0;
             int skipped = 0;
@@ -149,13 +223,18 @@ namespace Onikiri.EditorTools
                         continue;
                     }
 
+                    string spriteName = baseName + "_" + index;
+
+                    GUID id;
+                    if (!existingIds.TryGetValue(spriteName, out id)) id = GUID.Generate();
+
                     var spriteRect = new SpriteRect
                     {
-                        name = baseName + "_" + index,
+                        name = spriteName,
                         rect = cell,
                         alignment = SpriteAlignment.Custom,
                         pivot = pivot,
-                        spriteID = GUID.Generate()
+                        spriteID = id
                     };
                     rects.Add(spriteRect);
                     index++;
@@ -181,6 +260,64 @@ namespace Onikiri.EditorTools
             provider.Apply();
             importer.SaveAndReimport();
             return true;
+        }
+
+        /**
+         * @brief 시트의 모든 셀에서 아트 아래에 남는 빈 픽셀 줄 수.
+         *
+         * 보스 피벗을 여기에 고정하기 위한 값이다. 자동 슬라이싱이 만드는 타이트
+         * 렉트를 그대로 쓰면 프레임마다 피벗이 달라져 보스가 제자리에서 떨린다.
+         * 격자로 자르고 피벗을 발밑에 고정하면 모든 프레임이 같은 바닥을 공유한다.
+         *
+         * 12단계까지 이 값(다크 사무라이의 12px)은 손으로 세서 상수에 적혀 있었다.
+         * 팩마다 다른 값이라, 보스를 바꾸려면 매번 다시 세야 했다.
+         *
+         * **셀 전체가 아니라 시트 하나의 최솟값**을 낸다. 프레임마다 다르면 가장
+         * 낮은 프레임에 맞춰야 다른 프레임이 땅에 박히지 않는다.
+         *
+         * @return 아래에서부터의 빈 줄 수. 시트를 못 읽거나 전부 투명이면 -1
+         */
+        public static int MeasureFeetPadding(string assetPath, int cellWidth, int cellHeight)
+        {
+            var texture = LoadReadableCopy(assetPath);
+            if (texture == null) return -1;
+
+            try
+            {
+                if (cellWidth <= 0 || cellHeight <= 0) return -1;
+                if (texture.width % cellWidth != 0 || texture.height % cellHeight != 0) return -1;
+
+                int columns = texture.width / cellWidth;
+                int rows = texture.height / cellHeight;
+                int lowest = int.MaxValue;
+
+                for (int row = 0; row < rows; row++)
+                {
+                    for (int column = 0; column < columns; column++)
+                    {
+                        var pixels = texture.GetPixels(column * cellWidth, row * cellHeight,
+                                                       cellWidth, cellHeight);
+
+                        // 아래에서 위로 훑다가 처음 불투명한 줄에서 멈춘다.
+                        // GetPixels는 y=0이 아래쪽이다
+                        for (int y = 0; y < cellHeight && y < lowest; y++)
+                        {
+                            bool opaque = false;
+                            for (int x = 0; x < cellWidth; x++)
+                            {
+                                if (pixels[y * cellWidth + x].a > 0.03f) { opaque = true; break; }
+                            }
+                            if (opaque) { if (y < lowest) lowest = y; break; }
+                        }
+                    }
+                }
+
+                return lowest == int.MaxValue ? -1 : lowest;
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture);
+            }
         }
 
         /**

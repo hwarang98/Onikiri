@@ -67,11 +67,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -143,6 +143,19 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
@@ -150,12 +163,12 @@ TextureImporter:
       name: DASH_0
       rect:
         serializedVersion: 2
-        x: 6
-        y: 8
-        width: 19
-        height: 23
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -172,12 +185,12 @@ TextureImporter:
       name: DASH_1
       rect:
         serializedVersion: 2
-        x: 33
-        y: 8
-        width: 39
-        height: 34
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 106
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -194,12 +207,12 @@ TextureImporter:
       name: DASH_2
       rect:
         serializedVersion: 2
-        x: 110
-        y: 8
-        width: 68
-        height: 34
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 212
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -216,12 +229,12 @@ TextureImporter:
       name: DASH_3
       rect:
         serializedVersion: 2
-        x: 254
-        y: 8
-        width: 30
-        height: 34
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 318
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -238,12 +251,12 @@ TextureImporter:
       name: DASH_4
       rect:
         serializedVersion: 2
-        x: 355
-        y: 8
-        width: 26
-        height: 33
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 424
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -260,12 +273,12 @@ TextureImporter:
       name: DASH_5
       rect:
         serializedVersion: 2
-        x: 461
-        y: 8
-        width: 27
-        height: 33
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 530
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -282,12 +295,12 @@ TextureImporter:
       name: DASH_6
       rect:
         serializedVersion: 2
-        x: 569
-        y: 8
-        width: 25
-        height: 35
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 636
+        y: 0
+        width: 106
+        height: 84
+      alignment: 9
+      pivot: {x: 0.5, y: 0.10714286}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -296,28 +309,6 @@ TextureImporter:
       bones: []
       spriteID: d7787c11453be16d0800000000000000
       internalID: -3017777526634739843
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: DASH_7
-      rect:
-        serializedVersion: 2
-        x: 676
-        y: 8
-        width: 27
-        height: 36
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: b72604a6f65a5dce0800000000000000
-      internalID: -1381015812776631685
       vertices: []
       indices: 
       edges: []
@@ -343,7 +334,6 @@ TextureImporter:
       DASH_4: -6140239544766606957
       DASH_5: 1491388436357712059
       DASH_6: -3017777526634739843
-      DASH_7: -1381015812776631685
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb2ebeac1c956654c8c641f32ca5f30d, type: 3}
+  m_Name: Region_2
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.RegionConfig
+  displayName: "\uC9C0\uC5ED 2"
+  stageCount: 10
+  chapterEvery: 5
+  background: {fileID: 11400000, guid: 0d677bec3028da24f866d17776d9b56b, type: 2}
+  mobs: {fileID: 11400000, guid: abbf8e62338394e41a92e2609684e086, type: 2}
+  chapterBoss: {fileID: 11400000, guid: efb080627d57cbe439211d25009fa03e, type: 2}
+  finaleBoss: {fileID: 11400000, guid: 80a73e3e44c9fd147836cbac485596a2, type: 2}
+  normalBossOverride: {fileID: 0}

@@ -1,0 +1,393 @@
+fileFormatVersion: 2
+guid: 7a91dc150a71a80409d06f57166adaec
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -732934623312028207
+    second: SPARK_RAY_0
+  - first:
+      213: 445135834723454760
+    second: SPARK_RAY_1
+  - first:
+      213: 5223896834113903598
+    second: SPARK_RAY_2
+  - first:
+      213: -2817649305297287901
+    second: SPARK_RAY_3
+  - first:
+      213: -3397456435473595349
+    second: SPARK_RAY_4
+  - first:
+      213: -3999674743509270838
+    second: SPARK_RAY_5
+  - first:
+      213: 4791075609557701988
+    second: SPARK_RAY_6
+  - first:
+      213: 751305140661381650
+    second: SPARK_RAY_7
+  - first:
+      213: 1877463391959095026
+    second: SPARK_RAY_8
+  - first:
+      213: -1017828556178952180
+    second: SPARK_RAY_9
+  - first:
+      213: -5704767512247842648
+    second: SPARK_RAY_10
+  - first:
+      213: -6303985879799399758
+    second: SPARK_RAY_11
+  - first:
+      213: -408799751588653771
+    second: SPARK_RAY_12
+  - first:
+      213: -1874284813486069524
+    second: SPARK_RAY_13
+  - first:
+      213: -2152755941224412443
+    second: SPARK_RAY_14
+  - first:
+      213: -9188979815985389040
+    second: SPARK_RAY_15
+  - first:
+      213: 5858163939223914680
+    second: SPARK_RAY_16
+  - first:
+      213: 5880287127553796346
+    second: SPARK_RAY_17
+  - first:
+      213: -2496241198876199995
+    second: SPARK_RAY_18
+  - first:
+      213: 4655110404511279665
+    second: SPARK_RAY_19
+  - first:
+      213: -9118794649364919278
+    second: SPARK_RAY_20
+  - first:
+      213: 3944916385979451377
+    second: SPARK_RAY_21
+  - first:
+      213: 5234248081720591942
+    second: SPARK_RAY_22
+  - first:
+      213: -4503941601984497635
+    second: SPARK_RAY_23
+  - first:
+      213: -5606824922369026213
+    second: SPARK_RAY_24
+  - first:
+      213: 292204236005380000
+    second: SPARK_RAY_25
+  - first:
+      213: -4632424192724868963
+    second: SPARK_RAY_26
+  - first:
+      213: -574258843944268013
+    second: SPARK_RAY_27
+  - first:
+      213: 7480769973738627281
+    second: SPARK_RAY_28
+  - first:
+      213: -4985556809918991648
+    second: SPARK_RAY_29
+  - first:
+      213: 3006008947692874008
+    second: SPARK_RAY_30
+  - first:
+      213: 1351405951536096741
+    second: SPARK_RAY_31
+  - first:
+      213: 6880193430154015660
+    second: SPARK_RAY_32
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 0
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: SPARK_RAY_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 70
+        height: 102
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1ddd6e5e7d714d5f0800000000000000
+      internalID: -732934623312028207
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SPARK_RAY_1
+      rect:
+        serializedVersion: 2
+        x: 70
+        y: 0
+        width: 70
+        height: 102
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 82f0d79eea07d2600800000000000000
+      internalID: 445135834723454760
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SPARK_RAY_2
+      rect:
+        serializedVersion: 2
+        x: 140
+        y: 0
+        width: 70
+        height: 102
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eeb95a44e720f7840800000000000000
+      internalID: 5223896834113903598
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SPARK_RAY_3
+      rect:
+        serializedVersion: 2
+        x: 210
+        y: 0
+        width: 70
+        height: 102
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3250128a2e2b5e8d0800000000000000
+      internalID: -2817649305297287901
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SPARK_RAY_4
+      rect:
+        serializedVersion: 2
+        x: 280
+        y: 0
+        width: 70
+        height: 102
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b244bb75f5fc9d0d0800000000000000
+      internalID: -3397456435473595349
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SPARK_RAY_5
+      rect:
+        serializedVersion: 2
+        x: 350
+        y: 0
+        width: 70
+        height: 102
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ace3700130d4e78c0800000000000000
+      internalID: -3999674743509270838
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 23c9af8046999544cb44c94415eead4b
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      SPARK_RAY_0: -732934623312028207
+      SPARK_RAY_1: 445135834723454760
+      SPARK_RAY_2: 5223896834113903598
+      SPARK_RAY_3: -2817649305297287901
+      SPARK_RAY_4: -3397456435473595349
+      SPARK_RAY_5: -3999674743509270838
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

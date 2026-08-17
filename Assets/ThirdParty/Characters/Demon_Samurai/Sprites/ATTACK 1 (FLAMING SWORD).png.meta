@@ -67,11 +67,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -143,181 +143,172 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_0
+      name: ATTACK_1_(FLAMING_SWORD)_0
       rect:
         serializedVersion: 2
-        x: 25
-        y: 11
-        width: 64
-        height: 47
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 3e72f22d52f796c10800000000000000
-      internalID: 2047307306033424355
+      spriteID: d78277fbf2317484790a456015f9e5c6
+      internalID: 1056375095
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_1
+      name: ATTACK_1_(FLAMING_SWORD)_1
       rect:
         serializedVersion: 2
-        x: 152
-        y: 11
-        width: 64
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 128
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: af7dfa98fc65b19f0800000000000000
-      internalID: -496707884526086150
+      spriteID: 7ccc2ae4ec61ac44cac32200db5c5b5d
+      internalID: -1916030928
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_2
+      name: ATTACK_1_(FLAMING_SWORD)_2
       rect:
         serializedVersion: 2
-        x: 280
-        y: 11
-        width: 64
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 256
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 8f7d9e8dd609fe460800000000000000
-      internalID: 7273190724691679224
+      spriteID: 3bd1009f881e96843862a7e84e4f405f
+      internalID: -643486113
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_3
+      name: ATTACK_1_(FLAMING_SWORD)_3
       rect:
         serializedVersion: 2
-        x: 425
-        y: 11
-        width: 68
-        height: 47
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f7aa469d2f8d4a8d0800000000000000
-      internalID: -2835903327795631489
+      spriteID: 415c2f2ae28747042a7c54ca237a5b99
+      internalID: -1126908510
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_4
+      name: ATTACK_1_(FLAMING_SWORD)_4
       rect:
         serializedVersion: 2
-        x: 561
-        y: 11
-        width: 60
-        height: 57
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 512
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 146ff6b034758f9c0800000000000000
-      internalID: -3893265932395481535
+      spriteID: 3ecd4188aee0a4f4aa79ae674911976c
+      internalID: -2132641485
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_5
+      name: ATTACK_1_(FLAMING_SWORD)_5
       rect:
         serializedVersion: 2
-        x: 689
-        y: 11
-        width: 52
-        height: 58
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 640
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 7d02c66c94f7404c0800000000000000
-      internalID: -4322189787530518313
+      spriteID: 69cb11360c8b16a419f06b2e4f6d8395
+      internalID: -667877527
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_6
+      name: ATTACK_1_(FLAMING_SWORD)_6
       rect:
         serializedVersion: 2
-        x: 733
-        y: 34
-        width: 9
-        height: 7
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 768
+        y: 0
+        width: 128
+        height: 108
+      alignment: 9
+      pivot: {x: 0.5, y: 0.11111111}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 1e157e0505a215cb0800000000000000
-      internalID: -4877070397022449183
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: ATTACK 1 (FLAMING SWORD)_7
-      rect:
-        serializedVersion: 2
-        x: 817
-        y: 11
-        width: 49
-        height: 59
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 1d43f779d343148b0800000000000000
-      internalID: -5169793458105273135
+      spriteID: 700583e96ec0cf440ac488b386e4e655
+      internalID: 780228625
       vertices: []
       indices: 
       edges: []
@@ -336,14 +327,13 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ATTACK 1 (FLAMING SWORD)_0: 2047307306033424355
-      ATTACK 1 (FLAMING SWORD)_1: -496707884526086150
-      ATTACK 1 (FLAMING SWORD)_2: 7273190724691679224
-      ATTACK 1 (FLAMING SWORD)_3: -2835903327795631489
-      ATTACK 1 (FLAMING SWORD)_4: -3893265932395481535
-      ATTACK 1 (FLAMING SWORD)_5: -4322189787530518313
-      ATTACK 1 (FLAMING SWORD)_6: -4877070397022449183
-      ATTACK 1 (FLAMING SWORD)_7: -5169793458105273135
+      ATTACK_1_(FLAMING_SWORD)_0: 1056375095
+      ATTACK_1_(FLAMING_SWORD)_1: -1916030928
+      ATTACK_1_(FLAMING_SWORD)_2: -643486113
+      ATTACK_1_(FLAMING_SWORD)_3: -1126908510
+      ATTACK_1_(FLAMING_SWORD)_4: -2132641485
+      ATTACK_1_(FLAMING_SWORD)_5: -667877527
+      ATTACK_1_(FLAMING_SWORD)_6: 780228625
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

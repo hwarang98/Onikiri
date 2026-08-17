@@ -119,3 +119,5 @@ InitTestScene*.unity*
 
 # git-lfs 가 Windows 에서 /dev/null 리다이렉트를 실제 폴더로 만든다
 /dev/
+
+/Artifacts

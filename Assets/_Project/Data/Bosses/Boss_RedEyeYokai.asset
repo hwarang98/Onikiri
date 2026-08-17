@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4010c342f197d57419207c5c1cb399e2, type: 3}
+  m_Name: Boss_RedEyeYokai
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.BossConfig
+  displayName: "\uB2E4\uD06C \uC0AC\uBB34\uB77C\uC774"
+  kind: 0
+  fullIntro: 1
+  soulId: yodo_darksamurai
+  idleSheet: {fileID: 2800000, guid: 07d1d01d0e70cd040a586f99a2623b39, type: 3}
+  walkSheet: {fileID: 2800000, guid: 03a26c70055ee9945a707a01797ee441, type: 3}
+  hurtSheet: {fileID: 2800000, guid: a65dafa00ce5e9340a6ff751550eb5e5, type: 3}
+  deathSheet: {fileID: 2800000, guid: b6d7446901d063d47a8dfef8ffc92e03, type: 3}
+  attackSheet: {fileID: 2800000, guid: 7b1f28f037e8d644b892ea51e0c4db30, type: 3}
+  attackSheetVariants:
+  - {fileID: 2800000, guid: 6f0d81f037ca9e4459fb165703ec2e5a, type: 3}
+  - {fileID: 2800000, guid: c290c44cea81e044db7de7e4c4ed60f5, type: 3}
+  - {fileID: 2800000, guid: f90959345b5551c488058b50594b5661, type: 3}
+  cellWidth: 310
+  cellHeight: 216
+  feetPadding: 24
+  frameRate: 12
+  moveSpeed: 0.85
+  artFacesLeft: 0
+  generatedDefinition: {fileID: 11400000, guid: a5e2ab2df2826704582a4e97a1768efc, type: 2}
+  attackVfxId: 
+  baseMob: {fileID: 0}
+  scale: 2
+  tint: {r: 1, g: 0.7529412, b: 0.78431374, a: 1}
+  healthMultiplier: 1
+  attackMultiplier: 1
+  goldMultiplier: 1

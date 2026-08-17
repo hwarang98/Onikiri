@@ -88,11 +88,11 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 7
-  spritePivot: {x: 0.5, y: 0.5}
+  spritePivot: {x: 0.5, y: 0}
   spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -164,335 +164,238 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: AIR ATTACK_0
+      name: AIR_ATTACK_0
       rect:
         serializedVersion: 2
-        x: 34
-        y: 12
-        width: 50
-        height: 44
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d6d7dd934185c2bd0800000000000000
-      internalID: -2653649236534657683
+      spriteID: c11f5128fbe5e9744b19bbe28f83acb6
+      internalID: 162396127
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_1
+      name: AIR_ATTACK_1
       rect:
         serializedVersion: 2
-        x: 130
-        y: 12
-        width: 50
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 96
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: fbd8ba7a572212ce0800000000000000
-      internalID: -1431825317807551041
+      spriteID: b453c7bf33fc8ab418f5ad4d100b0c97
+      internalID: -1570199832
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_2
+      name: AIR_ATTACK_2
       rect:
         serializedVersion: 2
-        x: 225
-        y: 11
-        width: 44
-        height: 48
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 192
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f95b84681a6bb8a80800000000000000
-      internalID: -8463470269853813345
+      spriteID: 8dc8855190d1011479a1944ada1a5b15
+      internalID: 466891407
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_3
+      name: AIR_ATTACK_3
       rect:
         serializedVersion: 2
-        x: 319
-        y: 11
-        width: 43
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 288
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: d09b6d09240127ef0800000000000000
-      internalID: -112009162646963955
+      spriteID: 5763aea89e3ce1044a2a5a18cf8434cc
+      internalID: 1426364560
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_4
+      name: AIR_ATTACK_4
       rect:
         serializedVersion: 2
-        x: 414
-        y: 11
-        width: 42
-        height: 45
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 384
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 48c2230117111d230800000000000000
-      internalID: 3661727149329624196
+      spriteID: a34dbbe6af6299247b2124edccf714c8
+      internalID: 530702623
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_5
+      name: AIR_ATTACK_5
       rect:
         serializedVersion: 2
-        x: 510
-        y: 11
-        width: 38
-        height: 47
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 480
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 980fc5046bcbdb890800000000000000
-      internalID: -7440583518396288887
+      spriteID: 96d08a089c28ab7468c3d5ea1d37080d
+      internalID: 1328178483
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_6
+      name: AIR_ATTACK_6
       rect:
         serializedVersion: 2
-        x: 547
-        y: 27
-        width: 11
-        height: 26
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 576
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 25bb914a3ff3fbee0800000000000000
-      internalID: -1243204656468214958
+      spriteID: 917d7c88e26aad84da544a11042e2dd3
+      internalID: -1874946918
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_7
+      name: AIR_ATTACK_7
       rect:
         serializedVersion: 2
-        x: 605
-        y: 11
-        width: 38
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 672
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c7cdbd8259763ae90800000000000000
-      internalID: -7015649904179815300
+      spriteID: 34769f610b2a5b7458dfc406183932e2
+      internalID: -64521705
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_8
+      name: AIR_ATTACK_8
       rect:
         serializedVersion: 2
-        x: 642
-        y: 27
-        width: 11
-        height: 27
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 768
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 7163d3228f07b8ef0800000000000000
-      internalID: -104865955284437481
+      spriteID: 6310a192e52446340b2b7ef98fe637c9
+      internalID: 590271336
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: AIR ATTACK_9
+      name: AIR_ATTACK_9
       rect:
         serializedVersion: 2
-        x: 646
-        y: 35
-        width: 19
-        height: 11
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 864
+        y: 0
+        width: 96
+        height: 80
+      alignment: 9
+      pivot: {x: 0.5, y: 0.15}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: f2afbe7cd25ad0950800000000000000
-      internalID: 6416966660119067183
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: AIR ATTACK_10
-      rect:
-        serializedVersion: 2
-        x: 701
-        y: 11
-        width: 40
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 2aa05ea32313d1e70800000000000000
-      internalID: 9087473714909743778
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: AIR ATTACK_11
-      rect:
-        serializedVersion: 2
-        x: 739
-        y: 37
-        width: 28
-        height: 18
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 359b1886764bb1490800000000000000
-      internalID: -7774421975497066157
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: AIR ATTACK_12
-      rect:
-        serializedVersion: 2
-        x: 797
-        y: 11
-        width: 68
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: a2ad361cbccafe460800000000000000
-      internalID: 7273221914349525546
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: AIR ATTACK_13
-      rect:
-        serializedVersion: 2
-        x: 893
-        y: 11
-        width: 38
-        height: 46
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 9ac54e4d33f67f280800000000000000
-      internalID: -9009610261125636951
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: AIR ATTACK_14
-      rect:
-        serializedVersion: 2
-        x: 739
-        y: 26
-        width: 9
-        height: 7
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: df3fa96fd75ee92e0800000000000000
-      internalID: -2117002445646531587
+      spriteID: 1aabe86b6350d564bb1f36235d1b1fab
+      internalID: -2107744959
       vertices: []
       indices: 
       edges: []
@@ -511,21 +414,16 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      AIR ATTACK_0: -2653649236534657683
-      AIR ATTACK_1: -1431825317807551041
-      AIR ATTACK_10: 9087473714909743778
-      AIR ATTACK_11: -7774421975497066157
-      AIR ATTACK_12: 7273221914349525546
-      AIR ATTACK_13: -9009610261125636951
-      AIR ATTACK_14: -2117002445646531587
-      AIR ATTACK_2: -8463470269853813345
-      AIR ATTACK_3: -112009162646963955
-      AIR ATTACK_4: 3661727149329624196
-      AIR ATTACK_5: -7440583518396288887
-      AIR ATTACK_6: -1243204656468214958
-      AIR ATTACK_7: -7015649904179815300
-      AIR ATTACK_8: -104865955284437481
-      AIR ATTACK_9: 6416966660119067183
+      AIR_ATTACK_0: 162396127
+      AIR_ATTACK_1: -1570199832
+      AIR_ATTACK_2: 466891407
+      AIR_ATTACK_3: 1426364560
+      AIR_ATTACK_4: 530702623
+      AIR_ATTACK_5: 1328178483
+      AIR_ATTACK_6: -1874946918
+      AIR_ATTACK_7: -64521705
+      AIR_ATTACK_8: 590271336
+      AIR_ATTACK_9: -2107744959
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

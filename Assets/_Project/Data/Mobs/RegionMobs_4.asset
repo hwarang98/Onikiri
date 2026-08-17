@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7279377ad1cc9d40a85bd9ae75e8562, type: 3}
+  m_Name: RegionMobs_4
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.RegionMobSet
+  mobs:
+  - {fileID: 11400000, guid: 162c912d08b6d3b4e84d4e7a3fccc868, type: 2}
+  - {fileID: 11400000, guid: 98ab160d4c4b3e942b344b0d55333c4e, type: 2}

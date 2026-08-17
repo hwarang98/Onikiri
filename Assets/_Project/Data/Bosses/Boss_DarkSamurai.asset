@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4010c342f197d57419207c5c1cb399e2, type: 3}
+  m_Name: Boss_DarkSamurai
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.BossConfig
+  displayName: "\uBD89\uC740\uB208 \uC694\uAD34"
+  kind: 0
+  fullIntro: 1
+  soulId: yodo_redeye
+  idleSheet: {fileID: 2800000, guid: a0533d7e924c3cc43bf4916b302e0c46, type: 3}
+  walkSheet: {fileID: 2800000, guid: 12411396718817e49bca366e81b057de, type: 3}
+  hurtSheet: {fileID: 2800000, guid: e7d673badead6824cace4ff2aafba06f, type: 3}
+  deathSheet: {fileID: 2800000, guid: 3ec95ec69cdce174f8f45df8bf7ab42c, type: 3}
+  attackSheet: {fileID: 2800000, guid: 5c2bca8dae7926648a55d4121b209f96, type: 3}
+  attackSheetVariants: []
+  cellWidth: 128
+  cellHeight: 108
+  feetPadding: 12
+  frameRate: 12
+  moveSpeed: 0.85
+  artFacesLeft: 0
+  generatedDefinition: {fileID: 11400000, guid: e86d33969346f0649bfdb480aafbb754, type: 2}
+  attackVfxId: 
+  baseMob: {fileID: 0}
+  scale: 2
+  tint: {r: 1, g: 0.7529412, b: 0.78431374, a: 1}
+  healthMultiplier: 1
+  attackMultiplier: 1
+  goldMultiplier: 1

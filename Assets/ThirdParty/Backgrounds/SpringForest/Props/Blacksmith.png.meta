@@ -91,7 +91,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 0
   spriteMeshType: 0
   alignment: 0
@@ -167,6 +167,19 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
@@ -174,12 +187,12 @@ TextureImporter:
       name: Blacksmith_0
       rect:
         serializedVersion: 2
-        x: 461
-        y: 103
-        width: 7
-        height: 9
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 0
+        y: 0
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -196,12 +209,12 @@ TextureImporter:
       name: Blacksmith_1
       rect:
         serializedVersion: 2
-        x: 633
-        y: 105
-        width: 11
-        height: 7
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 176
+        y: 0
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -218,12 +231,12 @@ TextureImporter:
       name: Blacksmith_2
       rect:
         serializedVersion: 2
-        x: 808
-        y: 107
-        width: 9
-        height: 5
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 352
+        y: 0
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -240,12 +253,12 @@ TextureImporter:
       name: Blacksmith_3
       rect:
         serializedVersion: 2
-        x: 3
+        x: 528
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -262,12 +275,12 @@ TextureImporter:
       name: Blacksmith_4
       rect:
         serializedVersion: 2
-        x: 179
+        x: 704
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -284,12 +297,12 @@ TextureImporter:
       name: Blacksmith_5
       rect:
         serializedVersion: 2
-        x: 355
+        x: 880
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -306,12 +319,12 @@ TextureImporter:
       name: Blacksmith_6
       rect:
         serializedVersion: 2
-        x: 531
+        x: 1056
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -328,12 +341,12 @@ TextureImporter:
       name: Blacksmith_7
       rect:
         serializedVersion: 2
-        x: 707
+        x: 1232
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -350,12 +363,12 @@ TextureImporter:
       name: Blacksmith_8
       rect:
         serializedVersion: 2
-        x: 883
+        x: 1408
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -372,12 +385,12 @@ TextureImporter:
       name: Blacksmith_9
       rect:
         serializedVersion: 2
-        x: 1059
+        x: 1584
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -394,12 +407,12 @@ TextureImporter:
       name: Blacksmith_10
       rect:
         serializedVersion: 2
-        x: 1235
+        x: 1760
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -416,12 +429,12 @@ TextureImporter:
       name: Blacksmith_11
       rect:
         serializedVersion: 2
-        x: 1411
+        x: 1936
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -438,12 +451,12 @@ TextureImporter:
       name: Blacksmith_12
       rect:
         serializedVersion: 2
-        x: 1587
+        x: 2112
         y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        width: 176
+        height: 112
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -452,72 +465,6 @@ TextureImporter:
       bones: []
       spriteID: 81ead6b0c0007f990800000000000000
       internalID: -7352407814927700456
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Blacksmith_13
-      rect:
-        serializedVersion: 2
-        x: 1763
-        y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 629b2f97977fb1920800000000000000
-      internalID: 2962233281035286822
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Blacksmith_14
-      rect:
-        serializedVersion: 2
-        x: 1939
-        y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 41be314d8cd981f80800000000000000
-      internalID: -8135579240967705836
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Blacksmith_15
-      rect:
-        serializedVersion: 2
-        x: 2115
-        y: 0
-        width: 169
-        height: 104
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 0b35a78f558d7c560800000000000000
-      internalID: 7334068381948728240
       vertices: []
       indices: 
       edges: []
@@ -541,9 +488,6 @@ TextureImporter:
       Blacksmith_10: 7495732428478274217
       Blacksmith_11: -6558737973322667468
       Blacksmith_12: -7352407814927700456
-      Blacksmith_13: 2962233281035286822
-      Blacksmith_14: -8135579240967705836
-      Blacksmith_15: 7334068381948728240
       Blacksmith_2: 2519558717104666162
       Blacksmith_3: 7572660796457402651
       Blacksmith_4: -7453021727624417130

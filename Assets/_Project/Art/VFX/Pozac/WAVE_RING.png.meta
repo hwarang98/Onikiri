@@ -1,0 +1,502 @@
+fileFormatVersion: 2
+guid: 9024194e67731b340a733947bc28a84a
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 5520387481850877716
+    second: WAVE_RING_0
+  - first:
+      213: -682074855699679596
+    second: WAVE_RING_1
+  - first:
+      213: -5032391596196944101
+    second: WAVE_RING_2
+  - first:
+      213: -5968059230203547363
+    second: WAVE_RING_3
+  - first:
+      213: -8187094715762191081
+    second: WAVE_RING_4
+  - first:
+      213: -1856679916203854519
+    second: WAVE_RING_5
+  - first:
+      213: -2377403199514319261
+    second: WAVE_RING_6
+  - first:
+      213: -2616532477931885510
+    second: WAVE_RING_7
+  - first:
+      213: -750668907526052472
+    second: WAVE_RING_8
+  - first:
+      213: -7360520272869545315
+    second: WAVE_RING_9
+  - first:
+      213: 7113051901831761282
+    second: WAVE_RING_10
+  - first:
+      213: -8252428284096058047
+    second: WAVE_RING_11
+  - first:
+      213: 7127935748829947044
+    second: WAVE_RING_12
+  - first:
+      213: -3300413319139325059
+    second: WAVE_RING_13
+  - first:
+      213: -6751110906472145720
+    second: WAVE_RING_14
+  - first:
+      213: -5990423627232750254
+    second: WAVE_RING_15
+  - first:
+      213: 7553112929675179184
+    second: WAVE_RING_16
+  - first:
+      213: -4048278215632659249
+    second: WAVE_RING_17
+  - first:
+      213: 2955466851899107726
+    second: WAVE_RING_18
+  - first:
+      213: 1280482320302189771
+    second: WAVE_RING_19
+  - first:
+      213: 135084317343157323
+    second: WAVE_RING_20
+  - first:
+      213: -3002923687945436478
+    second: WAVE_RING_21
+  - first:
+      213: -7684807664388710876
+    second: WAVE_RING_22
+  - first:
+      213: -4008070520208649289
+    second: WAVE_RING_23
+  - first:
+      213: -3271654396981140848
+    second: WAVE_RING_24
+  - first:
+      213: 437541241691250553
+    second: WAVE_RING_25
+  - first:
+      213: 1548098242305336602
+    second: WAVE_RING_26
+  - first:
+      213: -5712795634093236833
+    second: WAVE_RING_27
+  - first:
+      213: -531074159114683172
+    second: WAVE_RING_28
+  - first:
+      213: 2693597183102810262
+    second: WAVE_RING_29
+  - first:
+      213: 7059284985895065977
+    second: WAVE_RING_30
+  - first:
+      213: 7421079056092276971
+    second: WAVE_RING_31
+  - first:
+      213: -2318991619903245333
+    second: WAVE_RING_32
+  - first:
+      213: 5505541330423141293
+    second: WAVE_RING_33
+  - first:
+      213: -6999256130768876512
+    second: WAVE_RING_34
+  - first:
+      213: 9186903476884449023
+    second: WAVE_RING_35
+  - first:
+      213: 1994000109167896192
+    second: WAVE_RING_36
+  - first:
+      213: 5128080776296129379
+    second: WAVE_RING_37
+  - first:
+      213: 4570630512685015111
+    second: WAVE_RING_38
+  - first:
+      213: 5793858751931491027
+    second: WAVE_RING_39
+  - first:
+      213: 4149458348360453234
+    second: WAVE_RING_40
+  - first:
+      213: -7368705605199813642
+    second: WAVE_RING_41
+  - first:
+      213: 4125407739435614079
+    second: WAVE_RING_42
+  - first:
+      213: -7789919125475201737
+    second: WAVE_RING_43
+  - first:
+      213: -5540371360807070174
+    second: WAVE_RING_44
+  - first:
+      213: 8757846937953712468
+    second: WAVE_RING_45
+  - first:
+      213: 5455243661583427218
+    second: WAVE_RING_46
+  - first:
+      213: 7995539687706886208
+    second: WAVE_RING_47
+  - first:
+      213: -7312356940832357812
+    second: WAVE_RING_48
+  - first:
+      213: 6981431771580734538
+    second: WAVE_RING_49
+  - first:
+      213: -1613952841487120597
+    second: WAVE_RING_50
+  - first:
+      213: 2573399362792905336
+    second: WAVE_RING_51
+  - first:
+      213: 5854047643794755658
+    second: WAVE_RING_52
+  - first:
+      213: 2349724225355830734
+    second: WAVE_RING_53
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 0
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 1
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: WAVE_RING_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4171c3e9a2b5c9c40800000000000000
+      internalID: 5520387481850877716
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_1
+      rect:
+        serializedVersion: 2
+        x: 126
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4967bc35888c886f0800000000000000
+      internalID: -682074855699679596
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_2
+      rect:
+        serializedVersion: 2
+        x: 252
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b17250a818a592ab0800000000000000
+      internalID: -5032391596196944101
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_3
+      rect:
+        serializedVersion: 2
+        x: 378
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d11f93110c13d2da0800000000000000
+      internalID: -5968059230203547363
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_4
+      rect:
+        serializedVersion: 2
+        x: 504
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 715548cabb8916e80800000000000000
+      internalID: -8187094715762191081
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_5
+      rect:
+        serializedVersion: 2
+        x: 630
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 945311d047fbb36e0800000000000000
+      internalID: -1856679916203854519
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_6
+      rect:
+        serializedVersion: 2
+        x: 756
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3666215d264c10fd0800000000000000
+      internalID: -2377403199514319261
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: WAVE_RING_7
+      rect:
+        serializedVersion: 2
+        x: 882
+        y: 0
+        width: 126
+        height: 120
+      alignment: 9
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a3ce895039530bbd0800000000000000
+      internalID: -2616532477931885510
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 2718c8852e778ad44995456580f18409
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      WAVE_RING_0: 5520387481850877716
+      WAVE_RING_1: -682074855699679596
+      WAVE_RING_2: -5032391596196944101
+      WAVE_RING_3: -5968059230203547363
+      WAVE_RING_4: -8187094715762191081
+      WAVE_RING_5: -1856679916203854519
+      WAVE_RING_6: -2377403199514319261
+      WAVE_RING_7: -2616532477931885510
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

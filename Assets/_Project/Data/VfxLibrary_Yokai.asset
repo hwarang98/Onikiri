@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a288edfec86153247903e64e2c1dad86, type: 3}
+  m_Name: VfxLibrary_Yokai
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.VfxLibrary
+  clips:
+  - id: crescent
+    frames:
+    - {fileID: -8817235237339478446, guid: 5cc644f15f105ea49a144dbda74395c4, type: 3}
+    - {fileID: -4986965245157821097, guid: 5cc644f15f105ea49a144dbda74395c4, type: 3}
+    - {fileID: 2299941192692531627, guid: 5cc644f15f105ea49a144dbda74395c4, type: 3}
+    - {fileID: 395897443073741171, guid: 5cc644f15f105ea49a144dbda74395c4, type: 3}
+    frameRate: 16
+    scale: 1
+    angle: 0
+    forwardOffset: 1.8
+    heightOffset: 1.06
+  - id: whip
+    frames:
+    - {fileID: 4311718261371108954, guid: d065ba132aaa0e74bad19bb4de7a67b4, type: 3}
+    - {fileID: 6941325948842525417, guid: d065ba132aaa0e74bad19bb4de7a67b4, type: 3}
+    - {fileID: -5216223904637713319, guid: d065ba132aaa0e74bad19bb4de7a67b4, type: 3}
+    - {fileID: 8107981444325600625, guid: d065ba132aaa0e74bad19bb4de7a67b4, type: 3}
+    - {fileID: 8642730533108816533, guid: d065ba132aaa0e74bad19bb4de7a67b4, type: 3}
+    frameRate: 14
+    scale: 1
+    angle: 0
+    forwardOffset: 0.8
+    heightOffset: 1.3
+  - id: wave
+    frames:
+    - {fileID: 816531642611401881, guid: b4cb4e169e3c4a747946857681066753, type: 3}
+    - {fileID: -7664201581800304881, guid: b4cb4e169e3c4a747946857681066753, type: 3}
+    - {fileID: 3958638349945819065, guid: b4cb4e169e3c4a747946857681066753, type: 3}
+    - {fileID: 5205718827688859455, guid: b4cb4e169e3c4a747946857681066753, type: 3}
+    - {fileID: -741172618624160538, guid: b4cb4e169e3c4a747946857681066753, type: 3}
+    frameRate: 14
+    scale: 1
+    angle: 0
+    forwardOffset: 0.7
+    heightOffset: 1.1

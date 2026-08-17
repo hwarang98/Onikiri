@@ -138,6 +138,94 @@ namespace Onikiri.Tests
             Assert.IsTrue(formatted.Contains("e5000"), "Expected scientific fallback, got " + formatted);
         }
 
+        // ------------------------------------------------------------ 전체 자릿수 표기
+
+        [Test]
+        public void FormatFull_ShowsEveryDigitWithSeparators()
+        {
+            Assert.AreEqual("1,234", NumberFormatter.FormatFull(BigDouble.FromDouble(1234d)));
+            Assert.AreEqual("291,512,345", NumberFormatter.FormatFull(BigDouble.FromDouble(291512345d)));
+        }
+
+        [Test]
+        public void FormatFull_BelowThousand_HasNoSeparator()
+        {
+            Assert.AreEqual("0", NumberFormatter.FormatFull(BigDouble.Zero));
+            Assert.AreEqual("5", NumberFormatter.FormatFull(BigDouble.FromDouble(5d)));
+            Assert.AreEqual("999", NumberFormatter.FormatFull(BigDouble.FromDouble(999d)));
+        }
+
+        /**
+         * 축약과 갈라지는 지점. 같은 값이 재화 표기로는 "1.2K", 데미지 팝업으로는
+         * "1,234"로 나와야 한다 - 이것이 이번 변경의 전부다
+         */
+        [Test]
+        public void FormatFull_DivergesFromAbbreviated()
+        {
+            var value = BigDouble.FromDouble(1234d);
+            Assert.AreEqual("1.2K", NumberFormatter.Format(value));
+            Assert.AreEqual("1,234", NumberFormatter.FormatFull(value));
+        }
+
+        /**
+         * @brief 자릿수가 아무리 늘어도 **축약으로 도망가지 않는다.**
+         *
+         * 한때 12자리에서 멈추고 그 위는 축약으로 되돌렸다. 그 폴백이 실제로 한
+         * 일은 후반에 이 기능을 통째로 끄는 것이었다 - 강화가 쌓이면 타격은 금방
+         * 10^16을 넘고, 그때부터는 전체 표기를 켠 적이 없는 것과 같아진다.
+         *
+         * 사용자 지시로 상한을 없앴다. 폭은 폰트로 푼다(ThaleahScale 3 -> 2).
+         */
+        [Test]
+        public void FormatFull_NeverFallsBackToAbbreviated()
+        {
+            Assert.AreEqual("999,999,999,999",
+                            NumberFormatter.FormatFull(BigDouble.FromDouble(999999999999d)));
+
+            // 옛 상한 바로 위. 축약이 아니라 전체 자릿수여야 한다
+            Assert.AreEqual("1,000,000,000,000", NumberFormatter.FormatFull(BigDouble.Create(1d, 12L)));
+            Assert.AreEqual("1,200,000,000,000,000", NumberFormatter.FormatFull(BigDouble.Create(1.2d, 15L)));
+
+            // 실제로 화면에서 축약이 보이던 자리 (공격력 Lv.2203 무렵)
+            Assert.AreEqual("26,400,000,000,000,000",
+                            NumberFormatter.FormatFull(BigDouble.Create(2.64d, 16L)));
+        }
+
+        /**
+         * @brief double 범위(10^308) 밖에서도 자릿수를 짓는다.
+         *
+         * `ToDouble()`은 그 위에서 무한대가 되므로 가수부 유효자리 + 0으로 만든다.
+         * BigDouble은 10^2042까지 가므로 언젠가 닿는 구간이다.
+         */
+        [Test]
+        public void FormatFull_WorksBeyondDoubleRange()
+        {
+            var huge = NumberFormatter.FormatFull(BigDouble.Create(1d, 400L));
+
+            // 1 뒤에 0이 400개 = 401자리. 401 % 3 = 2라 맨 앞 묶음이 두 자리("10")다
+            Assert.AreEqual(401 + 133, huge.Length, "자릿수 401 + 쉼표 133이어야 한다");
+            Assert.IsTrue(huge.StartsWith("10,000,"), "맨 앞 묶음이 두 자리여야 한다: " + huge.Substring(0, 8));
+            Assert.IsFalse(huge.Contains("E"), "지수 표기로 새면 안 된다");
+            Assert.IsFalse(huge.Contains("∞"), "무한대로 새면 안 된다");
+        }
+
+        /** 유효자리 아래는 0이다. double이 원래 들고 있지 않은 정보다 */
+        [Test]
+        public void FormatFull_PadsBeyondSignificantDigitsWithZeroes()
+        {
+            // 1.2345678901234567 x 10^20 -> 앞 15자리만 진짜(15번째에서 반올림),
+            // 나머지 6자리는 0. double이 원래 들고 있지 않은 자리다
+            var text = NumberFormatter.FormatFull(BigDouble.Create(1.2345678901234567d, 20L));
+
+            Assert.AreEqual("123,456,789,012,346,000,000", text);
+        }
+
+        [Test]
+        public void FormatFull_NegativeKeepsSign()
+        {
+            Assert.AreEqual("-1,234", NumberFormatter.FormatFull(BigDouble.FromDouble(-1234d)));
+        }
+
         [Test]
         public void Duration_FormatsCompactly()
         {

@@ -3,6 +3,7 @@
     "rootNamespace": "Onikiri.Tests",
     "references": [
         "Onikiri.Runtime",
+        "Onikiri.DevTools",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

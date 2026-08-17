@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a755fbb40057134aa3af5303b090010, type: 3}
+  m_Name: Enemy_Boss_Executioner
+  m_EditorClassIdentifier: Onikiri.Runtime::Onikiri.Battle.EnemyDefinition
+  displayName: "\uCC98\uD615\uC778"
+  idleFrames:
+  - {fileID: 815424164945274260, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: -270785710348516584, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: 8443794771774750484, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: 1777182293076053196, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: 6114163804962241700, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: -7154528564402915179, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: -8112586356116296526, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: 6124698253077029035, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: 900705793506851975, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: -705124532602476047, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: 5163444025004545101, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  - {fileID: -7116078867445553742, guid: fc70ab51c5a8df6448fffd355360147e, type: 3}
+  walkFrames:
+  - {fileID: 1675591081817592477, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 8567217733156871805, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: -844607794755927498, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 8281386150497923764, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 1733609291106537979, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: -6466037411978660262, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 4313088863760870316, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 110470969849003857, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 8543948204784495141, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 1185585584393584564, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: 6577857483261853295, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  - {fileID: -3272854615633135238, guid: 6a4862dc9b852b447a777c0483e97513, type: 3}
+  hurtFrames:
+  - {fileID: 3571635775238715396, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
+  - {fileID: -6552392919759675800, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
+  - {fileID: -4191814458887339610, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
+  - {fileID: -5703626821815436037, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
+  - {fileID: 4332283064884588920, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
+  - {fileID: 7281234911334293172, guid: b933bb9610d11eb41bcbea61dcc64b2e, type: 3}
+  deathFrames:
+  - {fileID: -1745646317731160461, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -1962882971833571424, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: 7163519229324203079, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -2824850348822682002, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -4395442915117589123, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: 7527047216810660112, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -6116082883535636463, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -5775218795824829258, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -5608201998214337042, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: 6576388434661106147, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  - {fileID: -1154471196408308341, guid: 35f95c1cc5b1f104fb69d3aea5847358, type: 3}
+  frameRate: 12
+  spawnWeight: 0
+  maxHealth:
+    m: 0
+    e: 0
+  goldReward:
+    m: 0
+    e: 0
+  moveSpeed: 0.85
+  queueSpacing: 2
+  attackFrames:
+  - {fileID: -1885436774, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: 1685713697, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: 1299527389, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: -1131463825, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: 1113959349, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: 1412311058, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: -265163356, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: -1228493469, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: -1830818796, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: 1911828765, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  - {fileID: -1799208618, guid: cf92429720ae7c64087cecdbdc697b46, type: 3}
+  attackVariants: []
+  attackInterval: 2
+  attackImpactPoint: 0.55
+  attackTelegraphSeconds: 0
+  hoverHeight: 0
+  artBottomOffset: 0
+  artFacesLeft: 1

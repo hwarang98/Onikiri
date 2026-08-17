@@ -80,7 +80,10 @@ namespace Onikiri.Tests
 
             for (int level = 1; level <= 20; level++)
             {
-                double expected = PowerBaseCost * System.Math.Pow(PowerCostGrowth, level - 1);
+                // 정수화(E-3 수정)를 지난 값이 기대값이다. 곡선 statics와 트랙이
+                // 같은 규칙을 지나는지는 UpgradeCostTests가 따로 잰다
+                double expected = UpgradeCost.Quantize(
+                    PowerBaseCost * System.Math.Pow(PowerCostGrowth, level - 1));
                 Assert.AreEqual(expected, track.Cost.ToDouble(), expected * 1e-6d,
                     "cost wrong at level " + level);
                 Assert.IsTrue(track.TryPurchase(wallet));
@@ -166,8 +169,18 @@ namespace Onikiri.Tests
             Object.DestroyImmediate(wallet.gameObject);
         }
 
+        /**
+         * @brief SetLevel은 아래로만 막는다. 위로는 막지 않는다.
+         *
+         * 9단계에서 바뀐 동작이다. 예전에는 maxLevel로도 잘랐는데, 그러면 상한이
+         * 내려간 업데이트에서 플레이어가 산 레벨이 영구히 사라진다 - 공격속도 상한을
+         * 51에서 32로 낮췄을 때 Lv.44 세이브가 정확히 그렇게 됐다.
+         *
+         * 이제 레벨은 남고 효과만 valueCeiling에서 막힌다. 구매는 여전히 IsMaxed가
+         * 막으므로 UI 동작은 달라지지 않는다.
+         */
         [Test]
-        public void SetLevel_ClampsToTheAllowedRange()
+        public void SetLevel_ClampsBelowOneButKeepsLevelsPastTheCap()
         {
             var track = AttackSpeed();
 
@@ -175,7 +188,9 @@ namespace Onikiri.Tests
             Assert.AreEqual(1, track.Level, "level 0 would make the base value unreachable");
 
             track.SetLevel(SpeedMaxLevel + 50);
-            Assert.AreEqual(SpeedMaxLevel, track.Level);
+            Assert.AreEqual(SpeedMaxLevel + 50, track.Level,
+                "저장된 레벨이 잘렸다. 상한이 내려간 업데이트에서 플레이어가 산 것이 사라진다");
+            Assert.IsTrue(track.IsMaxed, "상한 위인데 더 살 수 있는 상태로 보인다");
         }
 
         [Test]
