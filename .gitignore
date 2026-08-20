@@ -121,3 +121,9 @@ InitTestScene*.unity*
 /dev/
 
 /Artifacts
+
+# Firestore 규칙 테스트(개발 전용) 의존성 - 58단계
+/tools/firestore-rules-tests/node_modules/
+/tools/firestore-rules-tests/package-lock.json
+/firebase-debug.log
+/firestore-debug.log

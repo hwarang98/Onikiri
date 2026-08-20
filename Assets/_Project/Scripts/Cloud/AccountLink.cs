@@ -262,6 +262,12 @@ namespace Onikiri.Cloud
 
             // [5] **복구.** 이 구글 계정에는 이미 uid가 있다 - 그리로 돌아간다
             Set("기존 계정을 찾았습니다 - 기록을 복구하는 중...");
+
+            // ① uid를 갈아타기 **전에** 현재 로컬 세이브를 복구 후보로 보존한다
+            //    (61단계, 설계 §8.2). 교체 뒤에 하면 "어느 세이브가 이 기기의
+            //    것이었나"를 말할 근거가 흐려진다
+            SaveData saveCandidate = CloudSaveRecovery.PrepareCandidate();
+
             abandonedStage = await CloudScores.FetchStageOfAsync(abandonedUid);
 
             var auth = CloudScores.Auth;
@@ -286,6 +292,15 @@ namespace Onikiri.Cloud
 
             Debug.Log(Tag + " ★ 복구 성공 - uid 교체 " + abandonedUid
                       + " -> " + recoveredUser.UserId);
+
+            // ②~⑤ **게임 세이브**를 잇는다 (61단계). 기존 계정의 playerSaves를
+            //    읽어 없으면 로컬이 첫 정본, 같으면 조용히, 다르면 충돌 화면이다.
+            //    아래의 랭킹 max 병합과는 **다른 규칙**이다 - 랭킹은 값 하나의
+            //    최고 기록이고, 세이브는 한 벌 통째 선택이다(설계 §8.2 꼬리).
+            //    ⑥ 버려진 익명 save 문서는 어느 갈래도 지우지 않는다(규칙 4-B)
+            CloudRecoveryPlan savePlan =
+                await CloudSaveRecovery.RunAsync(recoveredUser.UserId, saveCandidate);
+            Debug.Log(Tag + " 세이브 복구 갈래 = " + savePlan);
 
             int recoveredStage = await CloudScores.FetchReachAsync();
             if (recoveredStage < 0) recoveredStage = 0;
@@ -321,9 +336,14 @@ namespace Onikiri.Cloud
             // ⚠️ 버려진 익명 문서는 **지우지 않는다**. 규칙 4-B가 클라이언트
             //    delete를 막아 두었고, 그 판단은 이 스텝에서도 유효하다
             //    (AccountLinkPolicy.ShouldDeleteAbandonedDocument 주석)
-            Set(recoveredStage > 0
-                ? "기록을 복구했습니다 - 최고 " + Math.Max(merged, recoveredStage) + "층"
-                : provider.DisplayName + " 계정으로 로그인했습니다");
+            //
+            // 세이브가 갈라졌으면 그 사실이 문장에 먼저 온다 - "복구했습니다"라고
+            // 말해 놓고 진행이 옛것이면, 선택이 남았다는 것을 아무도 모른다
+            Set(savePlan == CloudRecoveryPlan.AskTheHuman
+                ? "계정을 복구했습니다 - 이어갈 기록을 선택하세요"
+                : recoveredStage > 0
+                    ? "기록을 복구했습니다 - 최고 " + Math.Max(merged, recoveredStage) + "층"
+                    : provider.DisplayName + " 계정으로 로그인했습니다");
 
             return true;
         }

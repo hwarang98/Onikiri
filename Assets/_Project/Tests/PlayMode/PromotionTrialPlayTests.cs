@@ -57,9 +57,7 @@ namespace Onikiri.Tests.PlayMode
         PlayerCombat combat;
         Onikiri.UI.TrialHud trialHud;
 
-        string savePath;
-        byte[] savedBytes;
-        string savedHash;
+        SaveSandbox sandbox;
 
         // ------------------------------------------------------------ 준비
 
@@ -67,16 +65,14 @@ namespace Onikiri.Tests.PlayMode
         public IEnumerator LoadScene()
         {
             /**
-             * @brief **씬을 열기 전에 세이브를 뜬다.**
+             * @brief **씬을 열기 전에 세이브 경로를 격리한다** (61단계 S5-0).
              *
-             * 처음에는 씬을 한 프레임 돌린 뒤에 떴다. 그 한 프레임 사이에
-             * `GameSession`이 로드하고 v21로 마이그레이션해 저장할 수 있으므로,
-             * 그때 뜬 "원본"은 이미 오염된 값이다 - 백업의 뜻이 없어진다.
+             * 60단계까지는 원본 바이트를 떠 두고 TearDown이 되돌렸다 - 그 반창고는
+             * 검사가 죽거나 에디터가 행에 걸리면 안 붙었고, 실제로 이 클래스가
+             * 그 순서에 두 번 물렸다. 이제 `GameSession`이 보는 경로 자체가 임시
+             * 폴더라, 어떤 경로로 저장이 나가도 실사용 파일은 못 만진다.
              */
-            savePath = System.IO.Path.Combine(Application.persistentDataPath, SaveSystem.FileName);
-            savedBytes = System.IO.File.Exists(savePath)
-                ? System.IO.File.ReadAllBytes(savePath) : null;
-            savedHash = HashOf(savedBytes);
+            sandbox = new SaveSandbox();
 
             yield return SceneManager.LoadSceneAsync(MainScene, LoadSceneMode.Single);
             yield return null;
@@ -133,25 +129,10 @@ namespace Onikiri.Tests.PlayMode
              */
             TrialDamageScale.ResetAudit();
 
-            // 검사가 실패하거나 중단돼도 반드시 돈다
-            if (!string.IsNullOrEmpty(savePath))
-            {
-                if (savedBytes != null) System.IO.File.WriteAllBytes(savePath, savedBytes);
-                else if (System.IO.File.Exists(savePath)) System.IO.File.Delete(savePath);
-            }
-
-            var now = System.IO.File.Exists(savePath)
-                ? HashOf(System.IO.File.ReadAllBytes(savePath)) : HashOf(null);
-
-            Assert.AreEqual(savedHash, now,
-                "복구 뒤에도 세이브 해시가 원본과 다르다 - 사용자 세이브가 오염됐다");
-        }
-
-        static string HashOf(byte[] bytes)
-        {
-            if (bytes == null) return "(none)";
-            using (var md5 = System.Security.Cryptography.MD5.Create())
-                return System.BitConverter.ToString(md5.ComputeHash(bytes));
+            // 루트를 되돌리고 **실사용 파일이 그대로인지 검사한다** - 격리가
+            // 뚫렸으면 여기서 예외로 실패한다 (S5-0 회귀 방지)
+            if (sandbox != null) sandbox.Dispose();
+            sandbox = null;
         }
 
         // ------------------------------------------------------------ 헬퍼
@@ -317,6 +298,21 @@ namespace Onikiri.Tests.PlayMode
         void SuspendPlayerDamage()
         {
             if (combat != null) combat.enabled = false;
+
+            /**
+             * @brief **죽지도 않는다.** 61단계 경로 격리가 드러낸 숨은 의존이다.
+             *
+             * 이 헬퍼의 주석은 "죽지 않으므로 폐쇄까지 간다"고 적었지만, 그
+             * 생존은 사실 **실사용 세이브의 강화 상태**가 우연히 보장하고
+             * 있었다 - 샌드박스(새 게임) 부팅이 되자 st30 귀문 적의 첫 타가
+             * 기본 체력(100)을 넘어 2.3초 만에 사망 실패가 났고, 시계 검사
+             * 다섯(격노 90초·폐쇄 180초·공격 간격)이 통째로 무너졌다.
+             *
+             * 검사가 재는 것은 시계이지 생존이 아니므로 체력 풀을 검사 스스로
+             * 세운다. 사망 검사는 `Current + 1`을 때리므로 이 값과 무관하게
+             * 죽고, 회복 검사는 비율(MaxHealth * 0.4)로 재므로 그대로 성립한다.
+             */
+            if (health != null) health.MaxHealthStat = 1e12d;
 
             foreach (var pet in Object.FindObjectsByType<PetCombat>(
                          FindObjectsInactive.Include, FindObjectsSortMode.None))

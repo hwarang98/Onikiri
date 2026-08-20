@@ -91,6 +91,45 @@ namespace Onikiri.EditorTools
         private int mergeAbandoned;
         private int mergeRecovered = 171;
 
+        /**
+         * @brief 크로스 저장 절의 판정 계산기 입력 (1단계).
+         *
+         * 기본값이 **충돌**이다 - 서버도 갔고 이 기기도 놀았다. 크로스 저장에서
+         * 사람이 실제로 마주치는 어려운 상태가 그것 하나뿐이라, 창을 열면 그
+         * 답이 먼저 보이는 편이 맞다(병합 계산기가 "재설치 직후"를 기본으로
+         * 둔 것과 같은 이유).
+         *
+         * 실제 서버 왕복은 여기 없다. 1단계는 순수 규칙과 로컬 형식까지이고,
+         * 저장소·규칙은 2단계다.
+         */
+        private bool cloudSaveServerChecked = true;
+        private bool cloudSaveHasLocal = true;
+        private bool cloudSaveHasCloud = true;
+        private bool cloudSaveSameRecord;
+        private bool cloudSaveLocalChanged = true;
+        private bool cloudSaveHasSidecar = true;
+        private bool cloudSaveChainBroken;
+        private Onikiri.Cloud.CloudSaveEnvelopeFault cloudSaveFault =
+            Onikiri.Cloud.CloudSaveEnvelopeFault.None;
+        private long cloudSaveBaseRevision = 5L;
+        private long cloudSaveServerRevision = 6L;
+        private int cloudSaveServerSaveVersion = Onikiri.Progression.SaveData.CurrentVersion;
+
+        /** 디스크의 세이브에서 실제로 뽑은 지문. 버튼을 누를 때만 갱신한다 */
+        private string cloudSaveFingerprintPreview = string.Empty;
+
+        /**
+         * @brief 2단계(저장소·세션) 절의 안전 스위치와 결과판.
+         *
+         * 기본값이 **꺼짐**인 것이 요점이다. 에디터의 Firebase는 운영
+         * 프로젝트(onikiri-9cc18)에 붙으므로, 이 절의 버튼은 실서버로 나간다.
+         * 58단계는 규칙을 **배포하지 않았으므로** 지금 누르면 거부되는 것이
+         * 정답이고, 그 사실 자체가 확인거리다 - 다만 사람이 모르고 누르는
+         * 일은 없어야 한다.
+         */
+        private bool cloudStoreAllowServerCalls;
+        private string cloudStorePreview = string.Empty;
+
         /** 공격속도 실측용. 창 길이는 게임 시간으로 잰다 */
         private float rateWindowStart;
         private int rateWindowAttacks;
@@ -3318,6 +3357,651 @@ namespace Onikiri.EditorTools
                     + "도달층 복구**입니다. AlreadyInUse -> Recover 갈래를 밟는지 보세요.",
                     MessageType.Info);
             }
+
+            DrawCloudSaveTools();
+        }
+
+        /**
+         * @brief 크로스 저장 (1단계). **계정 절 바로 다음이다 - 같은 uid를 쓴다.**
+         *
+         * 이 스텝에는 Firestore가 한 줄도 없다. 그래서 이 절이 하는 일은 셋이다:
+         *
+         *   지문      디스크의 세이브가 실제로 몇 바이트이고 두 지문이 무엇인가.
+         *             **시각만 바꿔 저장했을 때 상태 지문이 안 움직이는 것**을
+         *             눈으로 보는 자리다 - 위 세이브 절의 "방치 적용"을 누른 뒤
+         *             다시 뽑으면 payload 지문만 달라진다
+         *
+         *   판정표    설계 6.1의 아홉 줄을 손으로 만든다. 실기에서 이 상태들을
+         *             만들려면 기기 둘과 재설치가 통째로 드는데, 여기서는
+         *             체크박스 여섯 개다
+         *
+         *   sidecar   서버에 대해 이 기기가 아는 것. 지우면 "아무것도 모르는
+         *             기기"가 되고, 그 상태에서 두 기록이 갈리면 답은 언제나
+         *             충돌 화면이다
+         *
+         * 진짜 검증은 2단계(규칙)와 6단계(기기 둘)다. 여기서 초록불이 떠도
+         * 그것은 "규칙이 맞게 짜였는가"까지다.
+         */
+        private void DrawCloudSaveTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (1단계 - 규칙과 지문)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("세이브", SaveSystem.Exists ? "있음" : "없음");
+                Row("sidecar", Onikiri.Cloud.CloudSaveSidecar.Exists
+                    ? Onikiri.Cloud.CloudSaveSidecar.Path : "없음 (서버를 모르는 기기)");
+
+                var sidecar = Onikiri.Cloud.CloudSaveSidecar.Load();
+                if (sidecar != null)
+                {
+                    Row("소유 uid", string.IsNullOrEmpty(sidecar.ownerUid) ? "(없음)" : sidecar.ownerUid);
+                    Row("base rev", sidecar.baseRevision.ToString()
+                        + (sidecar.HasPending ? "   / 보내는 중: " + sidecar.pendingMutationId : string.Empty));
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("디스크 세이브 지문 뽑기")) RefreshCloudSaveFingerprint();
+                    if (GUILayout.Button("sidecar 지우기")) Onikiri.Cloud.CloudSaveSidecar.Delete();
+                }
+
+                if (!string.IsNullOrEmpty(cloudSaveFingerprintPreview))
+                    EditorGUILayout.HelpBox(cloudSaveFingerprintPreview, MessageType.None);
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("판정 계산기 (부팅에서 무엇을 할 것인가)",
+                                           EditorStyles.miniBoldLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    cloudSaveServerChecked = EditorGUILayout.ToggleLeft(
+                        "서버 확인됨", cloudSaveServerChecked, GUILayout.Width(96f));
+                    cloudSaveHasLocal = EditorGUILayout.ToggleLeft(
+                        "로컬 있음", cloudSaveHasLocal, GUILayout.Width(88f));
+                    cloudSaveHasCloud = EditorGUILayout.ToggleLeft(
+                        "서버 문서 있음", cloudSaveHasCloud, GUILayout.Width(110f));
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    cloudSaveHasSidecar = EditorGUILayout.ToggleLeft(
+                        "sidecar 있음", cloudSaveHasSidecar, GUILayout.Width(96f));
+                    cloudSaveLocalChanged = EditorGUILayout.ToggleLeft(
+                        "로컬 변경됨", cloudSaveLocalChanged, GUILayout.Width(88f));
+                    cloudSaveSameRecord = EditorGUILayout.ToggleLeft(
+                        "같은 기록", cloudSaveSameRecord, GUILayout.Width(110f));
+                }
+
+                cloudSaveFault = (Onikiri.Cloud.CloudSaveEnvelopeFault)EditorGUILayout.EnumPopup(
+                    "봉투 검증 결과", cloudSaveFault);
+
+                cloudSaveChainBroken = EditorGUILayout.ToggleLeft(
+                    "사슬 끊김 (baseRevision != revision - 1)", cloudSaveChainBroken);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    cloudSaveBaseRevision = EditorGUILayout.LongField("base rev", cloudSaveBaseRevision);
+                    cloudSaveServerRevision = EditorGUILayout.LongField("서버 rev", cloudSaveServerRevision);
+                }
+
+                cloudSaveServerSaveVersion = EditorGUILayout.IntField(
+                    "서버 세이브 v", cloudSaveServerSaveVersion);
+
+                var verdict = Onikiri.Cloud.CloudSavePolicy.Decide(BuildCloudSaveFacts());
+                Row("판정", verdict.ToString() + "   -   " + CloudSaveVerdictText(verdict));
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("다른 기기가 앞서 감"))
+                    { CloudSavePreset(true, true, true, false, true, false); }
+                    if (GUILayout.Button("이 기기만 놀았다"))
+                    { CloudSavePreset(true, true, true, true, true, true); cloudSaveServerRevision = cloudSaveBaseRevision; }
+                    if (GUILayout.Button("둘 다 놀았다 (충돌)"))
+                    { CloudSavePreset(true, true, true, true, true, false); }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("재설치 (로컬 없음)"))
+                    { CloudSavePreset(true, false, true, false, false, false); }
+                    if (GUILayout.Button("오프라인"))
+                    { CloudSavePreset(false, true, true, true, true, false); }
+                    if (GUILayout.Button("미래 버전 세이브"))
+                    {
+                        CloudSavePreset(true, true, true, true, true, false);
+                        cloudSaveServerSaveVersion = Onikiri.Progression.SaveData.CurrentVersion + 1;
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    // 동기화 이력이 있는데 문서가 사라진 상태. 여기서 신규 업로드를
+                    // 내면 사슬이 1로 리셋되어 다른 기기의 base가 갈 곳을 잃는다
+                    if (GUILayout.Button("문서가 사라짐 (동기화 이력 있음)"))
+                    {
+                        CloudSavePreset(true, true, false, true, true, false);
+                        cloudSaveBaseRevision = 41L;
+                    }
+                    if (GUILayout.Button("봉투 손상 (해시 불일치)"))
+                    {
+                        CloudSavePreset(true, true, true, true, true, false);
+                        cloudSaveFault = Onikiri.Cloud.CloudSaveEnvelopeFault.PayloadHashMismatch;
+                    }
+                    if (GUILayout.Button("사슬 끊김"))
+                    {
+                        CloudSavePreset(true, true, true, true, true, false);
+                        cloudSaveChainBroken = true;
+                    }
+                }
+
+                EditorGUILayout.HelpBox(
+                    "1단계에는 Firestore 쓰기가 없습니다 - 여기 있는 것은 규칙과 로컬 형식뿐입니다.\n"
+                    + "★ 이 설계의 알맹이는 **필드별 병합이 없다**는 것입니다. 두 기록이 갈리면 "
+                    + "보석·오의·천장을 섞지 않고 한쪽 브랜치를 통째로 고릅니다 - 섞으면 지불 전 "
+                    + "지갑과 지불 후 상품이 같은 세이브에 남습니다.\n"
+                    + "디바운스 " + Onikiri.Cloud.CloudSavePolicy.DebounceSeconds + "초 / 세션 만료 "
+                    + Onikiri.Cloud.CloudSavePolicy.SessionExpirySeconds + "초 / payload 상한 "
+                    + (Onikiri.Cloud.CloudSaveFingerprint.MaxPayloadBytes / 1024) + "KB",
+                    MessageType.Info);
+            }
+
+            DrawCloudStoreTools();
+        }
+
+        /**
+         * @brief 크로스 저장 2단계 (58단계) - 저장소·세션. **실서버로 나가는 절이다.**
+         *
+         * 위 절(1단계)은 파일과 순수 규칙만 만졌지만 여기 있는 버튼은 Firestore로
+         * 간다. 그리고 에디터의 Firebase는 **운영 프로젝트(onikiri-9cc18)**에 붙는다 -
+         * 58단계는 규칙을 배포하지 않았으므로 `playerSaves` 쓰기는 지금 **거부되는
+         * 것이 정답**이다(규칙의 catch-all이 닫혀 있다). 그 거부를 눈으로 보는 것도
+         * 이 절의 용도이고, 그래서 스위치를 하나 두고 기본값을 꺼짐으로 둔다 -
+         * 모르고 누르는 일이 없어야 한다.
+         *
+         * 진짜 규칙 검증은 여기가 아니라 Emulator다:
+         *
+         *     npm --prefix tools/firestore-rules-tests test   (47개)
+         *
+         * 그쪽은 `demo-onikiri`라는 데모 프로젝트를 쓰므로 실 프로젝트에 닿지 않고,
+         * 만료된 heartbeat처럼 **규칙을 통해서는 만들 수 없는 상태**까지 만들어 잰다.
+         */
+        private void DrawCloudStoreTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (2단계 - 저장소·세션)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                string uid = Onikiri.Cloud.CloudScores.Uid;
+
+                Row("uid", string.IsNullOrEmpty(uid) ? "(로그인 전)" : uid);
+                Row("세션 id", Onikiri.Cloud.CloudSaveSession.CurrentId);
+                Row("세션 상태", Onikiri.Cloud.CloudSaveSession.LastStatus
+                    + (Onikiri.Cloud.CloudSaveSession.HoldsWrite ? "   (작성권 있음)" : string.Empty));
+
+                var sidecar = Onikiri.Cloud.CloudSaveSidecar.Load();
+                Row("기기 id", sidecar != null ? sidecar.deviceId : "(sidecar 없음)");
+                Row("문서", Onikiri.Cloud.CloudSaveEnvelope.Collection + "/"
+                    + (string.IsNullOrEmpty(uid) ? "{uid}" : uid));
+
+                cloudStoreAllowServerCalls = EditorGUILayout.ToggleLeft(
+                    "실서버 호출 허용 (운영 프로젝트로 나갑니다)", cloudStoreAllowServerCalls);
+
+                using (new EditorGUI.DisabledScope(!cloudStoreAllowServerCalls || string.IsNullOrEmpty(uid)))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("세션 획득")) RunSession(Onikiri.Cloud.CloudSaveSession.AcquireAsync, "획득");
+                        if (GUILayout.Button("heartbeat")) RunSession(Onikiri.Cloud.CloudSaveSession.HeartbeatAsync, "heartbeat");
+                        if (GUILayout.Button("release")) RunSession(Onikiri.Cloud.CloudSaveSession.ReleaseAsync, "release");
+                    }
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("정본 읽기 (Source.Server)")) FetchCanonicalForPanel();
+                        if (GUILayout.Button("지금 커밋 (revision + 1)")) CommitForPanel();
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(cloudStorePreview))
+                    EditorGUILayout.HelpBox(cloudStorePreview, MessageType.None);
+
+                EditorGUILayout.HelpBox(
+                    "★ 규칙 검증은 이 창이 아니라 Emulator입니다:\n"
+                    + "    npm --prefix tools/firestore-rules-tests test   (47개)\n"
+                    + "여기 버튼은 **운영 프로젝트**로 나갑니다. 58단계는 규칙을 배포하지 "
+                    + "않았으므로 playerSaves 쓰기는 거부(PermissionDenied)가 정답입니다.\n"
+                    + "커밋은 pending을 sidecar에 먼저 남기고, 그 저장이 성공했을 때만 "
+                    + "서버 트랜잭션을 시작합니다.", MessageType.Info);
+            }
+
+            DrawCloudBootTools();
+        }
+
+        /**
+         * @brief 크로스 저장 3단계 (59단계) - 부팅 선택. **이 스텝의 알맹이는 순서다.**
+         *
+         * 재는 것이 둘이다: 부팅 적용이 **한 번**인가, 방치 보상이 **한 번**인가.
+         * 예전 구조(즉시 Apply 후 클라우드 덮어쓰기)에서는 로컬 기준으로 한 번,
+         * 클라우드 기준으로 또 한 번 나갔다 - 그 사고가 다시 열렸는지는 이 두
+         * 숫자만 보면 안다.
+         *
+         * 서버 확인 스위치가 기본 꺼짐인 이유는 규칙이 아직 운영에 배포되지
+         * 않았기 때문이다(58단계). 켜면 부팅마다 거부되는 왕복이 하나 나간다.
+         */
+        private void DrawCloudBootTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (3단계 - 부팅 선택)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("상태", Onikiri.Cloud.CloudSaveCoordinator.State.ToString());
+                Row("서버 확인", Onikiri.Cloud.CloudSaveCoordinator.LastServerStatus.ToString());
+
+                var choice = Onikiri.Cloud.CloudSaveCoordinator.LastChoice;
+                Row("선택", choice != null ? choice.reason : "(아직 부팅 안 함)");
+
+                if (session != null)
+                {
+                    Row("부팅 적용", session.BootApplyCount + "회"
+                        + (session.BootApplyCount == 1 ? "   (정상)" : "   ← 1이어야 한다"));
+                    Row("방치 보상", session.OfflineRewardGrants + "회   "
+                        + Onikiri.Core.NumberFormatter.Format(session.LastOfflineReward));
+                }
+                else
+                {
+                    Row("부팅 적용", "(플레이 모드에서 표시됩니다)");
+                }
+
+                Row("적용 전 백업", System.IO.File.Exists(Onikiri.Cloud.CloudSaveCoordinator.PreCloudBackupPath)
+                    ? "있음 (클라우드를 채택한 적이 있다)" : "없음");
+
+                // 실기의 스위치(ServerCheckEnabled)는 이제 기본 켜짐이다. 에디터는
+                // 별도 게이트가 막는다 - 에디터의 Firebase는 운영 프로젝트라,
+                // 플레이·테스트가 운영 정본을 읽는 것은 사고이지 기능이 아니다
+                Onikiri.Cloud.CloudSaveCoordinator.EditorServerCheckAllowed =
+                    EditorGUILayout.ToggleLeft(
+                        "에디터에서 부팅 실서버 확인 허용 (운영 프로젝트로 나갑니다)",
+                        Onikiri.Cloud.CloudSaveCoordinator.EditorServerCheckAllowed);
+
+                EditorGUILayout.HelpBox(
+                    "부팅 순서: 로컬 읽기 → sidecar → (최대 "
+                    + Onikiri.Cloud.CloudSavePolicy.BootServerCheckSeconds + "초) 서버 확인 → 판정 → "
+                    + "고른 한 벌만 Apply 1회 → 방치 보상 1회 → 즉시 저장.\n"
+                    + "★ 충돌이 나도 이 스텝은 **자동으로 아무것도 쓰지 않습니다** - 로컬로 들어가고 "
+                    + "상태만 Conflict로 남습니다(선택 UI는 4단계).\n"
+                    + "위 '세이브' 절의 '다시 불러오기'는 디스크만 다시 얹습니다 - 클라우드 선택을 "
+                    + "다시 지나지 않습니다.", MessageType.Info);
+            }
+
+            DrawCloudSyncTools();
+        }
+
+        /**
+         * @brief 크로스 저장 4단계 (60단계) - 자동 동기화·충돌.
+         *
+         * 실기에서 이 절이 답하는 질문: 지금 상태 문장이 무엇인가(설계 §9의
+         * 넷 중 하나) · dirty/urgent가 걸려 있는가 · 충돌 화면을 지금 열 수
+         * 있는가. 120초를 기다리기 싫으면 urgent 버튼이 2초로 줄인다.
+         */
+        private void DrawCloudSyncTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (4단계 - 자동 동기화·충돌)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("상태 문장", Onikiri.Cloud.CloudSaveSync.StatusLine);
+                Row("다른 기기", Onikiri.Cloud.CloudSaveSync.OtherDeviceActive ? "활동 중" : "조용함");
+
+                Onikiri.Cloud.CloudSaveSync.EditorNetworkAllowed = EditorGUILayout.ToggleLeft(
+                    "에디터에서 sync 실서버 허용 (기본 꺼짐 - 두 번의 행이 이 스위치의 이유다)",
+                    Onikiri.Cloud.CloudSaveSync.EditorNetworkAllowed);
+
+                using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("urgent 예약 (2초 뒤 커밋)"))
+                            Onikiri.Cloud.CloudSaveSync.RequestUrgent("테스트 패널");
+                        if (GUILayout.Button("pause 신호 (저장+release 시도)"))
+                            Onikiri.Cloud.CloudSaveSync.OnAppPaused();
+                        if (GUILayout.Button("resume 신호 (재획득+확인)"))
+                            Onikiri.Cloud.CloudSaveSync.OnAppResumed();
+                    }
+
+                    var conflictPanel = Object.FindFirstObjectByType<Onikiri.UI.CloudConflictPanel>(
+                        FindObjectsInactive.Include);
+                    Row("충돌 화면", conflictPanel != null ? "배선됨" : "없음 - Build Hud Screens");
+
+                    using (new EditorGUI.DisabledScope(
+                        conflictPanel == null || Onikiri.Cloud.CloudSaveSync.ConflictServerEnvelope == null))
+                    {
+                        if (GUILayout.Button("충돌 화면 열기 (서버 봉투 있음일 때)"))
+                            conflictPanel.Show(Onikiri.Cloud.CloudSaveSync.ConflictServerEnvelope);
+                    }
+                }
+
+                EditorGUILayout.HelpBox(
+                    "debounce " + Onikiri.Cloud.CloudSavePolicy.DebounceSeconds + "초 / urgent "
+                    + Onikiri.Cloud.CloudSaveSyncPolicy.UrgentDelaySeconds + "초 / 재시도 "
+                    + Onikiri.Cloud.CloudSaveSyncPolicy.RetryDelaySeconds + "초.\n"
+                    + "★ Conflict 상태에서는 어떤 자동 쓰기도 나가지 않습니다 - 사람이 고르기 "
+                    + "전까지 '기록 선택 필요'가 유지됩니다. urgent 트리거 = 귀문 승리 · 뽑기 · "
+                    + "보석 소비 (이벤트 구독이라 그 시스템들은 무수정).", MessageType.Info);
+            }
+
+            DrawCloudRecoveryTools();
+        }
+
+        private string cloudRecoveryPreview = string.Empty;
+
+        /**
+         * @brief 크로스 저장 5단계 (61단계) - 계정 복구의 세이브 통합.
+         *
+         * 시뮬 버튼 넷이 설계 §8.2의 갈래를 Firebase 없이 밟는다. 전부
+         * **SaveSandbox 안**에서 돈다 - 이 패널이 실사용 세이브·sidecar를
+         * 건드리는 일은 없다(S5-0이 이 스텝에서 닫은 빚 그대로).
+         */
+        private void DrawCloudRecoveryTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (5단계 - 계정 복구)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("마지막 복구 갈래", Onikiri.Cloud.CloudSaveRecovery.LastPlan.ToString());
+                Row("복구 전 백업", System.IO.File.Exists(
+                        Onikiri.Cloud.CloudSaveRecovery.PreRecoverBackupPath)
+                    ? Onikiri.Cloud.CloudSaveRecovery.PreRecoverBackupPath
+                    : "없음 (복구를 밟은 적 없음)");
+                Row("계정 갈래", Onikiri.Cloud.AccountLink.LastPlan.ToString());
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("복구 시뮬 (샌드박스 - 실사용 파일 무접촉)",
+                                           EditorStyles.miniBoldLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("③ 서버에 없음")) SimulateRecovery(RecoverySim.Missing);
+                    if (GUILayout.Button("④ 지문 같음")) SimulateRecovery(RecoverySim.Same);
+                    if (GUILayout.Button("⑤ 다름")) SimulateRecovery(RecoverySim.Diverged);
+                    if (GUILayout.Button("오프라인")) SimulateRecovery(RecoverySim.Offline);
+                }
+
+                if (!string.IsNullOrEmpty(cloudRecoveryPreview))
+                    EditorGUILayout.HelpBox(cloudRecoveryPreview, MessageType.None);
+
+                EditorGUILayout.HelpBox(
+                    "순서(설계 §8.2): ① 후보 보존(메모리+.prerecover) -> ② 기존 uid의 "
+                    + "playerSaves 읽기 -> ③ 없으면 로컬이 rev 1 -> ④ 같으면 조용히 -> "
+                    + "⑤ 다르면 60단계 충돌 화면 -> ⑥ 버려진 익명 문서는 안 지운다.\n"
+                    + "★ 랭킹 maxStage는 max 병합, 세이브는 한 벌 선택 - 두 값이 잠시 다른 "
+                    + "것은 버그가 아닙니다(랭킹 줄이 '최고 N층'으로 적는 이유).\n"
+                    + "실기 검증 = 재설치 -> 구글 로그인(AlreadyInUse->Recover) -> "
+                    + "adb logcat -s Unity | grep CloudSave 에서 '복구 세이브 판정' 한 줄.",
+                    MessageType.Info);
+            }
+        }
+
+        private enum RecoverySim { Missing, Same, Diverged, Offline }
+
+        /** 갈래 하나를 샌드박스 안에서 밟고, 남긴 것(상태·sidecar)을 요약한다 */
+        private void SimulateRecovery(RecoverySim sim)
+        {
+            const string SimUid = "panel-recover-uid";
+
+            bool netAllowed = Onikiri.Cloud.CloudSaveSync.EditorNetworkAllowed;
+
+            try
+            {
+                using (new SaveSandbox())
+                {
+                    var candidate = SaveData.NewGame();
+                    candidate.stage = 12;
+                    candidate.maxStageReached = 12;
+                    SaveSystem.Save(candidate);
+
+                    var server = SaveData.NewGame();
+                    server.stage = sim == RecoverySim.Same ? 12 : 171;
+                    server.maxStageReached = server.stage;
+
+                    var envelope = Onikiri.Cloud.CloudSaveEnvelope.ForUpload(
+                        sim == RecoverySim.Same ? candidate : server, 5L,
+                        Onikiri.Cloud.CloudSaveIds.New(), Onikiri.Cloud.CloudSaveIds.New(),
+                        Onikiri.Cloud.CloudSaveIds.New());
+
+                    var status = sim == RecoverySim.Missing
+                        ? Onikiri.Cloud.CloudSaveStoreStatus.Missing
+                        : sim == RecoverySim.Offline
+                            ? Onikiri.Cloud.CloudSaveStoreStatus.Offline
+                            : Onikiri.Cloud.CloudSaveStoreStatus.Found;
+
+                    Onikiri.Cloud.CloudSaveRecovery.UseFetchForTests(uid =>
+                        System.Threading.Tasks.Task.FromResult(new Onikiri.Cloud.CloudSaveFetchResult
+                        {
+                            status = status,
+                            envelope = status == Onikiri.Cloud.CloudSaveStoreStatus.Found
+                                ? envelope : null
+                        }));
+
+                    var prepared = Onikiri.Cloud.CloudSaveRecovery.PrepareCandidate();
+                    var plan = Onikiri.Cloud.CloudSaveRecovery.RunAsync(SimUid, prepared)
+                        .GetAwaiter().GetResult();
+
+                    var sidecar = Onikiri.Cloud.CloudSaveSidecar.Load();
+
+                    cloudRecoveryPreview = "갈래 -> " + plan
+                        + "\n상태 -> " + Onikiri.Cloud.CloudSaveCoordinator.State
+                        + " / 상태 문장 -> " + Onikiri.Cloud.CloudSaveSync.StatusLine
+                        + "\nsidecar -> " + (sidecar == null
+                            ? "없음 (선택 전에는 안 세운다)"
+                            : sidecar.ownerUid + " · base rev " + sidecar.baseRevision)
+                        + "\n.prerecover -> " + (System.IO.File.Exists(
+                            Onikiri.Cloud.CloudSaveRecovery.PreRecoverBackupPath) ? "남음" : "없음")
+                        + "\n후보 진행 -> " + prepared.maxStageReached
+                        + "층 (복구는 세이브 필드를 만지지 않는다)";
+                }
+            }
+            finally
+            {
+                // 시뮬이 남긴 정적 상태를 끊는다 - 패널 토글만 살려 둔다
+                Onikiri.Cloud.CloudSaveRecovery.ResetForTests();
+                Onikiri.Cloud.CloudSaveCoordinator.ResetForTests();
+                Onikiri.Cloud.CloudSaveSync.ResetForTests();
+                Onikiri.Cloud.CloudSaveSync.EditorNetworkAllowed = netAllowed;
+            }
+        }
+
+        /**
+         * @brief 커밋용 sidecar를 준비한다. 없으면 이 uid로 새로 만든다.
+         *
+         * 기기 id를 실제 생성 함수로 만드는 것이 중요하다 - 임의 문자열을 넣으면
+         * 이 창에서만 통과하는 봉투가 만들어지고, 그러면 여기서 본 것이 실기에서
+         * 나갈 것과 다른 물건이 된다.
+         */
+        private static Onikiri.Cloud.CloudSaveLocalState PanelSidecar(string uid)
+        {
+            var sidecar = Onikiri.Cloud.CloudSaveSidecar.Load();
+            if (sidecar != null && Onikiri.Cloud.CloudSavePolicy.SidecarAppliesTo(sidecar, uid))
+                return sidecar;
+
+            var created = Onikiri.Cloud.CloudSaveLocalState.NewFor(
+                uid, Onikiri.Cloud.CloudSaveSidecar.NewDeviceId());
+
+            Onikiri.Cloud.CloudSaveSidecar.Save(created);
+            return created;
+        }
+
+        private void RunSession(
+            System.Func<string, string, System.Threading.Tasks.Task<Onikiri.Cloud.CloudSaveSessionStatus>> call,
+            string label)
+        {
+            string uid = Onikiri.Cloud.CloudScores.Uid;
+            var sidecar = PanelSidecar(uid);
+            if (sidecar == null) { cloudStorePreview = "sidecar를 만들지 못했습니다."; return; }
+
+            cloudStorePreview = "세션 " + label + " 요청 중...";
+
+            call(uid, sidecar.deviceId).ContinueWith(task =>
+            {
+                cloudStorePreview = "세션 " + label + " -> " + task.Result;
+            }, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
+        private void FetchCanonicalForPanel()
+        {
+            cloudStorePreview = "정본 읽는 중...";
+
+            Onikiri.Cloud.CloudSaveStore.FetchAsync(Onikiri.Cloud.CloudScores.Uid).ContinueWith(task =>
+            {
+                var result = task.Result;
+                if (result.envelope == null) { cloudStorePreview = "읽기 -> " + result; return; }
+
+                cloudStorePreview = "읽기 -> " + result.status
+                    + "\nrev " + result.envelope.baseRevision + " -> " + result.envelope.revision
+                    + " / 세이브 v" + result.envelope.saveVersion
+                    + " / " + result.envelope.PayloadBytes() + "B"
+                    + "\n요약 " + result.envelope.summary.maxStageReached + "층 · Lv."
+                    + result.envelope.summary.characterLevel
+                    + " · 티어 " + result.envelope.summary.evolutionTier
+                    + " · 보석 " + result.envelope.summary.gems;
+            }, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
+        /**
+         * @brief 지금 세이브를 정본으로 올려 본다.
+         *
+         * 플레이 중이면 먼저 저장해서 **화면의 상태와 올라가는 것이 같게** 만든다.
+         * 아니면 디스크에 있는 것을 그대로 올린다.
+         */
+        private void CommitForPanel()
+        {
+            if (session != null) session.Save();
+
+            string uid = Onikiri.Cloud.CloudScores.Uid;
+            var sidecar = PanelSidecar(uid);
+            if (sidecar == null) { cloudStorePreview = "sidecar를 만들지 못했습니다."; return; }
+
+            cloudStorePreview = "커밋 요청 중...";
+
+            Onikiri.Cloud.CloudSaveStore.CommitAsync(uid, SaveSystem.Load(), sidecar).ContinueWith(task =>
+            {
+                cloudStorePreview = "커밋 -> " + task.Result
+                    + "\nsidecar base rev " + sidecar.baseRevision
+                    + (sidecar.HasPending ? "   / 보내는 중: " + sidecar.pendingMutationId
+                                          : "   / 보내는 중 없음");
+            }, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
+        private void CloudSavePreset(bool serverChecked, bool hasLocal, bool hasCloud,
+                                     bool localChanged, bool hasSidecar, bool sameRecord)
+        {
+            cloudSaveServerChecked = serverChecked;
+            cloudSaveHasLocal = hasLocal;
+            cloudSaveHasCloud = hasCloud;
+            cloudSaveLocalChanged = localChanged;
+            cloudSaveHasSidecar = hasSidecar;
+            cloudSaveSameRecord = sameRecord;
+            cloudSaveFault = Onikiri.Cloud.CloudSaveEnvelopeFault.None;
+            cloudSaveChainBroken = false;
+            cloudSaveServerSaveVersion = Onikiri.Progression.SaveData.CurrentVersion;
+            cloudSaveBaseRevision = 5L;
+            cloudSaveServerRevision = 6L;
+        }
+
+        /**
+         * @brief 체크박스를 판정 입력으로 옮긴다.
+         *
+         * 지문 자리에 진짜 해시를 넣지 않고 이름표("local"/"cloud")를 쓰는 것이
+         * 요점이다. 판정이 보는 것은 **같은가 다른가**뿐이라, 여기서 실제 세이브를
+         * 읽으면 계산기가 디스크 상태에 묶여 원하는 줄을 못 만든다.
+         */
+        private Onikiri.Cloud.CloudSaveFacts BuildCloudSaveFacts()
+        {
+            return new Onikiri.Cloud.CloudSaveFacts
+            {
+                serverChecked = cloudSaveServerChecked,
+                hasLocal = cloudSaveHasLocal,
+                localStateSha = "local",
+
+                hasCloud = cloudSaveHasCloud,
+                cloudFormatVersion = Onikiri.Cloud.CloudSaveEnvelope.CurrentFormatVersion,
+                cloudSaveVersion = cloudSaveServerSaveVersion,
+                cloudRevision = cloudSaveServerRevision,
+                cloudBaseRevision = cloudSaveServerRevision - (cloudSaveChainBroken ? 2L : 1L),
+                cloudStateSha = cloudSaveSameRecord ? "local" : "cloud",
+                cloudEnvelopeFault = cloudSaveFault,
+
+                hasSidecar = cloudSaveHasSidecar,
+                baseRevision = cloudSaveBaseRevision,
+                lastSyncedStateSha = cloudSaveLocalChanged ? "synced" : "local"
+            };
+        }
+
+        private static string CloudSaveVerdictText(Onikiri.Cloud.CloudSaveVerdict verdict)
+        {
+            switch (verdict.decision)
+            {
+                case Onikiri.Cloud.CloudSaveDecision.LocalOnly:
+                    return "로컬로 논다. 게임은 안 멈춘다";
+                case Onikiri.Cloud.CloudSaveDecision.InSync:
+                    return "같은 기록. sidecar만 서버 revision으로 맞춘다";
+                case Onikiri.Cloud.CloudSaveDecision.UploadLocal:
+                    return "로컬이 정본. revision + 1 로 올린다";
+                case Onikiri.Cloud.CloudSaveDecision.DownloadCloud:
+                    return "클라우드가 정본. 로컬 백업을 남기고 적용한다";
+                case Onikiri.Cloud.CloudSaveDecision.Conflict:
+                    return "사람이 고른다. 자동 병합은 없다";
+                default:
+                    return "어느 쪽도 건드리지 않는다";
+            }
+        }
+
+        /**
+         * @brief 디스크의 세이브에서 payload/상태 지문을 실제로 뽑는다.
+         *
+         * 플레이 모드가 아니어도 된다 - 읽는 것은 파일이지 씬이 아니다.
+         * 이 절에서 유일하게 **진짜 값**을 보는 자리다.
+         */
+        private void RefreshCloudSaveFingerprint()
+        {
+            if (!SaveSystem.Exists)
+            {
+                cloudSaveFingerprintPreview = "세이브 파일이 아직 없습니다.";
+                return;
+            }
+
+            var data = SaveSystem.Load();
+            string payload = Onikiri.Cloud.CloudSaveFingerprint.Serialize(data);
+            if (payload == null)
+            {
+                cloudSaveFingerprintPreview = "세이브를 payload로 만들지 못했습니다 (콘솔 참고).";
+                return;
+            }
+
+            int bytes = Onikiri.Cloud.CloudSaveFingerprint.ByteCount(payload);
+
+            // **실제 생성 함수로 만든 id를 쓴다.** 임의 문자열을 넣으면 이 창만
+            // 통과하는 봉투가 만들어지고, 그러면 여기서 본 것이 실기에서 나갈 것과
+            // 다른 물건이 된다 - ForUpload가 형식을 보는 이유가 그것이다
+            var envelope = Onikiri.Cloud.CloudSaveEnvelope.ForUpload(
+                data, cloudSaveBaseRevision,
+                Onikiri.Cloud.CloudSaveSidecar.NewSessionId(),
+                Onikiri.Cloud.CloudSaveSidecar.NewDeviceId(),
+                Onikiri.Cloud.CloudSaveSidecar.NewMutationId());
+
+            cloudSaveFingerprintPreview =
+                "payload " + bytes + "B / 상한 "
+                + Onikiri.Cloud.CloudSaveFingerprint.MaxPayloadBytes + "B\n"
+                + "payload 지문  " + Onikiri.Cloud.CloudSaveFingerprint.HashOf(payload) + "\n"
+                + "상태 지문      " + Onikiri.Cloud.CloudSaveFingerprint.StateHashOf(data) + "\n"
+                + (envelope != null
+                    ? "봉투: rev " + envelope.baseRevision + " -> " + envelope.revision
+                      + " / 세이브 v" + envelope.saveVersion
+                      + " / 검증 " + envelope.Validate()
+                      + "\n요약 " + envelope.summary.maxStageReached + "층 · Lv."
+                      + envelope.summary.characterLevel + " · 티어 " + envelope.summary.evolutionTier
+                      + " · 보석 " + envelope.summary.gems
+                    : "봉투를 만들지 못했습니다 (상한 초과 · id 형식 · revision 상한)");
         }
 
         /** 조회 결과를 패널 안에 그대로 적는다 - 콘솔과 화면을 오가지 않게 */

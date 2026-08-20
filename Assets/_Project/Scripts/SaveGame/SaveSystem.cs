@@ -40,9 +40,54 @@ namespace Onikiri.Progression
     {
         public const string FileName = "onikiri_save.json";
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // ---- 테스트 seam (61단계 S5-0). **릴리스 빌드에는 존재하지 않는다.**
+        //
+        // 60단계까지 PlayMode 검사는 실사용 세이브를 백업해 두고 덮어쓴 뒤
+        // TearDown에서 되돌렸다. 그 반창고는 검사가 죽거나 에디터가 행에
+        // 걸리면 안 붙는다 - 실제로 §9의 행 국면에서 실사용 세이브가 테스트
+        // 세이브로 덮였다. 근본 수정은 복원이 아니라 **접촉 자체를 없애는 것**이다:
+        // 검사는 이 루트를 임시 폴더로 바꿔 끼우고, 실사용 파일은 읽지도 않는다.
+        private static string rootOverride;
+
+        /** 세이브가 사는 폴더를 바꿔 끼운다. sidecar·백업도 전부 따라온다 */
+        public static void UseRootForTests(string directory)
+        {
+            rootOverride = directory;
+        }
+
+        public static void ResetRootForTests()
+        {
+            rootOverride = null;
+        }
+
+        public static bool IsRootOverridden
+        {
+            get { return rootOverride != null; }
+        }
+#endif
+
+        /**
+         * @brief 세이브 파일들이 사는 폴더. **경로를 만드는 유일한 뿌리다.**
+         *
+         * sidecar(CloudSaveSidecar)·클라우드 백업(precloud)·손상 백업(.broken)이
+         * 전부 이 값에서 출발한다 - 한 군데서 갈아 끼우면 전부 따라오고,
+         * 어느 하나가 따로 실사용 폴더를 보는 순간 격리가 구멍 난다.
+         */
+        public static string Root
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (rootOverride != null) return rootOverride;
+#endif
+                return Application.persistentDataPath;
+            }
+        }
+
         public static string Path
         {
-            get { return System.IO.Path.Combine(Application.persistentDataPath, FileName); }
+            get { return System.IO.Path.Combine(Root, FileName); }
         }
 
         public static bool Exists

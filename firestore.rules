@@ -74,6 +74,196 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ================================================================
+    // 크로스 저장 (58단계) - playerSaves / playerSaveBackups / playerSaveSessions
+    //
+    // 랭킹(scores)의 규칙을 복사하지 않는다. 저 문서는 **공개 읽기**이고 값이
+    // 하나뿐이지만, 이쪽은 진행 전체가 들어 있어 소유자만 읽을 수 있어야 한다.
+    //
+    // ## 이 규칙이 강제하는 것 / 못 하는 것
+    //
+    //   강제한다   남의 세이브를 못 읽고 못 쓴다 · **오래된 기기가 새 정본을
+    //              못 덮는다**(revision 사슬) · 백업 없이 정본만 못 바꾼다 ·
+    //              백업만 따로 못 바꾼다 · 지금 세션이 아닌 기기는 못 쓴다 ·
+    //              놓아준 세션으로는 못 쓴다 · 형식 밖의 필드·값은 못 넣는다
+    //
+    //   못 한다    payload **안의** 경제가 진짜인지. 문자열 한 덩어리라 서버는
+    //              그 안을 보지 않는다(57단계 설계). 그 검증은 Cloud Functions와
+    //              Blaze가 필요하고, 유료 재화 원장은 그것과 또 다른 층이다.
+    //
+    // 클라이언트(CloudSaveEnvelope.Validate)가 같은 검사를 한 벌 더 한다. 두 곳에
+    // 적는 이유는 역할이 다르기 때문이다 - 클라는 "잘못된 것을 만들지 않는다"이고
+    // 여기는 "보내와도 안 받는다"다. 조작 클라는 클라 검사를 지나지 않는다.
+    // ================================================================
+
+    function isHash(value) {
+      return value is string && value.matches('^[0-9a-f]{64}$');
+    }
+
+    // 세션·기기·쓰기 id는 한 형식이다 (CloudSaveIds - Guid "N" 32자 소문자 16진)
+    function isId(value) {
+      return value is string && value.matches('^[0-9a-f]{32}$');
+    }
+
+    function hasOnlySaveFields() {
+      return request.resource.data.keys().hasOnly(
+               ['formatVersion', 'saveVersion', 'revision', 'baseRevision',
+                'payload', 'payloadSha256', 'stateSha256',
+                'lastMutationId', 'sessionId', 'deviceId', 'updatedAt', 'summary'])
+             && request.resource.data.keys().hasAll(
+               ['formatVersion', 'saveVersion', 'revision', 'baseRevision',
+                'payload', 'payloadSha256', 'stateSha256',
+                'lastMutationId', 'sessionId', 'deviceId', 'updatedAt', 'summary']);
+    }
+
+    // 요약은 충돌 화면이 그리는 여섯 값이다. 임의 필드를 허용하면 그 자리가
+    // 무료 저장소가 되고, 언젠가 누군가 payload 대신 그리로 값을 흘린다
+    function hasValidSummary() {
+      return request.resource.data.summary.keys().hasOnly(
+               ['maxStageReached', 'characterLevel', 'evolutionTier',
+                'gems', 'gachaTotalPulls', 'skillGachaTotalPulls'])
+             && request.resource.data.summary.keys().hasAll(
+               ['maxStageReached', 'characterLevel', 'evolutionTier',
+                'gems', 'gachaTotalPulls', 'skillGachaTotalPulls'])
+             // 상한은 StageProgress.ReachSanityCap과 같은 값
+             && request.resource.data.summary.maxStageReached is int
+             && request.resource.data.summary.maxStageReached >= 1
+             && request.resource.data.summary.maxStageReached <= 100000
+             && request.resource.data.summary.characterLevel is int
+             && request.resource.data.summary.characterLevel >= 1
+             && request.resource.data.summary.characterLevel <= 100000
+             // EvolutionCurve.MaxTier = EvolutionCatalog.Count = 6
+             && request.resource.data.summary.evolutionTier is int
+             && request.resource.data.summary.evolutionTier >= 0
+             && request.resource.data.summary.evolutionTier <= 6
+             && request.resource.data.summary.gems is int
+             && request.resource.data.summary.gems >= 0
+             && request.resource.data.summary.gachaTotalPulls is int
+             && request.resource.data.summary.gachaTotalPulls >= 0
+             && request.resource.data.summary.skillGachaTotalPulls is int
+             && request.resource.data.summary.skillGachaTotalPulls >= 0;
+    }
+
+    // **지금 작성권을 가진 세션만 정본을 쓴다.**
+    //
+    // 세션 문서가 없으면 get()이 null을 돌려주고 그 다음 접근이 오류가 되어
+    // 규칙이 거부한다 - 세션 없이 쓰는 경로가 없다는 뜻이고, 그것이 맞다.
+    function writerHoldsSession(uid) {
+      return get(/databases/$(database)/documents/playerSaveSessions/$(uid)).data.sessionId
+               == request.resource.data.sessionId
+             && get(/databases/$(database)/documents/playerSaveSessions/$(uid)).data.released == false;
+    }
+
+    function isValidSave(uid) {
+      return hasOnlySaveFields()
+             // 봉투 형식은 정확히 1이다. 옛 것도 새 것도 아니다
+             && request.resource.data.formatVersion == 1
+             // SaveData.CurrentVersion = 21. 미래 버전은 서버에 놓일 수 없다
+             && request.resource.data.saveVersion is int
+             && request.resource.data.saveVersion >= 1
+             && request.resource.data.saveVersion <= 21
+             && request.resource.data.revision is int
+             && request.resource.data.baseRevision is int
+             && request.resource.data.payload is string
+             && request.resource.data.payload.size() > 0
+             // 200KB. **규칙의 size()는 글자 수라 바이트보다 느슨하다** -
+             // 정확한 바이트 상한은 클라(CloudSaveFingerprint)가 지킨다.
+             // 여기 있는 것은 문서가 무한정 자라는 것을 막는 천장이다
+             && request.resource.data.payload.size() <= 204800
+             && isHash(request.resource.data.payloadSha256)
+             && isHash(request.resource.data.stateSha256)
+             && isId(request.resource.data.lastMutationId)
+             && isId(request.resource.data.sessionId)
+             && isId(request.resource.data.deviceId)
+             // 서버 타임스탬프여야 한다. 클라 시계를 받으면 "언제 저장됐는가"가
+             // 조작 가능해지고, 진단이 통째로 거짓말을 하기 시작한다
+             && request.resource.data.updatedAt == request.time
+             && hasValidSummary()
+             && writerHoldsSession(uid);
+    }
+
+    match /playerSaves/{uid} {
+
+      // 랭킹과 달리 **공개 읽기가 아니다.** 여기 있는 것은 진행 전체다
+      allow read: if isOwner(uid);
+
+      // 첫 정본은 revision 1 · baseRevision 0만이다. 사슬은 반드시 1에서 시작한다
+      allow create: if isOwner(uid)
+                    && isValidSave(uid)
+                    && request.resource.data.revision == 1
+                    && request.resource.data.baseRevision == 0;
+
+      // ---- 낙관적 잠금. 이 세 줄이 "오래된 기기가 새 정본을 덮는 것"을 막는다
+      //
+      // revision을 **정확히 하나** 올려야 하고(건너뛰기 금지), 출발점이 지금
+      // 서버의 값이어야 하며(stale 거부), **직전 정본이 백업으로 복사된 뒤에만**
+      // 통과한다. 마지막 줄이 없으면 되돌릴 수 없는 덮어쓰기가 가능해진다.
+      allow update: if isOwner(uid)
+                    && isValidSave(uid)
+                    && request.resource.data.revision == resource.data.revision + 1
+                    && request.resource.data.baseRevision == resource.data.revision
+                    && getAfter(/databases/$(database)/documents/playerSaveBackups/$(uid)).data
+                         == resource.data;
+
+      // 지울 이유가 없다. 계정 삭제는 서버(Functions)의 일이다 - scores와 같은 판단
+      allow delete: if false;
+    }
+
+    match /playerSaveBackups/{uid} {
+
+      allow read: if isOwner(uid);
+
+      // 백업은 **정본이 교체되는 그 순간에만, 교체되는 그 값 그대로** 쓰인다.
+      //
+      // 두 조건이 짝이다. 앞줄이 "임의의 값을 백업이라 부르며 넣는 것"을 막고,
+      // 뒷줄이 "정본은 그대로 둔 채 백업만 바꾸는 것"을 막는다. 뒷줄이 없으면
+      // 백업이 조용히 오염되고, 그것은 사고가 난 다음에야 드러난다.
+      allow create, update: if isOwner(uid)
+                            && request.resource.data
+                                 == get(/databases/$(database)/documents/playerSaves/$(uid)).data
+                            && getAfter(/databases/$(database)/documents/playerSaves/$(uid)).data.revision
+                                 == get(/databases/$(database)/documents/playerSaves/$(uid)).data.revision + 1;
+
+      allow delete: if false;
+    }
+
+    function hasOnlySessionFields() {
+      return request.resource.data.keys().hasOnly(['sessionId', 'deviceId', 'heartbeatAt', 'released'])
+             && request.resource.data.keys().hasAll(['sessionId', 'deviceId', 'heartbeatAt', 'released']);
+    }
+
+    function isValidSession() {
+      return hasOnlySessionFields()
+             && isId(request.resource.data.sessionId)
+             && isId(request.resource.data.deviceId)
+             && request.resource.data.released is bool
+             // 서버 시각이어야 한다. 클라가 heartbeat를 미래로 적으면 그 세션은
+             // 영원히 만료되지 않고, 다른 기기는 영영 인수하지 못한다
+             && request.resource.data.heartbeatAt == request.time;
+    }
+
+    // 인수는 셋 중 하나일 때만이다: 내 세션의 갱신 · 놓아준 세션 · 만료된 세션.
+    //
+    // 180초는 CloudSavePolicy.SessionExpirySeconds와 **같은 값**이다. 갈리면
+    // 클라가 인수 가능하다고 판단한 순간에 서버가 거부하고, 그 기기는 이유를
+    // 모른 채 영원히 못 쓴다
+    function mayTakeSession() {
+      return resource.data.sessionId == request.resource.data.sessionId
+             || resource.data.released == true
+             || resource.data.heartbeatAt < request.time - duration.value(180, 's');
+    }
+
+    match /playerSaveSessions/{uid} {
+
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid) && isValidSession();
+
+      allow update: if isOwner(uid) && isValidSession() && mayTakeSession();
+
+      allow delete: if false;
+    }
+
     // 그 밖의 모든 것은 거부. 4-A에서 열려 있던 나머지 컬렉션이 여기서 닫힌다
     match /{document=**} {
       allow read, write: if false;

@@ -59,9 +59,105 @@ namespace Onikiri.EditorTools
             BuildRegionSelectPanel(safeArea, font);
             BuildSettingsPanel(safeArea, font);
             WireTopBarButtons(safeArea);
+            BuildCloudConflictPanel(safeArea, font);
+            WireConflictIntoSettings(safeArea);
             WireSoundApplier();
 
-            Debug.Log("[Onikiri] Hud screens built: stats / region select / settings.");
+            Debug.Log("[Onikiri] Hud screens built: stats / region select / settings / cloud conflict.");
+        }
+
+        // ---------------------------------------------------------------- 충돌 (60단계)
+
+        public const string ConflictPanelName = "CloudConflictPanel";
+
+        /**
+         * @brief 충돌 선택 화면. **자동 병합 버튼이 없다.**
+         *
+         * 두 카드(현재 기기 / 클라우드)와 버튼 셋. 딤 탭으로 닫히면 "나중에
+         * 결정"과 구분되지 않으므로 딤은 죽여 둔다(dimIsInert) - 보류도 명시적
+         * 버튼이어야 상태가 화면에 읽힌다.
+         *
+         * 이름·수치 줄은 정적 폰트로 충분하다 - 층수·레벨·전직명·보석은 전부
+         * 우리가 짓는 글자다(남이 지은 이름이 없다).
+         */
+        private static void BuildCloudConflictPanel(Transform safeArea, TMP_FontAsset font)
+        {
+            RectTransform root;
+            var panel = PopupBuilder.Ensure(safeArea, ConflictPanelName, font, 0.42f, out root,
+                                            dimIsInert: true);
+            BuildTitle(panel, font, "기록 선택 필요");
+
+            // -- 현재 기기 카드
+            var localRow = EnsureRow(panel, "LocalCard", 0);
+            var localHead = CreateLabel(localRow, font, "Head", TextAlignmentOptions.Left);
+            StretchInside(localHead, 24f, 0.45f);
+            localHead.text = "현재 기기 기록";
+
+            var localSummary = CreateLabel(localRow, font, "Summary", TextAlignmentOptions.Right);
+            StretchInside(localSummary, 24f, 1f);
+            UiFonts.Demote(localSummary);
+            localSummary.text = "최고 1층 · Lv.1 · 로닌 · 보석 0";
+
+            var useLocal = CreateRowButton(EnsureRow(panel, "LocalUse", 1), font,
+                                           "Button", "현재 기기 기록 사용", 560f);
+
+            // -- 클라우드 카드
+            var cloudRow = EnsureRow(panel, "CloudCard", 2);
+            var cloudHead = CreateLabel(cloudRow, font, "Head", TextAlignmentOptions.Left);
+            StretchInside(cloudHead, 24f, 0.45f);
+            cloudHead.text = "클라우드 기록";
+
+            var cloudSummary = CreateLabel(cloudRow, font, "Summary", TextAlignmentOptions.Right);
+            StretchInside(cloudSummary, 24f, 1f);
+            UiFonts.Demote(cloudSummary);
+            cloudSummary.text = "최고 1층 · Lv.1 · 로닌 · 보석 0";
+
+            // 서버 저장 시각. 판정이 아니라 사람의 기억을 돕는 줄이다
+            var stampRow = EnsureRow(panel, "CloudStamp", 3);
+            stampRow.GetComponent<Image>().enabled = false;
+            var stamp = CreateLabel(stampRow, font, "Label", TextAlignmentOptions.Right);
+            StretchInside(stamp, 24f, 1f);
+            UiFonts.Demote(stamp);
+            stamp.color = DimColor;
+            stamp.text = string.Empty;
+
+            var useCloud = CreateRowButton(EnsureRow(panel, "CloudUse", 4), font,
+                                           "Button", "클라우드 기록 사용", 560f);
+
+            // -- 보류. 로컬 플레이는 계속, 클라우드 쓰기만 멈춘다
+            var later = CreateRowButton(EnsureRow(panel, "Later", 5), font,
+                                        "Button", "나중에 결정", 400f);
+
+            var conflict = root.gameObject.GetComponent<Onikiri.UI.CloudConflictPanel>();
+            if (conflict == null) conflict = root.gameObject.AddComponent<Onikiri.UI.CloudConflictPanel>();
+
+            var so = new SerializedObject(conflict);
+            so.FindProperty("titleLabel").objectReferenceValue = null;
+            so.FindProperty("localSummaryLabel").objectReferenceValue = localSummary;
+            so.FindProperty("cloudSummaryLabel").objectReferenceValue = cloudSummary;
+            so.FindProperty("cloudStampLabel").objectReferenceValue = stamp;
+            so.FindProperty("useCloudButton").objectReferenceValue = useCloud;
+            so.FindProperty("useLocalButton").objectReferenceValue = useLocal;
+            so.FindProperty("laterButton").objectReferenceValue = later;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            root.gameObject.SetActive(false);
+        }
+
+        /** 설정의 "기록 선택" 버튼이 이 팝업을 연다 - 두 빌드가 따로 돌아도 배선이 남게 */
+        private static void WireConflictIntoSettings(Transform safeArea)
+        {
+            var settingsRoot = safeArea.Find(SettingsPanelName);
+            var conflictRoot = safeArea.Find(ConflictPanelName);
+            if (settingsRoot == null || conflictRoot == null) return;
+
+            var settings = settingsRoot.GetComponent<Onikiri.UI.SettingsPanel>();
+            var conflict = conflictRoot.GetComponent<Onikiri.UI.CloudConflictPanel>();
+            if (settings == null || conflict == null) return;
+
+            var so = new SerializedObject(settings);
+            so.FindProperty("conflictPanel").objectReferenceValue = conflict;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ---------------------------------------------------------------- 스탯
@@ -398,7 +494,7 @@ namespace Onikiri.EditorTools
         private static void BuildSettingsPanel(Transform safeArea, TMP_FontAsset font)
         {
             RectTransform root;
-            var panel = PopupBuilder.Ensure(safeArea, SettingsPanelName, font, 0.30f, out root);
+            var panel = PopupBuilder.Ensure(safeArea, SettingsPanelName, font, 0.34f, out root);
             BuildTitle(panel, font, "설정");
 
             var muteRow = EnsureRow(panel, "Mute", 0);
@@ -450,7 +546,18 @@ namespace Onikiri.EditorTools
             status.color = DimColor;
             status.gameObject.SetActive(false);
 
-            var versionRow = EnsureRow(panel, "Version", 5);
+            // -- 클라우드 저장 상태 (60단계). 설계 §9의 네 문장 중 하나가 뜬다.
+            //    "기록 선택 필요"일 때만 오른쪽 버튼이 살아나 충돌 화면을 연다
+            var cloudRow = EnsureRow(panel, "Cloud", 5);
+            var cloudLabel = CreateLabel(cloudRow, font, "State", TextAlignmentOptions.Left);
+            StretchInside(cloudLabel, 24f, 0.68f);
+            UiFonts.Demote(cloudLabel);
+            cloudLabel.text = "클라우드 확인 중";
+
+            var conflictButton = CreateRowButton(cloudRow, font, "ChooseButton", "기록 선택", 240f);
+            conflictButton.gameObject.SetActive(false);
+
+            var versionRow = EnsureRow(panel, "Version", 6);
             versionRow.GetComponent<Image>().enabled = false;
             var version = CreateLabel(versionRow, font, "Label", TextAlignmentOptions.Center);
             UiFonts.Demote(version);
@@ -475,6 +582,8 @@ namespace Onikiri.EditorTools
             so.FindProperty("nameInput").objectReferenceValue = input;
             so.FindProperty("nameConfirmButton").objectReferenceValue = confirmButton;
             so.FindProperty("statusLabel").objectReferenceValue = status;
+            so.FindProperty("cloudStatusLabel").objectReferenceValue = cloudLabel;
+            so.FindProperty("conflictButton").objectReferenceValue = conflictButton;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             root.gameObject.SetActive(false);

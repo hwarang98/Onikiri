@@ -289,9 +289,14 @@ namespace Onikiri.UI
 
             // 실패를 "-위"로 적지 않는다. 숫자 자리에 뭔가 적혀 있으면 그것이
             // 순위로 읽히고, 0위·-1위는 존재하지 않는 순위다
+            //
+            // "최고"를 붙이는 것은 61단계의 인정이다 - 복구에서 랭킹은 max
+            // 병합이고 세이브는 한 벌 선택이라, 이 값이 세이브의 현재 진행보다
+            // 높을 수 있다. 그 상태는 버그가 아니라 "랭킹 = 이 계정의 최고
+            // 기록 / 세이브 = 지금 이어가는 진행"이고, 그 구분이 여기 적힌다
             myRankLabel.text = rank > 0
-                ? string.Format("내 순위  {0:N0}위   ({1}층)", rank, mine)
-                : string.Format("내 순위  -   ({0}층)", mine);
+                ? string.Format("내 순위  {0:N0}위   (최고 {1}층)", rank, mine)
+                : string.Format("내 순위  -   (최고 {0}층)", mine);
         }
 
         private void Fill(CloudScores.LeaderboardEntry[] entries)

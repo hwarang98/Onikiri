@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using Onikiri.Battle;
+using Onikiri.Cloud;
 using Onikiri.Core;
 using UnityEngine;
 
@@ -41,21 +43,81 @@ namespace Onikiri.Progression
 
         private float autoSaveTimer;
         private bool loaded;
+        private bool bootApplied;
 
         /**
          * @brief 세이브 적용이 끝났는가. 인트로의 로딩 게이트가 읽는다.
          *
          * 쓰기는 이 클래스만 한다 - 게이트는 관측이지 조종이 아니다.
+         *
+         * 59단계에서 이 값이 **몇 프레임 늦게** true가 될 수 있다. 부팅이 서버
+         * 확인을 기다리기 때문인데, 게이트가 보는 것은 여전히 "세이브가 준비됐는가"
+         * 하나뿐이다 - 인트로는 한 줄도 안 바뀐다(56단계 계약).
          */
         public bool IsLoaded { get { return loaded; } }
 
+        /** 부팅 적용이 몇 번 돌았는가. **정확히 1이어야 한다** (테스트가 잰다) */
+        public int BootApplyCount { get; private set; }
+
+        /** 방치 보상이 실제로 지급된 횟수. 부팅 한 번에 **1을 넘을 수 없다** */
+        public int OfflineRewardGrants { get; private set; }
+
+        /** 마지막 방치 보상 금액. 어느 세이브 기준으로 지급됐는지 재는 자 */
+        public BigDouble LastOfflineReward { get; private set; }
+
+        /**
+         * @brief 부팅. **읽고 -> 고르고 -> 한 벌만 적용한다.**
+         *
+         * 순서가 이 스텝의 전부다. 예전에는 `Load()`가 곧바로 Apply했고, 그
+         * 뒤에 클라우드를 얹으면 방치 보상이 **두 번** 나간다 - 로컬 기준으로
+         * 한 번, 클라우드 기준으로 또 한 번. 그래서 고르기가 Apply보다 앞에 선다.
+         *
+         * 코루틴인 이유는 서버 확인 때문이다. 그 기다림에는 제한 시간이 있고,
+         * 넘으면 로컬로 들어간다 - Firebase는 게이트가 아니다.
+         */
         private void Start()
         {
-            Load();
+            SaveData local = SaveSystem.Load();
+
+            // **서버를 볼 이유가 없으면 한 프레임도 안 쓴다.** 인트로가 "세이브
+            // 로드는 같은 프레임"을 가정하고(56단계), PlayMode 검사 몇은 첫
+            // 프레임에 이 컴포넌트를 파괴한다 - 그때 코루틴으로 미루면 세이브가
+            // 통째로 안 얹힌다(귀문 검사 다섯이 그렇게 깨졌다)
+            if (!CloudSaveCoordinator.WillCheckServer)
+            {
+                BootWith(CloudSaveCoordinator.ChooseLocally(local));
+                return;
+            }
+
+            StartCoroutine(BootRoutine(local));
+        }
+
+        private IEnumerator BootRoutine(SaveData local)
+        {
+            CloudSaveBootChoice choice = null;
+            yield return CloudSaveCoordinator.ChooseBootSave(local, picked => choice = picked);
+
+            BootWith(choice ?? CloudSaveCoordinator.LocalFallback(local));
+        }
+
+        private void BootWith(CloudSaveBootChoice choice)
+        {
+            ApplyBoot(choice.data, choice.reason);
+
+            // urgent 트리거는 이벤트 구독이다 - 그 시스템들은 한 줄도 안 바뀐다
+            CloudSaveSync.Wire(evolution, gacha, skillGacha, GemWallet.Instance);
+
+            // 고른 한 벌이 곧바로 디스크의 정본이 된다. 클라우드를 채택했다면
+            // 이 저장이 그것을 로컬에 굳히고, 그 전에 원본은 옆에 남아 있다
+            // (CloudSaveCoordinator.KeepPreCloudBackup)
+            Save();
         }
 
         private void Update()
         {
+            // 클라우드 debounce(120초)·urgent는 sync가 스스로 잰다. 여기는 시계만 준다
+            CloudSaveSync.Tick();
+
             autoSaveTimer += Time.unscaledDeltaTime;
             if (autoSaveTimer < autoSaveInterval) return;
 
@@ -72,6 +134,12 @@ namespace Onikiri.Progression
         private void OnApplicationPause(bool paused)
         {
             Save();
+
+            // 로컬이 먼저다(위 줄). 그 다음 클라우드 저장과 세션 release를
+            // **시도**한다 - 완료는 보장이 아니다. 모바일은 이 뒤에 프로세스를
+            // 예고 없이 회수하므로, 평소의 120초 주기가 진짜 보증이다
+            if (paused) CloudSaveSync.OnAppPaused();
+            else CloudSaveSync.OnAppResumed();
         }
 
         private void OnApplicationFocus(bool focused)
@@ -86,9 +154,34 @@ namespace Onikiri.Progression
 
         // ---------------------------------------------------------------- 불러오기
 
-        private void Load()
+        /**
+         * @brief 부팅에서 고른 한 벌을 얹는다. **방치 보상을 지급하는 유일한 자리다.**
+         *
+         * `Apply`와 갈라 둔 이유가 그것이다. `Apply`는 검사·프리셋이 여러 번
+         * 부르는 복원 경로이고(TrialPresetEquivalencePlayTests), 그 경로가 보상을
+         * 지급하면 프리셋을 갈아끼울 때마다 골드가 들어온다.
+         *
+         * 두 번째 호출은 **거부한다.** 부팅이 두 번 도는 상태가 조용히 성립하면
+         * 이 스텝이 막으려던 이중 지급이 다른 문으로 돌아온다.
+         */
+        public void ApplyBoot(SaveData data, string reason)
         {
-            Apply(SaveSystem.Load());
+            if (data == null) return;
+
+            if (bootApplied)
+            {
+                Debug.LogWarning("[Onikiri] 부팅 적용이 두 번 요청됐습니다. 무시합니다: " + reason);
+                return;
+            }
+
+            bootApplied = true;
+            BootApplyCount++;
+
+            Apply(data);
+            GrantOfflineReward(data);
+
+            Debug.Log("[Onikiri] Boot apply #" + BootApplyCount + " - " + reason
+                      + " (방치 보상 " + OfflineRewardGrants + "회)");
         }
 
         /**
@@ -204,9 +297,10 @@ namespace Onikiri.Progression
 
             loaded = true;
 
-            // 방치 보상은 퀘스트 복원 뒤다. 지급이 wallet.Add를 지나 골드 카운터를
-            // 올리는데, 복원이 나중이면 그 값을 세이브의 옛 값이 덮어쓴다
-            GrantOfflineReward(data);
+            // **방치 보상은 여기 없다.** 59단계 전에는 이 줄 끝에서 지급했는데,
+            // 그러면 이 함수를 부르는 모든 경로가 보상 경로가 된다 - 프리셋
+            // 검사가 세이브를 갈아끼울 때마다, 그리고 클라우드를 나중에 덮을
+            // 때마다. 지급은 부팅 한 곳(ApplyBoot)만이 한다.
         }
 
         private void GrantOfflineReward(SaveData data)
@@ -227,6 +321,9 @@ namespace Onikiri.Progression
             // 구간에서 반올림이 갈린다. 골드 기준으로 조기 반환하면 그 구간의
             // 방치 경험치가 통째로 사라진다
             if (reward <= BigDouble.Zero && expReward <= BigDouble.Zero) return;
+
+            OfflineRewardGrants++;
+            LastOfflineReward = reward;
 
             var wallet = PlayerWallet.Instance;
             if (wallet != null) wallet.Add(reward);
@@ -356,6 +453,10 @@ namespace Onikiri.Progression
             data.expPerSecond = EstimateExpPerSecond(data.goldPerSecond);
 
             SaveSystem.Save(data);
+
+            // 방금 저장한 **이 스냅샷**이 클라우드로 올라갈 후보다 (60단계).
+            // 디스크 재읽기가 없으므로 서버의 payload가 정확히 이 한 벌이다
+            CloudSaveSync.NoteSaved(data);
         }
 
         /** 지금 스탯과 스테이지에서 기대되는 초당 골드 */
@@ -434,8 +535,7 @@ namespace Onikiri.Progression
         public void DeleteSaveAndReload()
         {
             SaveSystem.Delete();
-            loaded = false;
-            Load();
+            ReloadFromDisk();
         }
 
         /**
@@ -448,7 +548,12 @@ namespace Onikiri.Progression
         public void ReloadFromDisk()
         {
             loaded = false;
-            Load();
+            bootApplied = false;
+
+            // **디스크만 본다.** 클라우드 선택을 다시 지나지 않는 것이 의도다 -
+            // 이 경로가 재현하려는 것은 "앱을 껐다 켰다"가 아니라 "이 파일을
+            // 다시 얹었다"이고, 방치 보상 확인이 그것을 필요로 한다
+            ApplyBoot(SaveSystem.Load(), "디스크에서 다시 불러오기");
         }
     }
 }
