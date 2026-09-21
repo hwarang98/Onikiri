@@ -114,7 +114,19 @@ namespace Onikiri.UI
             // 덮이기 전의 로컬을 먼저 지킨다 (precloud.1/2/3 순환)
             CloudSaveCoordinator.KeepPreCloudBackup();
 
-            SaveSystem.Save(cloud);
+            // ★ 62.1.1 P1: **디스크에 들어간 뒤에만** 서버 사슬을 옮긴다.
+            //
+            // 부팅 경로와 같은 결함이 여기에도 있었다 - 저장 결과를 보지 않고
+            // 곧바로 head를 채택했다. 저장이 실패하면 "로컬은 옛 기록인데
+            // 사슬은 최신"이 되고, 다음 동기화가 그 옛 기록을 서버에서 파생된
+            // 변경분으로 오인해 올린다.
+            if (!SaveSystem.Save(cloud))
+            {
+                Debug.LogWarning("[CloudSave] 클라우드 기록을 저장하지 못했습니다. "
+                                 + "사슬을 옮기지 않고 선택을 유지합니다.");
+                return;
+            }
+
             AdoptServerHead();
 
             Debug.Log("[CloudSave] 충돌 해결: 클라우드 기록 사용 (rev "

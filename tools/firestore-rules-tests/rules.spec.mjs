@@ -34,6 +34,8 @@ const OTHER = 'player-b';
 const SESSION_A = '1'.repeat(32);
 const SESSION_B = '2'.repeat(32);
 const DEVICE_A = 'a'.repeat(32);
+const SESSION_C = '3'.repeat(32);
+const DEVICE_B = 'f'.repeat(32);
 const MUTATION_1 = 'b'.repeat(32);
 const MUTATION_2 = 'c'.repeat(32);
 const HASH_PAYLOAD = 'd'.repeat(64);
@@ -90,15 +92,53 @@ function envelope(over = {}) {
   };
 }
 
+/**
+ * 세션 문서 한 벌 (63단계: 여덟 필드).
+ *
+ * `generation`이 없는 옛 문서를 만들려면 `legacy: true`를 준다 - 규칙의
+ * `legacyUpgrade` 갈래가 그것을 위해 있다.
+ */
+function sessionDoc({
+  sessionId = SESSION_A,
+  deviceId = DEVICE_A,
+  released = false,
+  generation = 1,
+  takeoverSessionId = '',
+  takeoverDeviceId = '',
+  heartbeatAt = serverTimestamp(),
+  takeoverAt = serverTimestamp(),
+} = {}) {
+  return {
+    sessionId, deviceId, released, generation,
+    takeoverSessionId, takeoverDeviceId, heartbeatAt, takeoverAt,
+  };
+}
+
 /** 규칙을 끄고 상태를 만든다 - 만료된 heartbeat처럼 규칙이 못 쓰게 하는 상태용 */
-async function seedSession({ sessionId = SESSION_A, released = false, ageSeconds = 0 } = {}) {
+async function seedSession({
+  sessionId = SESSION_A,
+  deviceId = DEVICE_A,
+  released = false,
+  ageSeconds = 0,
+  generation = 1,
+  takeoverSessionId = '',
+  takeoverDeviceId = '',
+  takeoverAgeSeconds = 0,
+  legacy = false,
+} = {}) {
+  const beat = Timestamp.fromMillis(Date.now() - ageSeconds * 1000);
+
+  const data = legacy
+    ? { sessionId, deviceId, released, heartbeatAt: beat }
+    : {
+        sessionId, deviceId, released, generation,
+        takeoverSessionId, takeoverDeviceId,
+        heartbeatAt: beat,
+        takeoverAt: Timestamp.fromMillis(Date.now() - takeoverAgeSeconds * 1000),
+      };
+
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'playerSaveSessions', ME), {
-      sessionId,
-      deviceId: DEVICE_A,
-      released,
-      heartbeatAt: Timestamp.fromMillis(Date.now() - ageSeconds * 1000),
-    });
+    await setDoc(doc(ctx.firestore(), 'playerSaveSessions', ME), data);
   });
 }
 
@@ -355,54 +395,239 @@ describe('작성 세션', () => {
   });
 
   it('세션은 처음 만들 수 있다', async () => {
-    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A, deviceId: DEVICE_A, released: false, heartbeatAt: serverTimestamp(),
-    }));
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), sessionDoc()));
+  });
+
+  it('첫 세션의 세대는 1이어야 한다', async () => {
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 7 })));
   });
 
   it('같은 세션은 heartbeat로 갱신한다', async () => {
-    await seedSession({ sessionId: SESSION_A });
-    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A, deviceId: DEVICE_A, released: false, heartbeatAt: serverTimestamp(),
-    }));
+    await seedSession({ sessionId: SESSION_A, generation: 4 });
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 4, takeoverAt: (await readRaw('playerSaveSessions')).takeoverAt })));
   });
 
   it('살아 있는 다른 세션은 인수하지 못한다', async () => {
-    await seedSession({ sessionId: SESSION_B, ageSeconds: 30 });
-    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A, deviceId: DEVICE_A, released: false, heartbeatAt: serverTimestamp(),
-    }));
+    // **다른 기기**여야 한다. 같은 기기의 이전 실행은 이어받기이지 인수가 아니다
+    // (63단계에서 그 갈래가 규칙에 들어왔다)
+    await seedSession({
+      sessionId: SESSION_B, deviceId: DEVICE_B, ageSeconds: 30, generation: 2,
+    });
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
   });
 
   it('만료된 세션(180초)은 인수한다', async () => {
-    await seedSession({ sessionId: SESSION_B, ageSeconds: 200 });
-    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A, deviceId: DEVICE_A, released: false, heartbeatAt: serverTimestamp(),
-    }));
+    await seedSession({ sessionId: SESSION_B, ageSeconds: 200, generation: 2 });
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
   });
 
   it('놓아준 세션은 만료 전에도 인수한다', async () => {
-    await seedSession({ sessionId: SESSION_B, released: true, ageSeconds: 5 });
-    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A, deviceId: DEVICE_A, released: false, heartbeatAt: serverTimestamp(),
-    }));
+    await seedSession({ sessionId: SESSION_B, released: true, ageSeconds: 5, generation: 2 });
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
   });
 
   it('heartbeat를 미래로 적을 수 없다', async () => {
     await seedSession({ sessionId: SESSION_A });
-    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A,
-      deviceId: DEVICE_A,
-      released: false,
-      heartbeatAt: Timestamp.fromMillis(Date.now() + 3_600_000),
-    }));
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ heartbeatAt: Timestamp.fromMillis(Date.now() + 3_600_000) })));
   });
 
   it('세션에 임의 필드를 붙일 수 없다', async () => {
-    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME), {
-      sessionId: SESSION_A, deviceId: DEVICE_A, released: false,
-      heartbeatAt: serverTimestamp(), owner: 'me',
-    }));
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      { ...sessionDoc(), owner: 'me' }));
+  });
+});
+
+// ------------------------------------------------- 63단계: 세대와 명시적 인수
+
+describe('단일 활성 기기 - 세대(generation)와 명시적 인수 (63단계)', () => {
+
+  // ---- 인수 요청은 아무것도 밀어내지 않는다
+
+  it('살아 있는 세션에 인수 요청을 남길 수 있다', async () => {
+    await seedSession({ sessionId: SESSION_B, ageSeconds: 10, generation: 2 });
+
+    const before = await readRaw('playerSaveSessions');
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), sessionDoc({
+      sessionId: SESSION_B, deviceId: DEVICE_A, generation: 2,
+      takeoverSessionId: SESSION_A, takeoverDeviceId: DEVICE_A,
+      heartbeatAt: before.heartbeatAt,
+    })));
+
+    const after = await readRaw('playerSaveSessions');
+    assert.equal(after.sessionId, SESSION_B);        // owner는 그대로다
+    assert.equal(after.generation, 2);
+    assert.equal(after.takeoverSessionId, SESSION_A);
+  });
+
+  it('인수 요청이 상대의 만료 시계를 되감을 수 없다', async () => {
+    await seedSession({ sessionId: SESSION_B, ageSeconds: 60, generation: 2 });
+
+    // heartbeatAt을 지금으로 적으면(=되감기) 거부된다. 되감을 수 있으면
+    // 요청만 반복해 상대를 영원히 살려 두고 강제 인수를 막을 수 있다
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME), sessionDoc({
+      sessionId: SESSION_B, deviceId: DEVICE_A, generation: 2,
+      takeoverSessionId: SESSION_A, takeoverDeviceId: DEVICE_A,
+    })));
+  });
+
+  it('owner의 heartbeat는 인수 요청을 지우지 못한다', async () => {
+    await seedSession({
+      sessionId: SESSION_A, generation: 3,
+      takeoverSessionId: SESSION_B, takeoverDeviceId: DEVICE_B,
+    });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, generation: 3 })));   // 요청을 빈 값으로 밀었다
+  });
+
+  // ---- 인수 커밋
+
+  it('익지 않은 요청으로는 살아 있는 세션을 못 뺏는다', async () => {
+    await seedSession({
+      sessionId: SESSION_B, deviceId: DEVICE_B, ageSeconds: 5, generation: 2,
+      takeoverSessionId: SESSION_A, takeoverDeviceId: DEVICE_A, takeoverAgeSeconds: 3,
+    });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
+  });
+
+  it('20초 익은 요청은 살아 있는 세션도 인수한다 (강제 인수)', async () => {
+    await seedSession({
+      sessionId: SESSION_B, deviceId: DEVICE_B, ageSeconds: 5, generation: 2,
+      takeoverSessionId: SESSION_A, takeoverDeviceId: DEVICE_A, takeoverAgeSeconds: 40,
+    });
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
+
+    const after = await readRaw('playerSaveSessions');
+    assert.equal(after.sessionId, SESSION_A);
+    assert.equal(after.deviceId, DEVICE_A);
+    assert.equal(after.generation, 3);
+    assert.equal(after.takeoverSessionId, '');   // 처리된 요청은 지워진다
+  });
+
+  it('같은 기기의 이전 실행은 살아 있어도 이어받는다', async () => {
+    // 강제 종료로 release를 못 한 자기 자신의 자리. heartbeat는 아직 신선하다
+    await seedSession({
+      sessionId: SESSION_B, deviceId: DEVICE_A, ageSeconds: 5, generation: 2,
+    });
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A, generation: 3 })));
+  });
+
+  it('다른 기기는 살아 있는 자리를 그냥 못 가져간다', async () => {
+    await seedSession({
+      sessionId: SESSION_B, deviceId: DEVICE_B, ageSeconds: 5, generation: 2,
+    });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A, generation: 3 })));
+  });
+
+  it('남의 요청에 편승해 인수할 수 없다', async () => {
+    await seedSession({
+      sessionId: SESSION_B, deviceId: DEVICE_B, ageSeconds: 5, generation: 2,
+      takeoverSessionId: SESSION_C, takeoverDeviceId: DEVICE_B, takeoverAgeSeconds: 40,
+    });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
+  });
+
+  it('세대는 정확히 1만 오른다', async () => {
+    await seedSession({ sessionId: SESSION_B, released: true, generation: 2 });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 4 })), '건너뛰기');
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 2 })), '제자리');
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ generation: 3 })));
+  });
+
+  it('동시 인수는 하나만 성공한다', async () => {
+    await seedSession({ sessionId: SESSION_C, released: true, generation: 5 });
+
+    // 둘 다 세대 5를 보고 6을 쓴다. 먼저 든 쪽이 세대를 6으로 올리면
+    // 나중 쪽의 전제(resource.generation == 5)가 무너져 거부된다
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A, generation: 6 })));
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_B, deviceId: DEVICE_B, generation: 6 })));
+
+    const after = await readRaw('playerSaveSessions');
+    assert.equal(after.sessionId, SESSION_A);
+    assert.equal(after.generation, 6);
+  });
+
+  // ---- 이전 기기는 새 세션을 건드리지 못한다
+
+  it('이전 기기의 heartbeat가 거부된다', async () => {
+    await seedSession({ sessionId: SESSION_B, deviceId: DEVICE_B, generation: 3 });
+
+    // A는 자기가 아직 owner인 줄 알고 자기 id로 heartbeat를 쓴다
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A, generation: 3 })));
+  });
+
+  it('이전 기기의 release가 새 세션을 해제하지 못한다', async () => {
+    await seedSession({ sessionId: SESSION_B, deviceId: DEVICE_B, generation: 3 });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME), sessionDoc({
+      sessionId: SESSION_A, deviceId: DEVICE_A, generation: 3, released: true,
+    })));
+
+    const after = await readRaw('playerSaveSessions');
+    assert.equal(after.released, false);   // B는 여전히 쥐고 있다
+  });
+
+  it('이전 기기의 세이브 커밋이 거부된다', async () => {
+    await seedSession({ sessionId: SESSION_B, deviceId: DEVICE_B, generation: 3 });
+
+    // 인수 전에 만들어 둔 봉투를 A가 뒤늦게 올린다
+    await assertFails(setDoc(doc(me(), 'playerSaves', ME), envelope({ sessionId: SESSION_A })));
+  });
+
+  it('현재 owner 세션만 커밋한다', async () => {
+    await seedSession({ sessionId: SESSION_A, deviceId: DEVICE_A, generation: 3 });
+    await assertSucceeds(setDoc(doc(me(), 'playerSaves', ME), envelope({ sessionId: SESSION_A })));
+  });
+
+  // ---- 남의 계정
+
+  it('다른 uid의 세션 문서를 읽거나 인수하지 못한다', async () => {
+    await seedSession({ sessionId: SESSION_A, generation: 2 });
+
+    await assertFails(getDoc(doc(stranger(), 'playerSaveSessions', ME)));
+    await assertFails(setDoc(doc(stranger(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_B, deviceId: DEVICE_B, generation: 3 })));
+  });
+
+  // ---- 옛 문서 (62단계까지의 네 필드)
+
+  it('세대가 없는 옛 문서를 자기 세션이 올릴 수 있다', async () => {
+    await seedSession({ sessionId: SESSION_A, legacy: true });
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, generation: 1 })));
+  });
+
+  it('옛 문서라도 살아 있는 남의 자리는 못 가져간다', async () => {
+    await seedSession({ sessionId: SESSION_B, ageSeconds: 30, legacy: true });
+
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, generation: 1 })));
   });
 });
 

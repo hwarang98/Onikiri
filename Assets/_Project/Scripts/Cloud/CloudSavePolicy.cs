@@ -387,6 +387,47 @@ namespace Onikiri.Cloud
          * 불변식을 어긴 sidecar도 아니라고 답한다 - 반쯤 맞는 상태를 믿는 것이
          * 모르는 것보다 위험하다(CloudSaveLocalState.IsWellFormed).
          */
+        /**
+         * @brief 부팅이 **인증 준비를 기다려야 하는가** (62.1단계 P0).
+         *
+         * ## 무엇이 부러져 있었는가
+         *
+         * `GameSession.Start()`가 `WillCheckServer`를 **한 번** 물어보는데, 그
+         * 시점에는 Firebase 로그인이 아직 안 끝나 uid가 비어 있다. uid가 없으면
+         * `ShouldCheckServer`가 false를 돌려주므로 부팅은 같은 프레임에 로컬로
+         * 확정된다 - 그리고 약 1초 뒤 로그인이 끝나도 **이미 고른 뒤다.**
+         *
+         * 62단계 실기가 그대로 찍었다: 부팅 판정 14:01:13.023, 로그인 완료
+         * 14:01:14.082. 다른 기기가 올린 최신 정본이 서버에 있어도 이 기기는
+         * 그것을 부팅에서 보지 못한다.
+         *
+         * ## 왜 "사이드카가 있을 때만"인가
+         *
+         * 기다림에는 값이 있다. 신규 사용자·로컬 전용 사용자에게 부팅을 늦추는
+         * 것은 **아무 이득 없이 첫 화면을 늦추는 일**이다. 사이드카가 있다는
+         * 것은 "이 기기가 이 uid로 서버와 사슬을 맺은 적이 있다"는 뜻이고,
+         * 그때만 서버에 볼 것이 있다.
+         *
+         * 그래서 기다림의 조건은 **디스크에 성립하는 사이드카가 있다** 하나다.
+         * uid가 이미 있으면 기다릴 이유가 없고(그때는 곧바로 서버를 본다),
+         * 서버 확인이 꺼져 있으면 기다려 봐야 쓸 데가 없다.
+         *
+         * @param serverCheckEnabled 서버 확인이 켜져 있는가 (에디터 게이트 포함)
+         * @param hasUid             지금 이미 uid가 있는가
+         * @param hasSidecar         디스크에 **성립하는** 사이드카가 있는가
+         */
+        public static bool ShouldAwaitIdentity(bool serverCheckEnabled, bool hasUid,
+                                               bool hasSidecar)
+        {
+            if (!serverCheckEnabled) return false;
+
+            // 이미 있으면 기다릴 것이 없다 - 곧바로 서버를 본다
+            if (hasUid) return false;
+
+            // 신규·로컬 전용은 Firebase 때문에 한 프레임도 늦지 않는다
+            return hasSidecar;
+        }
+
         public static bool SidecarAppliesTo(CloudSaveLocalState state, string uid)
         {
             if (state == null) return false;

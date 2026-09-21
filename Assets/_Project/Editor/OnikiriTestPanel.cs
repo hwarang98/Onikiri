@@ -3740,6 +3740,117 @@ namespace Onikiri.EditorTools
                     + "adb logcat -s Unity | grep CloudSave 에서 '복구 세이브 판정' 한 줄.",
                     MessageType.Info);
             }
+
+            DrawCloudAppCheckTools();
+        }
+
+        private string appCheckPreview = string.Empty;
+
+        /**
+         * @brief 크로스 저장 (6단계 - App Check·실측 기록표) (62단계).
+         *
+         * 이 절이 답하는 것 셋이다: **지금 어떤 provider가 붙어 있는가** ·
+         * **토큰이 실제로 발급되는가** · **두 기기 실측에 적을 한 줄이 무엇인가.**
+         *
+         * 토큰 원문은 어디에도 안 뜬다. 뜨는 것은 성공 여부·만료 시각·오류
+         * 코드뿐이고, 그 셋이면 진단에 모자람이 없다 - 원문이 한 번 화면에
+         * 뜨면 스크린샷 한 장으로 새어 나가고, 그러면 콘솔에서 앱을 갈아야
+         * 회수된다.
+         */
+        private void DrawCloudAppCheckTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (6단계 - App Check)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Onikiri.Cloud.FirebaseAppCheckBootstrap.EnsureConfigured();
+
+                Row("provider", Onikiri.Cloud.FirebaseAppCheckBootstrap.Provider
+                    + "   (이 플랫폼의 계획 = "
+                    + Onikiri.Cloud.FirebaseAppCheckBootstrap.PlannedProvider + ")");
+                Row("배선", Onikiri.Cloud.FirebaseAppCheckBootstrap.Setup.ToString());
+
+                if (!Onikiri.Cloud.FirebaseAppCheckBootstrap.IsConfigured)
+                    EditorGUILayout.HelpBox(
+                        Onikiri.Cloud.FirebaseAppCheckBootstrap.Detail
+                        + "\n\n★ 이 상태에서는 위 두 절의 실서버 스위치를 켜도 왕복이 나가지 "
+                        + "않습니다 - 토큰 없이 나간 요청은 enforcement 뒤에 전부 거부되고, "
+                        + "그 거부는 규칙이 틀린 것과 로그에서 구분되지 않습니다.",
+                        MessageType.Warning);
+
+                EditorGUILayout.Space(4f);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("실측 기록표 (서버 왕복 없음)"))
+                        appCheckPreview = Onikiri.Cloud.AppCheckDiagnostics.Snapshot();
+
+                    using (new EditorGUI.DisabledScope(
+                        !Onikiri.Cloud.FirebaseAppCheckBootstrap.IsConfigured))
+                    {
+                        if (GUILayout.Button("토큰 강제 갱신"))
+                            RunAppCheck(Onikiri.Cloud.AppCheckDiagnostics.RefreshTokenAsync());
+                    }
+
+                    // ★ 62.1.1 P1: 정본 읽기는 **토큰이 확인된 뒤에만** 누를 수 있다.
+                    //
+                    // provider가 붙었다(IsConfigured)와 토큰이 나왔다(LastTokenOk)는
+                    // 다른 사실이다. 예전에는 앞엣것만 보고 버튼을 열어, 갱신이
+                    // 실패한 상태에서도 미검증 요청을 보낼 수 있었다.
+                    // (진짜 방어는 ReadCanonicalAsync 안에 있고, 이 버튼은 그 사실을
+                    //  화면에 비추는 쪽이다 - 눌리지 않는 버튼이 설명이 된다)
+                    using (new EditorGUI.DisabledScope(
+                        !Onikiri.Cloud.AppCheckDiagnostics.LastTokenOk))
+                    {
+                        if (GUILayout.Button("정본 읽기 (Source.Server)"))
+                            RunAppCheck(Onikiri.Cloud.AppCheckDiagnostics.ReadCanonicalAsync());
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(
+                    !Onikiri.Cloud.FirebaseAppCheckBootstrap.IsConfigured))
+                {
+                    if (GUILayout.Button("전체 진단 (provider → 토큰 → 정본)"))
+                        RunAppCheck(Onikiri.Cloud.AppCheckDiagnostics.RunAsync());
+                }
+
+                EditorGUILayout.Space(4f);
+
+                // 응답 유실은 손으로 만들 수 없다 - 서버가 커밋한 **직후** 앱이
+                // 죽어야 생기는 상태라, seam 없이는 idempotency가 영영 안 밟힌다
+                Onikiri.Cloud.CloudSaveStore.DropNextCommitResponseForTests =
+                    EditorGUILayout.ToggleLeft(
+                        "다음 커밋 한 번을 '응답 유실'로 만든다 (서버는 커밋, 로컬은 pending 유지)",
+                        Onikiri.Cloud.CloudSaveStore.DropNextCommitResponseForTests);
+
+                if (!string.IsNullOrEmpty(appCheckPreview))
+                    EditorGUILayout.HelpBox(appCheckPreview, MessageType.None);
+
+                EditorGUILayout.HelpBox(
+                    "provider 표: 에디터 = Debug (환경 변수 "
+                    + Onikiri.Cloud.FirebaseAppCheckBootstrap.DebugTokenVariable
+                    + ") / 안드로이드 실기 = Play Integrity.\n"
+                    + "★ 토큰 원문은 이 창에도 로그에도 보고서에도 찍지 않습니다.\n"
+                    + "두 기기 실측 순서: 양쪽에서 '실측 기록표'를 먼저 찍고 → 한쪽을 진행시키고 "
+                    + "→ 다른 쪽에서 다시 찍어 revision·state hash가 어떻게 움직였는지 나란히 "
+                    + "놓습니다.\n"
+                    + "응답 유실 실측: 토글을 켜고 urgent 커밋 하나를 띄운 뒤, 다음 커밋에서 "
+                    + "AlreadyApplied가 나오고 revision이 **안 오르는지** 봅니다.",
+                    MessageType.Info);
+            }
+        }
+
+        /** 진단 Task 하나의 결과를 창에 적는다. 예외는 창에 남고 콘솔을 안 덮는다 */
+        private void RunAppCheck(System.Threading.Tasks.Task<string> task)
+        {
+            appCheckPreview = "진단 실행 중...";
+
+            task.ContinueWith(finished =>
+            {
+                appCheckPreview = finished.IsFaulted
+                    ? "진단 예외 -> " + Onikiri.Cloud.FirebaseRuntime.Flatten(finished.Exception)
+                    : finished.Result;
+            });
         }
 
         private enum RecoverySim { Missing, Same, Diverged, Offline }

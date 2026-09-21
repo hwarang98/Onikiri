@@ -208,6 +208,15 @@ namespace Onikiri.Cloud
         {
             try
             {
+                // ★ 62단계: **Firebase를 만지기 전에** App Check provider를 붙인다.
+                //
+                // 이 한 줄이 아래 CheckAndFixDependenciesAsync보다 뒤로 가면
+                // FirebaseApp이 provider 없이 서고, 그 뒤에 factory를 붙여도
+                // 이미 만들어진 핸들은 토큰을 달지 않는다 - enforcement가 켜진
+                // 순간 전 요청이 거부되고, 그 거부는 규칙 문제와 구분되지 않는다.
+                // 멱등이므로 두 번째 호출부터는 아무 일도 하지 않는다.
+                FirebaseAppCheckBootstrap.EnsureConfigured();
+
                 Set("Firebase 의존성 확인 중...");
 
                 var check = FirebaseApp.CheckAndFixDependenciesAsync();

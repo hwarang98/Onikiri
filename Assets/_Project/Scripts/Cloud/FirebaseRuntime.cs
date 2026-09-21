@@ -52,6 +52,12 @@ namespace Onikiri.Cloud
         {
             try
             {
+                // 62단계: 두 부팅 경로가 **모두** App Check를 먼저 지난다.
+                // CloudScores.InitializeCoreAsync도 자기 첫 줄에서 부르므로
+                // 보통은 여기가 이기지만, 그 순서에 기대지 않는다 - 기대면
+                // 나중에 초기화 경로가 하나 더 생겼을 때 조용히 깨진다.
+                FirebaseAppCheckBootstrap.EnsureConfigured();
+
                 if (!await CloudScores.InitializeAsync()) return false;
                 if (string.IsNullOrEmpty(CloudScores.Uid)
                     && !await CloudScores.SignInAnonymouslyAsync()) return false;

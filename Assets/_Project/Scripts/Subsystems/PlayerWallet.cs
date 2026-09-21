@@ -49,6 +49,10 @@ namespace Onikiri.Progression
         {
             if (amount.IsZero || amount.IsNegative) return;
 
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return;
+
             gold += amount;
             LifetimeGold += amount;
             Raise();
@@ -74,6 +78,10 @@ namespace Onikiri.Progression
         /** 감당 가능할 때만 소비한다. 구매가 성사됐는지를 반환 */
         public bool TrySpend(BigDouble cost)
         {
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return false;
+
             if (cost.IsNegative || !CanAfford(cost)) return false;
 
             gold -= cost;

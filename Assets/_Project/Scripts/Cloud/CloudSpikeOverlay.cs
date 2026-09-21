@@ -57,7 +57,9 @@ namespace Onikiri.Cloud
             var safe = Screen.safeArea;
             float top = Screen.height - safe.yMax + margin;
 
-            var area = new Rect(margin, top, width, lineHeight * (expanded ? 8.2f : 1f));
+            // App Check 절(62단계)이 붙어 두 줄 늘었다. 모자라면 마지막 줄이
+            // 잘려서, 정작 읽어야 할 진단 결과가 화면 밖으로 나간다
+            var area = new Rect(margin, top, width, lineHeight * (expanded ? 11.4f : 1f));
             GUILayout.BeginArea(area);
 
             if (GUILayout.Button(expanded ? "Firebase ▲" : "Firebase ▼",
@@ -114,9 +116,64 @@ namespace Onikiri.Cloud
                 GUILayout.Label(CloudScores.Status, labelStyle);
                 if (!string.IsNullOrEmpty(AccountLink.Status))
                     GUILayout.Label(AccountLink.Status, labelStyle);
+
+                // ---- App Check (62단계)
+                //
+                // 에디터 테스트 패널에만 진단을 두면 **실기에서 부를 방법이 없다** -
+                // 그런데 Play Integrity가 도는 곳은 여기뿐이다. 데스크톱 Debug
+                // provider가 통과하는 것은 실기 통과의 증거가 못 된다(스파이크를
+                // 이 오버레이로 옮긴 것과 정확히 같은 이유다).
+                //
+                // 결과는 화면에 한 줄로 적고 **logcat에도 남긴다** - 폰 화면은
+                // 좁고, 실측은 adb로 읽는 편이 정확하다.
+                using (new GUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("App Check 진단", buttonStyle,
+                                         GUILayout.Height(lineHeight)))
+                        RunAppCheck();
+
+                    // 응답 유실은 손으로 만들 수 없다 - 서버가 커밋한 **직후**
+                    // 앱이 죽어야 생기는 상태라, seam 없이는 idempotency가
+                    // 영영 안 밟힌다 (62단계 7절)
+                    CloudSaveStore.DropNextCommitResponseForTests = GUILayout.Toggle(
+                        CloudSaveStore.DropNextCommitResponseForTests,
+                        "응답유실 1회", buttonStyle, GUILayout.Height(lineHeight));
+                }
+
+                GUILayout.Label(string.IsNullOrEmpty(appCheckLine)
+                    ? "App Check " + FirebaseAppCheckBootstrap.Provider
+                      + " / " + FirebaseAppCheckBootstrap.Setup
+                    : appCheckLine, labelStyle);
             }
 
             GUILayout.EndArea();
+        }
+
+        /** 마지막 App Check 진단의 한 줄. 토큰 원문은 **여기 절대 안 온다** */
+        private string appCheckLine = string.Empty;
+
+        private bool appCheckBusy;
+
+        /**
+         * @brief provider → 토큰 강제 갱신 → 정본 읽기를 한 번에.
+         *
+         * `RunAsync`가 결과를 Debug.Log로도 남기므로 실측은 화면이 아니라
+         * `adb logcat -s Unity | grep AppCheck` 로 읽으면 된다.
+         */
+        private void RunAppCheck()
+        {
+            if (appCheckBusy) return;
+            appCheckBusy = true;
+            appCheckLine = "App Check 진단 중...";
+
+            AppCheckDiagnostics.RunAsync().ContinueWith(task =>
+            {
+                appCheckBusy = false;
+
+                appCheckLine = task.IsFaulted
+                    ? "App Check 진단 예외: " + FirebaseRuntime.Flatten(task.Exception)
+                    : task.Result;
+            });
         }
 
         /** 반환된 Task를 버리되 실패는 로그로 남긴다 (CloudScores.Observe와 같은 이유) */

@@ -198,6 +198,11 @@ namespace Onikiri.Progression
 
         public bool TryFreePullAt(DateTime utcNow)
         {
+            // 무료 뽑기는 지불이 없어 지갑을 안 지난다. 그래서 여기에도 한 줄 둔다
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return false;
+
             if (!HasFreePullAt(utcNow)) return false;
 
             lastFreePullDayTicks = GachaCurve.DayOf(utcNow).Ticks;

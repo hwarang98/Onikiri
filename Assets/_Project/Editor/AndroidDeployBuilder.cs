@@ -76,6 +76,19 @@ namespace Onikiri.EditorTools
             Launch(adb, device);
         }
 
+        /**
+         * @brief 배치에서 부르는 입구 (`-executeMethod`). **APK만 굽고 설치는 안 한다.**
+         *
+         * 두 기기에 같은 APK를 얹어야 하는 실기(63단계)에서 필요한 모양이다 -
+         * 메뉴 경로는 기기 하나를 찾아 거기에만 설치하고, 실패하면
+         * `EditorUtility.DisplayDialog`를 띄운다(배치에서는 그것이 곧 행이다).
+         */
+        public static void BuildDevelopmentApkBatch()
+        {
+            if (!BuildApk(true))
+                throw new System.Exception("[Onikiri] 개발 빌드 실패 - 로그를 보세요.");
+        }
+
         [MenuItem("Onikiri/Build/폰 연결만 확인", false, 101)]
         public static void CheckDeviceOnly()
         {

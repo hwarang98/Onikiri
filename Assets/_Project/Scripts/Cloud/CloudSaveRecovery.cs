@@ -211,9 +211,11 @@ namespace Onikiri.Cloud
 #if UNITY_EDITOR
             // 에디터의 Firebase는 운영 프로젝트에 붙는다. 60단계 행 사고의
             // 방어선(EditorServerCheckAllowed)을 복구 읽기도 그대로 지난다
-            if (!CloudSaveCoordinator.EditorServerCheckAllowed)
+            if (!CloudSaveCoordinator.EditorServerCheckAllowed
+                || !FirebaseAppCheckBootstrap.EditorServerCallsAllowed)
             {
-                Debug.Log(Tag + " 복구: 에디터 실서버 게이트가 꺼져 있어 서버를 보지 않습니다.");
+                Debug.Log(Tag + " 복구: 에디터 실서버 게이트가 꺼져 있어 서버를 보지 않습니다. "
+                          + FirebaseAppCheckBootstrap.EditorBlockReason);
                 return Task.FromResult(new CloudSaveFetchResult
                 {
                     status = CloudSaveStoreStatus.Offline

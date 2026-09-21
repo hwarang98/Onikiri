@@ -126,6 +126,19 @@ namespace Onikiri.Cloud
     {
         private const string Tag = "[CloudSave]";
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /**
+         * @brief 다음 커밋 **한 번만** 응답이 유실된 것처럼 군다 (62단계 진단 seam).
+         *
+         * 켜는 곳은 테스트 패널과 테스트뿐이고, 한 번 쓰면 스스로 꺼진다 -
+         * 켠 채로 잊으면 그 실행의 모든 커밋이 pending으로 남는다.
+         *
+         * **출시 빌드에는 이 필드 자체가 없다.** 임의 실패 스위치가 production에
+         * 남으면 그것은 진단 도구가 아니라 사고의 원인이 된다.
+         */
+        public static bool DropNextCommitResponseForTests;
+#endif
+
         /**
          * @brief 서버 정본을 읽는다. **캐시가 아니라 서버에서.**
          *
@@ -271,6 +284,22 @@ namespace Onikiri.Cloud
                 return Commit(Classify(task));
 
             CloudSaveCommitResult result = task.Result;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // [8b] **응답 유실 모의** (62단계 7절). 서버 트랜잭션은 위에서 이미
+            // 커밋됐고, 여기서 응답이 사라진 것처럼 군다 - sidecar를 앞으로 밀지
+            // 않으므로 pendingMutationId가 그대로 남고, 다음 실행은 같은 id로
+            // 재시도해 [4]의 AlreadyApplied로 떨어져야 한다. revision은 더 오르지
+            // 않는다. 이 상황은 지하철·앱 강제 종료에서 실제로 생기고, 손으로
+            // 만들 방법이 없어서 seam이 필요하다
+            if (DropNextCommitResponseForTests && result.IsSynced)
+            {
+                DropNextCommitResponseForTests = false;
+                Debug.LogWarning(Tag + " [진단] 응답 유실 모의 - 서버는 rev "
+                                 + result.revision + " 로 커밋됐지만 sidecar를 밀지 않습니다.");
+                return Commit(CloudSaveStoreStatus.Failed, result.revision);
+            }
+#endif
 
             // [9] **성공을 확인한 뒤에만** sidecar를 앞으로 민다
             if (result.IsSynced) AdoptRevision(sidecar, envelope, result.revision);

@@ -83,7 +83,18 @@ namespace Onikiri.Progression
             // 로드는 같은 프레임"을 가정하고(56단계), PlayMode 검사 몇은 첫
             // 프레임에 이 컴포넌트를 파괴한다 - 그때 코루틴으로 미루면 세이브가
             // 통째로 안 얹힌다(귀문 검사 다섯이 그렇게 깨졌다)
-            if (!CloudSaveCoordinator.WillCheckServer)
+            // ★ 62.1단계 P0: **인증을 기다릴 이유가 있는지도 함께 묻는다.**
+            //
+            // 예전에는 `WillCheckServer` 하나만 봤다. 그런데 부팅 시점에는 Firebase
+            // 로그인이 아직 안 끝나 uid가 비어 있고, uid가 없으면 그 값이 false다 -
+            // 그래서 사이드카를 든 기존 사용자도 같은 프레임에 로컬로 확정됐고,
+            // 1초 뒤 로그인이 끝나도 이미 고른 뒤였다(62단계 실기 §5.B).
+            //
+            // 기다림은 사이드카가 있는 기기에만 붙는다. 신규·로컬 전용 사용자는
+            // 예전 그대로 한 프레임도 안 쓴다 - 인트로의 "같은 프레임" 가정과
+            // 귀문 PlayMode 검사 다섯이 그 경로에 그대로 걸려 있다
+            if (!CloudSaveCoordinator.WillCheckServer
+                && !CloudSaveCoordinator.WillAwaitIdentity)
             {
                 BootWith(CloudSaveCoordinator.ChooseLocally(local));
                 return;
@@ -94,10 +105,47 @@ namespace Onikiri.Progression
 
         private IEnumerator BootRoutine(SaveData local)
         {
+            // ★★ 63단계: **작성권이 서버 정본 재조회보다 먼저다.**
+            //
+            // 다른 기기가 살아 있으면 여기서 멈추고 사람에게 묻는다. 승인 없이
+            // 자동으로 뺏지 않고, 취소하면 **게임이 시작되지 않는다** - "취소하고
+            // 로컬로 논다"는 갈래가 곧 62단계의 갈라짐이기 때문이다.
+            //
+            // 오프라인은 막지 않는다. 방치형 게임의 오프라인 계약이 세션보다
+            // 먼저이고, 그 경우 커밋은 규칙(writerHoldsSession)이 막는다
+            // ★ 63단계 실기: **인증이 먼저다.** 게이트가 uid 없이 들어오면
+            // 곧바로 Offline로 빠져 아무것도 묻지 않는다 - 62.1 P0-1과 같은 모양
+            yield return CloudSaveCoordinator.AwaitIdentity();
+
+            yield return TakeoverGate();
+
+            if (!CloudSaveTakeover.MayStartGame)
+            {
+                Debug.Log("[Onikiri] 세션을 얻지 못해 게임을 시작하지 않습니다 ("
+                          + CloudSaveTakeover.Phase + ").");
+                yield break;
+            }
+
             CloudSaveBootChoice choice = null;
             yield return CloudSaveCoordinator.ChooseBootSave(local, picked => choice = picked);
 
             BootWith(choice ?? CloudSaveCoordinator.LocalFallback(local));
+        }
+
+        /**
+         * @brief 세션 게이트. **에디터에서는 실서버 스위치가 켜졌을 때만 돈다.**
+         *
+         * 60단계 행 3회와 62.1의 PlayMode 매달림이 같은 자리에서 나왔다 - 에디터
+         * 에는 기다릴 로그인이 없고, 검사들은 가짜 서버만 쥐여 준다. 실기에는
+         * 이 게이트가 없다.
+         */
+        private IEnumerator TakeoverGate()
+        {
+#if UNITY_EDITOR
+            if (!CloudSaveSync.EditorNetworkAllowed) yield break;
+#endif
+            yield return CloudSaveTakeover.EnsureSession(
+                CloudScores.Uid, CloudSaveSession.DeviceIdFor(CloudScores.Uid));
         }
 
         private void BootWith(CloudSaveBootChoice choice)
@@ -107,6 +155,11 @@ namespace Onikiri.Progression
             // urgent 트리거는 이벤트 구독이다 - 그 시스템들은 한 줄도 안 바뀐다
             CloudSaveSync.Wire(evolution, gacha, skillGacha, GemWallet.Instance);
 
+            // urgent 커밋이 올리기 **직전에** 저장을 한 번 세운다 (62단계 실측).
+            // 이것이 없으면 올라가는 것은 최대 30초 전 스냅샷이고, 방금 낸
+            // 지불이 서버에 없다 - CloudSaveSync.SaveRequested 주석 참고
+            CloudSaveSync.SaveRequested = Save;
+
             // 고른 한 벌이 곧바로 디스크의 정본이 된다. 클라우드를 채택했다면
             // 이 저장이 그것을 로컬에 굳히고, 그 전에 원본은 옆에 남아 있다
             // (CloudSaveCoordinator.KeepPreCloudBackup)
@@ -115,6 +168,14 @@ namespace Onikiri.Progression
 
         private void Update()
         {
+            // ★ 63단계: 다른 기기가 인수했는지 지켜본다. 주기는 스스로 잰다(5초)
+            CloudSaveSessionWatch.Tick();
+
+            // 회수된 뒤에는 자동 저장도 동기화도 없다. 이 기기가 만든 진행은
+            // 서버로 갈 수 없고, 디스크에 굳혀 두면 다음 부팅이 그것을 두고
+            // 충돌 화면을 띄운다 - 63단계가 없애려는 갈라짐이 바로 그것이다
+            if (CloudSavePlayLock.Locked) return;
+
             // 클라우드 debounce(120초)·urgent는 sync가 스스로 잰다. 여기는 시계만 준다
             CloudSaveSync.Tick();
 
@@ -133,12 +194,15 @@ namespace Onikiri.Progression
          */
         private void OnApplicationPause(bool paused)
         {
-            Save();
+            // ★ 62.1.2: 저장 결과를 **그대로 넘긴다.** 실패했으면 pause 커밋이
+            // 낡은 `pendingData`를 올리고, 그것은 urgent 갈래에서 막은 사고가
+            // pause 갈래로 그대로 나가는 것이다
+            bool saved = Save();
 
             // 로컬이 먼저다(위 줄). 그 다음 클라우드 저장과 세션 release를
             // **시도**한다 - 완료는 보장이 아니다. 모바일은 이 뒤에 프로세스를
             // 예고 없이 회수하므로, 평소의 120초 주기가 진짜 보증이다
-            if (paused) CloudSaveSync.OnAppPaused();
+            if (paused) CloudSaveSync.OnAppPaused(saved);
             else CloudSaveSync.OnAppResumed();
         }
 
@@ -347,9 +411,28 @@ namespace Onikiri.Progression
          * 불러오기 전에는 저장하지 않는다. 씬이 뜨자마자 종료되면 아직 비어 있는
          * 기본값이 기존 세이브를 덮어써 진행이 통째로 사라진다.
          */
-        public void Save()
+        /**
+         * @brief 지금 상태를 디스크에 쓴다. **성공 여부를 돌려준다** (62.1.2).
+         *
+         * 자동 저장 30초 · pause · focus 상실 · 종료 · urgent 직전 - 다섯 경로가
+         * 전부 이 하나를 지나고, 전부 같은 성공 계약을 받는다. 실패하면
+         * `NoteSaved`를 부르지 않으므로 **디스크에 없는 스냅샷이 서버로 갈
+         * 후보가 되지 않는다.**
+         *
+         * @return 디스크에 들어갔으면 true
+         */
+        public bool Save()
         {
-            if (!loaded) return;
+            if (!loaded) return false;
+
+            // ★ 63단계: **로컬 진행 저장도 회수된 권한 중 하나다.**
+            //
+            // 지우지는 않는다(이전 기기의 로컬 기록은 복구 자료로 남는다) -
+            // 회수 시점 이후의 변화를 디스크에 굳히지 않을 뿐이다. 굳히면
+            // 다음 부팅이 "서버와 갈라진 로컬"을 보고 사람에게 고르라고 묻는다
+            // 봉인 중(인계 정리)에는 **이 한 벌이 지나가야 한다** - 그것이
+            // 다음 기기로 넘어가는 마지막 기록이다
+            if (!CloudSavePlayLock.AllowsFinalWrite) return false;
 
             var data = new SaveData();
 
@@ -452,11 +535,32 @@ namespace Onikiri.Progression
             data.goldPerSecond = EstimateGoldPerSecond();
             data.expPerSecond = EstimateExpPerSecond(data.goldPerSecond);
 
-            SaveSystem.Save(data);
+            // ★ 62.1.1 P1: **저장 성공을 확인한 뒤에만** 서버 사슬을 확정한다.
+            //
+            // 부팅이 클라우드를 채택했다면 그 사슬은 여기까지 "확정 대기"로
+            // 남아 있다. 디스크에 안 들어간 기록을 사슬의 근거로 삼으면, 다음
+            // 동기화가 옛 로컬을 **서버에서 파생된 변경분**으로 오인해 올린다.
+            //
+            // 실패하면 예약이 그대로 남아 다음 자동 저장(30초)이 마저 한다 -
+            // 저장 하나가 실패했다고 진행이 사라지지는 않는다.
+            if (!SaveSystem.Save(data))
+            {
+                // ★★ 62.1.2: **여기서 끝난다.**
+                //
+                // 예전에는 실패해도 아래 `NoteSaved`가 돌았다. 그러면 디스크에
+                // 없는 스냅샷이 클라우드 업로드 후보가 되고, urgent이 그것을
+                // 올린다 - 서버가 로컬보다 앞선 것을 들고 있다는 거짓이 만들어진다.
+                //
+                // 사슬 확정 예약도 그대로 둔다(로컬이 아직 사실이 아니다).
+                return false;
+            }
+
+            CloudSaveCoordinator.NoteLocalSaveCommitted();
 
             // 방금 저장한 **이 스냅샷**이 클라우드로 올라갈 후보다 (60단계).
             // 디스크 재읽기가 없으므로 서버의 payload가 정확히 이 한 벌이다
             CloudSaveSync.NoteSaved(data);
+            return true;
         }
 
         /** 지금 스탯과 스테이지에서 기대되는 초당 골드 */

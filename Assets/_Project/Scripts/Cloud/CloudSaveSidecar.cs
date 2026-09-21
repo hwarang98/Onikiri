@@ -103,9 +103,29 @@ namespace Onikiri.Cloud
          *
          * @return 원자 교체까지 끝났으면 true. null·불변식 실패·IO 예외는 false
          */
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /**
+         * @brief 다음 sidecar 저장 **한 번만** 실패시킨다 (62.1.2 검사용).
+         *
+         * "사슬 확정 예약은 sidecar 파일이 남은 뒤에만 푼다"는 계약은 실패를
+         * 만들 수 있어야 잴 수 있다. 한 번 쓰면 스스로 꺼진다.
+         * **출시 빌드에는 이 필드가 없다.**
+         */
+        public static bool FailNextSaveForTests;
+#endif
+
         public static bool Save(CloudSaveLocalState state)
         {
             if (state == null) return false;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (FailNextSaveForTests)
+            {
+                FailNextSaveForTests = false;
+                Debug.LogWarning("[Onikiri] [진단] sidecar 저장 실패 모의.");
+                return false;
+            }
+#endif
 
             if (!state.IsWellFormed())
             {

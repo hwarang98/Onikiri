@@ -154,6 +154,10 @@ namespace Onikiri.Progression
          */
         public void RegisterKill()
         {
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return;
+
             if (killsThisStage >= StageCurve.KillsPerStage) return;
 
             killsThisStage++;
@@ -168,6 +172,10 @@ namespace Onikiri.Progression
          */
         public void AdvanceStage()
         {
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return;
+
             stage++;
             if (stage > maxStageReached) maxStageReached = stage;
             killsThisStage = 0;

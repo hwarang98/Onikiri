@@ -65,6 +65,10 @@ namespace Onikiri.Progression
         {
             if (amount <= 0L) return;
 
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return;
+
             // long이 넘칠 일은 없지만, 손상된 세이브가 long.MaxValue 근처를 들고
             // 오면 덧셈이 음수로 돌아 잔액이 사라진다. 저장된 값을 그대로 믿지
             // 않는 것은 SaveData.LastQuitUtc가 시각 범위를 확인하는 것과 같은 규칙이다
@@ -82,6 +86,10 @@ namespace Onikiri.Progression
         /** 감당 가능할 때만 소비한다. 소비처는 다음 pillar에서 붙는다 */
         public bool TrySpend(long cost)
         {
+            // ★ 63단계: 다른 기기가 인수했다. **재화는 여기서 멈춘다** -
+            // 올라가지 못하는 진행을 더 쌓는 것은 나중에 버릴 것을 만드는 일이다
+            if (Onikiri.Cloud.CloudSavePlayLock.Locked) return false;
+
             if (!CanAfford(cost)) return false;
 
             gems -= cost;
