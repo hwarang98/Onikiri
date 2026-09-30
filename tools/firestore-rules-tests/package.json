@@ -1,0 +1,16 @@
+{
+  "name": "onikiri-firestore-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ONIKIRI 크로스 저장 보안 규칙 검증 (Firestore Emulator). 운영 배포와 무관한 개발 전용 도구.",
+  "scripts": {
+    "test": "cd ../.. && firebase emulators:exec --only firestore --project demo-onikiri \"mocha tools/firestore-rules-tests/rules.spec.mjs --timeout 30000\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^13.35.1",
+    "mocha": "^10.8.2"
+  }
+}

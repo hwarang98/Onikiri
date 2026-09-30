@@ -44,6 +44,63 @@ namespace Onikiri.EditorTools
             UnityEditor.SceneManagement.EditorSceneManager.MarkAllScenesDirty();
         }
 
+        /**
+         * @brief 배치에서 부르는 입구 (`-executeMethod`). 씬을 열고 짓고 저장한다.
+         *
+         * 메뉴 항목은 "지금 열려 있는 씬"에 짓고 저장은 사람에게 맡긴다. 배치에는
+         * 열려 있는 씬도 사람도 없으므로 셋을 여기서 한다 - BattleContentBuilder가
+         * 같은 이유로 같은 모양을 하고 있다.
+         */
+        public static void BuildBatch()
+        {
+            RunOnMainScene(Build);
+        }
+
+        /**
+         * @brief 63단계 팝업 **둘만** 짓는다 (`-executeMethod`).
+         *
+         * ## 왜 전체 Build가 아닌가 - 실제로 물렸다
+         *
+         * `Build()`는 `PopupBuilder.Ensure`로 기존 팝업들을 **부수고 다시 만든다**
+         * (`DestroyImmediate` -> `new GameObject`). 그러면 씬의 다른 오브젝트가
+         * 들고 있던 참조가 통째로 끊긴다 - 이번 회차에 그것을 그대로 밟았고,
+         * `PromotionTrialPlayTests.EveryTab_ClosesEveryOtherScreen`이 잡았다
+         * (`LockedTab.otherScreens`에 null 한 칸: "그 화면은 이 탭을 열어도
+         * 안 닫힌다"). 그 검사가 4단계에 그 목적으로 쓰인 것이고, 이번에 값을 했다.
+         *
+         * 새 팝업 둘은 남이 참조하지 않는다(자기 이벤트를 구독해 스스로 뜬다).
+         * 그래서 이 입구는 그 둘만 짓고 나머지 씬은 한 줄도 건드리지 않는다.
+         */
+        public static void BuildSessionPanelsBatch()
+        {
+            RunOnMainScene(() =>
+            {
+                var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+                if (safeArea == null)
+                {
+                    Debug.LogError("[Onikiri] SafeArea missing - run Build Main Scene first.");
+                    return;
+                }
+
+                BuildCloudSessionPanels(
+                    safeArea, AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath));
+
+                Debug.Log("[Onikiri] Cloud session panels built (takeover / evicted).");
+            });
+        }
+
+        private static void RunOnMainScene(System.Action build)
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                MainSceneBuilder.ScenePath,
+                UnityEditor.SceneManagement.OpenSceneMode.Single);
+
+            build();
+
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        }
+
         public static void Build()
         {
             var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
@@ -59,9 +116,267 @@ namespace Onikiri.EditorTools
             BuildRegionSelectPanel(safeArea, font);
             BuildSettingsPanel(safeArea, font);
             WireTopBarButtons(safeArea);
+            BuildCloudConflictPanel(safeArea, font);
+            WireConflictIntoSettings(safeArea);
+            BuildCloudSessionPanels(safeArea, font);
             WireSoundApplier();
 
-            Debug.Log("[Onikiri] Hud screens built: stats / region select / settings.");
+            Debug.Log("[Onikiri] Hud screens built: stats / region select / settings / "
+                      + "cloud conflict / cloud session.");
+        }
+
+        // ---------------------------------------------------------------- 충돌 (60단계)
+
+        public const string ConflictPanelName = "CloudConflictPanel";
+
+        /**
+         * @brief 충돌 선택 화면. **자동 병합 버튼이 없다.**
+         *
+         * 두 카드(현재 기기 / 클라우드)와 버튼 셋. 딤 탭으로 닫히면 "나중에
+         * 결정"과 구분되지 않으므로 딤은 죽여 둔다(dimIsInert) - 보류도 명시적
+         * 버튼이어야 상태가 화면에 읽힌다.
+         *
+         * 이름·수치 줄은 정적 폰트로 충분하다 - 층수·레벨·전직명·보석은 전부
+         * 우리가 짓는 글자다(남이 지은 이름이 없다).
+         */
+        private static void BuildCloudConflictPanel(Transform safeArea, TMP_FontAsset font)
+        {
+            RectTransform root;
+            var panel = PopupBuilder.Ensure(safeArea, ConflictPanelName, font, 0.42f, out root,
+                                            dimIsInert: true);
+            BuildTitle(panel, font, "기록 선택 필요");
+
+            // -- 현재 기기 카드
+            var localRow = EnsureRow(panel, "LocalCard", 0);
+            var localHead = CreateLabel(localRow, font, "Head", TextAlignmentOptions.Left);
+            StretchInside(localHead, 24f, 0.45f);
+            localHead.text = "현재 기기 기록";
+
+            var localSummary = CreateLabel(localRow, font, "Summary", TextAlignmentOptions.Right);
+            StretchInside(localSummary, 24f, 1f);
+            UiFonts.Demote(localSummary);
+            localSummary.text = "최고 1층 · Lv.1 · 로닌 · 보석 0";
+
+            var useLocal = CreateRowButton(EnsureRow(panel, "LocalUse", 1), font,
+                                           "Button", "현재 기기 기록 사용", 560f);
+
+            // -- 클라우드 카드
+            var cloudRow = EnsureRow(panel, "CloudCard", 2);
+            var cloudHead = CreateLabel(cloudRow, font, "Head", TextAlignmentOptions.Left);
+            StretchInside(cloudHead, 24f, 0.45f);
+            cloudHead.text = "클라우드 기록";
+
+            var cloudSummary = CreateLabel(cloudRow, font, "Summary", TextAlignmentOptions.Right);
+            StretchInside(cloudSummary, 24f, 1f);
+            UiFonts.Demote(cloudSummary);
+            cloudSummary.text = "최고 1층 · Lv.1 · 로닌 · 보석 0";
+
+            // 서버 저장 시각. 판정이 아니라 사람의 기억을 돕는 줄이다
+            var stampRow = EnsureRow(panel, "CloudStamp", 3);
+            stampRow.GetComponent<Image>().enabled = false;
+            var stamp = CreateLabel(stampRow, font, "Label", TextAlignmentOptions.Right);
+            StretchInside(stamp, 24f, 1f);
+            UiFonts.Demote(stamp);
+            stamp.color = DimColor;
+            stamp.text = string.Empty;
+
+            var useCloud = CreateRowButton(EnsureRow(panel, "CloudUse", 4), font,
+                                           "Button", "클라우드 기록 사용", 560f);
+
+            // -- 보류. 로컬 플레이는 계속, 클라우드 쓰기만 멈춘다
+            var later = CreateRowButton(EnsureRow(panel, "Later", 5), font,
+                                        "Button", "나중에 결정", 400f);
+
+            var conflict = root.gameObject.GetComponent<Onikiri.UI.CloudConflictPanel>();
+            if (conflict == null) conflict = root.gameObject.AddComponent<Onikiri.UI.CloudConflictPanel>();
+
+            var so = new SerializedObject(conflict);
+            so.FindProperty("titleLabel").objectReferenceValue = null;
+            so.FindProperty("localSummaryLabel").objectReferenceValue = localSummary;
+            so.FindProperty("cloudSummaryLabel").objectReferenceValue = cloudSummary;
+            so.FindProperty("cloudStampLabel").objectReferenceValue = stamp;
+            so.FindProperty("useCloudButton").objectReferenceValue = useCloud;
+            so.FindProperty("useLocalButton").objectReferenceValue = useLocal;
+            so.FindProperty("laterButton").objectReferenceValue = later;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            root.gameObject.SetActive(false);
+        }
+
+        // ---------------------------------------------------------------- 세션 (63단계)
+
+        public const string TakeoverPanelName = "CloudTakeoverPanel";
+        public const string EvictedPanelName = "CloudEvictedPanel";
+
+        /**
+         * @brief 단일 활성 기기 팝업 **둘**. 63단계가 허용한 새 UI의 전부다.
+         *
+         * 전투 화면에 상시 세션 표시를 두지 않았다(지시서 5절 금지). 세션은
+         * 평소에 보이지 않아야 하는 물건이고, 보이는 순간이 곧 사고인 물건이다.
+         *
+         * 둘 다 딤이 죽어 있다(dimIsInert). 인수 확인에서 딤 탭이 닫힘이 되면
+         * **취소와 구분되지 않고**, 종료 알림에서는 닫을 방법 자체가 있어서는
+         * 안 된다 - 닫아 봐야 플레이가 돌아오지 않는다.
+         */
+        private static void BuildCloudSessionPanels(Transform safeArea, TMP_FontAsset font)
+        {
+            BuildTakeoverPanel(safeArea, font);
+            BuildEvictedPanel(safeArea, font);
+        }
+
+        /** 새 기기: "다른 기기에서 플레이 중입니다" -> [취소] [이 기기로 이어하기] */
+        private static void BuildTakeoverPanel(Transform safeArea, TMP_FontAsset font)
+        {
+            RectTransform root;
+            // 제목을 두지 않는다 - 본문 첫 줄이 곧 제목이고, 둘이 겹쳐 그려졌다
+            // (실측 캡처). 차단 팝업은 문장 하나가 전부여야 한다
+            var panel = PopupBuilder.Ensure(safeArea, TakeoverPanelName, font, 0.34f, out root,
+                                            dimIsInert: true);
+
+            var messageRow = EnsureRow(panel, "Message", 0);
+            messageRow.sizeDelta = new Vector2(messageRow.sizeDelta.x, RowHeight * 2.6f);
+            messageRow.GetComponent<Image>().enabled = false;
+
+            var message = CreateLabel(messageRow, font, "Label", TextAlignmentOptions.Center);
+            StretchInside(message, 24f, 1f);
+            message.overflowMode = TextOverflowModes.Overflow;
+            message.text = "다른 기기에서 플레이 중입니다.";
+
+            // 취소가 왼쪽, 이어하기가 오른쪽이다. 되돌릴 수 없는 쪽을 오른쪽에
+            // 두는 것은 이 프로젝트의 다른 확인 창과 같은 자리 규칙이다
+            var cancel = CreateRowButton(EnsureRow(panel, "Cancel", 3), font,
+                                         "Button", "취소", 260f);
+            var cancelRect = (RectTransform)cancel.transform;
+            cancelRect.anchorMin = new Vector2(0f, 0.5f);
+            cancelRect.anchorMax = new Vector2(0f, 0.5f);
+            cancelRect.pivot = new Vector2(0f, 0.5f);
+            cancelRect.anchoredPosition = new Vector2(16f, 0f);
+
+            var confirm = CreateRowButton(cancelRect.parent as RectTransform, font,
+                                          "Confirm", "이 기기로 이어하기", 360f);
+
+            var retryRow = EnsureRow(panel, "Retry", 4);
+            retryRow.GetComponent<Image>().enabled = false;   // 버튼이 숨으면 띠도 숨는다
+
+            var retry = CreateRowButton(retryRow, font, "Button", "다시 확인", 360f);
+
+            var takeover = root.gameObject.GetComponent<Onikiri.UI.CloudTakeoverPanel>();
+            if (takeover == null)
+                takeover = root.gameObject.AddComponent<Onikiri.UI.CloudTakeoverPanel>();
+
+            var so = new SerializedObject(takeover);
+            so.FindProperty("body").objectReferenceValue = panel.gameObject;
+            so.FindProperty("messageLabel").objectReferenceValue = message;
+            so.FindProperty("confirmButton").objectReferenceValue = confirm;
+            so.FindProperty("cancelButton").objectReferenceValue = cancel;
+            so.FindProperty("retryButton").objectReferenceValue = retry;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            HideBlockingPopup(root, panel);
+        }
+
+        /** 이전 기기: "다른 기기에서 접속했습니다" -> [확인] -> 타이틀 */
+        private static void BuildEvictedPanel(Transform safeArea, TMP_FontAsset font)
+        {
+            RectTransform root;
+            var panel = PopupBuilder.Ensure(safeArea, EvictedPanelName, font, 0.30f, out root,
+                                            dimIsInert: true);
+
+            var messageRow = EnsureRow(panel, "Message", 0);
+            messageRow.sizeDelta = new Vector2(messageRow.sizeDelta.x, RowHeight * 2f);
+            messageRow.GetComponent<Image>().enabled = false;
+
+            var message = CreateLabel(messageRow, font, "Label", TextAlignmentOptions.Center);
+            StretchInside(message, 24f, 1f);
+            message.overflowMode = TextOverflowModes.Overflow;
+            message.text = "다른 기기에서 접속했습니다.";
+
+            var confirm = CreateRowButton(EnsureRow(panel, "Confirm", 2), font,
+                                          "Button", "확인", 360f);
+
+            var evicted = root.gameObject.GetComponent<Onikiri.UI.CloudEvictedPanel>();
+            if (evicted == null)
+                evicted = root.gameObject.AddComponent<Onikiri.UI.CloudEvictedPanel>();
+
+            var so = new SerializedObject(evicted);
+            so.FindProperty("body").objectReferenceValue = panel.gameObject;
+            so.FindProperty("messageLabel").objectReferenceValue = message;
+            so.FindProperty("confirmButton").objectReferenceValue = confirm;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            HideBlockingPopup(root, panel);
+        }
+
+        /**
+         * @brief 차단 팝업의 **뿌리는 켜 둔 채** 감춘다 (63단계).
+         *
+         * 두 팝업은 남이 열어 주지 않고 자기 이벤트를 구독해 스스로 뜬다.
+         * 꺼진 GameObject에서는 `Awake`가 돌지 않아 그 구독이 영영 안 걸린다 -
+         * PlayMode 검사 넷이 그것을 잡았다.
+         *
+         * 그래서 뿌리는 켜 두고 **창과 딤**을 죽인다. 닫기 X도 없앤다:
+         * 인수 확인에서 X는 취소와 구분되지 않고, 종료 알림에서는 닫을 방법
+         * 자체가 있어서는 안 된다(닫아 봐야 플레이가 돌아오지 않는다).
+         */
+        private static void HideBlockingPopup(RectTransform root, RectTransform panel)
+        {
+            var close = panel.Find("Close");
+            if (close != null) Object.DestroyImmediate(close.gameObject);
+
+            var dim = root.GetComponent<Image>();
+            if (dim != null)
+            {
+                dim.enabled = false;
+                dim.raycastTarget = false;
+            }
+
+            // ★★ **인트로보다 위에 그린다.**
+            //
+            // `IntroScreenBuilder`는 부팅 화면을 **UI Canvas 직속**의 마지막
+            // 형제로 세운다("SafeArea 안에 두면 노치 옆에 먹빛이 안 닿는다").
+            // 이 팝업들은 SafeArea 안에 사니까, SafeArea 안에서 아무리 형제
+            // 순서를 올려도 인트로 아래다 - 실기에서 **로그에는 떴는데 화면에는
+            // 없는** 상태로 두 번 물렸다.
+            //
+            // 부모를 옮기면 Safe Area 여백을 잃는다. 그래서 자리는 그대로 두고
+            // **정렬만 덮어쓴다**(중첩 Canvas). 입력을 받으려면 레이캐스터가
+            // 그 Canvas에 함께 있어야 한다.
+            var sorting = root.GetComponent<Canvas>();
+            if (sorting == null) sorting = root.gameObject.AddComponent<Canvas>();
+
+            sorting.overrideSorting = true;
+            sorting.sortingOrder = BlockingPopupSortingOrder;
+
+            if (root.GetComponent<GraphicRaycaster>() == null)
+                root.gameObject.AddComponent<GraphicRaycaster>();
+
+            panel.gameObject.SetActive(false);
+            root.gameObject.SetActive(true);
+        }
+
+        /**
+         * @brief 차단 팝업의 정렬 순서. **인트로 오버레이보다 위여야 한다.**
+         *
+         * 인트로는 자체 Canvas가 없어 UI Canvas의 기본 순서(0)로 그려진다.
+         * 그보다 크기만 하면 되지만, 나중에 다른 오버레이가 생겨도 이 둘이
+         * 위에 남도록 넉넉히 띄워 둔다.
+         */
+        public const int BlockingPopupSortingOrder = 500;
+
+        /** 설정의 "기록 선택" 버튼이 이 팝업을 연다 - 두 빌드가 따로 돌아도 배선이 남게 */
+        private static void WireConflictIntoSettings(Transform safeArea)
+        {
+            var settingsRoot = safeArea.Find(SettingsPanelName);
+            var conflictRoot = safeArea.Find(ConflictPanelName);
+            if (settingsRoot == null || conflictRoot == null) return;
+
+            var settings = settingsRoot.GetComponent<Onikiri.UI.SettingsPanel>();
+            var conflict = conflictRoot.GetComponent<Onikiri.UI.CloudConflictPanel>();
+            if (settings == null || conflict == null) return;
+
+            var so = new SerializedObject(settings);
+            so.FindProperty("conflictPanel").objectReferenceValue = conflict;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ---------------------------------------------------------------- 스탯
@@ -398,7 +713,7 @@ namespace Onikiri.EditorTools
         private static void BuildSettingsPanel(Transform safeArea, TMP_FontAsset font)
         {
             RectTransform root;
-            var panel = PopupBuilder.Ensure(safeArea, SettingsPanelName, font, 0.30f, out root);
+            var panel = PopupBuilder.Ensure(safeArea, SettingsPanelName, font, 0.34f, out root);
             BuildTitle(panel, font, "설정");
 
             var muteRow = EnsureRow(panel, "Mute", 0);
@@ -450,7 +765,18 @@ namespace Onikiri.EditorTools
             status.color = DimColor;
             status.gameObject.SetActive(false);
 
-            var versionRow = EnsureRow(panel, "Version", 5);
+            // -- 클라우드 저장 상태 (60단계). 설계 §9의 네 문장 중 하나가 뜬다.
+            //    "기록 선택 필요"일 때만 오른쪽 버튼이 살아나 충돌 화면을 연다
+            var cloudRow = EnsureRow(panel, "Cloud", 5);
+            var cloudLabel = CreateLabel(cloudRow, font, "State", TextAlignmentOptions.Left);
+            StretchInside(cloudLabel, 24f, 0.68f);
+            UiFonts.Demote(cloudLabel);
+            cloudLabel.text = "클라우드 확인 중";
+
+            var conflictButton = CreateRowButton(cloudRow, font, "ChooseButton", "기록 선택", 240f);
+            conflictButton.gameObject.SetActive(false);
+
+            var versionRow = EnsureRow(panel, "Version", 6);
             versionRow.GetComponent<Image>().enabled = false;
             var version = CreateLabel(versionRow, font, "Label", TextAlignmentOptions.Center);
             UiFonts.Demote(version);
@@ -475,6 +801,8 @@ namespace Onikiri.EditorTools
             so.FindProperty("nameInput").objectReferenceValue = input;
             so.FindProperty("nameConfirmButton").objectReferenceValue = confirmButton;
             so.FindProperty("statusLabel").objectReferenceValue = status;
+            so.FindProperty("cloudStatusLabel").objectReferenceValue = cloudLabel;
+            so.FindProperty("conflictButton").objectReferenceValue = conflictButton;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             root.gameObject.SetActive(false);

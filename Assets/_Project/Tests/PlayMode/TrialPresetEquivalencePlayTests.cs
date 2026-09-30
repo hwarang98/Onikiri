@@ -50,9 +50,7 @@ namespace Onikiri.Tests.PlayMode
         PlayerCombat combat;
         StageProgress progress;
 
-        string savePath;
-        byte[] savedBytes;
-        string savedHash;
+        SaveSandbox sandbox;
 
         // ------------------------------------------------------------ 기대값 표
 
@@ -135,11 +133,9 @@ namespace Onikiri.Tests.PlayMode
         [UnitySetUp]
         public IEnumerator LoadScene()
         {
-            // 씬을 열기 **전에** 뜬다. 여는 순간 GameSession이 로드·저장할 수 있다
-            savePath = System.IO.Path.Combine(Application.persistentDataPath, SaveSystem.FileName);
-            savedBytes = System.IO.File.Exists(savePath)
-                ? System.IO.File.ReadAllBytes(savePath) : null;
-            savedHash = HashOf(savedBytes);
+            // 씬을 열기 **전에** 경로를 격리한다 (61단계 S5-0). 여는 순간
+            // GameSession이 로드·저장하는데, 그 경로가 처음부터 임시 폴더다
+            sandbox = new SaveSandbox();
 
             yield return SceneManager.LoadSceneAsync(MainScene, LoadSceneMode.Single);
             yield return null;
@@ -154,35 +150,20 @@ namespace Onikiri.Tests.PlayMode
         }
 
         /**
-         * @brief **`GameSession`을 파괴한 뒤** 세이브를 되돌린다. 순서가 중요하다.
+         * @brief **`GameSession`을 파괴한 뒤** 격리를 푼다. 순서가 중요하다.
          *
          * `OnApplicationQuit`은 `TearDown` **뒤에** 온다. 컴포넌트가 살아 있으면
-         * 플레이 모드를 나가는 순간 프리셋 상태가 실사용 세이브 위에 저장된다 -
-         * `PromotionTrialPlayTests`가 그 순서에 두 번 물렸다.
+         * 루트가 실사용으로 돌아간 다음 프리셋 상태가 실사용 세이브 위에
+         * 저장된다 - `PromotionTrialPlayTests`가 그 순서에 두 번 물렸다.
+         * Dispose는 실사용 파일이 바이트 그대로인지까지 검사한다 (S5-0).
          */
         [TearDown]
         public void Restore()
         {
             if (session != null) Object.DestroyImmediate(session);
 
-            if (!string.IsNullOrEmpty(savePath))
-            {
-                if (savedBytes != null) System.IO.File.WriteAllBytes(savePath, savedBytes);
-                else if (System.IO.File.Exists(savePath)) System.IO.File.Delete(savePath);
-            }
-
-            var now = System.IO.File.Exists(savePath)
-                ? HashOf(System.IO.File.ReadAllBytes(savePath)) : HashOf(null);
-
-            Assert.AreEqual(savedHash, now,
-                "복구 뒤에도 세이브 해시가 원본과 다르다 - 사용자 세이브가 오염됐다");
-        }
-
-        static string HashOf(byte[] bytes)
-        {
-            if (bytes == null) return "(none)";
-            using (var md5 = System.Security.Cryptography.MD5.Create())
-                return System.BitConverter.ToString(md5.ComputeHash(bytes));
+            if (sandbox != null) sandbox.Dispose();
+            sandbox = null;
         }
 
         // ------------------------------------------------------------ 검사

@@ -40,9 +40,63 @@ namespace Onikiri.Progression
     {
         public const string FileName = "onikiri_save.json";
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // ---- 테스트 seam (61단계 S5-0). **릴리스 빌드에는 존재하지 않는다.**
+        //
+        // 60단계까지 PlayMode 검사는 실사용 세이브를 백업해 두고 덮어쓴 뒤
+        // TearDown에서 되돌렸다. 그 반창고는 검사가 죽거나 에디터가 행에
+        // 걸리면 안 붙는다 - 실제로 §9의 행 국면에서 실사용 세이브가 테스트
+        // 세이브로 덮였다. 근본 수정은 복원이 아니라 **접촉 자체를 없애는 것**이다:
+        // 검사는 이 루트를 임시 폴더로 바꿔 끼우고, 실사용 파일은 읽지도 않는다.
+        private static string rootOverride;
+
+        /** 세이브가 사는 폴더를 바꿔 끼운다. sidecar·백업도 전부 따라온다 */
+        public static void UseRootForTests(string directory)
+        {
+            rootOverride = directory;
+        }
+
+        public static void ResetRootForTests()
+        {
+            rootOverride = null;
+        }
+
+        /**
+         * @brief 다음 저장 **한 번만** 실패시킨다 (62.1.1단계 검사용).
+         *
+         * "로컬 저장이 실패하면 서버 사슬을 확정하지 않는다"는 계약은 실패를
+         * 만들 수 있어야 잴 수 있다. 실제 파일 권한을 부수면 그 뒤의 검사가
+         * 전부 오염되므로 seam으로 둔다. **출시 빌드에는 이 필드가 없다.**
+         */
+        public static bool FailNextSaveForTests;
+
+        public static bool IsRootOverridden
+        {
+            get { return rootOverride != null; }
+        }
+#endif
+
+        /**
+         * @brief 세이브 파일들이 사는 폴더. **경로를 만드는 유일한 뿌리다.**
+         *
+         * sidecar(CloudSaveSidecar)·클라우드 백업(precloud)·손상 백업(.broken)이
+         * 전부 이 값에서 출발한다 - 한 군데서 갈아 끼우면 전부 따라오고,
+         * 어느 하나가 따로 실사용 폴더를 보는 순간 격리가 구멍 난다.
+         */
+        public static string Root
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (rootOverride != null) return rootOverride;
+#endif
+                return Application.persistentDataPath;
+            }
+        }
+
         public static string Path
         {
-            get { return System.IO.Path.Combine(Application.persistentDataPath, FileName); }
+            get { return System.IO.Path.Combine(Root, FileName); }
         }
 
         public static bool Exists
@@ -84,9 +138,35 @@ namespace Onikiri.Progression
             }
         }
 
-        public static void Save(SaveData data)
+        /**
+         * @brief 디스크에 쓴다. **성공 여부를 돌려준다** (62.1.1단계).
+         *
+         * 예전에는 void였고, 그래서 "저장했다고 믿고 다음 일을 하는" 코드가
+         * 생겼다 - 클라우드 채택이 정확히 그것이었다(설계 §11.17). 디스크에
+         * 안 들어간 기록을 서버 사슬의 근거로 삼으면, 다음 동기화가 **옛 로컬을
+         * 서버에서 파생된 변경분으로 오인해 올린다.**
+         *
+         * 실패해도 예외를 던지지 않는 것은 그대로다 - 저장 실패로 게임이 멈추면
+         * 방치형에서 그 실행이 통째로 날아간다. 실패는 **값으로** 돌려주고,
+         * 부르는 쪽이 그 값을 보고 판단한다.
+         *
+         * @return 디스크에 들어갔으면 true
+         */
+        public static bool Save(SaveData data)
         {
-            if (data == null) return;
+            if (data == null) return false;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // 저장 실패는 손으로 만들 수 없다(권한을 부수면 그 뒤 검사가 전부
+            // 오염된다). 한 번만 실패하고 스스로 꺼진다 - 켠 채로 잊으면 그
+            // 실행의 모든 저장이 사라진다
+            if (FailNextSaveForTests)
+            {
+                FailNextSaveForTests = false;
+                Debug.LogWarning("[Onikiri] [진단] 저장 실패 모의 - 디스크에 쓰지 않습니다.");
+                return false;
+            }
+#endif
 
             try
             {
@@ -100,11 +180,14 @@ namespace Onikiri.Progression
                 // File.Replace는 대상이 없으면 실패한다. 첫 저장에서는 그냥 옮긴다
                 if (File.Exists(Path)) File.Replace(temp, Path, null);
                 else File.Move(temp, Path);
+
+                return true;
             }
             catch (Exception exception)
             {
                 // 저장 실패로 게임이 멈춰서는 안 된다. 다음 자동 저장에서 다시 시도한다
                 Debug.LogError("[Onikiri] Save failed: " + exception.Message);
+                return false;
             }
         }
 
