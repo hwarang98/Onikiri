@@ -42,7 +42,15 @@ namespace Onikiri.Progression
             Plain,
             Percent,
             Multiplier,
-            PerSecond
+            PerSecond,
+
+            /**
+             * 배수에서 1을 뺀 보너스를 %로. x1.02 -> "+2.0%". 골드 획득량(64단계)이
+             * 쓴다 - 상한이 사라져 레벨이 수백이 되면 "x12.45"보다 "+1145%"가
+             * 무엇이 얼마나 늘었는지 읽힌다. 값이 1 아래로 내려가는 축에는 쓰지
+             * 않는다(음수 보너스는 이 게임에 없다)
+             */
+            BonusPercent
         }
 
         [SerializeField] private string id;
@@ -124,6 +132,10 @@ namespace Onikiri.Progression
                     return (value.ToDouble() * 100d).ToString("F1") + "%";
                 case Display.Multiplier:
                     return "x" + NumberFormatter.FormatStat(value, 2);
+                case Display.BonusPercent:
+                    // 배수 - 1. 소수 첫째 자리까지 - 한 칸이 +2.0%라 정수로 두면
+                    // 후반에 복리가 만드는 "+2.3%" 같은 칸 차이가 사라진다
+                    return "+" + ((value.ToDouble() - 1d) * 100d).ToString("F1") + "%";
                 case Display.PerSecond:
                     // 최대 체력 대비 비율이다. 절대량으로 읽히면 "1/s"가
                     // 체력 100에서도 100000에서도 같아 보인다

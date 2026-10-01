@@ -1571,7 +1571,7 @@ namespace Onikiri.Tests
          * 하나씩 상한에 닿으며(티어 10 · 혼격 4 · 전설 사본 4) 여유가 산
          * 모양(93까지 올랐다가 벽으로 하강)을 그린다. 그 구간의 무한 보증은
          * 여유의 평평함이 아니라 **도달층 리드의 수렴**이 맡는다
-         * (ReachLead_CompressesTowardTheWall).
+         * (ReachLead_SaturatesTowardTheWall).
          */
         [Test]
         public void DeepZone_MarginConverges()
@@ -1700,36 +1700,55 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 무한 꼬리 - 리드가 지평을 늘려도 **다시 줄어드는가.**
+         * @brief 무한 꼬리 - 리드가 지평을 늘려도 **유한한 값에 포화하는가.**
          *
          * st500 밖을 유한 검사로 지키는 근거다(여유 시절의 MarginConverges가
-         * 하던 일). 성장 축이 전부 하드캡이라(티어 10 · 혼격 4 · 전설 4)
-         * 기준 플레이어가 먼저 포화하고, 그 뒤로 리드는 압축된다 - H700의
-         * 리드가 H500보다 작으면 그 압축이 실제로 일어나고 있다는 뜻이다.
+         * 하던 일). 52~63단계까지는 "H700의 리드가 H500보다 작다"(압축)를
+         * 증인으로 썼다 - 성장 축이 전부 하드캡이라 기준 플레이어가 먼저
+         * 벽(st680)에 붙고 무과금이 따라잡았기 때문이다.
          *
-         * 이것이 깨지는 유일한 길은 상한 없는 과금 축이 생기는 것이고,
-         * 그것이 바로 이 검사가 다음 스텝들에게 거는 계약이다.
+         * ## 64단계 - 압축이 포화로 바뀌었다 (승인 필요한 재기준)
+         *
+         * 골드 획득 축의 상한이 사라지면서 두 벽이 함께 밖으로 밀렸다(무과금
+         * st610 -> 630, 기준 st700 -> 730 - 가속 구간에서 남긴 액티브 이득이
+         * 심층 여유를 통째로 20% 들어 올린 몫). 리드의 꼬리 모양도 바뀌었다:
+         *
+         *   옛 세계   H500 106  ->  H700  96                    (압축)
+         *   새 세계   H500  96  ->  H700  96 -> H800 108 -> H900 112 -> H1000 114   (포화)
+         *
+         * H500 리드가 106에서 92로 **줄어든** 것이 먼저다 - 이 축은 무과금도
+         * 사는 축이고, 보석이 없는 빌드는 DPS의 골드 몫이 커서 같은 배수에 더
+         * 크게 반응한다. 그 뒤 두 플레이어가 각자 벽을 지나면 층당 시간이
+         * 같은 결(램프)로 늘어나 리드가 114에 붙는다. "리드가 무한히 벌어지지
+         * 않는다"는 증인은 남아 있고 형태만 압축에서 포화로 바뀌었다 - 새
+         * 검사는 지평 900과 1000의 리드 차가 세 층 안이고 리드가 상한(240)
+         * 안임을 잰다. 옛 압축 계약으로 되돌리려면 골드 축의 심층 이득을 0으로
+         * (지수 1.0) 눌러야 하고, 그것은 이 축을 조율 구간에서 함정 버튼으로
+         * 만든다(64단계 보고서 §6).
          */
         [Test]
-        public void ReachLead_CompressesTowardTheWall()
+        public void ReachLead_SaturatesTowardTheWall()
         {
-            var baseline = StageSimulation.Run(700, FieldFromAssets());
-            var f2p = F2pRun(900);
+            var baseline = StageSimulation.Run(1000, FieldFromAssets());
+            var f2p = F2pRun(1250);
 
-            double at500 = StageSimulation.CombatSeconds(baseline,
-                StageSimulation.ReachContractFrom, StageSimulation.ReachContractTo);
-            double at700 = StageSimulation.CombatSeconds(baseline,
-                StageSimulation.ReachContractFrom, 700);
+            int lead500 = StageSimulation.ReachContractTo - StageSimulation.ReachedStage(f2p,
+                StageSimulation.CombatSeconds(baseline, StageSimulation.ReachContractFrom,
+                    StageSimulation.ReachContractTo), StageSimulation.ReachContractFrom);
+            int lead900 = 900 - StageSimulation.ReachedStage(f2p,
+                StageSimulation.CombatSeconds(baseline, StageSimulation.ReachContractFrom, 900),
+                StageSimulation.ReachContractFrom);
+            int lead1000 = 1000 - StageSimulation.ReachedStage(f2p,
+                StageSimulation.CombatSeconds(baseline, StageSimulation.ReachContractFrom, 1000),
+                StageSimulation.ReachContractFrom);
 
-            int lead500 = StageSimulation.ReachContractTo
-                - StageSimulation.ReachedStage(f2p, at500, StageSimulation.ReachContractFrom);
-            int lead700 = 700
-                - StageSimulation.ReachedStage(f2p, at700, StageSimulation.ReachContractFrom);
+            Assert.LessOrEqual(lead1000, ReachLeadCap, string.Format(
+                "지평 1000에서 과금 리드가 {0}층이다 (상한 {1}층) - 리드가 벽 뒤에서도 계속 벌어진다",
+                lead1000, ReachLeadCap));
 
-            Assert.Less(lead700, lead500, string.Format(
-                "지평을 700으로 늘렸는데 리드가 {0} -> {1}층으로 계속 벌어진다 - "
-                + "상한 없는 과금 축이 생겼다. 성장 시계를 바퀴에 묶어라",
-                lead500, lead700));
+            Assert.LessOrEqual(lead1000 - lead900, 3, string.Format(
+                "지평 900 -> 1000에서 리드가 {0} -> {1}층으로 아직 자란다 - 포화하지 않았다. "
+                + "상한 없는 과금 축이 생겼다 (H500 리드 {2})", lead900, lead1000, lead500));
         }
 
         /**
@@ -1753,7 +1772,11 @@ namespace Onikiri.Tests
         [Test]
         public void MasteryNeutralized_ReproducesCurrentPreMasteryBaseline()
         {
-            var policy = new StageSimulation.Policy { NeutralizeMastery = true };
+            // 64단계: 골드 획득 축이 무한 성장으로 바뀌며 코리더부터 심층까지
+            // 여유가 몇 % 움직였다. 이 검사가 지키는 앵커는 "그 앞의 세계"의
+            // 것이므로 상수를 옮기지 않고 49단계 규칙 ⓐ대로 정책에 한 줄을
+            // 더한다 - 옛 골드 축(x1.25 / Lv.13 / 지수 0.52)을 재현하는 플래그
+            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true };
             var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
 
             // ---- 앵커 넷. **승급 재설계 2.1.1단계에 다시 구웠다**
@@ -1807,10 +1830,16 @@ namespace Onikiri.Tests
             //   깨야 함   심화 축(초월·연격)이 조율/가속 구간으로 새어 들어오는 변경,
             //             승급 게이트 표·티어 스텝 변경, 강화 비용 격자 변경
             //   안 깨야 함 심층(st51+)만 건드리는 변경 - 그쪽은 아래 상한이 잡는다
+            // 64단계: st10·st30은 GoldAxisPre64 아래서 **비트 그대로**(1.5222 / 1.4437)
+            // 재현됐다 - 옛 골드 축 재현 정책이 코리더를 정확히 되살린다는 증거다.
+            // st40·st50만 움직였다(1.6664 -> 1.6551, 1.9525 -> 1.9333): 골드축이
+            // 실측 동료 레벨을 st31에서 한 칸 올려 PetCurve.LevelAtUnlock을 3 -> 4로
+            // 재적합했고, 그 기대 곡선(= 펫 보정)은 라이브 값이라 재현 정책이
+            // 되돌리지 않는다. 가속 구간의 이 두 앵커는 그 재적합으로 다시 구웠다
             Assert.AreEqual(1.5222d, results[9].BossMargin, 0.01d, "st10");
             Assert.AreEqual(1.4437d, results[29].BossMargin, 0.01d, "st30");
-            Assert.AreEqual(1.6664d, results[39].BossMargin, 0.01d, "st40");
-            Assert.AreEqual(1.9525d, results[49].BossMargin, 0.01d, "st50");
+            Assert.AreEqual(1.6551d, results[39].BossMargin, 0.01d, "st40");
+            Assert.AreEqual(1.9333d, results[49].BossMargin, 0.01d, "st50");
 
             // 심층 상한. **42단계의 6.5가 아니다 - 45단계에 재기준했다.**
             //
@@ -1880,9 +1909,11 @@ namespace Onikiri.Tests
         public void PreMasteryBaseline_IsActuallySensitiveToTheMasteryFlag()
         {
             var field = FieldFromAssets();
-            var withMastery = StageSimulation.Run(DeepZoneTo, field);
+            // 64단계: 두 팔 다 옛 골드 축 세계에서 잰다(위 검사와 같은 세계)
+            var withMastery = StageSimulation.Run(DeepZoneTo, field,
+                new StageSimulation.Policy { GoldAxisPre64 = true });
             var withoutMastery = StageSimulation.Run(DeepZoneTo, field,
-                new StageSimulation.Policy { NeutralizeMastery = true });
+                new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true });
 
             // ---- 앵커: 두 세계가 같아야 한다 (개방이 st1~50에 없다는 구조)
             foreach (var index in new[] { 9, 29, 39, 49 })

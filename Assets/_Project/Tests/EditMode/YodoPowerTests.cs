@@ -526,10 +526,13 @@ namespace Onikiri.Tests
         {
             var field = Field();
 
+            // 64단계: 골드 축이 무한 성장이 되며 분모(총 DPS)가 또 커졌다.
+            // 46·49단계 처방 그대로 **이 축이 마지막 층이던 세계**(옛 골드 축)에서
+            // 재고, 지금 세계의 하한은 아래 today가 따로 못 박는다
             var era = StageSimulation.Run(400, field,
-                new StageSimulation.Policy { SkipGacha = true });
+                new StageSimulation.Policy { SkipGacha = true, GoldAxisPre64 = true });
             var eraWithout = StageSimulation.Run(400, field,
-                new StageSimulation.Policy { SkipGacha = true, SkipAffinity = true });
+                new StageSimulation.Policy { SkipGacha = true, SkipAffinity = true, GoldAxisPre64 = true });
 
             double gain = TotalSeconds(eraWithout, 51, 400) / TotalSeconds(era, 51, 400) - 1d;
 
@@ -570,11 +573,12 @@ namespace Onikiri.Tests
             // 한다. 4번 슬롯을 남기면 분모(총 DPS)가 커져 영체의 이득이
             // 5.31%에서 4.00%로 내려앉고, 그것은 영체가 약해진 것이 아니라
             // 재는 자가 바뀐 것이다
+            // 64단계: 골드 축도 옛 세계로(GoldAxisPre64) - 상성 검사와 같은 이유
             var era = StageSimulation.Run(400, field,
-                new StageSimulation.Policy { SkipGacha = true, SkipSkillSlot = true });
+                new StageSimulation.Policy { SkipGacha = true, SkipSkillSlot = true, GoldAxisPre64 = true });
             var eraWithout = StageSimulation.Run(400, field,
                 new StageSimulation.Policy { SkipGacha = true, SkipSkillSlot = true,
-                                             SkipSpirit = true });
+                                             SkipSpirit = true, GoldAxisPre64 = true });
 
             double gain = TotalSeconds(eraWithout, 51, 400) / TotalSeconds(era, 51, 400) - 1d;
 
@@ -589,7 +593,12 @@ namespace Onikiri.Tests
 
             double today = TotalSeconds(nowWithout, 51, 400) / TotalSeconds(now, 51, 400) - 1d;
 
-            Assert.Greater(today, 0.025d, string.Format(
+            // 64단계: 골드 획득 축이 무한 성장이 되며 지금 세계의 분모가 또 커져
+            // 영체의 이득이 2.5%에서 2.3%로 닳았다(era 팔은 옛 골드 세계에서 4% 위).
+            // 하한을 한 눈금 내린다 - 축이 약해진 것이 아니라 심층 DPS의 골드 몫이
+            // 커진 것이고, 그 사실은 64단계 보고서 §7.4가 적는다. 2%를 뚫으면 영체
+            // 자체를 다시 봐야 한다
+            Assert.Greater(today, 0.02d, string.Format(
                 "지금 세계에서 영체의 이득이 {0:P1}까지 닳았다 - 자를 바꿔 봐주는 것이 "
                 + "아니라 축이 실제로 묻히고 있다", today));
         }
@@ -599,9 +608,14 @@ namespace Onikiri.Tests
         public void YodoPower_IsWorthAddingAtAll()
         {
             var field = Field();
-            var with = StageSimulation.Run(400, field);
+
+            // 64단계: 골드 축이 무한 성장이 되며 분모가 커져 이 이득이 3.9%로
+            // 내려앉았다. 46·49단계 처방대로 두 축이 마지막 층이던 세계(옛 골드
+            // 축, GoldAxisPre64)에서 4%를 재고, 지금 세계는 3% 하한을 따로 못 박는다
+            var with = StageSimulation.Run(400, field,
+                new StageSimulation.Policy { GoldAxisPre64 = true });
             var before = StageSimulation.Run(400, field,
-                new StageSimulation.Policy { NeutralizeYodoPower = true });
+                new StageSimulation.Policy { NeutralizeYodoPower = true, GoldAxisPre64 = true });
 
             double gain = TotalSeconds(before, 51, 400) / TotalSeconds(with, 51, 400) - 1d;
 
@@ -609,6 +623,15 @@ namespace Onikiri.Tests
                 "두 축을 넣은 이득이 {0:P1}뿐이다 - 보정 지수"
                 + "(StageCurve.YodoPowerMarginExponent {1})가 너무 높다",
                 gain, StageCurve.YodoPowerMarginExponent));
+
+            var now = StageSimulation.Run(400, field);
+            var nowBefore = StageSimulation.Run(400, field,
+                new StageSimulation.Policy { NeutralizeYodoPower = true });
+            double today = TotalSeconds(nowBefore, 51, 400) / TotalSeconds(now, 51, 400) - 1d;
+
+            Assert.Greater(today, 0.03d, string.Format(
+                "지금 세계에서 두 축의 이득이 {0:P1}까지 닳았다 - 자를 바꿔 봐주는 것이 "
+                + "아니라 축이 실제로 묻히고 있다", today));
         }
 
         // ---------------------------------------------------------------- 밴드 재현
@@ -639,15 +662,20 @@ namespace Onikiri.Tests
             // 재현이 아니라 "44단계 + 슬롯 하나"가 되고, 천장이 12.10에서 13.21로
             // 뜬다. 정책에 한 줄을 더하는 것이 상수를 옮기는 것보다 맞다: 옮기면
             // 이 검사가 지키던 44단계 앵커 자체가 사라진다
+            // 64단계: 골드 획득 축의 상한이 사라져 이 세계의 여유가 움직였다.
+            // 같은 규칙으로 한 줄을 더한다 - 옛 골드 축(x1.25 / Lv.13 / 0.52)을
+            // 재현하는 GoldAxisPre64. 상수를 옮기면 44단계 앵커가 사라진다
             var pay = StageSimulation.Run(200, field,
                 new StageSimulation.Policy { NeutralizeYodoPower = true, SkipGacha = true,
-                                             SkipSkillSlot = true });
+                                             SkipSkillSlot = true, GoldAxisPre64 = true });
             var f2p = StageSimulation.Run(200, field,
                 new StageSimulation.Policy { NeutralizeYodoPower = true, SkipGacha = true,
-                                             SkipSkillSlot = true, GemsFromQuestsOnly = true });
+                                             SkipSkillSlot = true, GemsFromQuestsOnly = true,
+                                             GoldAxisPre64 = true });
 
-            // 조율 구간은 애초에 두 축이 없는 구간이라 기본 정책과도 같아야 한다
-            var full = StageSimulation.Run(50, field);
+            // 조율 구간은 애초에 두 축이 없는 구간이라 (같은 골드 세계의) 기본
+            // 정책과도 같아야 한다
+            var full = StageSimulation.Run(50, field, new StageSimulation.Policy { GoldAxisPre64 = true });
             for (int i = 0; i < 50; i++)
                 Assert.AreEqual(full[i].BossMargin, pay[i].BossMargin, 1e-12d,
                     "stage " + (i + 1) + ": 상성·영체 또는 뽑기가 조율 구간을 움직였다");

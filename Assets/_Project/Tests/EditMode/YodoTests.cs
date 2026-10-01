@@ -395,16 +395,28 @@ namespace Onikiri.Tests
         public void ShardPack_BuysTime()
         {
             var field = Field();
+
+            // 64단계: 골드 축이 무한 성장이 되며 분모가 커져 이 이득이 3.8%로
+            // 내려앉았다. 46·49단계 처방대로 파편 묶음이 마지막 층이던 세계(옛
+            // 골드 축, GoldAxisPre64)에서 4%를 재고, 지금 세계는 3% 하한을 못 박는다
             var withPacks = StageSimulation.Run(450, field,
-                new StageSimulation.Policy { SkipGacha = true });
+                new StageSimulation.Policy { SkipGacha = true, GoldAxisPre64 = true });
             var without = StageSimulation.Run(450, field,
-                new StageSimulation.Policy { SkipShardPacks = true, SkipGacha = true });
+                new StageSimulation.Policy { SkipShardPacks = true, SkipGacha = true, GoldAxisPre64 = true });
 
             double gain = TotalSeconds(without, 200, 450) / TotalSeconds(withPacks, 200, 450) - 1d;
 
             Assert.Greater(gain, 0.04d,
                 string.Format("보석 파편 묶음의 이득이 {0:P1}뿐이다 - 파편이 남아서 "
                     + "살 이유가 없다(ShardsPerElite {1})", gain, YodoCurve.ShardsPerElite));
+
+            var now = StageSimulation.Run(450, field, new StageSimulation.Policy { SkipGacha = true });
+            var nowWithout = StageSimulation.Run(450, field,
+                new StageSimulation.Policy { SkipShardPacks = true, SkipGacha = true });
+            double today = TotalSeconds(nowWithout, 200, 450) / TotalSeconds(now, 200, 450) - 1d;
+
+            Assert.Greater(today, 0.03d, string.Format(
+                "지금 세계에서 파편 묶음의 이득이 {0:P1}까지 닳았다", today));
         }
 
         /**
