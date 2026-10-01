@@ -34,5 +34,21 @@ namespace Onikiri.Battle
         {
             get { return 1f + CritChance * (CritMultiplier - 1f); }
         }
+
+        /**
+         * @brief 강화 전 명중 수치 (65단계). AccuracyCurve.BaseValue가 이 값이다.
+         *
+         * 숫자 자체에는 뜻이 없다 - 판정식이 비율만 보므로(RatingContest) 90이든
+         * 9000이든 같은 게임이다. 뜻은 st1의 적 회피와 맞대었을 때 나온다:
+         * StageCurve.EnemyEvasionBase가 이 값에서 유도되어 st1 명중률이 정확히
+         * BaseHitChance(90%)가 된다.
+         */
+        public const double Accuracy = 90d;
+
+        /** st1, 강화 전 플레이어의 명중률. 65단계 확정 4 */
+        public const double BaseHitChance = 0.90d;
+
+        /** 강화 전 회피 수치. 0 - 회피는 사야 생긴다 */
+        public const double Evasion = 0d;
     }
 }

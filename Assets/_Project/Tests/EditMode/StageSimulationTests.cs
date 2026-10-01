@@ -152,7 +152,11 @@ namespace Onikiri.Tests
                 // 시간 = 체력 / DPS 이므로 시간 x DPS 가 곧 체력이다
                 var unit = new CombatStats { Damage = 1d, AttacksPerSecond = 1d, CritRate = 0d, CritMultiplier = 1d };
                 double seconds = StageSimulation.BossKillSeconds(field.AverageMobHealth, stage, unit);
-                double fromSimulation = seconds * StageSimulation.ExpectedDps(unit);
+
+                // 65단계: 시뮬레이션은 보스 회피를 상대로 빗나감까지 넣어 깎는다.
+                // 그래서 되짚는 DPS도 빗나감을 아는 값이어야 체력이 나온다
+                double fromSimulation = seconds
+                    * unit.ExpectedDpsAgainst(StageCurve.BossEvasionAtStage(stage));
 
                 Assert.AreEqual(fromFight, fromSimulation, fromFight * 1e-9d,
                     "stage " + stage + ": 보스 체력이 전투와 시뮬레이션에서 다르다");
@@ -453,6 +457,11 @@ namespace Onikiri.Tests
                 // 저울에 올라가야 한다. 해금 시점별 기한은 SkillAxisTests가 따로 본다
                 new { Name = SkillCatalog.Skills[0].DisplayName, Level = final.SkillLevels[0] },
                 new { Name = SkillCatalog.Skills[1].DisplayName, Level = final.SkillLevels[1] },
+
+                // 65단계의 명중(st11 해금)·회피(st5 해금). 같은 골드 저울이라 같은
+                // 기한을 받는다 - 실측 첫 구매 명중 st11 / 회피 st8
+                new { Name = "명중", Level = final.AccuracyLevel },
+                new { Name = "회피", Level = final.EvasionLevel },
             };
 
             foreach (var axis in levels)
@@ -627,7 +636,10 @@ namespace Onikiri.Tests
             double curveGrowth = StageCurve.HealthMultiplier(5).ToDouble() / StageCurve.HealthMultiplier(4).ToDouble()
                                * StageCurve.BossHealthMultiplier(5) / StageCurve.BossHealthMultiplier(4)
                                * StageCurve.GoldAxisCompensation(5) / StageCurve.GoldAxisCompensation(4)
-                               * StageCurve.CostRaiseRelief(4) / StageCurve.CostRaiseRelief(5);
+                               * StageCurve.CostRaiseRelief(4) / StageCurve.CostRaiseRelief(5)
+                               // 65단계의 명중 보정도 스테이지마다 다르다(강화 전
+                               // 명중률이 스테이지마다 떨어진다) - 같은 이유로 걷어낸다
+                               * StageCurve.HitRatingCompensation(5) / StageCurve.HitRatingCompensation(4);
 
             Assert.AreEqual(BossCurve.ChapterHealthMultiplier,
                             chapterHealth / plainHealth / curveGrowth, 1e-6d,
@@ -1776,7 +1788,7 @@ namespace Onikiri.Tests
             // 여유가 몇 % 움직였다. 이 검사가 지키는 앵커는 "그 앞의 세계"의
             // 것이므로 상수를 옮기지 않고 49단계 규칙 ⓐ대로 정책에 한 줄을
             // 더한다 - 옛 골드 축(x1.25 / Lv.13 / 지수 0.52)을 재현하는 플래그
-            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true };
+            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true };
             var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
 
             // ---- 앵커 넷. **승급 재설계 2.1.1단계에 다시 구웠다**
@@ -1911,9 +1923,9 @@ namespace Onikiri.Tests
             var field = FieldFromAssets();
             // 64단계: 두 팔 다 옛 골드 축 세계에서 잰다(위 검사와 같은 세계)
             var withMastery = StageSimulation.Run(DeepZoneTo, field,
-                new StageSimulation.Policy { GoldAxisPre64 = true });
+                new StageSimulation.Policy { GoldAxisPre64 = true, NeutralizeHitRating = true });
             var withoutMastery = StageSimulation.Run(DeepZoneTo, field,
-                new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true });
+                new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true });
 
             // ---- 앵커: 두 세계가 같아야 한다 (개방이 st1~50에 없다는 구조)
             foreach (var index in new[] { 9, 29, 39, 49 })

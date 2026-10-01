@@ -291,6 +291,12 @@ namespace Onikiri.Battle
                             : definition.maxHealth,
                         definition.goldReward * goldMultiplier,
                         Onikiri.Progression.ExpCurve.MobExp(stageNumber, atFrontier));
+
+            // 65단계: 잡몹의 회피. 체력에는 이미 강화 전 명중률이 곱해져 있다
+            // (StageCurve.MobEvasionCompensation) - 둘은 같은 스테이지에서 짝이다
+            if (progress != null)
+                enemy.SetEvasion(Onikiri.Progression.StageCurve.EnemyEvasionAtStage(stageNumber));
+
             active.Add(enemy);
         }
 

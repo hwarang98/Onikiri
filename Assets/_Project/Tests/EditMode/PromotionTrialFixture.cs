@@ -75,7 +75,12 @@ namespace Onikiri.Tests
             {
                 Dps = row.ExpectedDps,
                 MaxHealth = row.MaxHealth,
-                RegenPerSecond = row.RegenPerSecond
+                RegenPerSecond = row.RegenPerSecond,
+
+                // 65단계: 플레이어의 회피는 귀문에서도 돈다(BossFight.OnBossAttacked).
+                // 확정 6이 0으로 묶은 것은 **귀문 적의 회피**다 - 플레이어는 생존을
+                // 체력 대신 회피로 산 만큼 그것을 귀문에 들고 들어간다
+                DodgeChance = row.DodgeChance
             };
         }
 
@@ -94,7 +99,8 @@ namespace Onikiri.Tests
             {
                 Dps = row.ExpectedDps / 100d,
                 MaxHealth = row.MaxHealth,
-                RegenPerSecond = row.MaxHealth * HealthRegenCurve.Ceiling
+                RegenPerSecond = row.MaxHealth * HealthRegenCurve.Ceiling,
+                DodgeChance = row.DodgeChance
             };
         }
 
@@ -142,7 +148,11 @@ namespace Onikiri.Tests
             var field = FieldFromAssets();
             int stage = GateStages[gateNumber - 1];
 
-            double bossHealth = StageCurve.BossHealthForStage(
+            // 65단계: 귀문의 체력 기준(PromotionTrialCatalog.TotalTrialHealth)과 같은
+            // 값이다 - 명중·회피 보정 전. 귀문의 적은 회피 0이라 DPS도 빗나가지
+            // 않는 값(StageResult.ExpectedDps)이고, 둘이 짝이어야 M이 귀문 안의
+            // 시간을 잰다
+            double bossHealth = StageCurve.BossHealthBeforeHitRating(
                 BigDouble.FromDouble(field.AverageMobHealth), stage).ToDouble();
             double dps = PlayerAt(GemFloor(), stage).Dps;
 

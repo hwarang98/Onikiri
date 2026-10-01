@@ -51,6 +51,15 @@ namespace Onikiri.Tests
 
             /** 초당 회복량. 최대 체력 기준 비율이 아니라 절대값이다 */
             public double RegenPerSecond;
+
+            /**
+             * @brief 보스의 공격을 피할 확률 (65단계, `StageResult.DodgeChance`).
+             *
+             * 기대값으로 깎는다 - 한 대가 (1 - 회피율)배로 들어온다. 난수를 굴리지
+             * 않는 것은 이 계산기 전체의 규칙이고(결정론), 회피율은 게이트
+             * 스테이지 보스 명중을 상대로 잰 값이다. 0이면 65단계 전과 같다.
+             */
+            public double DodgeChance;
         }
 
         public struct Foe
@@ -158,7 +167,8 @@ namespace Onikiri.Tests
                 if (attackTimer <= 0d)
                 {
                     attackTimer += foes[index].AttackInterval;
-                    health -= foes[index].AttackDamage * EnrageMultiplier(rules, time);
+                    health -= foes[index].AttackDamage * EnrageMultiplier(rules, time)
+                              * (1d - player.DodgeChance);
                 }
 
                 if (health <= 0d)

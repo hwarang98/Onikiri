@@ -43,6 +43,23 @@ namespace Onikiri.Progression
 
             var baseline = CombatStats.AtLevel(level);
 
+            // 65단계: 명중은 적 회피가 있어야 값어치가 생긴다. 기준 적 회피는
+            // 이 레벨에서 명중률을 90%에 두는 값이다(AccuracyCurve 주석).
+            // 다른 축은 예전 그대로 "빗나가지 않는 DPS"로 잰다 - 비율 안에서
+            // 명중률이 약분되므로 값은 같고, 비트가 흔들릴 이유를 만들지 않는다
+            if (track.Id == UpgradeSystem.AccuracyId)
+            {
+                double evasion = AccuracyCurve.ReferenceEnemyEvasionAtLevel(level);
+                double hitNow = baseline
+                    .With(track.Id, track.UncappedValueAtLevel(level).ToDouble())
+                    .ExpectedDpsAgainst(evasion);
+                double hitNext = baseline
+                    .With(track.Id, track.UncappedValueAtLevel(level + 1).ToDouble())
+                    .ExpectedDpsAgainst(evasion);
+                if (hitNow <= 0d || double.IsNaN(hitNext)) return 0d;
+                return hitNext / hitNow - 1d;
+            }
+
             double current = baseline
                 .With(track.Id, track.UncappedValueAtLevel(level).ToDouble())
                 .ExpectedDps;

@@ -546,6 +546,60 @@ namespace Onikiri.Battle
         private void Start()
         {
             PlayIdle();
+
+            // 65단계: 회피는 PlayerHealth가 굴리고 글자는 여기서 띄운다 - 데미지
+            // 숫자 스포너를 들고 있는 것이 이쪽이다. 같은 게임오브젝트에 붙는다
+            // (BattleContentBuilder가 사무라이 하나에 둘을 붙인다)
+            dodgeSource = GetComponent<PlayerHealth>();
+            if (dodgeSource != null) dodgeSource.Dodged += OnDodged;
+        }
+
+        private void OnDestroy()
+        {
+            if (dodgeSource != null) dodgeSource.Dodged -= OnDodged;
+        }
+
+        private PlayerHealth dodgeSource;
+
+        private void OnDodged()
+        {
+            if (damageNumbers != null) damageNumbers.ShowDodge(transform.position);
+        }
+
+        // ---------------------------------------------------------------- 65단계: 명중
+
+        /**
+         * @brief 명중 수치. UpgradeSystem이 명중 축에서 넣는다. 0이면 기본값.
+         */
+        public double Accuracy
+        {
+            get { return accuracy > 0d ? accuracy : Onikiri.Battle.CombatBaseline.Accuracy; }
+            set { accuracy = value; }
+        }
+
+        private double accuracy;
+
+        /** 빗나간 횟수 (평타 + 오의). 테스트와 테스트 패널이 읽는다 */
+        public int MissCount { get; private set; }
+
+        /**
+         * @brief 이 대상에게 맞았는가. **치명타 굴림보다 먼저** 부른다.
+         *
+         * 대상의 회피가 0이면(귀문의 적, 회피를 받지 않은 테스트 적) 난수를
+         * 굴리지 않고 true다 - 그 경로의 난수열이 65단계 전과 같아야 한다.
+         * 귀문 중에는 대상과 무관하게 true다(확정 6).
+         */
+        private bool RollHit(Enemy target)
+        {
+            if (Onikiri.Progression.TrialDamageScale.IsActive) return true;
+            if (target == null || target.Evasion <= 0d) return true;
+
+            double chance = Onikiri.Progression.RatingContest.Chance(Accuracy, target.Evasion);
+            if (Random.value < chance) return true;
+
+            MissCount++;
+            if (damageNumbers != null) damageNumbers.ShowMiss(target.HitPoint);
+            return false;
         }
 
         private void Update()
@@ -652,6 +706,10 @@ namespace Onikiri.Battle
             if (target == null || !target.IsTargetable) return;
 
             AttackCount++;
+
+            // 65단계: 명중 굴림이 치명타 굴림 **앞**이다. 빗나가면 TakeDamage도
+            // 치명타·연격 굴림도 없다 - 불꽃·꽃잎·정지도 내지 않는다(벤 것이 없다)
+            if (!RollHit(target)) return;
 
             bool crit = critChance > 0f && Random.value < critChance;
             BigDouble dealt = crit
@@ -775,6 +833,12 @@ namespace Onikiri.Battle
                                     Onikiri.Progression.TrialDamageScale.Source skillDamageSource)
         {
             if (target == null || !target.IsTargetable) return false;
+
+            // 65단계: 오의는 빗나가고 **영체는 빗나가지 않는다**(확정 5). 영체는
+            // 출처 Special로 이 함수를 지난다(YodoSystem) - 출처로 가른다
+            if (skillDamageSource != Onikiri.Progression.TrialDamageScale.Source.Special
+                && !RollHit(target))
+                return false;
 
             bool crit = critChance > 0f && Random.value < critChance;
 

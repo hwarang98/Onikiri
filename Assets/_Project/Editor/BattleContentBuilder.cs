@@ -2372,6 +2372,12 @@ namespace Onikiri.EditorTools
             so.FindProperty("expTarget").objectReferenceValue = expStrip;
             so.FindProperty("expColor").colorValue = ExpStripFillColor;
 
+            // 65단계: MISS·회피 글자. 숫자 글꼴(Thaleah, 44자)에는 한글도 I·S도
+            // 없으므로 캡션 글꼴(Galmuri 33)을 따로 물린다 - 비면 글자를 안 띄운다
+            so.FindProperty("labelFont").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(UiFonts.CaptionPath);
+            so.FindProperty("labelFontSize").floatValue = Onikiri.UI.PixelFontSizes.GalmuriCaption;
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             return spawner;

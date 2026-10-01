@@ -697,6 +697,24 @@ namespace Onikiri.Progression
 
         public static BigDouble BossHealthForStage(BigDouble averageMobHealth, int stage)
         {
+            // 65단계: 명중·회피 보정은 **맨 마지막 한 번**이다. 그 앞의 값
+            // (BossHealthBeforeHitRating)이 64단계까지의 보스 체력과 비트
+            // 단위로 같아야 귀문이 그것을 그대로 읽을 수 있다 - 귀문의 적은
+            // 회피가 0이고(확정 6), 그래서 이 보정을 받으면 안 된다
+            return BossHealthBeforeHitRating(averageMobHealth, stage)
+                 * BigDouble.FromDouble(HitRatingCompensation(stage));
+        }
+
+        /**
+         * @brief 64단계까지의 보스 체력 - 명중·회피 보정이 걸리기 전.
+         *
+         * 귀문(PromotionTrialCatalog)이 이 값을 읽는다. 귀문의 적은 회피가 0이라
+         * 플레이어의 명중률이 1이고, 그러면 강화 전 명중률로 체력을 낮춰 둔
+         * 보정은 귀문을 그만큼 쉽게 만든다 - 65단계 확정 6("승급 밸런스 불변")을
+         * 깨는 길이다.
+         */
+        public static BigDouble BossHealthBeforeHitRating(BigDouble averageMobHealth, int stage)
+        {
             var health = BossHealth(averageMobHealth * HealthMultiplier(stage), stage);
 
             // 골드 축이 만든 여유를 보스가 따라간다. 곱하는 자리가 여기인 이유는
@@ -857,6 +875,171 @@ namespace Onikiri.Progression
                 / (double)(OnboardingReliefEndStage - 1));
         }
 
+        // ---------------------------------------------------------------- 65단계: 명중·회피
+
+        /**
+         * @brief st1 잡몹의 회피 수치. **강화 전 명중률 90%에서 유도한다.**
+         *
+         *     A0 / (A0 + E1) = 0.90   ->   E1 = A0 x (1 - 0.9) / 0.9 = 10
+         *
+         * 숫자가 아니라 비율이 설계다 - 기본 명중(CombatBaseline.Accuracy)을
+         * 바꾸면 이 값이 따라 움직여 st1의 90%가 유지된다.
+         */
+        public const double EnemyEvasionBase =
+            Onikiri.Battle.CombatBaseline.Accuracy * (1d - Onikiri.Battle.CombatBaseline.BaseHitChance)
+            / Onikiri.Battle.CombatBaseline.BaseHitChance;
+
+        /**
+         * @brief 적 회피가 스테이지마다 자라는 비율 (st1 값 대비, 일차).
+         *
+         * **이 축의 핵심 밸런스 변수다.** 명중을 안 사면 명중률이 이 속도로
+         * 떨어진다:
+         *
+         *     st10 88.7%   st30 86.0%   st50 83.5%   st100 77.7%   st500 50.0%
+         *
+         * 보스 상대는 회피가 1.5배라 더 빠르다 - st100 69.9%, st500 40.0%.
+         * 곡선 추종 플레이어는 명중을 사서 잡몹 92~97% / 보스 88~95%에 머문다.
+         *
+         * 일차인 이유는 명중 축이 가산이기 때문이다. 곡선 추종 플레이어의 레벨은
+         * 스테이지에 거의 비례해 오르므로(골드 x1.72 대 비용 x1.72) 명중 수치도
+         * 일차로 자라고, 두 일차가 맞물려 추종 명중률이 한 자리에 머문다.
+         * 적 회피가 지수로 자라면 가산 축이 반드시 진다.
+         */
+        public const double EnemyEvasionGrowthPerStage = 0.016d;
+
+        /** 보스의 회피 = 같은 스테이지 잡몹 회피 x 이 값. 등급과 무관하게 하나 */
+        public const double BossEvasionMultiplier = 1.5d;
+
+        /** 그 스테이지 잡몹의 회피 수치. 단조 증가 */
+        public static double EnemyEvasionAtStage(int stage)
+        {
+            return EnemyEvasionBase * (1d + EnemyEvasionGrowthPerStage * StepsFrom(stage));
+        }
+
+        public static double BossEvasionAtStage(int stage)
+        {
+            return EnemyEvasionAtStage(stage) * BossEvasionMultiplier;
+        }
+
+        /**
+         * @brief st1 보스의 명중 수치와 그 성장 (일차). 플레이어 회피의 상대다.
+         *
+         * 회피 확률 = 회피 / (회피 + 보스 명중). 보스 명중도 적 회피와 같은
+         * 이유로 일차다 - 회피 축이 가산이라 곡선 추종 회피율이 한 자리에 머문다.
+         * 100은 회피 수치의 눈금을 정할 뿐이다(첫 칸 회피 1.5 = 1.5%).
+         */
+        public const double BossAccuracyBase = 100d;
+        public const double BossAccuracyGrowthPerStage = 0.016d;
+
+        public static double BossAccuracyAtStage(int stage)
+        {
+            return BossAccuracyBase * (1d + BossAccuracyGrowthPerStage * StepsFrom(stage));
+        }
+
+        /** 명중을 한 번도 안 산 플레이어의 잡몹 명중률 */
+        public static double UnboughtMobHitChance(int stage)
+        {
+            return RatingContest.Chance(Onikiri.Battle.CombatBaseline.Accuracy, EnemyEvasionAtStage(stage));
+        }
+
+        /** 명중을 한 번도 안 산 플레이어의 보스 명중률 */
+        public static double UnboughtBossHitChance(int stage)
+        {
+            return RatingContest.Chance(Onikiri.Battle.CombatBaseline.Accuracy, BossEvasionAtStage(stage));
+        }
+
+        /**
+         * @brief 잡몹 체력에 곱하는 배수 = 강화 전 명중률.
+         *
+         * ## 왜 적 회피를 체력으로 되갚는가
+         *
+         * 적 회피가 들어오면 같은 DPS로 잡몹 한 마리에 1/명중률 배 오래 걸린다.
+         * st1에서 +11%(1/0.9)이고 지시서가 짚은 온보딩 소요 시간 +11%가 그것이다.
+         * 그것을 그대로 두면 조율이 끝난 코리더·온보딩이 통째로 느려진다.
+         *
+         * 그래서 체력을 강화 전 명중률만큼 낮춘다. 그러면 **명중을 한 번도 안
+         * 산 플레이어의 처치 시간이 64단계와 같다** - 빗나감이 생긴 만큼 맞을
+         * 때 더 잘 든다. 명중을 사는 플레이어는 그만큼 빨라지고, 그것이 이
+         * 축의 액티브 이득이다. 지시서가 "초반 잡몹 체력"이라 부른 손잡이를
+         * 전 구간에 쓴 것이고, 축 값이나 판정식은 건드리지 않았다.
+         *
+         * 회피가 스테이지마다 자라므로 이 배수도 스테이지마다 작아진다 - 안 산
+         * 플레이어의 세계를 64단계에 붙들어 두는 값이지 축을 상쇄하는 값이 아니다.
+         */
+        public static double MobEvasionCompensation(int stage)
+        {
+            return UnboughtMobHitChance(stage);
+        }
+
+        /**
+         * @brief 보스 체력에 곱하는 명중·회피 보정 = 강화 전 명중률 x 명중 축 보정.
+         *
+         * 첫 항은 잡몹과 같은 이유다(MobEvasionCompensation). 둘째 항은 다른
+         * 축들과 같은 보정항이다 - 곡선 추종 플레이어의 기대 명중률이 강화 전보다
+         * 높은 몫을 지수만큼 보스가 따라간다(AccuracyAxisCompensation).
+         */
+        public static double HitRatingCompensation(int stage)
+        {
+            return UnboughtBossHitChance(stage) * AccuracyAxisCompensation(stage);
+        }
+
+        /**
+         * @brief 명중 축이 만든 여유를 보스가 따라가는 보정. 해금 전 1.
+         *
+         *     (기대 명중률 / 강화 전 명중률) ^ AccuracyMarginExponent
+         *
+         * 골드 획득 축(GoldAxisCompensation)과 같은 구조다. 기대 명중률은 닫힌
+         * 식이다(AccuracyCurve.ExpectedValueAtStage) - 시뮬레이션을 참조하면
+         * 순환이 된다. 지수의 근거는 65단계 보고서 §4.
+         */
+        public static double AccuracyAxisCompensation(int stage)
+        {
+            if (!AccuracyCurve.IsUnlockedAt(stage)) return 1d;
+
+            double ratio = ExpectedHitRatio(stage);
+            if (stage <= AccuracyGainFrozenAfter) return Math.Pow(ratio, AccuracyMarginExponent);
+
+            // 무한 구간: 액티브 이득을 st50의 크기로 **얼린다.** 강화 전 명중률은
+            // 끝없이 떨어지고 추종 명중률은 한 자리에 머물므로, 지수를 그대로 두면
+            // 그 비율의 (1 - 지수) 몫이 스테이지마다 여유를 밀어 올린다 - 42단계
+            // 캐릭터 레벨, 64단계 골드 드립과 같은 발산이다. 비율을 전량 따라가고
+            // st50까지 남긴 이득만 상수로 둔다(상한이 아니다 - 보정은 계속 자란다)
+            double frozenGain = Math.Pow(ExpectedHitRatio(AccuracyGainFrozenAfter), 1d - AccuracyMarginExponent);
+            return ratio / frozenGain;
+        }
+
+        /** 곡선 추종 기대 명중률 / 강화 전 명중률 (보스 상대). 1 아래면 1 */
+        private static double ExpectedHitRatio(int stage)
+        {
+            double expected = RatingContest.Chance(AccuracyCurve.ExpectedValueAtStage(stage),
+                                                   BossEvasionAtStage(stage));
+            double unbought = UnboughtBossHitChance(stage);
+            return expected > unbought ? expected / unbought : 1d;
+        }
+
+        /** 이 스테이지 뒤로는 명중 축의 액티브 이득이 자라지 않는다 = 조율 구간의 끝 */
+        public const int AccuracyGainFrozenAfter = DeepRampStartStage - 1;
+
+        /**
+         * ## 1.0 - 명중의 이득을 보스가 전량 따라간다. **코리더의 칼날이 정했다**
+         *
+         * 다른 축처럼 1 아래로 두어 액티브 이득을 남기고 싶었다. 실측은 0.5에서
+         * st25 챕터 천장(2.0)을 0.04 넘었고, 0.75에서도 **st20 피날레가 st5
+         * 챕터보다 쉬워졌다**(1.500 대 1.459 - `ChapterBosses_AreTighterThanStageBosses`).
+         * st20 피날레는 64단계가 남긴 칼날(무과금 1.175 / 바닥 1.15)이고, 명중
+         * 구매가 만드는 배분 이득만으로도 그 자리가 +0.02 오른다.
+         *
+         * 그래서 이득은 보스 여유가 아니라 **파밍 속도**로 남는다 - 잡몹 체력에는
+         * 이 보정이 없다(MobEvasionCompensation은 강화 전 명중률만 되갚는다).
+         * 안 산 플레이어 대비 이득은 st1~50 +3.9%, st51~500 +4.4%(전투 시간)이고
+         * 안 산 플레이어는 보스 여유가 st20 1.315 / st50 2.092로 내려간다
+         * (추종 1.430 / 2.327).
+         *
+         * 무한 구간 얼림(AccuracyGainFrozenAfter)은 지수가 1이면 하는 일이
+         * 없지만 남겨 둔다 - 지수를 내리는 날 무한 구간 발산을 막는 장치다.
+         */
+        public const double AccuracyMarginExponent = 1.0d;
+
         /**
          * @brief 이 스테이지 잡몹의 실제 체력. 스포너와 시뮬레이션이 함께 부른다.
          *
@@ -865,6 +1048,25 @@ namespace Onikiri.Progression
          * 않는다 - 여기서 값을 만지면 "코리더 비트 불변"이 거짓말이 된다.
          */
         public static BigDouble MobHealth(BigDouble baseHealth, int stage)
+        {
+            // 65단계: 강화 전 명중률만큼 가볍다(MobEvasionCompensation 주석).
+            // **마지막에 곱한다** - 명중을 안 산 플레이어의 처치 시간이 64단계와
+            // 같게 한다
+            var compensated = MobHealthBeforeEvasion(baseHealth, stage)
+                            * BigDouble.FromDouble(MobEvasionCompensation(stage));
+
+            // 온보딩(완화 구간)의 체력은 정수 1 이상이다 - 그 구간 체력은 화면에
+            // 그대로 읽히는 작은 수라(12 -> 1.8) 소수가 보인다. 완화와 같은 반올림을
+            // 한 번 더 건다(StageProgressionTests.OnboardingMobHealth_IsWholeAndAtLeastOne)
+            if (MobHealthRelief(stage) > 1d)
+                return BigDouble.FromDouble(Math.Max(1d,
+                    Math.Round(compensated.ToDouble(), MidpointRounding.AwayFromZero)));
+
+            return compensated;
+        }
+
+        /** 64단계까지의 잡몹 체력. 회피 보정이 없는 세계를 재현하는 비교군이 쓴다 */
+        public static BigDouble MobHealthBeforeEvasion(BigDouble baseHealth, int stage)
         {
             var raw = baseHealth * HealthMultiplier(stage);
 

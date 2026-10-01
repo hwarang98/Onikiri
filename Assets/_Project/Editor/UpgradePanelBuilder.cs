@@ -193,6 +193,33 @@ namespace Onikiri.EditorTools
                 MaxLevel = ComboCurve.MaxLevel, ValueCeiling = ComboCurve.Ceiling,
                 Display = UpgradeTrack.Display.Percent,
                 DeepGate = true
+            },
+
+            // ---------------------------------------------------- 65단계: 명중·회피
+            // **맨 끝에 붙인다.** 트랙의 순번이 UpgradeButton.trackIndex이고, 앞에
+            // 끼우면 씬의 기존 행이 전부 한 칸씩 다른 축을 가리킨다. 목록의 보이는
+            // 순서는 Categories가 정한다 - 순번과 배치는 따로다
+            //
+            // 둘 다 가산 + **상한 없음**(MaxLevel 0, ValueCeiling 0) - 확률은
+            // 판정식이 가둔다(RatingContest). 표시는 수치가 아니라 지금 스테이지
+            // 기준 확률이다
+            new TrackSpec {
+                Id = UpgradeSystem.AccuracyId, DisplayName = "명중",
+                BaseCost = AccuracyCurve.BaseCost, CostGrowth = AccuracyCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Additive,
+                BaseValue = AccuracyCurve.BaseValue, Step = AccuracyCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.HitChance,
+                UnlockStage = AccuracyCurve.UnlockStage
+            },
+            new TrackSpec {
+                Id = UpgradeSystem.EvasionId, DisplayName = "회피",
+                BaseCost = EvasionCurve.BaseCost, CostGrowth = EvasionCurve.CostGrowth,
+                Curve = UpgradeTrack.Curve.Additive,
+                BaseValue = EvasionCurve.BaseValue, Step = EvasionCurve.Step,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.DodgeChance,
+                UnlockStage = EvasionCurve.UnlockStage
             }
         };
 
@@ -300,12 +327,15 @@ namespace Onikiri.EditorTools
 
         private static readonly CategorySpec[] Categories =
         {
+            // 65단계: 명중은 공격 절, 회피는 생존 절의 셋째 줄이다. 새 절을 만들지
+            // 않는 이유는 "무엇을 세게 하는가"의 분류가 그대로 맞기 때문이다 -
+            // 명중은 화력(%DPS), 회피는 생존(%EHP)이다
             new CategorySpec { DisplayName = "공격", TrackIds = new[] {
-                UpgradeSystem.AttackPowerId, UpgradeSystem.AttackSpeedId } },
+                UpgradeSystem.AttackPowerId, UpgradeSystem.AttackSpeedId, UpgradeSystem.AccuracyId } },
             new CategorySpec { DisplayName = "치명타", TrackIds = new[] {
                 UpgradeSystem.CritRateId, UpgradeSystem.CritDamageId } },
             new CategorySpec { DisplayName = "생존", TrackIds = new[] {
-                UpgradeSystem.HealthId, UpgradeSystem.HealthRegenId } },
+                UpgradeSystem.HealthId, UpgradeSystem.HealthRegenId, UpgradeSystem.EvasionId } },
             // 20단계. 공격/치명타/생존 어디에도 안 맞는다 - 이 축은 전투를
             // 세게 하는 것이 아니라 벌이를 늘린다. 계열 이름이 "무엇을 세게
             // 하는가"의 분류이므로 새 이름이 필요하다

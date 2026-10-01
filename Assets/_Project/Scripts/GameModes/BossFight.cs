@@ -389,6 +389,15 @@ namespace Onikiri.Battle
             if (phase == Phase.Trial && (trial == TrialState.Transition1
                                       || trial == TrialState.Transition2)) return;
 
+            // 65단계: 회피. **귀문에서도 굴린다.** 확정 6이 0으로 묶은 것은 귀문
+            // **적의** 회피다(플레이어가 늘 맞힌다). 플레이어의 회피는 생존을 체력
+            // 대신 산 몫이라, 귀문에서 빼면 회피를 산 플레이어만 맨몸으로 들어가
+            // 5단계 확정 밸런스가 깨진다 - 처음 그렇게 넣었다가 귀문 3·4에서 추종
+            // 플레이어가 죽었다(65단계 보고서 §6). 회피 수치가 0이면 난수도
+            // 굴리지 않는다(PlayerHealth.TryDodge)
+            if (playerHealth.TryDodge(StageCurve.BossAccuracyAtStage(CurrentStage)))
+                return;
+
             playerHealth.TakeDamage(attacker.AttackDamage);
         }
 
@@ -647,6 +656,10 @@ namespace Onikiri.Battle
             {
                 boss.Attacked += OnBossAttacked;
                 boss.SwingStarted += OnBossSwing;
+
+                // 65단계: 보스의 회피. 체력의 명중 보정(StageCurve.HitRatingCompensation)
+                // 과 같은 스테이지에서 짝이다. 귀문의 적은 이 경로를 지나지 않는다
+                boss.SetEvasion(StageCurve.BossEvasionAtStage(CurrentStage));
             }
 
             // 관문을 세운다. 달려가기 구간의 중간쯤에 서므로 플레이어가 먼저

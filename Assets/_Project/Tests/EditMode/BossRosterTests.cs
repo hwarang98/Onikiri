@@ -265,11 +265,15 @@ namespace Onikiri.Tests
             //
             // E-3 수정의 비용 상향 완화(CostRaiseRelief)도 같은 이유로 되돌린다 -
             // 나누는 항이라 곱해서 걷어낸다
+            //
+            // 65단계의 명중 보정(HitRatingCompensation)도 같은 부류다 - 강화 전
+            // 명중률을 따라 스테이지마다 다르다. 곱하는 항이라 나눠서 걷어낸다
             System.Func<int, double> tierOnly = stage =>
                 StageCurve.BossHealthForStage(mobHealth, stage).ToDouble()
                 * StageCurve.CostRaiseRelief(stage)
                 / (StageCurve.BossHealth(mobHealth * StageCurve.HealthMultiplier(stage), stage).ToDouble()
-                   * StageCurve.GoldAxisCompensation(stage));
+                   * StageCurve.GoldAxisCompensation(stage)
+                   * StageCurve.HitRatingCompensation(stage));
 
             double normal9 = tierOnly(9);
             double chapter5 = tierOnly(5);

@@ -75,6 +75,18 @@ namespace Onikiri.Progression
         {
             if (track == null || !FeedsSurvival(track.Id)) return 0d;
 
+            // 65단계: 회피는 유효체력에 1 + 회피/보스 명중을 곱한다(EvasionCurve).
+            // 기준 보스 명중은 이 레벨에서 회피율 10%가 되는 값이다
+            if (track.Id == UpgradeSystem.EvasionId)
+            {
+                double accuracy = EvasionCurve.ReferenceBossAccuracyAtLevel(level);
+                double now = EvasionCurve.EffectiveHealthFactor(
+                    track.UncappedValueAtLevel(level).ToDouble(), accuracy);
+                double then = EvasionCurve.EffectiveHealthFactor(
+                    track.UncappedValueAtLevel(level + 1).ToDouble(), accuracy);
+                return now > 0d ? then / now - 1d : 0d;
+            }
+
             double health = HealthCurve.ValueAtLevel(level);
             double regenFraction = HealthRegenCurve.ValueAtLevel(level);
 
@@ -124,7 +136,8 @@ namespace Onikiri.Progression
 
         public static bool FeedsSurvival(string trackId)
         {
-            return trackId == UpgradeSystem.HealthId || trackId == UpgradeSystem.HealthRegenId;
+            return trackId == UpgradeSystem.HealthId || trackId == UpgradeSystem.HealthRegenId
+                || trackId == UpgradeSystem.EvasionId;
         }
 
         public static string Describe(UpgradeTrack track, int level)

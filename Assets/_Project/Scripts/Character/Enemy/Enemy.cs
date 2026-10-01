@@ -130,6 +130,21 @@ namespace Onikiri.Battle
          */
         public bool IsTrialFoe { get; private set; }
 
+        /**
+         * @brief 회피 수치 (65단계). 플레이어의 평타·오의가 이것을 상대로 빗나간다.
+         *
+         * **스폰마다 0으로 돌아간다.** 값은 스폰한 쪽이 SetEvasion으로 넣는다 -
+         * 잡몹은 EnemySpawner, 보스는 BossFight. 귀문의 적은 아무도 넣지 않으므로
+         * 0이고(확정 6), 0이면 판정식이 정확히 1을 돌려 난수도 굴리지 않는다
+         * (PlayerCombat.RollHit).
+         */
+        public double Evasion { get; private set; }
+
+        public void SetEvasion(double value)
+        {
+            Evasion = value > 0d ? value : 0d;
+        }
+
         /** 체력 비율 0~1. 보스 체력 바가 쓴다 */
         public float HealthFraction
         {
@@ -192,6 +207,10 @@ namespace Onikiri.Battle
             // 2초 간격으로 때리거나 골드를 안 주는 상태가 된다
             IsTrialFoe = false;
             trialAttackInterval = 0f;
+
+            // 65단계: 회피도 스폰마다 비운다. 풀에서 돌아온 보스가 옛 회피를 들고
+            // 귀문에 나오면 확정 6(귀문의 적은 회피 0)이 조용히 깨진다
+            Evasion = 0d;
 
             // 고른 공격 그림은 정의에 딸린 것이라 반드시 함께 비운다. 풀에서
             // 돌아온 인스턴스가 옛 정의의 배열을 들고 있으면 다른 요괴의
@@ -607,6 +626,10 @@ namespace Onikiri.Battle
         public void ConfigureAsTrialFoe(float interval, float firstDelay)
         {
             IsTrialFoe = true;
+
+            // 65단계 확정 6: 귀문의 적은 회피 0. Spawn이 이미 비웠지만 계약을
+            // 이 함수에도 적는다 - 귀문 쪽에서 읽을 때 근거가 한 곳에 있다
+            Evasion = 0d;
             trialAttackInterval = interval > 0f ? interval : 0f;
 
             // 첫 타격을 지연시킨다. 타이머가 간격까지 차면 때리므로, 남은 지연만큼

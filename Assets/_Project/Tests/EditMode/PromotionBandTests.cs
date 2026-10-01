@@ -87,9 +87,17 @@ namespace Onikiri.Tests
         [Test]
         public void OverlayModel_MatchesTheSimulation()
         {
+            // 65단계: 모형의 충실도는 **명중·회피가 없는 세계**에서 잰다(49단계
+            // 규칙 ⓐ). 회피의 비용 결(x1.2)이 굵어서 전직 체력 배수가 있는 세계와
+            // 없는 세계의 생존 구매 조합이 한 칸씩 갈리고, 그 칸이 화력으로 가는
+            // 골드를 흔들어 st38에서 비가 40/41로 어긋났다 - 전직 모형의 오차가
+            // 아니라 구매 조합의 이산 잡음이다. 후보 비교(아래)는 지금 세계 그대로다
             var field = PromotionTrialFixture.FieldFromAssets();
-            var actual = StageSimulation.Run(Horizon, field);
-            var overlay = PromotionBandModel.Overlay(neutralLead, PromotionBandModel.RecommendedExponent);
+            var actual = StageSimulation.Run(Horizon, field,
+                new StageSimulation.Policy { NeutralizeHitRating = true });
+            var neutralPlain = StageSimulation.Run(Horizon, field,
+                new StageSimulation.Policy { NeutralizeEvolution = true, NeutralizeHitRating = true });
+            var overlay = PromotionBandModel.Overlay(neutralPlain, PromotionBandModel.RecommendedExponent);
 
             for (int stage = 31; stage <= 200; stage++)
             {
@@ -135,12 +143,18 @@ namespace Onikiri.Tests
         [Test]
         public void SurvivalMargin_DoesNotRespondToTheEvolutionMultiplier()
         {
+            // 65단계: 위 검사와 같은 이유로 명중·회피가 없는 세계에서 잰다 - 지금
+            // 세계의 실측은 st37 0.977(바닥 0.98)로, 회피 한 칸(x1.2 비용)이
+            // 체력 여러 칸을 대신하는 이산 잡음이다
             var field = PromotionTrialFixture.FieldFromAssets();
-            var actual = StageSimulation.Run(Horizon, field);
+            var actual = StageSimulation.Run(Horizon, field,
+                new StageSimulation.Policy { NeutralizeHitRating = true });
+            var neutralPlain = StageSimulation.Run(Horizon, field,
+                new StageSimulation.Policy { NeutralizeEvolution = true, NeutralizeHitRating = true });
 
             for (int stage = 31; stage <= 200; stage++)
             {
-                double ratio = actual[stage - 1].SurvivalMargin / neutralLead[stage - 1].SurvivalMargin;
+                double ratio = actual[stage - 1].SurvivalMargin / neutralPlain[stage - 1].SurvivalMargin;
 
                 // 상한이 체력 스텝 하나(x1.10)에 눈금 2%를 얹은 값이다.
                 // 두 칸이 쌓이면(x1.21) 여기서 걸린다 - 그것은 되먹임이

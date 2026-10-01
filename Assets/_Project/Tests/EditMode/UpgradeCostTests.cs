@@ -62,7 +62,7 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 아홉 축 전부와 훑는 범위.
+         * @brief 열한 축 전부와 훑는 범위 (65단계에 명중·회피가 더해졌다).
          *
          * 범위는 콘텐츠가 실제로 닿는 깊이다 - 치명타 확률·연격은 만렙(1000),
          * 공격속도는 아트 상한(32), 골드 획득은 64단계부터 무상한, 나머지 무상한 축은
@@ -80,7 +80,10 @@ namespace Onikiri.Tests
                 new Axis { Name = "체력 회복", Cost = HealthRegenCurve.CostAtLevel, Levels = HealthRegenCurve.MaxLevel },
                 new Axis { Name = "골드 획득", Cost = GoldGainCurve.CostAtLevel, Levels = 3000 },
                 new Axis { Name = "초월 치명타", Cost = TranscendCurve.CostAtLevel, Levels = 3000 },
-                new Axis { Name = "연격", Cost = ComboCurve.CostAtLevel, Levels = ComboCurve.MaxLevel }
+                new Axis { Name = "연격", Cost = ComboCurve.CostAtLevel, Levels = ComboCurve.MaxLevel },
+                // 65단계. 무상한이라 훑는 범위는 다른 무상한 축과 같다
+                new Axis { Name = "명중", Cost = AccuracyCurve.CostAtLevel, Levels = 3000 },
+                new Axis { Name = "회피", Cost = EvasionCurve.CostAtLevel, Levels = 3000 }
             };
         }
 

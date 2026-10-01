@@ -44,6 +44,14 @@ namespace Onikiri.Progression
         public const string TranscendId = "crit_transcend";
         public const string ComboId = "combo_strike";
 
+        /**
+         * 65단계: 명중·회피. 명중은 적 회피를 뚫는 공격 축(PlayerCombat), 회피는
+         * 보스 공격을 피하는 생존 축(PlayerHealth)이다. 확률이 아니라 수치를
+         * 들고, 판정식(RatingContest)이 상대 수치와 맞대어 확률을 만든다
+         */
+        public const string AccuracyId = "accuracy";
+        public const string EvasionId = "evasion";
+
         [SerializeField] private PlayerCombat combat;
         [SerializeField] private PlayerHealth health;
         [SerializeField] private UpgradeTrack[] tracks;
@@ -295,9 +303,17 @@ namespace Onikiri.Progression
 
             // 생존 축은 PlayerHealth로 간다. combat이 없어도 적용돼야 하므로
             // 아래 전투 스탯보다 먼저 처리한다
-            if (track.Id == HealthId || track.Id == HealthRegenId)
+            if (track.Id == HealthId || track.Id == HealthRegenId || track.Id == EvasionId)
             {
                 if (health == null) return;
+
+                // 65단계: 회피는 수치 그대로 PlayerHealth로 간다. 확률은 맞는
+                // 순간 보스 명중과 맞대어 만든다(PlayerHealth.TryDodge)
+                if (track.Id == EvasionId)
+                {
+                    health.Evasion = track.Value.ToDouble();
+                    return;
+                }
 
                 if (track.Id == HealthId)
                     // 방어구 배수가 여기서 곱해진다. 스탯 포인트 증폭과 **같은
@@ -387,6 +403,12 @@ namespace Onikiri.Progression
 
                 case ComboId:
                     combat.ComboChance = (float)track.Value.ToDouble();
+                    break;
+
+                // 65단계: 명중. 증폭·장비·전직을 곱하지 않는다 - 확률이 아니라
+                // 수치이고 판정식이 적 회피와 맞대어 확률을 만든다(RatingContest)
+                case AccuracyId:
+                    combat.Accuracy = track.Value.ToDouble();
                     break;
 
                 default:

@@ -509,7 +509,9 @@ namespace Onikiri.Progression
         {
             if (gateNumber < 1 || gateNumber > GateCount) return BigDouble.Zero;
 
-            var bossHealth = StageCurve.BossHealthForStage(averageMobHealth, GateStages[gateNumber - 1]);
+            // 65단계: 명중·회피 보정 **전**의 값. 귀문의 적은 회피가 0이라 플레이어가
+            // 늘 맞히고, 강화 전 명중률로 낮춘 체력을 쓰면 귀문이 그만큼 쉬워진다
+            var bossHealth = StageCurve.BossHealthBeforeHitRating(averageMobHealth, GateStages[gateNumber - 1]);
             return bossHealth * BigDouble.FromDouble(TotalHealthMultiple[gateNumber - 1]);
         }
 
