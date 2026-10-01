@@ -65,7 +65,7 @@ namespace Onikiri.Tests
          * @brief 아홉 축 전부와 훑는 범위.
          *
          * 범위는 콘텐츠가 실제로 닿는 깊이다 - 치명타 확률·연격은 만렙(1000),
-         * 공격속도는 아트 상한(32), 골드 획득은 상한(13), 나머지 무상한 축은
+         * 공격속도는 아트 상한(32), 골드 획득은 64단계부터 무상한, 나머지 무상한 축은
          * 심층 실측(st200)이 닿는 수천 레벨을 덮는 3000까지.
          */
         static Axis[] Axes()
@@ -78,7 +78,7 @@ namespace Onikiri.Tests
                 new Axis { Name = "치명타 피해", Cost = CritDamageCurve.CostAtLevel, Levels = 3000 },
                 new Axis { Name = "체력", Cost = HealthCurve.CostAtLevel, Levels = 3000 },
                 new Axis { Name = "체력 회복", Cost = HealthRegenCurve.CostAtLevel, Levels = HealthRegenCurve.MaxLevel },
-                new Axis { Name = "골드 획득", Cost = GoldGainCurve.CostAtLevel, Levels = GoldGainCurve.MaxLevel },
+                new Axis { Name = "골드 획득", Cost = GoldGainCurve.CostAtLevel, Levels = 3000 },
                 new Axis { Name = "초월 치명타", Cost = TranscendCurve.CostAtLevel, Levels = 3000 },
                 new Axis { Name = "연격", Cost = ComboCurve.CostAtLevel, Levels = ComboCurve.MaxLevel }
             };
@@ -162,6 +162,44 @@ namespace Onikiri.Tests
                 Assert.AreEqual(fromCurve, fromTrack, fromCurve * 1e-9d,
                     "치명타 확률 비용: Lv." + level + "에서 트랙과 곡선이 갈라졌다");
             }
+        }
+
+        /**
+         * @brief 골드 획득 트랙(64단계, 관문 축 둘째)이 곡선 statics와 같은 값을 낸다.
+         *
+         * 옛 상한(Lv.13) 앞은 26단계의 x1.25 결, 뒤는 WallGrowth 결이다. 빌더가
+         * SetWall로 옮겨 적는 세 값(관문 인덱스·도약 1·성장)이 곡선과 갈리면
+         * 화면의 가격과 시뮬레이션의 가격이 다른 세계가 된다. 값도 함께 본다 -
+         * 상한이 없으므로 트랙의 ValueAtLevel은 곡선 그대로여야 한다.
+         */
+        [Test]
+        public void GoldGainTrack_MatchesTheCurveAcrossTheWall()
+        {
+            var track = new UpgradeTrack(UpgradeSystem.GoldGainId, "골드 획득량",
+                BigDouble.FromDouble(GoldGainCurve.BaseCost), GoldGainCurve.CostGrowth,
+                UpgradeTrack.Curve.Multiplicative,
+                BigDouble.FromDouble(GoldGainCurve.BaseValue), GoldGainCurve.Step,
+                0, 0d, UpgradeTrack.Display.BonusPercent);
+            track.SetWall(GoldGainCurve.WallFromLevel, 1d, GoldGainCurve.WallGrowth);
+
+            Assert.IsFalse(track.IsMaxed, "골드 획득 트랙에 최대 레벨이 남아 있다");
+
+            for (int level = 1; level <= 400; level++)
+            {
+                double fromCurve = GoldGainCurve.CostAtLevel(level);
+                double fromTrack = track.CostAtLevel(level).ToDouble();
+
+                Assert.AreEqual(fromCurve, fromTrack, fromCurve * 1e-9d,
+                    "골드 획득 비용: Lv." + level + "에서 트랙과 곡선이 갈라졌다");
+
+                double value = GoldGainCurve.ValueAtLevel(level);
+                Assert.AreEqual(value, track.ValueAtLevel(level).ToDouble(), value * 1e-9d,
+                    "골드 획득 배수: Lv." + level + "에서 트랙과 곡선이 갈라졌다 (상한이 남았는가)");
+            }
+
+            track.SetLevel(2000);
+            Assert.IsFalse(track.IsMaxed, "Lv.2000에서 MASTER가 뜬다 - 상한이 되살아났다");
+            Assert.IsFalse(track.IsValueCapped, "Lv.2000에서 값이 막힌다 - 상한이 되살아났다");
         }
     }
 }

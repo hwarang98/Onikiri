@@ -203,5 +203,26 @@ namespace Onikiri.Tests
             Assert.AreEqual(5000, track.Level);
             Assert.IsFalse(track.IsMaxed);
         }
+
+        /**
+         * @brief 골드 획득량의 표기 - 배수가 아니라 **보너스 %** (64단계).
+         *
+         * x1.02는 "+2.0%"로 읽혀야 한다. 상한이 사라져 레벨이 수백이 되면
+         * "x12.45"보다 "+1145.0%"가 무엇이 얼마나 늘었는지 읽힌다. 1배(강화 안 함)는
+         * "+0.0%"다 - 마이그레이션 직후의 옛 세이브가 이 값을 본다.
+         */
+        [Test]
+        public void GoldGainDisplay_ReadsAsBonusPercent()
+        {
+            var track = new UpgradeTrack("gold_gain", "골드 획득량",
+                BigDouble.FromDouble(8d), 1.25d, UpgradeTrack.Curve.Multiplicative,
+                BigDouble.One, 1.02d, 0, 0d, UpgradeTrack.Display.BonusPercent);
+
+            Assert.AreEqual("+0.0%", track.Format(BigDouble.One));
+            Assert.AreEqual("+2.0%", track.Format(track.ValueAtLevel(2)));
+            Assert.AreEqual("+1145.0%", track.Format(BigDouble.FromDouble(12.45d)));
+            // 옛 상한(Lv.13) = 1.02^12 = x1.268. 옛 세이브의 MASTER 줄이 이 값을 본다
+            Assert.AreEqual("+26.8%", track.Format(track.ValueAtLevel(13)));
+        }
     }
 }

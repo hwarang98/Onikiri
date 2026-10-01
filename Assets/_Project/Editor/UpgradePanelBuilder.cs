@@ -143,22 +143,27 @@ namespace Onikiri.EditorTools
                 ValueCeiling = HealthRegenCurve.Ceiling,
                 Display = UpgradeTrack.Display.PerSecond
             },
-            // 골드 획득량: 곱연산 + 상한 x1.25.
+            // 골드 획득량: 곱연산 + **상한 없음** (64단계).
             //
             // 20단계에서 생긴 일곱 번째 축이고, 앞의 여섯과 종류가 다르다 -
             // 골드를 화력이나 생존이 아니라 **골드로** 바꾼다. 그래서 효율을
             // 재는 자도 다르다(GoldGainEfficiency의 회수 시간).
             //
-            // 배수로 표시한다. 값이 1.00에서 1.25까지만 움직이므로 Plain으로
-            // 두면 소수 둘째 자리 변화가 "안 오르는 버튼"으로 읽힌다
+            // 64단계까지는 MaxLevel 13 / 상한 x1.25였다. 지금은 공격력·치명타
+            // 피해와 같은 무상한 축이고 자기 제한은 비용 증가율이 한다
+            // (GoldGainCurve.CostGrowth 주석). MASTER는 이 줄에 뜨지 않는다.
+            //
+            // 보너스 %로 표시한다("+2.0%"). 한 칸이 +2%라 배수("x1.02")로 두면
+            // 소수 둘째 자리 변화가 "안 오르는 버튼"으로 읽히고, 레벨이 수백이
+            // 되면 "x12.45"는 무엇의 배수인지 읽히지 않는다 - 슬레이어 키우기의
+            // 골드 획득 줄이 쓰는 표기다
             new TrackSpec {
                 Id = UpgradeSystem.GoldGainId, DisplayName = "골드 획득량",
                 BaseCost = GoldGainCurve.BaseCost, CostGrowth = GoldGainCurve.CostGrowth,
                 Curve = UpgradeTrack.Curve.Multiplicative,
                 BaseValue = GoldGainCurve.BaseValue, Step = GoldGainCurve.Step,
-                MaxLevel = GoldGainCurve.MaxLevel,
-                ValueCeiling = GoldGainCurve.Ceiling,
-                Display = UpgradeTrack.Display.Multiplier,
+                MaxLevel = 0, ValueCeiling = 0d,
+                Display = UpgradeTrack.Display.BonusPercent,
 
                 // 온보딩 뒤에 열린다. 그 전에는 회수보다 구간이 먼저 끝나서
                 // 지표가 사라고 말하지만 실제로는 손해다(21단계)
@@ -849,15 +854,19 @@ namespace Onikiri.EditorTools
                 SetBigDouble(element.FindPropertyRelative("baseCost"), spec.BaseCost);
                 SetBigDouble(element.FindPropertyRelative("baseValue"), spec.BaseValue);
 
-                // 관문(2상 비용, 43단계) - 치명타 확률만 쓴다. 곡선 상수가
-                // 단일 출처이고 트랙은 사본이다(UpgradeTrack.CostAtLevel 주석)
-                bool wall = spec.Id == UpgradeSystem.CritRateId;
+                // 관문(2상 비용, 43단계) - 치명타 확률이 쓰고, 64단계부터 골드
+                // 획득량도 쓴다(옛 상한 Lv.13 위의 성장 결). 곡선 상수가 단일
+                // 출처이고 트랙은 사본이다(UpgradeTrack.CostAtLevel 주석)
+                bool critWall = spec.Id == UpgradeSystem.CritRateId;
+                bool goldWall = spec.Id == UpgradeSystem.GoldGainId;
                 element.FindPropertyRelative("wallFromLevel").intValue =
-                    wall ? CritRateCurve.DeepPhaseLevel - 1 : 0;
+                    critWall ? CritRateCurve.DeepPhaseLevel - 1
+                    : goldWall ? GoldGainCurve.WallFromLevel : 0;
                 element.FindPropertyRelative("wallJump").doubleValue =
-                    wall ? CritRateCurve.WallJump : 1d;
+                    critWall ? CritRateCurve.WallJump : 1d;
                 element.FindPropertyRelative("wallGrowth").doubleValue =
-                    wall ? CritRateCurve.DeepGrowth : 1d;
+                    critWall ? CritRateCurve.DeepGrowth
+                    : goldWall ? GoldGainCurve.WallGrowth : 1d;
 
                 // 새로 생긴 칸만 레벨 1로 초기화한다
                 if (i >= previousCount) element.FindPropertyRelative("level").intValue = 1;

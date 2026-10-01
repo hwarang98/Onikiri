@@ -17,10 +17,15 @@ namespace Onikiri.Progression
      * 이 축의 %DPS는 0이다. 10·11단계 주석에서 이미 예고한 문제이고, 그래서
      * 회수 시간이라는 별도의 자를 쓴다(GoldGainEfficiency).
      *
-     * **둘. 상한이 없으면 반드시 스노볼한다.** 다른 축은 사면 다음 레벨이 비싸질
-     * 뿐이지만, 이 축은 사면 **다음 레벨을 살 돈이 더 빨리 모인다.** 비용 증가율을
-     * 아무리 높여도 무한 곱연산은 결국 이긴다. 상한이 밸런스 장치가 아니라
-     * 구조적 요구다.
+     * **둘. 상한이 없으면 반드시 스노볼한다 - 20~26단계는 그렇게 판단했고, 64단계에
+     * 그 판단을 거뒀다.** 원문은 "비용 증가율을 아무리 높여도 무한 곱연산은 결국
+     * 이긴다. 상한이 밸런스 장치가 아니라 구조적 요구다"였다. 틀린 주장이었다.
+     * 이 축을 사는 조건은 회수 시간이고, 회수 시간은 아래 식대로 레벨마다
+     * (CostGrowth/Step)배씩 나빠진다. **CostGrowth > Step인 한 고정된 수입에서
+     * 살 수 있는 레벨은 유한하다** - 재귀는 수렴한다. 스노볼은 "골드가 있는 한
+     * 계속 산다"인데, 여기서는 골드가 아무리 많아도 회수 시간이 임계값을 넘는
+     * 칸부터 안 산다. 상한은 그 수렴을 보장하는 장치가 아니었고, 64단계에 지웠다.
+     * 지금 성장을 막는 것은 오직 비용이다(CostGrowth).
      *
      * ## 값의 근거
      *
@@ -30,12 +35,16 @@ namespace Onikiri.Progression
      *     payback = 비용(L) / (초당 골드 x (Step - 1))
      *
      * Step - 1 이 분모에 있으므로 **곱연산이면 회수 시간은 레벨과 무관하게
-     * 비용/수입 비율만 따라간다.** 레벨이 오르면 비용은 x1.15, 수입은 x1.04 이므로
-     * 회수 시간이 레벨마다 1.106배씩 나빠진다 - 그것이 자기 제한이다. 사면 살수록
-     * 다음 한 칸이 덜 매력적이어서, 골드가 무한해도 무한히 사지 않는다.
+     * 비용/수입 비율만 따라간다.** 한 칸 사면 비용은 xCostGrowth, 수입은 xStep
+     * 이므로 회수 시간이 레벨마다 CostGrowth/Step 배씩 나빠진다 - 그것이 자기
+     * 제한이다. 사면 살수록 다음 한 칸이 덜 매력적이어서, 골드가 무한해도
+     * 무한히 사지 않는다.
      *
-     * 스테이지가 오르면 반대로 수입이 x1.72 되어 회수 시간이 좋아진다. 두 힘이
-     * 만나는 곳에서 레벨이 정착하고, 그 지점이 스테이지마다 약 5~6레벨이다.
+     * 스테이지가 오르면 반대로 수입이 x1.72(StageCurve.GoldGrowth) 되어 회수
+     * 시간이 좋아진다. 두 힘이 만나는 곳에서 레벨이 정착하고, 그 균형 레벨은
+     * 스테이지의 **일차 함수**다(EquilibriumLevel). 따라서 배수는 스테이지의
+     * 지수 함수이되 밑이 Step^k = 1.02^k 로 아주 작다 - 수입 성장(x1.72)에
+     * 비하면 스테이지당 몇 %다. 64단계 보고서 §2가 이 도출과 실측을 담는다.
      */
     public static class GoldGainCurve
     {
@@ -59,30 +68,13 @@ namespace Onikiri.Progression
          * 원인은 한 칸의 크기였다. 수입은 스테이지마다 x1.72로 자라는데 한 칸이
          * 클수록 상한까지의 칸 수가 적어서, 수입이 비용을 앞지르는 순간 남은 칸을
          * 한꺼번에 사버린다. 칸을 잘게 나누면 같은 상한을 훨씬 천천히 오른다.
+         *
+         * 64단계에 상한이 사라졌지만 이 값은 그대로다. **Step을 키우는 것은 상한을
+         * 우회하는 길이지 비용으로 푸는 길이 아니다** - 스테이지당 배수 성장은
+         * Step^k 이고 k = ln(1.72)/ln(CostGrowth/Step)이라, Step을 키우면 성장이
+         * 두 배로 빨라진다. 성장 속도는 CostGrowth 하나로 정한다.
          */
         public const double Step = 1.02d;
-
-        /**
-         * @brief 배수의 상한. **x1.6이다.**
-         *
-         * 위에서 적은 대로 상한 자체는 구조적 요구이고, 남은 것은 크기다.
-         *
-         * 처음에 x3으로 잡았다가 내렸다. 골드 x3은 강화 비용이 레벨당 1.15배이므로
-         * 다른 축을 ln(3)/ln(1.15) = 7.9 레벨 더 사는 크기이고, 시뮬레이션에서
-         * **보스 여유가 1.5~3.0 밴드에서 6~9로 뛰었다.** 밴드를 되찾으려면 보스
-         * 체력을 2.8배 올려야 하는데, 그러면 이 축을 안 산 플레이어에게는 게임이
-         * 통째로 2.8배 어려워진다. 새 축 하나가 나머지를 필수로 만드는 것은
-         * 선택지를 늘리는 것이 아니라 없애는 것이다.
-         *
-         * x1.6은 다른 축 ln(1.6)/ln(1.15) = 3.4 레벨에 해당하고, 공격력으로
-         * 환산하면 1.12^3.4 = 1.47배다. 상쇄에 필요한 보스 체력 조정이 그만큼
-         * 완만해진다(20-4 참고).
-         *
-         * 더 크게 잡으면 후반에 이 축 하나가 다른 여섯을 합친 것보다 중요해진다 -
-         * 모든 축의 효율이 골드에 비례하기 때문이다. 그러면 빌드가 하나로 수렴하고,
-         * 강화 목록이 일곱 줄이어야 할 이유가 사라진다.
-         */
-        public const double Ceiling = 1.25d;
 
         /**
          * @brief 첫 구매 비용.
@@ -93,7 +85,7 @@ namespace Onikiri.Progression
          * 정하는 일과 등장 시점을 정하는 일. 21단계에서 등장 시점을 UnlockStage로
          * 떼어냈으므로 이 값은 회수 시간만 맡는다.
          *
-         * ## 26단계: 그 일을 하고 있지 않다는 것이 드러났다 (그래도 8을 유지한다)
+         * ## 26단계: 그 일을 하고 있지 않다는 것이 드러났다 (그래도 8을 유지했다)
          *
          * 위 문단이 이 상수의 일을 "회수 시간"이라고 적어놓고, 실제로는 21단계에
          * 게이트를 넣으면서 값을 다시 재지 않았다. 해금 시점(st6)의 파밍 속도는
@@ -106,7 +98,7 @@ namespace Onikiri.Progression
          * 통과하고 있었다. 26단계에 시뮬레이션이 **사는 순간**을 기록하도록
          * 고쳤고(StageResult.GoldGainPaybackAtPurchase), 그러자 값이 드러났다.
          *
-         * ## 그런데 고치면 더 나빠진다 - 두 번 재봤다
+         * ## 그런데 고치면 더 나빠진다 - 두 번 재봤다 (26단계, 상한 x1.25 세계)
          *
          * | BaseCost | 구매 시 회수 | 일반 밴드 | 액티브 이득(st30) |
          * |---|---|---|---|
@@ -125,24 +117,34 @@ namespace Onikiri.Progression
          * 건강한데 실제로는 손해인 상태가 된다 - 20단계가 겪은 것과 **같은
          * 종류의 착시이고 방향만 반대**다.
          *
-         * ## 그래서 8을 유지하고, 대신 이 축의 성격을 다시 적는다
+         * 26단계는 그래서 8을 유지하고 이 축을 "해금 즉시 한 번에 여는 스위치"로
+         * 다시 적었다 - 상한 x1.25가 총 이득을 닫고 있었기 때문이다. 그 문단은
+         * 64단계에 뜻을 잃었다: 상한이 없으니 이 축은 스위치가 아니라 다시 성장
+         * 축이고, 회수 밴드 30초를 지키는 일이 이 값으로 돌아왔다.
          *
-         * 8골드 열세 칸(총 600골드 남짓)은 성장 축이라기보다 **해금 즉시 한 번에
-         * 여는 스위치**에 가깝다. 스노볼이 아닌 이유는 상한이다 - 총 이득이
-         * x1.25로 닫혀 있어서 아무리 빨리 사도 다른 여섯을 제칠 수 없다.
-         * 20단계가 "상한은 밸런스 장치가 아니라 구조적 요구"라고 적은 것이
-         * 여기서 값을 한다.
+         * ## 64단계: 상한이 사라진 세계에서 다시 잰다 - 그리고 8을 유지한다
          *
-         * 회수 밴드 30초를 이 축에 다시 물리려면 상한을 먼저 키워야 한다. 그때는
-         * 보스 보정 지수도 함께 다시 재야 하고, 그것은 이 축 하나짜리 스텝이다.
+         * 먼저 잰 것은 "8골드 x1.25 한 결로 상한만 지운 세계"였다. 균형 레벨이
+         * 스테이지당 2.67칸씩 올라 st50에 배수 x15, st500에 x3e11 - 코리더의
+         * 안 산 플레이어는 st15부터 보스를 못 잡았다. 그래서 두 번째로 잰 것이
+         * 지시서대로 BaseCost·CostGrowth만 움직인 한 결(B 27~40, C 2.3~2.7)이다.
+         * 첫 칸의 회수는 30초 안에 들어왔지만 **코리더가 깨졌다**: 이 값들에서는
+         * 해금 순간에 사는 칸이 두세 칸(x1.04)뿐이라, 조율 코리더가 20~26단계에
+         * 전제로 굳혀 둔 "해금 즉시 x1.25"가 사라진다. 그 결손이 st6~20의 처치
+         * 속도-수입 되먹임으로 불어나 st20 피날레의 무과금 여유(1.150, 바닥 1.15)
+         * 를 뚫었고, 지수를 낮춰 그것을 되살리면 st45 챕터 천장(2.8)이 뚫렸다 -
+         * 60개 조합 중 통과가 하나도 없었다(64단계 보고서 §2·§4).
          *
-         * E-3 수정: 전 축 일괄 상향(UpgradeCost.RaiseScale)에서 **이 축만 뺀다.**
-         * 하네스 실측으로 x4를 얹자 상한까지 총 2.6K 골드가 되어 "해금 즉시
-         * 상한"(StagesToCeiling = 0)이 깨졌고, 보정(GoldAxisCompensation)은
-         * 여전히 즉시 상한을 가정하므로 st6~9 여유에 크레이터(결손 x6.7)가
-         * 파였다 - 26단계가 "이 값과 StagesToCeiling은 반드시 함께 움직인다"고
-         * 적어둔 바로 그 사고다. 이 축은 성장 축이 아니라 스위치라(총 600골드,
-         * 이득 상한 x1.25) 병목 상향의 목적과도 무관하다. 정수화만 받는다.
+         * 그래서 첫 열두 칸은 26단계의 스위치 그대로 두고(이 값 8과 CostGrowth
+         * 1.25), 성장은 옛 상한 위에서 두 번째 결(WallGrowth)로 이어 붙였다.
+         * 첫 칸 회수 9초는 26단계가 근거와 함께 받아들인 그 값이고 그 뒤의 모든
+         * 칸은 밴드(30~120초) 안이다 - `GoldAxis_PurchasesAboveTheOldCap_
+         * StayInsideTheBand`. 기존 세이브(v21)의 Lv.13 근방은 비용도 배수도
+         * 그대로 이어진다.
+         *
+         * E-3 수정(전 축 일괄 상향 UpgradeCost.RaiseScale에서 이 축만 뺀 것)은
+         * 그대로다 - 이 축의 비용은 회수 시간이 정하지 병목 상향의 대상이 아니다.
+         * 정수화만 받는다.
          */
         public const double BaseCost = 8d;
 
@@ -178,74 +180,132 @@ namespace Onikiri.Progression
         }
 
         /**
-         * @brief 레벨당 비용 배수. **다른 여섯보다 가파르다(1.25 대 1.15).**
+         * @brief 레벨당 비용 배수. **다른 여섯보다 가파르다.**
          *
          * 여섯 축이 1.15로 통일돼 있고 그것을 깨는 데는 이유가 필요하다.
          *
          * 이 축만 **자기 비용을 감당할 수입을 스스로 만든다.** 다른 축은 사면
          * 다음 레벨이 비싸질 뿐이지만, 이 축은 사면 다음 레벨을 살 돈이 더 빨리
          * 모인다. 같은 1.15로 두면 수입 성장(스테이지당 x1.72)이 비용 성장을
-         * 손쉽게 앞질러서, 골드가 생기는 족족 상한까지 밀어붙이게 된다 - 실제로
+         * 손쉽게 앞질러서, 골드가 생기는 족족 밀어붙이게 된다 - 실제로
          * 1.15에서 그렇게 나왔다.
          *
-         * 1.25면 스테이지당 x1.72의 수입 성장을 ln(1.72)/ln(1.25) = 2.4 레벨로
-         * 흡수한다. 상한까지 25레벨이므로 이 축의 수명이 약 10스테이지가 되고,
-         * 그동안 회수 시간이 밴드 안에 머문다.
+         * ## 64단계: 이 값은 첫 열두 칸(옛 상한 앞)만 맡는다
+         *
+         * 상한이 사라진 뒤의 성장 속도는 옛 상한 위의 결(WallGrowth)이 정한다.
+         * 이 값으로 계속 자라게 두면(x1.25 한 결) 균형 레벨이 스테이지당
+         * ln(1.72)/ln(1.25/1.02) = 2.67칸, 배수가 스테이지당 x1.054씩 올라 st50에
+         * x15가 된다 - 그 세계의 실측은 보고서 §2에 있다. 이 값을 4~5로 올려
+         * 한 결로 풀면 해금 순간의 착지가 사라져 코리더가 깨진다(BaseCost 주석).
+         * 두 결이 필요한 이유가 그것이고, 이 값은 26단계의 스위치를 보존하는
+         * 쪽에 남는다.
          */
         public const double CostGrowth = 1.25d;
 
-        /** 상한을 무시한 곡선값. 형태를 보는 지표가 쓴다 */
+        /** 이 레벨의 배수. 상한이 없으므로 게임도 지표도 같은 값을 쓴다 */
         public static double ValueAtLevel(int level)
         {
             return BaseValue * Math.Pow(Step, Math.Max(0, level - 1));
         }
 
-        /** 게임이 실제로 쓰는 배수. 상한에서 멈춘다 */
-        public static double CappedValueAtLevel(int level)
-        {
-            return Math.Min(Ceiling, ValueAtLevel(level));
-        }
+        /**
+         * @brief 64단계: 두 번째 비용 결이 시작되는 비용 인덱스 = 옛 MaxLevel(13).
+         *
+         * 여기까지는 26단계의 스위치(8골드 x1.25^L, 열두 칸 총 600골드)가 비트
+         * 단위로 그대로다 - 기존 세이브(v21)의 레벨 13 근방이 아무 마이그레이션
+         * 없이 같은 비용·같은 배수로 이어진다. 이 인덱스부터는 성장 축의 결
+         * (WallGrowth)로 자란다. CritRateCurve의 관문과 같은 장치이되 **도약은
+         * 없다**(WallJump 1) - 도약을 두면 옛 상한이 다시 벽으로 읽힌다.
+         * UpgradePanelBuilder가 UpgradeTrack의 wall 세 값에 같은 것을 옮겨 적고
+         * `GoldGainTrack_MatchesTheCurveAcrossTheWall`이 대조한다.
+         *
+         * 이것은 값의 상한이 아니다. 배수는 어느 레벨에서도 정확히 +2%씩 계속
+         * 오르고 MaxLevel도 Ceiling도 없다 - 성장을 늦추는 것은 오직 비용이다.
+         */
+        public const int WallFromLevel = 13;
 
         /**
-         * @brief 상한에 처음 닿는 레벨. UpgradeTrack의 maxLevel로 쓴다.
+         * @brief 옛 상한 위의 레벨당 비용 배수. **성장 속도를 정하는 유일한 손잡이.**
          *
-         * 이 위로는 팔지 않는다. 값이 안 오르는 버튼에 골드를 받으면 그것은
-         * 판매가 아니라 함정이다 - 공격속도·치명타율·회복이 같은 규칙을 쓴다.
+         * 균형 레벨은 스테이지당 k = ln(1.72) / ln(WallGrowth / Step) 칸씩 오르고
+         * (LevelsPerStage), 배수는 스테이지당 Step^k 배씩 자란다:
+         *
+         *   WallGrowth 3.5   k 0.44   스테이지당 x1.0087   st50 x1.92  st500 x97
+         *   WallGrowth 4     k 0.40   스테이지당 x1.0079   st50 x1.85  st500 x64
+         *   WallGrowth 5     k 0.34   스테이지당 x1.0068   st50 x1.78  st500 x37
+         *
+         * 5를 고른 근거는 셋이다(보고서 §4·§5). 첫째, 가속 구간 st45 챕터 천장
+         * (2.8)이 지수 0.38에서 여유 0.16을 남기는 가장 완만한 값 - 4는 0.04,
+         * 3.5는 음수 근처다. 둘째, 무한 구간 여유 수렴 검사(st100/st200 35%)가
+         * 4에서 0.37로 문턱을 넘고 5에서 0.29로 들어온다. 셋째, 옛 상한 위의
+         * 구매 시점 회수가 이산 타이밍 때문에 실측 56초 이상이라 밴드 하한(30초)
+         * 안이다 - 이론 하한 120 x Step / WallGrowth = 24초는 실측에서 닿지 않는다.
+         *
+         * 슬레이어 키우기의 골드 획득처럼 **끝이 없다.** 한 칸이 세 스테이지에
+         * 한 번 열리는 느린 축이고, st500에 +3600%, st700에 +7000%다.
          */
-        public static int MaxLevel
-        {
-            get
-            {
-                int level = 1 + (int)Math.Ceiling(Math.Log(Ceiling / BaseValue) / Math.Log(Step));
-                return Math.Max(1, level);
-            }
-        }
+        public const double WallGrowth = 5d;
 
         public static double CostAtLevel(int level)
         {
-            return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, Math.Max(0, level - 1)));
+            int index = Math.Max(1, level);
+            if (index < WallFromLevel)
+                return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, index - 1));
+
+            return UpgradeCost.Quantize(BaseCost * Math.Pow(CostGrowth, WallFromLevel - 1)
+                                        * Math.Pow(WallGrowth, index - WallFromLevel));
+        }
+
+        // ------------------------------------------------------------ 기대 곡선 (64단계)
+
+        /**
+         * @brief 해금 스테이지에서 곡선 추종 플레이어가 그 스테이지 안에 도달하는 레벨.
+         *
+         * 해금 시점의 수입(초당 44골드)에서 회수 시간이 임계값(120초) 아래인 칸을
+         * 전부 산 결과다 - 26단계 스위치 열두 칸(Lv.13)에 성장 결의 첫 칸(116골드,
+         * 회수 105초)이 하나 얹혀 14다. 수입 자체가 시뮬레이션의 결과라 닫힌
+         * 식으로 못 적고 **실측**으로 두며, `GoldAxis_ExpectedCurve_MatchesTheSimulation`
+         * 이 해금 스테이지의 실측 레벨과 대조한다.
+         */
+        public const double UnlockLevel = 14d;
+
+        /**
+         * @brief 균형 레벨이 스테이지마다 오르는 칸 수. **닫힌 식이다.**
+         *
+         * 수입이 스테이지당 G = StageCurve.GoldGrowth 배로 자라고, 한 칸 살 때마다
+         * 회수 시간이 (CostGrowth / Step) 배 나빠지므로, 회수 시간을 임계값에
+         * 붙여 두는 레벨은 스테이지당
+         *
+         *     k = ln(G) / ln(CostGrowth / Step)
+         *
+         * 칸씩 오른다. 분모가 CostGrowth가 아니라 CostGrowth/Step인 이유는 이
+         * 축의 배수가 자기 수입에 곱해지기 때문이다 - 한 칸 사면 비용은
+         * xCostGrowth, 분모의 수입은 xStep 이 되어 회수 시간은 그 비율만큼만
+         * 나빠진다. 그 자기 되먹임이 있어도 CostGrowth > Step 이면 k는 유한하고,
+         * 그것이 "상한 없이도 스노볼하지 않는다"의 정확한 뜻이다.
+         */
+        public static double LevelsPerStage
+        {
+            get { return Math.Log(StageCurve.GoldGrowth) / Math.Log(WallGrowth / Step); }
         }
 
         /**
-         * @brief 해금된 뒤 상한까지 오르는 데 걸리는 스테이지 수.
+         * @brief 그 스테이지에서 곡선 추종 플레이어가 서 있을 레벨. 해금 전에는 1.
          *
-         * 0인 이유는 실측이다 - 첫 칸이 8골드라 회수가 2초이고, 곡선 추종
-         * 플레이어는 해금된 그 스테이지 안에 상한까지 사버린다.
+         *     L*(stage) = UnlockLevel + k x (stage - UnlockStage)
          *
-         * **이 값과 BaseCost는 반드시 함께 움직인다.** 26단계에 BaseCost를 400으로
-         * 올려보면서 여기를 0에 둔 채로 한 번 돌렸는데, 보정
-         * (StageCurve.GoldAxisCompensation)이 "해금 즉시 x1.25를 갖고 있다"고
-         * 가정하는 바람에 **보스만 먼저 무거워졌고** st10 피날레 여유가 0.94까지
-         * 떨어졌다(= 보스를 못 잡는다). 7로 맞춰도 0.99였다.
-         *
-         * 값이 실측과 어긋나면 정확히 그 방향으로 조용히 틀린다. 그래서 상수로
-         * 두지 않고 `GoldAxis_ReachesCeilingWhenExpected`가 시뮬레이션과 대조한다 -
-         * 상수의 존재는 연결의 증거가 아니다.
+         * 실제 레벨은 정수 계단이라 이 직선 주위를 한 칸 안에서 오르내린다.
          */
-        public const int StagesToCeiling = 0;
+        public static double EquilibriumLevel(int stage)
+        {
+            if (!IsUnlockedAt(stage)) return 1d;
+            return UnlockLevel + LevelsPerStage * (stage - UnlockStage);
+        }
 
         /**
          * @brief 그 스테이지에서 곡선 추종 플레이어가 갖고 있을 배수.
+         *
+         *     ExpectedAtStage = Step^(L*(stage) - 1),  L* = EquilibriumLevel
          *
          * 보스 체력 보정(StageCurve.GoldAxisCompensation)이 이 곡선을 따라간다.
          *
@@ -256,19 +316,30 @@ namespace Onikiri.Progression
          *
          * **닫힌 식이어야 한다.** 보스 체력이 이 값을 쓰는데, 시뮬레이션 결과를
          * 참조하면 시뮬레이션이 보스 체력을 계산하려고 자기 결과를 필요로 하는
-         * 순환이 된다.
+         * 순환이 된다. 그래서 균형 레벨의 직선을 쓰고, 그 직선이 실측과 맞는지는
+         * `GoldAxis_ExpectedCurve_MatchesTheSimulation`이 대조한다.
+         *
+         * **상한이 없다.** 64단계 이전에는 여기서 Ceiling에 멈췄다. 지금은 균형
+         * 레벨이 자라는 만큼 계속 자란다 - 스테이지당 Step^k 배
+         * (DripPerStage). 그 끝없는 성장을 보스가 어떻게 따라가는지는
+         * StageCurve.GoldAxisCompensation과 BossHealthRampDeep 주석에 있다.
          */
         public static double ExpectedAtStage(int stage)
         {
             if (!IsUnlockedAt(stage)) return BaseValue;
+            return BaseValue * Math.Pow(Step, EquilibriumLevel(stage) - 1d);
+        }
 
-            // 해금 스테이지를 1번째로 세어 상한까지 보간한다. StagesToCeiling이
-            // 0이면 해금 즉시 상한이고, 지금이 그 경우다
-            int effective = stage - UnlockStage + 1;
-            if (StagesToCeiling <= 0 || effective >= 1 + StagesToCeiling) return Ceiling;
-
-            double t = (double)(effective - 1) / StagesToCeiling;
-            return Math.Min(Ceiling, BaseValue * Math.Pow(Ceiling / BaseValue, t));
+        /**
+         * @brief 해금 뒤 기대 배수가 스테이지마다 자라는 비율 = Step^k.
+         *
+         * 심층 램프(StageCurve.BossHealthRampDeep)가 이 값을 읽어 보정 지수가
+         * 남기는 잔여분을 흡수한다. 상수로 다시 적지 않고 여기서 유도하는
+         * 이유는 CostGrowth를 움직이면 이 값도 함께 움직여야 하기 때문이다.
+         */
+        public static double DripPerStage
+        {
+            get { return Math.Pow(Step, LevelsPerStage); }
         }
     }
 }

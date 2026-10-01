@@ -143,7 +143,32 @@ namespace Onikiri.Progression
          * 무한은 후반 구간이고, 조율이 끝난 구간을 다시 여는 비용은 이
          * 스텝이 감당할 크기가 아니다.
          */
-        public const double BossHealthRampDeep = 1.138d;
+        public const double BossHealthRampDeepBase = 1.138d;
+
+        /**
+         * @brief 64단계: 심층 램프 = 42단계 실측 하한 x 골드 축 드립의 잔여분.
+         *
+         * 골드 획득 축의 상한이 사라지면서 기대 배수가 스테이지마다 Step^k 배씩
+         * 끝없이 자란다(GoldGainCurve.DripPerStage). 보정항은 그중 지수
+         * (GoldAxisMarginExponent) 몫만 흡수하고 나머지 (1 - 지수) 몫을 액티브
+         * 이득으로 남기는데, 심층(st51+)에서 DPS는 골드에 1:1로 반응하므로
+         * (하네스 실측 탄성 1.0~1.02) 그 잔여분은 스테이지당 Step^(k(1-e))의
+         * 단조 발산이 된다 - 42단계가 캐릭터 레벨 증폭에서 잡은 x1.008과 같은
+         * 병이다. 그때와 같은 손잡이로 잡는다: 심층 램프에 그 잔여분을 곱한다.
+         *
+         * 값은 상수가 아니라 유도다. CostGrowth나 지수를 움직이면 램프도 따라
+         * 움직여야 하고, 둘을 따로 적어두면 26단계 StagesToCeiling 사고(한쪽만
+         * 고쳐 보스만 무거워진 것)가 재발한다. st50까지는 비트 단위로 이전과
+         * 같다 - 이 곱은 st51에 도착하는 걸음부터만 들어간다.
+         */
+        public static double BossHealthRampDeep
+        {
+            get
+            {
+                return BossHealthRampDeepBase
+                     * Math.Pow(GoldGainCurve.DripPerStage, 1d - GoldAxisMarginExponent);
+            }
+        }
 
         /** 심층 램프가 시작되는 스테이지. 이 앞은 기존 곡선 그대로다 */
         public const int DeepRampStartStage = 51;
@@ -290,7 +315,31 @@ namespace Onikiri.Progression
          * 되살린다 - st11 천장 여유는 42단계에 이미 두꺼워졌고(0.21), 이
          * 완화가 미는 폭은 그 1/10이다.
          */
-        public const double GoldAxisMarginExponent = 0.52d;
+        /**
+         * ## 64단계: 0.52 -> 0.50. 상한이 사라져 보정도 끝없이 자라고, 지수는 두 칼날 사이에 앉는다
+         *
+         * 축이 끝없이 자라므로 보정도 끝없이 자란다(ExpectedAtStage^지수). 지수를
+         * 정하는 것은 조율 코리더 st20의 두 칼날이다.
+         *
+         *   아래   안 산 플레이어(SkipGoldGain)가 st20 피날레를 깨야 한다 -
+         *          지수 0.50에서 1.018, 0.55에서 1.0 아래. 보정을 축 없이 상대하는
+         *          플레이어의 계약(`GoldAxis_SkippingPlayer_StillClearsTheTunedZone`)
+         *   위     피날레가 챕터보다 조여야 한다(`ChapterBosses_AreTighterThanStageBosses`,
+         *          코리더의 모양) - 지수 0.38에서 st20 피날레 1.47이 st5 챕터 1.44를
+         *          넘었고, 0.50에서 1.407로 내려온다
+         *
+         * 사이가 0.50~0.53이고, 옛 값 0.52와 사실상 같다 - 지수는 낮추지 않고
+         * 축의 성장(WallGrowth)으로 풀었다는 뜻이다. 0.50에서 코리더 천장 여유
+         * 0.14 / 가속 챕터 천장 여유 0.32 / 무과금 st20 1.175(바닥 1.15).
+         *
+         * 액티브 이득은 30스테이지 시간 이득 5.6% -> 6.2%(축 없는 세계 대비),
+         * 안 산 플레이어 대비 11.7% -> 15.4%. 스노볼 상한(35%)의 절반 아래다.
+         *
+         * 심층(st51+)에서는 이 지수가 남기는 (1 - 0.50) 몫을 심층 램프가 흡수한다
+         * (BossHealthRampDeep 주석). 그래서 이 값은 조율 구간의 이득 배분만 정하고
+         * 무한 구간의 수렴은 건드리지 않는다.
+         */
+        public const double GoldAxisMarginExponent = 0.5d;
 
         public static double GoldAxisCompensation(int stage)
         {

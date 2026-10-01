@@ -172,7 +172,7 @@ namespace Onikiri.Progression
          * 절편·기울기는 실측 앵커다(장비가 절편을 1로 뒀다가 물린 자리).
          * 실측과 어긋나면 PetTests.ExpectedCurve_TracksTheSimulation이 잡는다.
          */
-        public const int LevelAtUnlock = 3;   // 43단계 미세화 재적합 - 실측 st31 평균 Lv.3 (옛 5)
+        public const int LevelAtUnlock = 4;   // 64단계 재적합 - 골드축 무한 성장으로 st31 평균 Lv.4 (43단계 3, 옛 5)
         public const double LevelsPerStage = 0.85d;
 
         /** 후발 동료의 레벨 지연. 실측 0 - 위 주석 참고. 표는 재실측 대비로 남긴다 */

@@ -325,6 +325,22 @@ namespace Onikiri.Progression
              */
             public bool NeutralizeGoldAxis;
 
+            /**
+             * @brief 64단계 이전의 골드 획득 축을 재현한다 - **상한 x1.25 / Lv.13 / 지수 0.52**.
+             *
+             * 게임에는 없는 세계다. 64단계가 상한을 지우고 축을 무한 성장으로
+             * 바꾸면서 코리더·가속·심층의 여유가 전부 몇 % 움직였고, 그 앞의
+             * 스텝들이 "이 축이 마지막 층이던 세계"에 굳혀 둔 앵커(42·44·45단계
+             * 재현 검사, 요도 죽은 버튼 검사)가 그만큼 어긋난다. 49단계 규칙
+             * ⓐ대로 상수를 옮기지 않고 정책에 한 줄을 더한다 - 이 플래그가 켜진
+             * 세계에서는 축이 Lv.13에서 멈추고 배수가 x1.25에 닫히며, 보정은
+             * 옛 지수(0.52)의 상수값으로, 심층 램프는 옛 하한(1.138)으로 돌아간다.
+             *
+             * 라이브 곡선에는 어떤 상한도 없다(GoldGainCurve 주석). 이것은
+             * 비교군을 만드는 시뮬레이션 전용 장치다.
+             */
+            public bool GoldAxisPre64;
+
             /** 스킬을 한 번도 올리지 않는다 (해금은 되므로 레벨 1의 기여는 남는다) */
             public bool SkipSkills;
 
@@ -866,6 +882,7 @@ namespace Onikiri.Progression
 
             // 49단계: 장착. 정책이 말하지 않으면 기준 구성이고, 그것이 밴드가
             // 가정하는 구성이자 게임 쪽 기본값이다(SkillSystem.FillEmptySlots)
+            levels.GoldCapPre64 = policy.GoldAxisPre64;
             levels.NoExpansionSlot = policy.SkipSkillSlot;
             levels.NoExpansionSkills = policy.SkipExpansionSkills;
             levels.ForcedLoadout = policy.ForceLoadout;
@@ -942,6 +959,8 @@ namespace Onikiri.Progression
                 // 유지된다
                 double bossKill = BossKillSeconds(field.AverageMobHealth, stage, stats);
                 if (policy.NeutralizeGoldAxis) bossKill /= StageCurve.GoldAxisCompensation(stage);
+                // 64단계 이전 세계의 재현(GoldAxisPre64 주석). 보정도 램프도 옛 값으로
+                if (policy.GoldAxisPre64) bossKill *= LegacyGoldHealthRatio(stage);
                 if (policy.NeutralizeEquipment) bossKill /= StageCurve.EquipmentCompensation(stage);
                 // 전역 전직 보정은 여기 없다(2단계에 지웠다). 대신 2.1단계의
                 // **심층 수렴 보정**을 걷어낸다 - 이 정책이 만드는 중립 세계가
@@ -1262,6 +1281,38 @@ namespace Onikiri.Progression
             }
 
             return casts;
+        }
+
+        /**
+         * @brief 64단계 이전 골드 획득 축의 세 상수. **재현 전용**(Policy.GoldAxisPre64).
+         *
+         * 20~26단계의 값 그대로다 - 상한 x1.25, 그 상한에 처음 닿는 레벨 13,
+         * 보정 지수 0.52. 라이브 곡선(GoldGainCurve)에는 이 값들이 없고, 여기
+         * 남은 이유는 앞 스텝들의 앵커가 이 세계에 굳어 있기 때문이다.
+         */
+        private const double LegacyGoldCeiling = 1.25d;
+        private const int LegacyGoldMaxLevel = 13;
+        private const double LegacyGoldExponent = 0.52d;
+
+        /** 옛 세계의 보정: 해금 뒤 상수 1.25^0.52. 옛 ExpectedAtStage가 해금 즉시 상한이었다 */
+        private static double LegacyGoldCompensation(int stage)
+        {
+            return GoldGainCurve.IsUnlockedAt(stage)
+                ? Math.Pow(LegacyGoldCeiling, LegacyGoldExponent) : 1d;
+        }
+
+        /**
+         * @brief 옛 세계의 보스 체력 / 새 세계의 보스 체력. 처치 시간에 곱한다.
+         *
+         * 두 항이다 - 보정(새 E^e 대 옛 1.25^0.52)과 심층 램프(새 1.138 x 드립
+         * 잔여분 대 옛 1.138, st51에 도착하는 걸음부터 스테이지마다 한 번).
+         */
+        private static double LegacyGoldHealthRatio(int stage)
+        {
+            double compensation = LegacyGoldCompensation(stage) / StageCurve.GoldAxisCompensation(stage);
+            int deepSteps = Math.Max(0, stage - (StageCurve.DeepRampStartStage - 1));
+            double ramp = Math.Pow(StageCurve.BossHealthRampDeepBase / StageCurve.BossHealthRampDeep, deepSteps);
+            return compensation * ramp;
         }
 
         /** 여섯 축의 레벨. 구매 정책이 이것을 굴린다 */
@@ -2222,9 +2273,19 @@ namespace Onikiri.Progression
             public int H { get { return Health < 1 ? 1 : Health; } }
             public int G { get { return Regen < 1 ? 1 : Regen; } }
 
+            /** 64단계 이전 세계(Policy.GoldAxisPre64) - 배수가 x1.25에 닫힌다 */
+            public bool GoldCapPre64;
+
             /** 획득 축의 레벨과 지금 곱하고 있는 배수 */
             public int Gd { get { return Gold < 1 ? 1 : Gold; } }
-            public double GoldGain { get { return GoldGainCurve.CappedValueAtLevel(Gd); } }
+            public double GoldGain
+            {
+                get
+                {
+                    double value = GoldGainCurve.ValueAtLevel(Gd);
+                    return GoldCapPre64 ? Math.Min(LegacyGoldCeiling, value) : value;
+                }
+            }
 
             /**
              * @brief 스탯 포인트 증폭과 **방어구 배수**가 곱해진 값.
@@ -3357,9 +3418,9 @@ namespace Onikiri.Progression
          * 사면 골드가 있는 한 계속 사게 되고, 그것이 스노볼이다. 임계값이 그 선을
          * 긋는다(GoldGainEfficiency.BuyThresholdSeconds).
          *
-         * 회수 시간은 살 때마다 나빠지므로(비용 x1.15 대 수입 x1.04) 이 루프는
+         * 회수 시간은 살 때마다 나빠지므로(비용 xCostGrowth 대 수입 xStep) 이 루프는
          * 자연히 멈춘다. 그것이 이 축의 자기 제한이고, 별도의 개수 제한이 필요 없는
-         * 이유다.
+         * 이유다 - 64단계에 상한이 사라진 뒤로는 문자 그대로 이 조건 하나가 멈춘다.
          */
         private static void BuyGoldGain(ref Levels levels, ref double purse, double goldPerSecond,
                                         ref double purchasePayback)
@@ -3370,7 +3431,9 @@ namespace Onikiri.Progression
 
             for (int guard = 0; guard < 100000; guard++)
             {
-                if (levels.Gd >= GoldGainCurve.MaxLevel) break;
+                // 64단계: 상한(MaxLevel)이 없다. 멈추는 조건은 회수 시간 하나다 -
+                // 옛 세계 재현(GoldAxisPre64)만 옛 상한 Lv.13에서 멈춘다
+                if (levels.GoldCapPre64 && levels.Gd >= LegacyGoldMaxLevel) break;
                 if (!GoldGainEfficiency.WorthBuying(levels.Gd, goldPerSecond)) break;
 
                 double cost = GoldGainCurve.CostAtLevel(levels.Gd);
@@ -3388,8 +3451,12 @@ namespace Onikiri.Progression
 
                 // 사고 나면 수입이 늘어난다. 그 늘어난 값으로 다음 칸의 회수
                 // 시간을 재야 한다 - 안 그러면 자기 제한이 한 박자 늦게 걸린다
-                goldPerSecond *= GoldGainCurve.CappedValueAtLevel(levels.Gd)
-                                 / GoldGainCurve.CappedValueAtLevel(levels.Gd - 1);
+                // 옛 세계 재현에서는 마지막 칸이 상한에 잘려 Step보다 작게 오른다 -
+                // Levels.GoldGain이 그 잘림을 갖고 있으므로 그 비율로 잰다
+                double before = levels.GoldCapPre64
+                    ? Math.Min(LegacyGoldCeiling, GoldGainCurve.ValueAtLevel(levels.Gd - 1))
+                    : GoldGainCurve.ValueAtLevel(levels.Gd - 1);
+                goldPerSecond *= levels.GoldGain / before;
             }
         }
 

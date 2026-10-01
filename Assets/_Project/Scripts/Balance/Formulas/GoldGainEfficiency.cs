@@ -22,8 +22,9 @@ namespace Onikiri.Progression
      *               = 비용(L) / (지금 초당 골드 x (다음 배수/지금 배수 - 1))
      *
      * 곱연산이라 배수 비율은 항상 Step이고, 따라서 분모는 `초당 골드 x (Step-1)`로
-     * 정리된다. 상한에 닿으면 분모가 0이 되어 회수가 영원히 안 된다 - 무한대를
-     * 그대로 돌려준다. 그것이 "이 버튼은 이제 사면 안 된다"의 정직한 표현이다.
+     * 정리된다. 64단계 이전에는 상한에 닿으면 분모가 0이 되어 무한대를 돌려줬다 -
+     * 상한이 사라진 지금은 어느 레벨에서도 유한하고, 사면 살수록 (CostGrowth/Step)
+     * 배씩 길어진다. 그것이 이 축의 자기 제한이다.
      *
      * ## 밴드
      *
@@ -78,19 +79,18 @@ namespace Onikiri.Progression
          *                       곱해진 값이어야 한다** - 늘어나는 양은 현재 수입에
          *                       비례하므로, 원시 수입을 넘기면 회수 시간이 실제보다
          *                       길게 나와 이 축을 과소평가한다
-         * @return 회수까지 걸리는 초. 상한에 닿았거나 수입이 없으면 무한대
+         * @return 회수까지 걸리는 초. 수입이 없으면 무한대
          */
         public static double PaybackSeconds(int level, double goldPerSecond)
         {
             if (goldPerSecond <= 0d) return double.PositiveInfinity;
-            if (level >= GoldGainCurve.MaxLevel) return double.PositiveInfinity;
 
-            double now = GoldGainCurve.CappedValueAtLevel(level);
-            double next = GoldGainCurve.CappedValueAtLevel(level + 1);
+            // 64단계: 상한이 없다. 어느 레벨에서도 다음 칸은 정확히 Step배이고,
+            // 회수는 유한하다 - "무한대 = 완성"이던 표현은 상한과 함께 사라졌다
+            double now = GoldGainCurve.ValueAtLevel(level);
+            double next = GoldGainCurve.ValueAtLevel(level + 1);
             if (now <= 0d) return double.PositiveInfinity;
 
-            // 상한 근처에서는 마지막 한 칸이 Step보다 작게 오른다. 비율을 상수
-            // (Step-1)로 굳히면 그 칸의 회수 시간을 실제보다 짧게 보고하게 된다
             double gainRatio = next / now - 1d;
             if (gainRatio <= 0d) return double.PositiveInfinity;
 
