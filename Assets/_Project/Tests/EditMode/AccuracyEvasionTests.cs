@@ -314,7 +314,7 @@ namespace Onikiri.Tests
         [Test]
         public void HitRatingNeutralized_ReproducesTheStep64World()
         {
-            var rows = StageSimulation.Run(100, Field(), new StageSimulation.Policy { NeutralizeHitRating = true });
+            var rows = StageSimulation.Run(100, Field(), new StageSimulation.Policy { NeutralizeHitRating = true, StatPointsPre66 = true });
 
             Assert.AreEqual(1.527d, rows[9].BossMargin, 0.002d, "st10");
             Assert.AreEqual(1.407d, rows[19].BossMargin, 0.002d, "st20");
@@ -391,6 +391,10 @@ namespace Onikiri.Tests
          * 이득은 없고 이득은 파밍 속도로 남는다. 4% 기준은 무한 구간(st51~500)의
          * 전투 시간으로 잰다 - 실측 +4.4%. 조율 구간(st1~50)은 +3.9%로 기준
          * 아래이고, 3%를 하한으로 못 박는다(보고서 §8).
+         *
+         * 66단계: 성장탭 세 축이 분모를 키워 지금 세계의 무한 구간 이득이 3.86%로
+         * 내려앉았다. 46·49단계 처방(ⓒ)대로 4%는 **이 축이 마지막 층이던 세계**
+         * (StatPointsPre66)에서 재고, 지금 세계는 3% 하한을 못 박는다
          */
         [Test]
         public void Accuracy_IsNotADeadButton()
@@ -398,8 +402,15 @@ namespace Onikiri.Tests
             var with = StageSimulation.Run(500, Field());
             var without = StageSimulation.Run(500, Field(), new StageSimulation.Policy { SkipAccuracy = true });
 
+            var with65 = StageSimulation.Run(500, Field(), new StageSimulation.Policy { StatPointsPre66 = true });
+            var without65 = StageSimulation.Run(500, Field(),
+                new StageSimulation.Policy { SkipAccuracy = true, StatPointsPre66 = true });
+            double deep65 = StageSimulation.CombatSeconds(without65, 51, 500)
+                          / StageSimulation.CombatSeconds(with65, 51, 500) - 1d;
+            Assert.Greater(deep65, 0.04d, string.Format("무한 구간 이득(66 전 세계) {0:P2} - 4% 아래", deep65));
+
             double deep = StageSimulation.CombatSeconds(without, 51, 500) / StageSimulation.CombatSeconds(with, 51, 500) - 1d;
-            Assert.Greater(deep, 0.04d, string.Format("무한 구간 이득 {0:P2} - 4% 아래", deep));
+            Assert.Greater(deep, 0.03d, string.Format("무한 구간 이득(지금 세계) {0:P2} - 3% 아래", deep));
 
             double tuned = StageSimulation.TotalSeconds(without.GetRange(0, 50))
                          / StageSimulation.TotalSeconds(with.GetRange(0, 50)) - 1d;

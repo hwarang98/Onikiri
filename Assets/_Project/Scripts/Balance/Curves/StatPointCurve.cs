@@ -60,13 +60,142 @@ namespace Onikiri.Progression
          */
         public const int MaxPoints = 200;
 
-        /** 레벨업당 받는 스탯 포인트 */
-        public const int PointsPerLevel = 1;
+        /**
+         * @brief 레벨업당 받는 스탯 포인트.
+         *
+         * **1에서 2로 올렸다 (66단계).** 축이 둘에서 다섯이 됐다. 1로 두면
+         * 새 세 축에 찍는 만큼 공격력·체력 증폭이 그대로 굶는다 - 축을 늘린
+         * 것이 아니라 같은 포인트를 다섯으로 쪼갠 것이 된다.
+         *
+         * 2는 시뮬레이션이 고른 값이다(보고서 66 §2). 12단계 계약
+         * (LevelGrowth_DoesNotOutpaceGoldGrowth)과 16단계 체감 검사
+         * (StatPoint_IsFeltTheMomentItIsSpent)가 그대로 서는 값이다.
+         */
+        public const int PointsPerLevel = 2;
+
+        // ---------------------------------------------------------------- 66단계: 골드로 못 사는 세 축
+
+        /**
+         * @brief 경험치 획득 증폭의 포인트당 배수 (66단계).
+         *
+         * 처치 경험치에만 곱한다(CharacterLevel.AddKillExp). 업적 경험치는
+         * 되돌릴 수 없는 축이라 31단계가 faucet을 막은 자리다.
+         *
+         * 1.025 그대로다. 경험치 곡선이 가팔라 배수가 레벨로 번지는 몫이
+         * 작다 - 66단계 실측 Lv.30 도달이 st37 -> st35, Lv.100이 st146 ->
+         * st138이고, 심층 수렴·폭주 검사는 이 축 단독으로 0.14 / 32다.
+         */
+        public const double ExpPerPoint = 1.025d;
+
+        /**
+         * @brief 경험치 획득 증폭이 **열리는 레벨** (66단계). 일섬 해금과 같다.
+         *
+         * 상한이 아니라 등장 시점 게이트다 - 골드 획득 축의 UnlockStage(21단계)와
+         * 같은 종류. 이 축이 처음부터 있으면 Lv.15가 st15에서 st14로 당겨지고,
+         * 일섬의 비용(SkillCatalog UnlockStage 15)이 가정한 골드 규모보다 한
+         * 스테이지(x1.72) 일찍 열린다. 계수를 1.015로 내려도 그대로였다 - 크기가
+         * 아니라 **있느냐**의 문제라 게이트로 푼다.
+         *
+         * Lv.15 전에는 레벨이 66단계 전과 똑같이 오른다(경험치 축이 없으므로).
+         */
+        public const int ExpUnlockLevel = 15;
+
+        /** 축이 열리는 레벨. 게이트가 없으면 0 */
+        public static int UnlockLevelFor(string axisId)
+        {
+            return axisId == CharacterLevel.ExpAmpId ? ExpUnlockLevel : 0;
+        }
+
+        /** 이 레벨의 캐릭터에게 축이 열려 있는가. 경험치 축만 게이트가 있다 */
+        public static bool IsUnlocked(string axisId, int level)
+        {
+            if (axisId == CharacterLevel.ExpAmpId) return level >= ExpUnlockLevel;
+            return true;
+        }
+
+        /**
+         * @brief 골드 획득 증폭의 포인트당 배수 (66단계).
+         *
+         * 골드 강화의 획득 축(GoldGainCurve) 위에 **곱해진다** -
+         * UpgradeSystem.CurrentGoldGain 한 자리에서. 골드 축은 64단계부터
+         * 상한이 없지만 이 축은 다른 스탯 포인트 축과 같은 200에서 멈춘다.
+         *
+         * **1.025에서 출발해 1.0075로 내렸다 (66단계 시뮬레이션).** 골드는
+         * 그 자체가 다른 모든 축의 재화라 이 배수는 강화 전부에 복리로
+         * 번진다. 1.025에서 200점이면 x139이고, st100 보스 여유가 7.7에서
+         * 27.8로, 심층 최대 여유가 125에서 3365로 튄다 - 심층 수렴
+         * (|m200/m100-1| < 0.35)과 폭주 검사(< 150)가 먼저 깨진다.
+         *
+         *   1.005   수렴 0.02  최대  78  안 산 플레이어 최저 1.001 (문턱)
+         *   1.0075  수렴 0.09  최대 124  최저 1.024   <- 채택
+         *   1.01    수렴 0.32  최대 191  (폭주 검사 실패)
+         *
+         * 1.0075는 66단계 전 세계의 최대 여유(125)와 같은 자리다. 200점이면
+         * x4.46이다.
+         */
+        public const double GoldPerPoint = 1.0075d;
+
+        /**
+         * @brief 방치 보상 증폭 - 포인트당 **최대 누적 시간** +5분 (66단계).
+         *
+         * 배수가 아니라 시간이다. 방치 효율(IdleIncome.Efficiency 0.5)에
+         * 곱하면 28포인트(x2)에서 방치가 실제 플레이를 따라잡는다 - "켜두는
+         * 것이 이득"이라는 계약이 깨진다. 그것을 지키면서 16단계 체감
+         * 기준까지 맞추려면 계수가 포인트당 0.34% 아래여야 하고 그러면
+         * 눌러도 아무것도 안 움직인다.
+         *
+         * 시간은 둘 다 지킨다. 초당 수입은 그대로라 0.5 계약이 무수정이고,
+         * 한 점이 8시간 상한의 1%를 넘는다(5분 / 480분 = 1.04%).
+         *
+         * 가산이다. 200포인트 = +16시간 40분, 상한은 8시간에서 24시간
+         * 40분까지 간다. 새 상한이 아니라 기존 상한의 값이 커지는 것이다.
+         */
+        public const int IdleMinutesPerPoint = 5;
+
+        /**
+         * @brief 보석 초기화 비용 (66단계). 첫 1회는 무료다.
+         *
+         * 일일 퀘스트 다섯 개의 보석이 하루 55다(QuestCatalog.Daily:
+         * 10+15+10+10+10). 사흘치 165를 뽑기 단가(25)의 격자로 내린 값이
+         * 150 - 뽑기 6회, 장비 3등급 승급과 같은 값이다. 반복 퀘스트 보석은
+         * 진행도에 따라 갈려 기준에서 뺐다.
+         *
+         * "사흘"은 마음대로 다시 찍는 것이 아니라 **방향을 바꾸는** 값이라는
+         * 뜻이다. 하루치면 매일 다시 찍는 것이 최적이 되고 그때 이 축들은
+         * 배분이 아니라 상황별 스위치가 된다.
+         */
+        public const int ResetGemCost = 150;
 
         /** points 만큼 찍었을 때의 증폭 배수. 상한을 넘겨 넣어도 상한에서 멈춘다 */
         public static double Multiplier(int points)
         {
             return Math.Pow(PerPoint, Clamp(points));
+        }
+
+        /**
+         * @brief 축별 포인트당 배수. 공격력·체력은 PerPoint 그대로다.
+         *
+         * 방치 축은 배수가 아니라 1을 돌려준다 - 그 축은 시간을 늘리므로
+         * (IdleExtraAccrual) 배수 자리로 새어 들어가면 안 된다.
+         */
+        public static double PerPointFor(string axisId)
+        {
+            if (axisId == CharacterLevel.ExpAmpId) return ExpPerPoint;
+            if (axisId == CharacterLevel.GoldAmpId) return GoldPerPoint;
+            if (axisId == CharacterLevel.IdleAmpId) return 1d;
+            return PerPoint;
+        }
+
+        /** 축별 배수. 축을 모르는 옛 호출부는 Multiplier(points)를 그대로 쓴다 */
+        public static double Multiplier(string axisId, int points)
+        {
+            return Math.Pow(PerPointFor(axisId), Clamp(points));
+        }
+
+        /** 방치 보상 축이 늘려 주는 최대 누적 시간. 포인트에 선형이다 */
+        public static TimeSpan IdleExtraAccrual(int points)
+        {
+            return TimeSpan.FromMinutes((double)Clamp(points) * IdleMinutesPerPoint);
         }
 
         public static int Clamp(int points)

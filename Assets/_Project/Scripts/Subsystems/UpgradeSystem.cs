@@ -95,10 +95,24 @@ namespace Onikiri.Progression
          *
          * 1로 떨어지는 것이 중요하다. 전투 전용 테스트 씬은 UpgradeSystem 없이
          * 스포너만 세우는데, 거기서 0이 되면 골드가 통째로 사라진다.
+         *
+         * ## 66단계: 스탯 포인트의 골드 획득 증폭이 **여기서** 곱해진다
+         *
+         * 골드를 만드는 세 곳(처치·클리어·방치 추정)이 전부 이 값을 읽으므로
+         * 한 줄이면 셋에 같이 들어간다. 각자 곱하면 하나를 빠뜨리는 날이 온다.
+         * 업적 골드·장비 환불은 이 값을 안 읽으므로 증폭도 받지 않는다.
+         *
+         * 인스턴스 쪽 GoldGainMultiplier는 **곡선 값만** 그대로다 - 강화 탭의
+         * 골드 획득 행이 그것을 보여주고, 거기 스탯 포인트가 섞이면 "이 칸을
+         * 사면 얼마가 되는가"가 다른 축의 값까지 들고 온다.
          */
         public static double CurrentGoldGain
         {
-            get { return Instance != null ? Instance.GoldGainMultiplier : 1d; }
+            get
+            {
+                double curve = Instance != null ? Instance.GoldGainMultiplier : 1d;
+                return curve * CharacterLevel.CurrentGoldGainAmp;
+            }
         }
 
         /** 씬에 하나뿐이다. 골드를 만드는 쪽이 참조 없이 배수를 읽어 간다 */

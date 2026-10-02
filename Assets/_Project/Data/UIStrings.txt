@@ -55,6 +55,22 @@ Lv.
 캐릭터
 공격력 증폭
 체력 증폭
+# 66단계 성장탭 세 축 + 보석 초기화 (UpgradePanelBuilder.Reset*, StatPointButton 표시)
+경험치 획득 증폭
+골드 획득 증폭
+방치 보상 증폭
+초기화
+초기화 (무료)
+포인트 초기화
+배분한 포인트 개를 모두 되돌립니다
+처음 한 번 무료
+보석 개
+보석이 부족합니다
+취소
+# 잠긴 경험치 축 "Lv.15 해금" (UpgradePanelBuilder.StatLockedFormat)
+Lv. 해금
+# 방치 축 값 "+16시간 40분" (UpgradeTrack.Display.Duration), EXP "72.37%"
++시간 분 0123456789.%
 포인트당
 흡수
 쓸어담기

@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using Onikiri.Progression;
 using TMPro;
 using UnityEngine;
@@ -113,6 +115,23 @@ namespace Onikiri.UI
             expFill.color = Color.Lerp(fillBase, Color.white, PulseLift * wave);
         }
 
+        /**
+         * @brief 경험치 진행률을 소수 둘째 자리까지 (66단계). "0.37%".
+         *
+         * 정수 %는 고레벨에서 몇 분 동안 "0%"에 머문다 - 실기 제보의 Lv.98
+         * 진행률이 0.02%였다. 스트립 채움(VisibleFraction)과 같은 문제를 글자
+         * 쪽에서 푼다.
+         *
+         * **내림이다.** 반올림하면 99.995%가 "100.00%"로 떠서 레벨업이 될 것처럼
+         * 읽히는데 버튼은 아직 안 열린다.
+         */
+        public static string ExpPercentText(float fraction)
+        {
+            // 1e-3은 float 잡음 몫이다(0.7237f는 0.72369998...) - 0.29f가 0.2899999...로 들어와 "28.99%"가 되지 않게
+            double hundredths = Math.Floor((double)Mathf.Clamp01(fraction) * 10000d + 1e-3);
+            return (hundredths / 100d).ToString("F2", CultureInfo.InvariantCulture) + "%";
+        }
+
         private void OnLevelUpClicked()
         {
             if (character != null) character.TryLevelUp();
@@ -126,7 +145,7 @@ namespace Onikiri.UI
 
             if (headerLabel != null)
                 headerLabel.text = levelPrefix + character.Level + " · EXP "
-                    + Mathf.FloorToInt(Mathf.Clamp01(character.ExpFraction) * 100f) + "%";
+                    + ExpPercentText(character.ExpFraction);
 
             if (expFill != null)
             {

@@ -55,6 +55,15 @@ namespace Onikiri.EditorTools
             { CharacterLevel.AttackAmpId,   "Icon084" },  // 검 - 공격력과 같은 심볼
             { CharacterLevel.HealthAmpId,   "Icon066" },  // 심장 - 체력과 같은 심볼
 
+            // 66단계 성장탭 세 축. 증폭과 같은 판단으로, 늘리는 대상이 화면에
+            // 이미 아이콘으로 떠 있는 것은 그 심볼을 쓴다 - 경험치는 별(EXP),
+            // 골드는 상단 바의 금화. 방치 축은 대상(시간)의 심볼이 팩에 없어
+            // 초승달(밤 - 자리를 비운 동안)을 빌린다. **출시 전 교체 항목**
+            // (66단계 보고서 §8) - 월아 오의와 심볼이 겹친다
+            { CharacterLevel.ExpAmpId,      ExpIcon },    // 별 - 경험치
+            { CharacterLevel.GoldAmpId,     GoldIcon },   // 금화 - 골드 획득 축과 같은 심볼
+            { CharacterLevel.IdleAmpId,     "Icon044" },  // 초승달 (임시)
+
             // 43단계의 심화 축. **증폭 축과 같은 판단**이다 - 초월 치명타는
             // 치명타 피해의 연장(전타 치명타 뒤의 순수 배수)이고 연격은
             // 타격 수의 연장이라, 각자 뿌리가 되는 축의 심볼을 이어받는다.

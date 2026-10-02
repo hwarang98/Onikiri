@@ -1788,7 +1788,7 @@ namespace Onikiri.Tests
             // 여유가 몇 % 움직였다. 이 검사가 지키는 앵커는 "그 앞의 세계"의
             // 것이므로 상수를 옮기지 않고 49단계 규칙 ⓐ대로 정책에 한 줄을
             // 더한다 - 옛 골드 축(x1.25 / Lv.13 / 지수 0.52)을 재현하는 플래그
-            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true };
+            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true };
             var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
 
             // ---- 앵커 넷. **승급 재설계 2.1.1단계에 다시 구웠다**

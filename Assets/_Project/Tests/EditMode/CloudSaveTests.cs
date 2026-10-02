@@ -1154,7 +1154,7 @@ namespace Onikiri.Tests
         [Test]
         public void CrossSaveDoesNotTouchTheSaveFormat()
         {
-            Assert.AreEqual(21, SaveData.CurrentVersion,
+            Assert.AreEqual(22, SaveData.CurrentVersion,
                 "동기화 메타는 sidecar에 산다 - 세이브 버전을 올릴 이유가 없다");
         }
 

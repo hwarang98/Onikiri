@@ -51,8 +51,29 @@ namespace Onikiri.Progression
             return killsPerSecond * gold;
         }
 
+        /**
+         * @brief 방치 보상 증폭(66단계)까지 더한 최대 누적 시간.
+         *
+         * **방치 축이 닿는 곳은 여기 하나다.** 효율(Efficiency)에도 초당
+         * 수입에도 곱하지 않는다 - 0.5 계약은 무수정이고, 축은 "얼마나 오래
+         * 비워도 되는가"만 늘린다(StatPointCurve.IdleMinutesPerPoint 주석).
+         *
+         * 포인트에 선형이다: 8시간 + 포인트 x 5분. 새 상한이 아니라 기존
+         * 상한의 값이 커지는 것이다.
+         */
+        public static TimeSpan MaxAccrualFor(int idlePoints)
+        {
+            return MaxAccrual + StatPointCurve.IdleExtraAccrual(idlePoints);
+        }
+
         /** 보상이 쌓인 시간. 경과 시간을 0 ~ 8시간으로 자른다 */
         public static TimeSpan AccruedTime(DateTime lastQuitUtc, DateTime nowUtc)
+        {
+            return AccruedTime(lastQuitUtc, nowUtc, MaxAccrual);
+        }
+
+        /** 보상이 쌓인 시간. 경과 시간을 0 ~ maxAccrual로 자른다 (66단계) */
+        public static TimeSpan AccruedTime(DateTime lastQuitUtc, DateTime nowUtc, TimeSpan maxAccrual)
         {
             var elapsed = nowUtc - lastQuitUtc;
 
@@ -60,7 +81,7 @@ namespace Onikiri.Progression
             // 오류로 다루지는 않는다
             if (elapsed < TimeSpan.Zero) return TimeSpan.Zero;
 
-            return elapsed > MaxAccrual ? MaxAccrual : elapsed;
+            return elapsed > maxAccrual ? maxAccrual : elapsed;
         }
 
         /**
@@ -83,7 +104,13 @@ namespace Onikiri.Progression
         /** 상한에 걸렸는지. 팝업이 "상한 도달"을 띄울지 결정한다 */
         public static bool IsCapped(DateTime lastQuitUtc, DateTime nowUtc)
         {
-            return nowUtc - lastQuitUtc >= MaxAccrual;
+            return IsCapped(lastQuitUtc, nowUtc, MaxAccrual);
+        }
+
+        /** 상한에 걸렸는지 - 방치 축이 늘린 상한 기준 (66단계) */
+        public static bool IsCapped(DateTime lastQuitUtc, DateTime nowUtc, TimeSpan maxAccrual)
+        {
+            return nowUtc - lastQuitUtc >= maxAccrual;
         }
     }
 }

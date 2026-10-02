@@ -44,10 +44,11 @@ namespace Onikiri.Progression
          *   21 승급 재설계. 신규 필드 없음 - `evolutionTier`의 **뜻**이
          *      "재화로 산 티어"에서 "귀문을 돌파해 보유한 티어"로 바뀌고,
          *      그 변환이 마이그레이션을 필요로 한다
+         *   22 66단계. 성장탭 세 축(경험치·골드·방치) 포인트 · 보석 초기화 횟수
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 21;
+        public const int CurrentVersion = 22;
 
         public int version = CurrentVersion;
 
@@ -96,6 +97,20 @@ namespace Onikiri.Progression
          */
         public int attackPoints;
         public int healthPoints;
+
+        /** v22 (66단계). 골드로 못 사는 세 축 - CharacterLevel.ExpAmpId 등 */
+        public int expPoints;
+        public int goldPoints;
+        public int idlePoints;
+
+        /**
+         * @brief v22 (66단계). 보석 초기화를 한 횟수.
+         *
+         * 0이면 다음 초기화가 무료다. "무료를 썼는가" 한 비트가 아니라 횟수인
+         * 이유는 나중에 비용이 횟수를 따라 오를 수 있기 때문이다 - 그때 비트를
+         * 횟수로 바꾸는 마이그레이션은 이미 지난 초기화를 셀 수 없다.
+         */
+        public int statResetCount;
 
         /**
          * @brief 마지막으로 저장한 시각 (UTC ticks).
@@ -460,6 +475,10 @@ namespace Onikiri.Progression
                 exp = BigDouble.Zero,
                 attackPoints = 0,
                 healthPoints = 0,
+                expPoints = 0,
+                goldPoints = 0,
+                idlePoints = 0,
+                statResetCount = 0,
                 lastQuitUtcTicks = 0L,
                 goldPerSecond = 0d,
                 skillAutoCast = true,
@@ -981,6 +1000,23 @@ namespace Onikiri.Progression
                  */
                 ApplyGateEvolutionTier(data);
                 data.version = 21;
+            }
+
+            if (data.version == 21)
+            {
+                /**
+                 * v21 -> v22 (66단계). 새 세 축과 초기화 횟수는 0에서 시작한다.
+                 *
+                 * 포인트당 지급량이 1에서 2로 올랐지만(StatPointCurve.PointsPerLevel)
+                 * 소급 보상은 없다 - 남은 포인트는 레벨에서 매번 계산되므로
+                 * (CharacterLevel.UnspentPoints), 옛 세이브는 불러오는 순간 늘어난
+                 * 몫을 미배분으로 이미 갖고 있다. 출시 전이라 기존 플레이어도 없다.
+                 */
+                data.expPoints = 0;
+                data.goldPoints = 0;
+                data.idlePoints = 0;
+                data.statResetCount = 0;
+                data.version = 22;
             }
 
             data.version = CurrentVersion;

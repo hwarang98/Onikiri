@@ -370,9 +370,11 @@ namespace Onikiri.Battle
             var character = Onikiri.Progression.CharacterLevel.Instance;
             if (character != null && enemy.ExpReward > BigDouble.Zero)
             {
-                character.AddExp(enemy.ExpReward);
+                // 66단계: 처치 전용 입구. 경험치 증폭은 그 안에서 한 번 곱해지고,
+                // 화면의 숫자는 실제로 들어간 값이다
+                var granted = character.AddKillExp(enemy.ExpReward);
                 if (damageNumbers != null)
-                    damageNumbers.ShowExp(enemy.ExpReward, enemy.transform.position);
+                    damageNumbers.ShowExp(granted, enemy.transform.position);
             }
 
             // 보스는 스테이지 할당량에 들어가지 않는다. 보스가 하는 일은 할당량을
