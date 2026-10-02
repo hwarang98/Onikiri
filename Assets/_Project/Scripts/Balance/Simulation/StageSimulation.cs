@@ -99,6 +99,12 @@ namespace Onikiri.Progression
             public double AttackAmp;
             public double HealthAmp;
 
+            /** 66단계. 경험치·골드 획득 증폭에 찍은 포인트와 그 배수 */
+            public int ExpPoints;
+            public int GoldPoints;
+            public double ExpAmp;
+            public double GoldAmp;
+
             // ------------------------------------------------------------ 20단계
 
             public int GoldGainLevel;
@@ -364,6 +370,26 @@ namespace Onikiri.Progression
              * 비교군을 만드는 시뮬레이션 전용 장치다.
              */
             public bool GoldAxisPre64;
+
+            /**
+             * @brief **66단계 이전의 스탯 포인트** - 축 둘(공격력·체력), 레벨당 1점.
+             *
+             * GoldAxisPre64와 같은 49단계 규칙 ⓐ의 비교군이다. 66단계가 축 셋과
+             * 레벨당 2점을 더하면서 레벨·골드·화력이 함께 움직였고, 그 앞의
+             * 스텝이 굳힌 앵커를 재려면 옛 세계를 그대로 다시 돌릴 수 있어야
+             * 한다. 보고서 66 §5의 "전" 열이 이 정책이다.
+             */
+            public bool StatPointsPre66;
+
+            /**
+             * @brief **측정 전용.** 골드 획득 증폭에 이만큼 공짜 포인트를 더 얹는다.
+             *
+             * 게임에는 없는 세계다. 골드 축이 Step16 체감 기준(1%/pt)의 예외라는
+             * 주장(StatPointCurve.GoldPerPoint 주석)을 끝단에서 재려면 "한 점을 더
+             * 찍은 세계"가 있어야 하는데, 배분 정책을 건드리지 않고 그 한 점만
+             * 더하는 자리가 여기다. 0이면 아무 일도 하지 않는다
+             */
+            public int ExtraGoldPoints;
 
             /** 스킬을 한 번도 올리지 않는다 (해금은 되므로 레벨 1의 기여는 남는다) */
             public bool SkipSkills;
@@ -951,6 +977,8 @@ namespace Onikiri.Progression
             // 49단계: 장착. 정책이 말하지 않으면 기준 구성이고, 그것이 밴드가
             // 가정하는 구성이자 게임 쪽 기본값이다(SkillSystem.FillEmptySlots)
             levels.GoldCapPre64 = policy.GoldAxisPre64;
+            levels.StatPointsPre66 = policy.StatPointsPre66;
+            levels.ExtraGoldPoints = policy.ExtraGoldPoints;
             levels.NoExpansionSlot = policy.SkipSkillSlot;
             levels.NoExpansionSkills = policy.SkipExpansionSkills;
             levels.ForcedLoadout = policy.ForceLoadout;
@@ -1010,7 +1038,9 @@ namespace Onikiri.Progression
 
                     // 획득 축이 곱해진 실제 수령액. 루프 안에서 매번 다시 읽는
                     // 이유는 바로 아래 Buy가 이 축의 레벨을 올릴 수 있기 때문이다
-                    double goldPerMob = rawGoldPerMob * levels.GoldGain;
+                    // 66단계: 골드 획득 증폭까지 곱한 값(GoldIncome) - 게임의
+                    // UpgradeSystem.CurrentGoldGain과 같은 식이다
+                    double goldPerMob = rawGoldPerMob * levels.GoldIncome;
                     purse += goldPerMob;
 
                     // 회수 시간의 분모. 파밍 한 마리에 걸린 시간으로 나눈 것이
@@ -1020,7 +1050,8 @@ namespace Onikiri.Progression
 
                     // 경험치는 골드와 같은 자리에서 들어온다. 게임에서도 처치
                     // 하나가 둘 다 준다(EnemySpawner.OnEnemyKilled)
-                    levelsGained += levels.GainExp(expPerMob);
+                    // 66단계: 처치 경험치에 경험치 증폭(CharacterLevel.AddKillExp)
+                    levelsGained += levels.GainExp(expPerMob * levels.ExpAmp);
                     Buy(ref levels, ref purse, stage, lastGoldPerSecond, stage, policy, ref purchasePayback);
                 }
 
@@ -1064,14 +1095,16 @@ namespace Onikiri.Progression
                 // 두 지점(EnemySpawner, BossFight)과 같아야 하고, 여기만 빠지면
                 // 시뮬레이션이 실제보다 가난한 플레이어를 재게 된다
                 purse += StageCurve.BossGoldForStage(
-                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble() * levels.GoldGain;
+                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble() * levels.GoldIncome;
 
                 // 17단계의 클리어 보너스. 화면에는 축하 숫자로 뜨지만 밸런스에는
                 // 그대로 들어온다 - 16단계에서 피날레 골드가 다음 스테이지를
                 // 망가뜨린 것과 같은 경로다
                 purse += StageCurve.ClearGoldForStage(
-                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble() * levels.GoldGain;
-                levelsGained += levels.GainExp(ExpCurve.BossExp(stage).ToDouble());
+                    BigDouble.FromDouble(field.AverageMobGold), stage).ToDouble() * levels.GoldIncome;
+
+                // 보스도 처치다 - 경험치 증폭이 곱해진다(EnemySpawner의 같은 자리)
+                levelsGained += levels.GainExp(ExpCurve.BossExp(stage).ToDouble() * levels.ExpAmp);
 
                 // 업적 보상은 **보스를 잡은 직후**에 들어온다. 스테이지 도달
                 // 업적이 그 시점에 열리고, 레벨/총합 업적도 보스 경험치와 보스
@@ -1165,6 +1198,10 @@ namespace Onikiri.Progression
                     HealthPoints = levels.HealthPoints,
                     AttackAmp = levels.AttackAmp,
                     HealthAmp = levels.HealthAmp,
+                    ExpPoints = levels.ExpPoints,
+                    GoldPoints = levels.GoldPoints,
+                    ExpAmp = levels.ExpAmp,
+                    GoldAmp = levels.GoldAmp,
 
                     GoldGainLevel = levels.Gd,
                     GoldGain = levels.GoldGain,
@@ -2310,10 +2347,45 @@ namespace Onikiri.Progression
             public int AttackPoints;
             public int HealthPoints;
 
+            /** 66단계. 경험치·골드 획득 증폭. 방치 축은 시뮬레이션에 없다(SpendPoints 주석) */
+            public int ExpPoints;
+            public int GoldPoints;
+
+            /** 66단계 이전 세계(Policy.StatPointsPre66) - 축 둘, 레벨당 1점 */
+            public bool StatPointsPre66;
+
+            /** 측정 전용 공짜 골드 포인트(Policy.ExtraGoldPoints) */
+            public int ExtraGoldPoints;
+
             public int L { get { return Character < 1 ? 1 : Character; } }
 
             public double AttackAmp { get { return StatPointCurve.Multiplier(AttackPoints); } }
             public double HealthAmp { get { return StatPointCurve.Multiplier(HealthPoints); } }
+
+            /** 처치 경험치(잡몹·보스)에 곱한다. 업적 경험치에는 안 곱한다 - CharacterLevel.AddKillExp */
+            public double ExpAmp { get { return StatPointCurve.Multiplier(CharacterLevel.ExpAmpId, ExpPoints); } }
+
+            /** 골드 강화 배수(GoldGain) 위에 곱한다 - UpgradeSystem.CurrentGoldGain */
+            public double GoldAmp { get { return StatPointCurve.Multiplier(CharacterLevel.GoldAmpId, GoldPoints + ExtraGoldPoints); } }
+
+            /**
+             * @brief 골드 보상에 실제로 곱해지는 값 (66단계).
+             *
+             * 게임의 UpgradeSystem.CurrentGoldGain과 같은 식이다. GoldGain은
+             * 곡선 값만이라 구매 판단(BuyGoldGain의 회수 시간 비율)이 그대로 그것을
+             * 쓰고, 수령액은 이것을 쓴다.
+             */
+            public double GoldIncome { get { return GoldGain * GoldAmp; } }
+
+            /** 지금까지 받은 총 포인트. 옛 세계는 레벨당 1점 */
+            public int PointsEarned
+            {
+                get
+                {
+                    int levelUps = L - 1;
+                    return StatPointsPre66 ? levelUps : StatPointCurve.TotalPointsAtLevel(L);
+                }
+            }
 
             /**
              * @brief 경험치를 받고 올릴 수 있는 만큼 올린다.
@@ -2357,18 +2429,52 @@ namespace Onikiri.Progression
              * 상한(StatPointCurve.MaxPoints)에 닿은 축은 건너뛴다. 실제로
              * 도달할 일은 없지만, 도달했는데 계속 찍으면 포인트가 조용히
              * 사라진다.
+             *
+             * ## 66단계: 화력 몫을 셋이 나눈다
+             *
+             * 생존 먼저는 그대로다. 그 뒤의 몫을 공격력·골드 획득·경험치 획득
+             * 증폭 중 **가장 적게 찍힌 축**에 하나씩 준다 - 셋을 고르게 키우는
+             * 플레이어다. 셋은 같은 포인트당 배수(x1.025)를 갖고 하는 일만
+             * 다르다(지금 화력 / 다음 구매 / 다음 레벨). 셋의 효율을 비교하는
+             * 판단은 시간 지평을 가정해야 해서, 그 가정을 적는 대신 고르게
+             * 나누는 쪽이 시뮬레이션이 재는 플레이어를 덜 임의로 만든다.
+             *
+             * 방치 축에는 찍지 않는다. 시뮬레이션은 켜 둔 플레이를 재고, 그
+             * 축은 꺼 둔 시간만 바꾼다. 거기 찍은 플레이어는 이 표보다 약하다 -
+             * 바닥선 쪽 근거는 보고서 66 §5의 "새 축 0" 열이다.
              */
             public void SpendPoints(double neededEffectiveHealth)
             {
-                int unspent = StatPointCurve.TotalPointsAtLevel(L) - AttackPoints - HealthPoints;
+                int unspent = PointsEarned - AttackPoints - HealthPoints - ExpPoints - GoldPoints;
+                int max = StatPointCurve.MaxPoints;
 
                 for (int i = 0; i < unspent; i++)
                 {
                     bool wantHealth = EffectiveHealth < neededEffectiveHealth;
 
-                    if (wantHealth && HealthPoints < StatPointCurve.MaxPoints) HealthPoints++;
-                    else if (AttackPoints < StatPointCurve.MaxPoints) AttackPoints++;
-                    else if (HealthPoints < StatPointCurve.MaxPoints) HealthPoints++;
+                    if (wantHealth && HealthPoints < max) { HealthPoints++; continue; }
+
+                    if (StatPointsPre66)
+                    {
+                        if (AttackPoints < max) AttackPoints++;
+                        else if (HealthPoints < max) HealthPoints++;
+                        else break;
+                        continue;
+                    }
+
+                    // 가장 적게 찍힌 축. 동률이면 공격력 -> 골드 -> 경험치 순이다
+                    // (화면 순서가 아니라 "지금 세지는 것" 먼저)
+                    // 경험치 축은 Lv.15 전에는 잠겨 있다(StatPointCurve.ExpUnlockLevel) -
+                    // 그동안은 공격력·골드 둘이 나눈다
+                    bool expOpen = StatPointCurve.IsUnlocked(CharacterLevel.ExpAmpId, L);
+                    int expSeen = expOpen ? ExpPoints : int.MaxValue;
+
+                    if (AttackPoints < max && AttackPoints <= GoldPoints && AttackPoints <= expSeen) AttackPoints++;
+                    else if (GoldPoints < max && GoldPoints <= expSeen) GoldPoints++;
+                    else if (expOpen && ExpPoints < max) ExpPoints++;
+                    else if (AttackPoints < max) AttackPoints++;
+                    else if (GoldPoints < max) GoldPoints++;
+                    else if (HealthPoints < max) HealthPoints++;
                     else break;
                 }
             }
@@ -3519,6 +3625,27 @@ namespace Onikiri.Progression
          * 때문이다. 여기 숫자를 복사해 두면 그 순간부터 시뮬레이션은 게임이
          * 아니라 자기 자신을 검사한다.
          */
+        /**
+         * @brief 오의 첫 칸 비용. 66단계 이전 세계(Policy.StatPointsPre66)는 귀참의
+         * 비용 기준점을 옛 st21로 둔다.
+         *
+         * 66단계가 경험치 축을 Lv.15에 열면서 Lv.20(귀참)이 st21 -> st20으로
+         * 당겨졌고, 카탈로그의 비용 기준점(SkillSpec.UnlockStage)도 실측을 따라
+         * 20이 됐다. 비교군이 66단계 전 세계를 **재현**하려면 그 기준점도 옛 값이어야
+         * 한다 - 49단계 규칙 ⓐ(상수를 옮기지 않고 정책 한 줄)와 같은 처리다
+         */
+        private static double SkillBaseCost(int index, Levels levels)
+        {
+            var spec = SkillCatalog.Skills[index];
+            if (levels.StatPointsPre66 && spec.Id == SkillCatalog.OniCleaveId)
+                return spec.BaseCost * StageCurve.GoldMultiplier(Pre66OniCleaveStage).ToDouble()
+                       / StageCurve.GoldMultiplier(spec.UnlockStage).ToDouble();
+            return spec.BaseCost;
+        }
+
+        /** 66단계 전 귀참의 비용 기준 스테이지 */
+        private const int Pre66OniCleaveStage = 21;
+
         private static double WeaponBaseCost { get { return WeaponSpec.TemperBaseCost; } }
         private static double ArmorBaseCost { get { return ArmorSpec.TemperBaseCost; } }
 
@@ -3680,7 +3807,7 @@ namespace Onikiri.Progression
                     int skillLevel = levels.SkillLevel(index);
                     if (skillLevel >= SkillCurve.MaxLevel) return false;
 
-                    cost = SkillCurve.CostAtLevel(SkillCatalog.Skills[index].BaseCost, skillLevel);
+                    cost = SkillCurve.CostAtLevel(SkillBaseCost(index, levels), skillLevel);
                     return true;
             }
         }

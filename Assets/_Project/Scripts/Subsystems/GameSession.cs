@@ -281,7 +281,8 @@ namespace Onikiri.Progression
             // 곱해지므로(UpgradeSystem.Apply), 순서가 뒤바뀌면 강화가 증폭 없는
             // 값으로 한 번 적용되고 그 상태가 다음 구매까지 남는다
             if (character != null)
-                character.Restore(data.characterLevel, data.exp, data.attackPoints, data.healthPoints);
+                character.Restore(data.characterLevel, data.exp, data.attackPoints, data.healthPoints,
+                                  data.expPoints, data.goldPoints, data.idlePoints, data.statResetCount);
 
             // 강화는 스테이지 다음에 적용한다. 스탯이 곧바로 전투에 반영되므로
             // 순서가 뒤바뀌면 한 프레임 동안 어긋난 값으로 싸운다
@@ -373,7 +374,12 @@ namespace Onikiri.Progression
             if (lastQuit == null) return;
 
             var now = DateTime.UtcNow;
-            var accrued = IdleIncome.AccruedTime(lastQuit.Value, now);
+
+            // 66단계: 방치 보상 증폭은 **최대 누적 시간**을 늘린다(배수가 아니다).
+            // 포인트는 세이브에서 읽는다 - 나갈 때 찍혀 있던 것이 그동안의 상한이고,
+            // 부팅 순서(Apply가 CharacterLevel을 먼저 세운다)에 기대지 않는다
+            var maxAccrual = IdleIncome.MaxAccrualFor(data.idlePoints);
+            var accrued = IdleIncome.AccruedTime(lastQuit.Value, now, maxAccrual);
             if (accrued <= TimeSpan.Zero) return;
 
             // 나갈 때 적어둔 초당 수입을 쓴다. 지금 다시 계산하면 그동안 오른 것이
@@ -395,7 +401,7 @@ namespace Onikiri.Progression
             if (character != null) character.AddExp(expReward);
 
             if (offlinePopup != null)
-                offlinePopup.Show(reward, accrued, IdleIncome.IsCapped(lastQuit.Value, now));
+                offlinePopup.Show(reward, accrued, IdleIncome.IsCapped(lastQuit.Value, now, maxAccrual));
 
             Debug.Log(string.Format("[Onikiri] Offline reward: {0} gold, {1} exp for {2} away "
                 + "(rates {3:F2}/s, {4:F2}/s).",
@@ -463,6 +469,10 @@ namespace Onikiri.Progression
                 data.exp = character.Exp;
                 data.attackPoints = character.AttackPoints;
                 data.healthPoints = character.HealthPoints;
+                data.expPoints = character.ExpPoints;
+                data.goldPoints = character.GoldPoints;
+                data.idlePoints = character.IdlePoints;
+                data.statResetCount = character.ResetCount;
             }
 
             if (skills != null)
@@ -640,7 +650,12 @@ namespace Onikiri.Progression
             // 최전선 아래에서 나가면 방치 경험치도 0이다. 파밍이 안 주는 것을
             // 방치가 주면 "낮은 데서 꺼두는 것"이 경험치 최적이 된다
             bool atFrontier = stage == null || stage.IsAtFrontier;
-            return killsPerSecond * ExpCurve.MobExp(stageNumber, atFrontier).ToDouble();
+            // 66단계: 경험치 증폭. 방치는 파밍의 축소판이라 처치 경험치에 곱해지는
+            // 것(CharacterLevel.AddKillExp)이 여기서도 곱해져야 두 벌이 안 갈린다.
+            // **방치 축은 여기 오지 않는다** - 그 축은 시간을 늘린다
+            double expGain = character != null ? character.ExpGainMultiplier : 1d;
+
+            return killsPerSecond * ExpCurve.MobExp(stageNumber, atFrontier).ToDouble() * expGain;
         }
 
         /** 테스트 패널이 쓰는 초기화 */

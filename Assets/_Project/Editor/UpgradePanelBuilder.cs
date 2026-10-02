@@ -228,13 +228,55 @@ namespace Onikiri.EditorTools
         {
             public string AxisId;
             public string DisplayName;
+
+            /** 값 표시 방식 (66단계). 공격력·체력은 예전 그대로 "×1.025" */
+            public UpgradeTrack.Display Display;
         }
 
+        /**
+         * 66단계에 셋이 늘었다 - 골드로는 살 수 없는 종류의 축이다. 순서는
+         * CharacterLevel.AxisIds와 같다(전투 -> 보상 -> 방치). 다섯 줄 + 머리글은
+         * 960px라 뷰포트(474px)를 넘고 기존 스크롤이 맡는다 - 강화 탭은 이미
+         * 1,200px를 스크롤한다. 행 높이는 그대로다(55pt 두 줄의 최소선).
+         */
         private static readonly StatSpec[] StatSpecs =
         {
-            new StatSpec { AxisId = CharacterLevel.AttackAmpId, DisplayName = "공격력 증폭" },
-            new StatSpec { AxisId = CharacterLevel.HealthAmpId, DisplayName = "체력 증폭" }
+            new StatSpec { AxisId = CharacterLevel.AttackAmpId, DisplayName = "공격력 증폭",
+                           Display = UpgradeTrack.Display.Multiplier },
+            new StatSpec { AxisId = CharacterLevel.HealthAmpId, DisplayName = "체력 증폭",
+                           Display = UpgradeTrack.Display.Multiplier },
+            new StatSpec { AxisId = CharacterLevel.ExpAmpId, DisplayName = "경험치 획득 증폭",
+                           Display = UpgradeTrack.Display.BonusPercent },
+            new StatSpec { AxisId = CharacterLevel.GoldAmpId, DisplayName = "골드 획득 증폭",
+                           Display = UpgradeTrack.Display.BonusPercent },
+            new StatSpec { AxisId = CharacterLevel.IdleAmpId, DisplayName = "방치 보상 증폭",
+                           Display = UpgradeTrack.Display.Duration }
         };
+
+        // ---------------------------------------------------------------- 66단계: 초기화
+
+        public const string StatResetButtonName = "ResetButton";
+        public const string StatResetPopupName = "StatResetPopup";
+
+        /** 머리글 오른쪽 버튼. "초기화 (무료)"가 33pt로 들어가는 폭 */
+        private const float StatResetButtonWidth = 300f;
+
+        /**
+         * 문구. 전부 Data/UIStrings.txt에 같은 줄이 있다 - 런타임이 조립하는
+         * 숫자 자리({0})만 빼면 글자는 아틀라스에 구워져 있어야 한다.
+         * 빌더(에디터 코드)가 직렬화 필드로 넣고, 런타임 코드에는 없다
+         */
+        public const string ResetOpenText = "초기화";
+        public const string ResetOpenFreeText = "초기화 (무료)";
+        public const string ResetTitleText = "포인트 초기화";
+        public const string ResetBodyFormat = "배분한 포인트 {0}개를 모두 되돌립니다";
+        public const string ResetFreeCostText = "처음 한 번 무료";
+        public const string ResetGemCostFormat = "보석 {0}개";
+        public const string ResetShortFormat = "보석이 부족합니다 ({1} / {0})";
+        public const string ResetCancelText = "취소";
+
+        /** 잠긴 스탯 포인트 축 (66단계 - 경험치 축 Lv.15). {0} = 해금 레벨 */
+        public const string StatLockedFormat = "Lv.{0} 해금";
 
         /**
          * @brief 남은 포인트 머리글이 차지하는 줄 수.
@@ -1969,6 +2011,162 @@ namespace Onikiri.EditorTools
 
             for (int i = 0; i < StatSpecs.Length; i++)
                 BuildStatRow(page, font, i, HeaderRows + i);
+
+            BuildStatReset(header, font);
+        }
+
+        /**
+         * @brief 머리글 오른쪽의 초기화 버튼 + 확인 팝업 (66단계).
+         *
+         * 버튼은 머리글의 **자식**이다. 행으로 세우면 다섯 줄 아래에 한 줄이
+         * 더 생기고, 머리글 오른쪽은 "남은 포인트" 하나만 쓰고 비어 있었다.
+         * 머리글 자체에는 여전히 버튼이 없다 - 아이콘 검사(VerifyRowIcons)는
+         * 행 오브젝트의 버튼으로 행을 가르므로 자식 버튼은 행으로 세지 않는다.
+         *
+         * 팝업은 SafeArea 직속이다. 스크롤 안에 두면 성장 탭을 스크롤한 만큼
+         * 함께 밀려 올라가고, 다른 탭으로 가면 페이지와 함께 꺼진다.
+         */
+        private static void BuildStatReset(Transform header, TMP_FontAsset font)
+        {
+            var old = header.Find(StatResetButtonName);
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+
+            var buttonObject = new GameObject(StatResetButtonName, typeof(RectTransform));
+            buttonObject.transform.SetParent(header, false);
+            var rect = (RectTransform)buttonObject.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.sizeDelta = new Vector2(StatResetButtonWidth, LineHeight);
+            rect.anchoredPosition = new Vector2(-24f, -10f);
+
+            var image = buttonObject.AddComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Row);
+            var openButton = buttonObject.AddComponent<Button>();
+            UiSkin.ApplyButton(openButton, image);
+
+            var openLabel = CreateLabel(buttonObject.transform, font, "Label", TextAlignmentOptions.Center);
+            UiFonts.Demote(openLabel);
+            StretchFull((RectTransform)openLabel.transform);
+            openLabel.text = ResetOpenFreeText;
+
+            var popup = BuildStatResetPopup(font);
+
+            var reset = buttonObject.AddComponent<Onikiri.UI.StatPointResetButton>();
+            var so = new SerializedObject(reset);
+            so.FindProperty("openButton").objectReferenceValue = openButton;
+            so.FindProperty("openLabel").objectReferenceValue = openLabel;
+            so.FindProperty("popupRoot").objectReferenceValue = popup.Root;
+            so.FindProperty("bodyLabel").objectReferenceValue = popup.Body;
+            so.FindProperty("costLabel").objectReferenceValue = popup.Cost;
+            so.FindProperty("confirmButton").objectReferenceValue = popup.Confirm;
+            so.FindProperty("cancelButton").objectReferenceValue = popup.Cancel;
+            so.FindProperty("dimButton").objectReferenceValue = popup.Dim;
+            so.FindProperty("openText").stringValue = ResetOpenText;
+            so.FindProperty("openFreeText").stringValue = ResetOpenFreeText;
+            so.FindProperty("bodyFormat").stringValue = ResetBodyFormat;
+            so.FindProperty("freeCostText").stringValue = ResetFreeCostText;
+            so.FindProperty("gemCostFormat").stringValue = ResetGemCostFormat;
+            so.FindProperty("shortOfGemsFormat").stringValue = ResetShortFormat;
+            so.FindProperty("enabledColor").colorValue = TextColor;
+            so.FindProperty("disabledColor").colorValue = DimColor;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private struct ResetPopupParts
+        {
+            public GameObject Root;
+            public TMP_Text Body;
+            public TMP_Text Cost;
+            public Button Confirm;
+            public Button Cancel;
+            public Button Dim;
+        }
+
+        private static ResetPopupParts BuildStatResetPopup(TMP_FontAsset font)
+        {
+            var parts = new ResetPopupParts();
+            var safeArea = EnsureSafeArea();
+
+            var existing = safeArea.Find(StatResetPopupName);
+            if (existing != null) Object.DestroyImmediate(existing.gameObject);
+
+            var root = new GameObject(StatResetPopupName, typeof(RectTransform));
+            root.transform.SetParent(safeArea, false);
+            root.transform.SetAsLastSibling();
+            StretchFull((RectTransform)root.transform);
+            parts.Root = root;
+
+            // 딤은 누르면 닫힌다(PopupPanel과 같은 규칙) - 바깥을 누르는 것이
+            // 손가락 화면의 취소다
+            var dim = new GameObject("Dim", typeof(RectTransform));
+            dim.transform.SetParent(root.transform, false);
+            StretchFull((RectTransform)dim.transform);
+            var dimImage = dim.AddComponent<Image>();
+            dimImage.color = new Color32(0x10, 0x0E, 0x18, 0xD0);
+            parts.Dim = dim.AddComponent<Button>();
+            parts.Dim.transition = Selectable.Transition.None;
+
+            var box = new GameObject("Box", typeof(RectTransform));
+            box.transform.SetParent(root.transform, false);
+            var boxRect = (RectTransform)box.transform;
+            boxRect.anchorMin = boxRect.anchorMax = new Vector2(0.5f, 0.5f);
+            boxRect.pivot = new Vector2(0.5f, 0.5f);
+            boxRect.sizeDelta = new Vector2(920f, 560f);
+            UiSkin.ApplyPanel(box.AddComponent<Image>(), UiSkin.Row);
+
+            // 제목과 동사(버튼)는 44, 나머지는 33 - 패널 글자 위계(2a)
+            var title = CreateLabel(box.transform, font, "Title", TextAlignmentOptions.Center);
+            PlaceStretched((RectTransform)title.transform, 24f, 24f, 40f, LineHeight);
+            title.text = ResetTitleText;
+
+            parts.Body = CreateLabel(box.transform, font, "Body", TextAlignmentOptions.Center);
+            UiFonts.Demote(parts.Body);
+            PlaceStretched((RectTransform)parts.Body.transform, 24f, 24f, 160f, LineHeight);
+            parts.Body.text = string.Format(ResetBodyFormat, 0);
+
+            parts.Cost = CreateLabel(box.transform, font, "Cost", TextAlignmentOptions.Center);
+            UiFonts.Demote(parts.Cost);
+            PlaceStretched((RectTransform)parts.Cost.transform, 24f, 24f, 240f, LineHeight);
+            parts.Cost.text = ResetFreeCostText;
+
+            parts.Confirm = CreatePopupButton(box.transform, font, "ConfirmButton", ResetOpenText,
+                                              -170f, UiSkin.Good);
+            parts.Cancel = CreatePopupButton(box.transform, font, "CancelButton", ResetCancelText,
+                                             170f, Color.white);
+
+            // 씬에는 꺼진 채로 저장한다 - 켜진 채로 저장되면 시작부터 화면을 가린다
+            root.SetActive(false);
+            return parts;
+        }
+
+        private static Button CreatePopupButton(Transform box, TMP_FontAsset font, string name, string text,
+                                                float x, Color tint)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(box, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.sizeDelta = new Vector2(300f, 110f);
+            rect.anchoredPosition = new Vector2(x, -380f);
+
+            var image = go.AddComponent<Image>();
+            UiSkin.ApplyPanel(image, UiSkin.Panel, tint);
+            var button = go.AddComponent<Button>();
+            UiSkin.ApplyButton(button, image);
+
+            var label = CreateLabel(go.transform, font, "Label", TextAlignmentOptions.Center);
+            StretchFull((RectTransform)label.transform);
+            label.text = text;
+            return button;
+        }
+
+        private static void StretchFull(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
         }
 
         private static void BuildStatRow(RectTransform page, TMP_FontAsset font, int specIndex, int rowIndex)
@@ -2002,6 +2200,8 @@ namespace Onikiri.EditorTools
             var so = new SerializedObject(stat);
             so.FindProperty("axisId").stringValue = spec.AxisId;
             so.FindProperty("displayName").stringValue = spec.DisplayName;
+            so.FindProperty("display").enumValueIndex = (int)spec.Display;
+            so.FindProperty("lockedFormat").stringValue = StatLockedFormat;
             so.FindProperty("button").objectReferenceValue = button;
             so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
             so.FindProperty("valueLabel").objectReferenceValue = valueLabel;

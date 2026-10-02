@@ -158,10 +158,11 @@ service cloud.firestore {
       return hasOnlySaveFields()
              // 봉투 형식은 정확히 1이다. 옛 것도 새 것도 아니다
              && request.resource.data.formatVersion == 1
-             // SaveData.CurrentVersion = 21. 미래 버전은 서버에 놓일 수 없다
+             // SaveData.CurrentVersion = 22 (66단계 - 성장탭 세 축·보석 초기화).
+             // 미래 버전은 서버에 놓일 수 없다. 21 이하(옛 빌드)는 그대로 통과한다
              && request.resource.data.saveVersion is int
              && request.resource.data.saveVersion >= 1
-             && request.resource.data.saveVersion <= 21
+             && request.resource.data.saveVersion <= 22
              && request.resource.data.revision is int
              && request.resource.data.baseRevision is int
              && request.resource.data.payload is string

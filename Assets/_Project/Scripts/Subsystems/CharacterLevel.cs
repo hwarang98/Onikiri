@@ -26,6 +26,20 @@ namespace Onikiri.Progression
         public const string AttackAmpId = "stat_attack";
         public const string HealthAmpId = "stat_health";
 
+        /**
+         * 66단계: 골드로는 살 수 없는 종류의 세 축. 전투 스탯이 아니라
+         * 보상(경험치·골드)과 방치 시간에 걸린다 - StatPointCurve 참고
+         */
+        public const string ExpAmpId = "stat_exp";
+        public const string GoldAmpId = "stat_gold";
+        public const string IdleAmpId = "stat_idle";
+
+        /** 성장 탭에 서는 순서 그대로. 초기화·합산·복원이 이 목록 하나를 돈다 */
+        public static readonly string[] AxisIds =
+        {
+            AttackAmpId, HealthAmpId, ExpAmpId, GoldAmpId, IdleAmpId
+        };
+
         [SerializeField] private UpgradeSystem upgrades;
 
         [SerializeField] private int level = 1;
@@ -35,6 +49,12 @@ namespace Onikiri.Progression
 
         [SerializeField] private int attackPoints;
         [SerializeField] private int healthPoints;
+        [SerializeField] private int expPoints;
+        [SerializeField] private int goldPoints;
+        [SerializeField] private int idlePoints;
+
+        [Tooltip("보석 초기화를 한 횟수. 0이면 다음 초기화가 무료다")]
+        [SerializeField] private int resetCount;
 
         /** 레벨/경험치/포인트 중 무엇이든 바뀌면 발생 */
         public event Action Changed;
@@ -45,11 +65,26 @@ namespace Onikiri.Progression
 
         public int AttackPoints { get { return attackPoints; } }
         public int HealthPoints { get { return healthPoints; } }
+        public int ExpPoints { get { return expPoints; } }
+        public int GoldPoints { get { return goldPoints; } }
+        public int IdlePoints { get { return idlePoints; } }
+
+        /** 지금까지 한 초기화 횟수. 첫 1회만 무료다(IsNextResetFree) */
+        public int ResetCount { get { return resetCount; } }
+
+        /** 다음 초기화가 무료인가. 첫 1회 */
+        public bool IsNextResetFree { get { return resetCount <= 0; } }
+
+        /** 다섯 축에 찍은 합. 0이면 초기화할 것이 없다 */
+        public int SpentPoints
+        {
+            get { return attackPoints + healthPoints + expPoints + goldPoints + idlePoints; }
+        }
 
         /**
          * @brief 아직 안 찍은 포인트.
          *
-         * 저장하지 않고 매번 계산한다. 총 지급량은 레벨의 함수이고 쓴 양은 두 축의
+         * 저장하지 않고 매번 계산한다. 총 지급량은 레벨의 함수이고 쓴 양은 축들의
          * 합이므로, 남은 양을 따로 들고 있으면 셋 중 하나가 어긋났을 때 어느 것이
          * 맞는지 알 수 없는 상태가 생긴다.
          */
@@ -58,7 +93,7 @@ namespace Onikiri.Progression
             get
             {
                 int total = StatPointCurve.TotalPointsAtLevel(level);
-                int spent = attackPoints + healthPoints;
+                int spent = SpentPoints;
                 return total - spent < 0 ? 0 : total - spent;
             }
         }
@@ -82,6 +117,21 @@ namespace Onikiri.Progression
 
         public double AttackMultiplier { get { return StatPointCurve.Multiplier(attackPoints); } }
         public double HealthMultiplier { get { return StatPointCurve.Multiplier(healthPoints); } }
+
+        /** 66단계. 처치 경험치에 곱한다 - AddKillExp와 방치 경험치 추정 */
+        public double ExpGainMultiplier { get { return StatPointCurve.Multiplier(ExpAmpId, expPoints); } }
+
+        /** 66단계. UpgradeSystem.CurrentGoldGain이 골드 강화 배수 위에 곱한다 */
+        public double GoldGainMultiplier { get { return StatPointCurve.Multiplier(GoldAmpId, goldPoints); } }
+
+        /** 66단계. 방치 보상의 최대 누적 시간에 더해지는 몫. 배수가 아니다 */
+        public TimeSpan IdleAccrualBonus { get { return StatPointCurve.IdleExtraAccrual(idlePoints); } }
+
+        /** 씬의 골드 획득 증폭. 없으면 1. 읽는 곳은 UpgradeSystem.CurrentGoldGain 하나다 */
+        public static double CurrentGoldGainAmp
+        {
+            get { return Instance != null ? Instance.GoldGainMultiplier : 1d; }
+        }
 
         private void Awake()
         {
@@ -111,6 +161,28 @@ namespace Onikiri.Progression
 
             exp = exp + amount;
             Raise();
+        }
+
+        /**
+         * @brief 처치 경험치 (66단계). **경험치 증폭은 여기서만 곱한다.**
+         *
+         * AddExp에 곱하지 않는 이유는 그 입구를 셋이 지나기 때문이다 - 처치,
+         * 방치, 업적. 업적 경험치는 31단계가 "되돌릴 수 없는 축이라 faucet
+         * 금지"로 막은 자리이고, 방치 경험치는 이미 배수가 반영된 초당
+         * 경험치(GameSession.EstimateExpPerSecond)에서 나온다. AddExp에서
+         * 곱하면 앞의 것은 금지를 어기고 뒤의 것은 배수가 제곱된다.
+         *
+         * 보스도 처치다. 보스 경험치는 EnemySpawner의 같은 자리를 지난다.
+         *
+         * @return 실제로 들어간 양. 데미지 숫자가 이 값을 띄운다
+         */
+        public BigDouble AddKillExp(BigDouble amount)
+        {
+            if (amount <= BigDouble.Zero) return BigDouble.Zero;
+
+            var granted = amount * BigDouble.FromDouble(ExpGainMultiplier);
+            AddExp(granted);
+            return granted;
         }
 
         // ---------------------------------------------------------------- 레벨업
@@ -190,22 +262,23 @@ namespace Onikiri.Progression
         {
             if (UnspentPoints <= 0) return false;
 
-            if (axisId == AttackAmpId)
+            if (!IsKnownAxis(axisId))
             {
-                if (attackPoints >= StatPointCurve.MaxPoints) return false;
-                attackPoints++;
-                return true;
+                Debug.LogWarning("[Onikiri] Unknown stat axis '" + axisId + "'.");
+                return false;
             }
 
-            if (axisId == HealthAmpId)
-            {
-                if (healthPoints >= StatPointCurve.MaxPoints) return false;
-                healthPoints++;
-                return true;
-            }
+            // 경험치 축은 Lv.15에 열린다(StatPointCurve.ExpUnlockLevel). 상한이 아니라
+            // 등장 시점이다 - 열리면 다른 축과 같은 200까지 간다
+            if (!IsAxisUnlocked(axisId)) return false;
 
-            Debug.LogWarning("[Onikiri] Unknown stat axis '" + axisId + "'.");
-            return false;
+            // 상한은 다섯 축 공통 200이다(StatPointCurve.MaxPoints). 66단계의
+            // 세 축에 다른 상한을 두지 않는다
+            int have = PointsIn(axisId);
+            if (have >= StatPointCurve.MaxPoints) return false;
+
+            SetPoints(axisId, have + 1);
+            return true;
         }
 
         /**
@@ -217,6 +290,8 @@ namespace Onikiri.Progression
          */
         public int SpendableInto(string axisId, int limit)
         {
+            if (!IsAxisUnlocked(axisId)) return 0;
+
             int room = StatPointCurve.MaxPoints - PointsIn(axisId);
             if (room <= 0) return 0;
 
@@ -273,7 +348,30 @@ namespace Onikiri.Progression
         {
             if (axisId == AttackAmpId) return attackPoints;
             if (axisId == HealthAmpId) return healthPoints;
+            if (axisId == ExpAmpId) return expPoints;
+            if (axisId == GoldAmpId) return goldPoints;
+            if (axisId == IdleAmpId) return idlePoints;
             return 0;
+        }
+
+        /** 지금 레벨에서 이 축에 찍을 수 있는가 (66단계 - 경험치 축 Lv.15 게이트) */
+        public bool IsAxisUnlocked(string axisId)
+        {
+            return StatPointCurve.IsUnlocked(axisId, level);
+        }
+
+        public static bool IsKnownAxis(string axisId)
+        {
+            return Array.IndexOf(AxisIds, axisId) >= 0;
+        }
+
+        private void SetPoints(string axisId, int value)
+        {
+            if (axisId == AttackAmpId) attackPoints = value;
+            else if (axisId == HealthAmpId) healthPoints = value;
+            else if (axisId == ExpAmpId) expPoints = value;
+            else if (axisId == GoldAmpId) goldPoints = value;
+            else if (axisId == IdleAmpId) idlePoints = value;
         }
 
         public bool IsAxisMaxed(string axisId)
@@ -305,13 +403,49 @@ namespace Onikiri.Progression
          */
         public void DebugRefundPoints()
         {
-            attackPoints = 0;
-            healthPoints = 0;
+            ClearAllPoints();
 
             // 증폭이 곱해진 스탯을 되돌린다. 이것을 잊으면 포인트는 0인데 공격력에
             // 배수가 남아 있는 상태가 되고, 다음 강화 구매 전까지 그대로 간다
             ApplyToStats();
             Raise();
+        }
+
+        /**
+         * @brief 보석 초기화 (66단계). 다섯 축을 전부 미배분으로 되돌린다.
+         *
+         * **보석은 여기서 빼지 않는다.** 차감은 호출 측이 GemWallet 한 문으로
+         * 한다(StatPointReset). 60단계의 urgent 동기화가 GemsChanged 하나를
+         * 듣고 있어서 다른 길로 보석이 줄면 그 동기화가 놓친다.
+         *
+         * 환불 구조는 DebugRefundPoints와 같다. 남은 포인트는 저장하지 않고
+         * "총 지급량 - 쓴 양"이므로, 쓴 양을 0으로 만들면 전부 돌아온다.
+         *
+         * @param free 첫 1회 무료로 하는가. 무료가 이미 쓰였는데 true가 오면
+         *             거절한다 - 호출 측 판단이 어긋나도 무료가 두 번 나가지 않게
+         * @return 실제로 되돌렸는가. 찍은 것이 없으면 false다 - 무료 1회를 빈
+         *         초기화로 날리지 않는다
+         */
+        public bool ResetAllPoints(bool free)
+        {
+            if (SpentPoints <= 0) return false;
+            if (free && !IsNextResetFree) return false;
+
+            ClearAllPoints();
+            resetCount++;
+
+            ApplyToStats();
+            Raise();
+            return true;
+        }
+
+        private void ClearAllPoints()
+        {
+            attackPoints = 0;
+            healthPoints = 0;
+            expPoints = 0;
+            goldPoints = 0;
+            idlePoints = 0;
         }
 
         // ---------------------------------------------------------------- 반영
@@ -330,25 +464,44 @@ namespace Onikiri.Progression
 
         // ---------------------------------------------------------------- 세이브
 
+        /** 66단계 이전의 모양. 새 세 축과 초기화 횟수는 0이다 */
         public void Restore(int savedLevel, BigDouble savedExp, int savedAttackPoints, int savedHealthPoints)
+        {
+            Restore(savedLevel, savedExp, savedAttackPoints, savedHealthPoints, 0, 0, 0, 0);
+        }
+
+        public void Restore(int savedLevel, BigDouble savedExp, int savedAttackPoints, int savedHealthPoints,
+                            int savedExpPoints, int savedGoldPoints, int savedIdlePoints, int savedResetCount)
         {
             level = savedLevel < 1 ? 1 : savedLevel;
             exp = savedExp < BigDouble.Zero ? BigDouble.Zero : savedExp;
 
             attackPoints = StatPointCurve.Clamp(savedAttackPoints);
             healthPoints = StatPointCurve.Clamp(savedHealthPoints);
+            // 잠긴 축에 찍힌 세이브(손상)는 미배분으로 돌린다 - 받은 포인트는 남는다
+            expPoints = StatPointCurve.IsUnlocked(ExpAmpId, level) ? StatPointCurve.Clamp(savedExpPoints) : 0;
+            goldPoints = StatPointCurve.Clamp(savedGoldPoints);
+            idlePoints = StatPointCurve.Clamp(savedIdlePoints);
+            resetCount = savedResetCount < 0 ? 0 : savedResetCount;
 
             // 찍은 합이 지급량을 넘으면(상한이 내려갔거나 손상된 파일) 넘친 만큼
             // 뒤에서부터 깎는다. 그냥 두면 UnspentPoints가 계속 0이라 정상처럼
-            // 보이는데 실제 스탯은 받지 않은 포인트를 반영하고 있다
+            // 보이는데 실제 스탯은 받지 않은 포인트를 반영하고 있다.
+            //
+            // "뒤"는 성장 탭의 아래쪽(AxisIds 역순)이다 - 전투와 먼 축이 먼저
+            // 깎여야 잘린 세이브가 보스 앞에서 갑자기 약해지지 않는다
             int total = StatPointCurve.TotalPointsAtLevel(level);
-            int overflow = attackPoints + healthPoints - total;
+            int overflow = SpentPoints - total;
             if (overflow > 0)
             {
-                int fromHealth = Mathf.Min(healthPoints, overflow);
-                healthPoints -= fromHealth;
-                attackPoints -= overflow - fromHealth;
-                if (attackPoints < 0) attackPoints = 0;
+                int left = overflow;
+                for (int i = AxisIds.Length - 1; i >= 0 && left > 0; i--)
+                {
+                    int have = PointsIn(AxisIds[i]);
+                    int take = Mathf.Min(have, left);
+                    SetPoints(AxisIds[i], have - take);
+                    left -= take;
+                }
 
                 Debug.LogWarning("[Onikiri] Save had more spent stat points than earned; trimmed "
                                  + overflow + ".");

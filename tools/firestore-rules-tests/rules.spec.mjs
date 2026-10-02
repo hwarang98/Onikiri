@@ -77,10 +77,10 @@ function summary(over = {}) {
 function envelope(over = {}) {
   return {
     formatVersion: 1,
-    saveVersion: 21,
+    saveVersion: 22,
     revision: 1,
     baseRevision: 0,
-    payload: '{"version":21,"stage":82}',
+    payload: '{"version":22,"stage":82}',
     payloadSha256: HASH_PAYLOAD,
     stateSha256: HASH_STATE,
     lastMutationId: MUTATION_1,
@@ -347,7 +347,17 @@ describe('봉투 형식', () => {
   });
 
   rejects({ updatedAt: Timestamp.fromMillis(Date.now()) }, '클라이언트 시각은 거부한다');
-  rejects({ saveVersion: 22 }, '미래 saveVersion은 거부한다');
+  rejects({ saveVersion: 23 }, '미래 saveVersion은 거부한다');
+
+  // 66단계: 상한이 21 -> 22. 현재 버전과 옛 빌드(v21)가 둘 다 정본을 만든다
+  it('현재 saveVersion(22)은 받는다', async () => {
+    await assertSucceeds(setDoc(doc(me(), 'playerSaves', ME), envelope({ saveVersion: 22 })));
+  });
+
+  it('옛 빌드의 saveVersion(21)도 계속 받는다', async () => {
+    await assertSucceeds(setDoc(doc(me(), 'playerSaves', ME),
+      envelope({ saveVersion: 21, payload: '{"version":21,"stage":82}' })));
+  });
   rejects({ saveVersion: 0 }, 'saveVersion 0은 거부한다');
   rejects({ formatVersion: 2 }, '모르는 봉투 형식은 거부한다');
   rejects({ payload: 'x'.repeat(204801) }, '200KB 초과 payload는 거부한다');

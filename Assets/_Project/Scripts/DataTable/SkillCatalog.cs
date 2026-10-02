@@ -568,7 +568,7 @@ namespace Onikiri.Progression
          * ## 자리를 고른 방식 - 기본 셋 사이에 끼운다
          *
          *     st8  연참(기본)   st12 혈파동   st15 일섬(기본)
-         *     st18 낙혈         st21 귀참(기본)  st27 혈륜
+         *     st18 낙혈         st20 귀참(기본, 66단계 전 st21)  st27 혈륜
          *
          * 기본 오의의 해금(8/15/21)은 **자리가 하나 늘어나는 순간**이고 신규의
          * 해금은 **고를 것이 하나 늘어나는 순간**이다. 둘을 번갈아 두면 서로
@@ -640,7 +640,11 @@ namespace Onikiri.Progression
             new SkillSpec {
                 Id = OniCleaveId, DisplayName = "귀참", Family = SkillFamily.OniSecret,
                 BaseMultiplier = 3.52d, CooldownSeconds = 11d,
-                UnlockLevel = 20, UnlockStage = 21,
+                // 66단계: st21 -> st20. 경험치 증폭이 Lv.15에 열리면서 Lv.20이 한
+                // 스테이지 앞당겨졌다(실측 - Skills_UnlockWhereTheCostAssumes). 비용
+                // 기준점은 실측을 따른다(UnlockStage 주석) - 일섬(Lv.15)은 게이트가
+                // 막아 st15 그대로다
+                UnlockLevel = 20, UnlockStage = 20,
                 IconFile = "Icon118",           // 오니 뿔
                 SlashRgba = 0xFF9500FFu,        // 깊은 호박빛 금 (치명타 #FFD34D 과 거리 0.39)
                 Area = SkillArea.Screen, Split = SkillSplit.Once, HitCount = 1, Weight = 2,

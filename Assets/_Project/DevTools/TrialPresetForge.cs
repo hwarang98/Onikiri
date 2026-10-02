@@ -96,6 +96,9 @@ namespace Onikiri.DevTools
             data.characterLevel = row.CharacterLevel;
             data.attackPoints = row.AttackPoints;
             data.healthPoints = row.HealthPoints;
+            // 66단계: 시뮬레이션이 찍는 두 보상 축. 방치 축은 시뮬레이션에 없다(0)
+            data.expPoints = row.ExpPoints;
+            data.goldPoints = row.GoldPoints;
             data.exp = BigDouble.Zero;
 
             // ---- 강화 아홉 축. 시뮬레이션이 `Levels`에서 쓰는 것과 같은 순서다
@@ -283,6 +286,8 @@ namespace Onikiri.DevTools
             Int(bad, "characterLevel", row.CharacterLevel, save.characterLevel);
             Int(bad, "attackPoints", row.AttackPoints, save.attackPoints);
             Int(bad, "healthPoints", row.HealthPoints, save.healthPoints);
+            Int(bad, "expPoints", row.ExpPoints, save.expPoints);
+            Int(bad, "goldPoints", row.GoldPoints, save.goldPoints);
 
             // ---- 강화 아홉
             Int(bad, "강화:" + UpgradeSystem.AttackPowerId, row.AttackPowerLevel, Track(save, UpgradeSystem.AttackPowerId));

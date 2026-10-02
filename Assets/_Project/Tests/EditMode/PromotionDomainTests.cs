@@ -645,8 +645,8 @@ namespace Onikiri.Tests
         [Test]
         public void MigrationV21_IsActiveAndConvertsOldSaves()
         {
-            Assert.AreEqual(21, SaveData.CurrentVersion,
-                "귀문이 연결됐는데 세이브 버전이 21이 아니다 - 원자적 변경 넷 중 하나가 빠졌다");
+            Assert.GreaterOrEqual(SaveData.CurrentVersion, 21,
+                "귀문이 연결됐는데 세이브 버전이 21 미만이다 (66단계가 22로 올렸다) - 원자적 변경 넷 중 하나가 빠졌다");
 
             // st200을 지난 v20 플레이어의 티어가 0이어도 여섯 문을 인정받는다
             var veteran = SaveAt(frontier: 200, tier: 0);
@@ -743,7 +743,7 @@ namespace Onikiri.Tests
             Assert.IsTrue(bossSource.Contains("TrialDamageScale.Exit"),
                 "귀문 종료가 소프트캡을 끄지 않는다");
 
-            Assert.AreEqual(21, SaveData.CurrentVersion, "세이브 버전이 21이 아니다");
+            Assert.AreEqual(22, SaveData.CurrentVersion, "세이브 버전이 22가 아니다");
         }
 
         /**

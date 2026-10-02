@@ -628,6 +628,7 @@ namespace Onikiri.EditorTools
                 }
 
                 DrawLevelTools();
+                DrawGrowthTabTools();
                 DrawBossTools();
                 DrawRegionMobTools();
                 DrawDeepZoneTools();
@@ -2300,6 +2301,84 @@ namespace Onikiri.EditorTools
                 EditorGUILayout.LabelField(
                     character.PendingLevelUps > 0 ? "알림 점 ON" : "알림 점 OFF",
                     EditorStyles.miniLabel, GUILayout.Width(90f));
+            }
+        }
+
+        /**
+         * @brief 성장 탭 (66단계) - 다섯 축의 포인트, 세 증폭의 지금 값, 보석 초기화.
+         *
+         * 절의 문법은 다른 재화 소비처와 같다:
+         *
+         *   실제 경로      "초기화 (실제)" - 버튼과 같은 StatPointReset.TryReset.
+         *                  무료 1회 판정·보석 차감·GemsChanged(urgent 동기화)를
+         *                  화면 버튼과 똑같이 지난다
+         *   재화 무시      "무료 다시" - 초기화 횟수만 0으로 돌려 다음을 무료로
+         *   치트           "+50점 고르게" - 다섯 축에 10점씩(레벨을 부어 만든다)
+         *
+         * 방치 축은 시간이라 여기서 바로 확인할 길이 없다. 그래서 지금의 최대
+         * 누적 시간을 함께 적는다 - 아래 "방치 보상" 절의 시각 되돌리기로
+         * 상한을 넘겨 보면 팝업의 "(상한 도달)"이 이 값에서 켜져야 한다.
+         */
+        private void DrawGrowthTabTools()
+        {
+            if (character == null) return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("성장 탭", GUILayout.Width(64f));
+                EditorGUILayout.LabelField(string.Format(
+                    "공 {0} 체 {1} 경 {2} 골 {3} 방 {4} / 남음 {5}",
+                    character.AttackPoints, character.HealthPoints, character.ExpPoints,
+                    character.GoldPoints, character.IdlePoints, character.UnspentPoints),
+                    EditorStyles.miniLabel);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(string.Empty, GUILayout.Width(64f));
+                EditorGUILayout.LabelField(string.Format(
+                    "EXP x{0:F3}  골드 x{1:F3} (강화 포함 x{2:F3})  방치 상한 {3}",
+                    character.ExpGainMultiplier, character.GoldGainMultiplier,
+                    UpgradeSystem.CurrentGoldGain,
+                    NumberFormatter.FormatDurationKo(IdleIncome.MaxAccrualFor(character.IdlePoints))),
+                    EditorStyles.miniLabel);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(string.Empty, GUILayout.Width(64f));
+
+                if (GUILayout.Button("+50점 고르게"))
+                {
+                    // 레벨을 부어 포인트를 만든다 - 포인트를 직접 대입하면 남은
+                    // 포인트 식(총 지급 - 쓴 양)이 어긋난 상태를 테스트하게 된다
+                    while (character.UnspentPoints < 50)
+                    {
+                        character.AddExp(character.ExpRequired);
+                        character.ClaimLevelUps();
+                    }
+                    foreach (var axis in CharacterLevel.AxisIds) character.TrySpendPoints(axis, 10);
+                }
+
+                var gemsNow = GemWallet.Instance;
+                string label = character.IsNextResetFree
+                    ? "초기화 (실제·무료)"
+                    : "초기화 (실제·" + StatPointCurve.ResetGemCost + "보석)";
+                if (GUILayout.Button(label))
+                {
+                    var result = StatPointReset.TryReset(character, gemsNow);
+                    Debug.Log("[Onikiri] 스탯 포인트 초기화 (테스트 패널): " + result
+                              + " / 초기화 " + character.ResetCount + "회, 보석 "
+                              + (gemsNow != null ? gemsNow.Gems : 0L));
+                }
+
+                if (GUILayout.Button("무료 다시"))
+                {
+                    character.Restore(character.Level, character.Exp, character.AttackPoints,
+                        character.HealthPoints, character.ExpPoints, character.GoldPoints,
+                        character.IdlePoints, 0);
+                    Debug.Log("[Onikiri] 초기화 횟수를 0으로 - 다음 초기화가 무료다.");
+                }
             }
         }
 

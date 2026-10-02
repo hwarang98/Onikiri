@@ -400,9 +400,9 @@ namespace Onikiri.Tests
             // 내려앉았다. 46·49단계 처방대로 파편 묶음이 마지막 층이던 세계(옛
             // 골드 축, GoldAxisPre64)에서 4%를 재고, 지금 세계는 3% 하한을 못 박는다
             var withPacks = StageSimulation.Run(450, field,
-                new StageSimulation.Policy { SkipGacha = true, GoldAxisPre64 = true, NeutralizeHitRating = true });
+                new StageSimulation.Policy { SkipGacha = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true });
             var without = StageSimulation.Run(450, field,
-                new StageSimulation.Policy { SkipShardPacks = true, SkipGacha = true, GoldAxisPre64 = true, NeutralizeHitRating = true });
+                new StageSimulation.Policy { SkipShardPacks = true, SkipGacha = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true });
 
             double gain = TotalSeconds(without, 200, 450) / TotalSeconds(withPacks, 200, 450) - 1d;
 

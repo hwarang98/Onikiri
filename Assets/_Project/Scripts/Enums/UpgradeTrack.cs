@@ -61,7 +61,15 @@ namespace Onikiri.Progression
             HitChance,
 
             /** 65단계: 회피. 지금 스테이지 보스의 명중을 상대로 한 회피율로 보인다 */
-            DodgeChance
+            DodgeChance,
+
+            /**
+             * 66단계: 방치 보상 증폭. 값은 **분**이고 "+16시간 40분"으로 보인다.
+             * 그 축은 배수가 아니라 방치 보상의 최대 누적 시간을 늘리므로
+             * (StatPointCurve.IdleMinutesPerPoint), "x1.04"로 적으면 효율이
+             * 오르는 것으로 읽힌다 - 실제로는 효율 0.5가 그대로다
+             */
+            Duration
         }
 
         /** 명중·회피 표시가 기준으로 삼는 스테이지. 진행이 없는 씬(테스트)에서는 1 */
@@ -143,6 +151,18 @@ namespace Onikiri.Progression
          */
         public string Format(BigDouble value)
         {
+            return FormatAs(display, value);
+        }
+
+        /**
+         * @brief 표시 방식을 지정해 값 하나를 문자열로 (66단계).
+         *
+         * 강화 행이 아닌 곳(성장 탭의 스탯 포인트 줄)도 같은 규칙으로 적어야
+         * 해서 정적으로 열었다. 두 곳이 "+n%"를 따로 만들면 언젠가 자릿수가
+         * 갈린다.
+         */
+        public static string FormatAs(Display display, BigDouble value)
+        {
             switch (display)
             {
                 case Display.Percent:
@@ -161,6 +181,12 @@ namespace Onikiri.Progression
                     // 배수 - 1. 소수 첫째 자리까지 - 한 칸이 +2.0%라 정수로 두면
                     // 후반에 복리가 만드는 "+2.3%" 같은 칸 차이가 사라진다
                     return "+" + ((value.ToDouble() - 1d) * 100d).ToString("F1") + "%";
+                case Display.Duration:
+                    // 0분도 "+0분"이다. 빈 문자열이면 라벨이 사라져 "현재 -> 다음"의
+                    // 앞쪽이 비어 보인다
+                    double minutes = value.ToDouble();
+                    if (minutes < 1d) return "+0분";
+                    return "+" + NumberFormatter.FormatDurationKo(System.TimeSpan.FromMinutes(minutes));
                 case Display.PerSecond:
                     // 최대 체력 대비 비율이다. 절대량으로 읽히면 "1/s"가
                     // 체력 100에서도 100000에서도 같아 보인다

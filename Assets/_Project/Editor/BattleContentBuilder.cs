@@ -1940,8 +1940,15 @@ namespace Onikiri.EditorTools
 
             var stats = Object.FindObjectsByType<Onikiri.UI.StatPointButton>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
-            if (stats.Length != 2)
-                problems.Add("Expected 2 stat point axes but found " + stats.Length);
+            // 66단계: 공격력·체력 + 경험치·골드·방치. 개수는 CharacterLevel.AxisIds가 정한다
+            if (stats.Length != CharacterLevel.AxisIds.Length)
+                problems.Add("Expected " + CharacterLevel.AxisIds.Length + " stat point axes but found "
+                             + stats.Length);
+
+            var resets = Object.FindObjectsByType<Onikiri.UI.StatPointResetButton>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (resets.Length != 1)
+                problems.Add("Expected 1 stat point reset button but found " + resets.Length);
 
             // 하단 바의 잠긴 탭 + 성장 패널의 전직 안내. 18단계에 전직이 하단에서
             // 성장 패널 탭으로 옮겨가면서 LockedTab이 두 밴드에 나뉘어 산다.

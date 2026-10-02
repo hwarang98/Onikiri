@@ -12,9 +12,10 @@ namespace Onikiri.UI
      * 같은 자리에 같은 모양으로 선다 - 두 축이 다르게 생기면 플레이어는 이것이
      * 다른 종류의 조작이라고 배우고, 실제로는 아니다.
      *
-     * 다른 점 하나는 되돌릴 수 없다는 것이다. 골드는 다시 벌 수 있지만 포인트는
-     * 레벨을 다시 올려야 나온다. 승급(12단계 범위 밖)이 생기면 그때 초기화
-     * 수단이 붙는다.
+     * 다른 점 하나는 되돌리기가 비싸다는 것이다. 골드는 다시 벌 수 있지만
+     * 포인트는 레벨을 다시 올려야 나온다. 66단계부터 보석 초기화가 있지만
+     * (StatPointReset - 첫 1회 무료, 이후 150 보석) 사흘치 보석이라, 찍기 전에
+     * 결과를 보여주는 규칙(배수 표시)은 그대로다.
      */
     public sealed class StatPointButton : MonoBehaviour
     {
@@ -26,6 +27,25 @@ namespace Onikiri.UI
         [SerializeField] private TMP_Text costLabel;
 
         [SerializeField] private string displayName = "공격력 증폭";
+
+        /**
+         * @brief 값의 표시 방식 (66단계).
+         *
+         *   Multiplier     공격력·체력 증폭. 예전 그대로 "×1.025" (소수 셋째 자리)
+         *   BonusPercent   경험치·골드 획득 증폭. "+0.8%" - 강화 탭의 골드 획득
+         *                  행과 같은 모양(UpgradeTrack.FormatAs)
+         *   Duration       방치 보상 증폭. "+16시간 40분" - 배수가 아니다
+         */
+        [SerializeField] private UpgradeTrack.Display display = UpgradeTrack.Display.Multiplier;
+
+        /**
+         * @brief 잠긴 축의 문구 (66단계). "Lv.15 해금" - {0}이 해금 레벨이다.
+         *
+         * 경험치 축만 게이트가 있다(StatPointCurve.ExpUnlockLevel). 잠긴 줄도
+         * 목록에 서 있는 것은 강화 행(UpgradeButton.lockedLabel)과 같은 규칙이다 -
+         * 줄이 없으면 그 축이 나중에 온다는 것을 알 길이 없다. 빌더가 넣는다
+         */
+        [SerializeField] private string lockedFormat = string.Empty;
 
         [Header("색")]
         [SerializeField] private Color affordableColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
@@ -108,6 +128,12 @@ namespace Onikiri.UI
         {
             if (character == null) return;
 
+            if (!character.IsAxisUnlocked(axisId))
+            {
+                ShowLocked();
+                return;
+            }
+
             int points = character.PointsIn(axisId);
             bool maxed = character.IsAxisMaxed(axisId);
 
@@ -124,10 +150,10 @@ namespace Onikiri.UI
                 //
                 // 배수로 찍을 때는 **그만큼 간 값**을 보여준다. 되돌릴 수 없는
                 // 재화라 누르기 전에 결과가 화면에 있어야 한다
-                string now = Format(StatPointCurve.Multiplier(points));
+                string now = Format(points);
                 valueLabel.text = maxed
                     ? now
-                    : now + " → " + Format(StatPointCurve.Multiplier(points + Mathf.Max(1, planned)))
+                    : now + " → " + Format(points + Mathf.Max(1, planned))
                       + (planned > 1 ? "   +" + planned : string.Empty);
             }
 
@@ -154,8 +180,29 @@ namespace Onikiri.UI
          * UpgradeButton이 Format 대신 FormatStat을 쓰는 것과 같은 이유이고,
          * 같은 실수를 한 번 더 한 것이다.
          */
-        private static string Format(double multiplier)
+        private void ShowLocked()
         {
+            if (nameLabel != null) nameLabel.text = displayName;
+            if (valueLabel != null)
+                valueLabel.text = string.Format(lockedFormat, StatPointCurve.UnlockLevelFor(axisId));
+            if (costLabel != null)
+            {
+                costLabel.text = string.Empty;
+                costLabel.color = unaffordableColor;
+            }
+            if (button != null) button.interactable = false;
+        }
+
+        private string Format(int points)
+        {
+            if (display == UpgradeTrack.Display.Duration)
+                return UpgradeTrack.FormatAs(display,
+                    Onikiri.Core.BigDouble.FromDouble(StatPointCurve.IdleExtraAccrual(points).TotalMinutes));
+
+            double multiplier = StatPointCurve.Multiplier(axisId, points);
+            if (display == UpgradeTrack.Display.BonusPercent)
+                return UpgradeTrack.FormatAs(display, Onikiri.Core.BigDouble.FromDouble(multiplier));
+
             return "×" + multiplier.ToString("0.000");
         }
     }
