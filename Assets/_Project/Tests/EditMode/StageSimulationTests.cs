@@ -1036,6 +1036,43 @@ namespace Onikiri.Tests
          * 골드 축의 생존성 검사와 짝이다. 이쪽이 0이면 구매 정책이 포인트를
          * 아예 배분하지 않는다는 뜻이고, 그러면 위의 체감 검사도 의미가 없다.
          */
+        /**
+         * @brief 골드 획득 증폭(66단계)은 1% 기준의 **명시적 예외**다 - 표시와 실효를 함께 못 박는다.
+         *
+         * 표시는 한 점 +0.75%로 기준 아래다. 예외의 근거는 복리다: 골드가 강화
+         * 전부의 재화라 실효 DPS 체감이 표시보다 크다. st50에서 공짜 골드 포인트
+         * 열 점을 얹은 세계와 비교해 한 점당 실효를 잰다 - 한 점으로 재면 강화
+         * 구매 시점의 계단이 값을 흔든다(실측 0.74~0.93%).
+         *
+         * 실효가 표시 아래로 내려가면 예외의 근거가 사라진 것이고, 1%를 넘으면
+         * 더 이상 예외가 아니다 - 둘 다 이 주석과 StatPointCurve.GoldPerPoint를
+         * 함께 다시 볼 신호다.
+         */
+        [Test]
+        public void GoldAmp_IsTheExplicitExceptionToTheFeltRule()
+        {
+            const int Probe = 10;
+            const int Stage = 50;
+
+            double shown = StatPointCurve.GoldPerPoint - 1d;
+            Assert.AreEqual(0.0075d, shown, 1e-12, "표시 계수가 바뀌었다 - 예외 문단을 다시 볼 것");
+            Assert.Less(shown, MinimumFeltGain, "표시가 1%를 넘으면 예외로 둘 이유가 없다");
+
+            var now = StageSimulation.Run(Stage, FieldFromAssets());
+            var more = StageSimulation.Run(Stage, FieldFromAssets(),
+                new StageSimulation.Policy { ExtraGoldPoints = Probe });
+
+            double gain = more[Stage - 1].ExpectedDps / now[Stage - 1].ExpectedDps;
+            double perPoint = Math.Pow(gain, 1d / Probe) - 1d;
+
+            Assert.Greater(perPoint, shown, string.Format(
+                "st{0}: 골드 한 점의 실효 DPS {1:P3}가 표시 {2:P2} 아래다 - 복리 예외의 근거가 사라졌다",
+                Stage, perPoint, shown));
+            Assert.Less(perPoint, MinimumFeltGain, string.Format(
+                "st{0}: 골드 한 점의 실효 {1:P3}가 1%를 넘었다 - 예외가 아니게 됐다(계수·폭주 검사 재확인)",
+                Stage, perPoint));
+        }
+
         [Test]
         public void StatPointAxes_AreInvestedThrough20()
         {

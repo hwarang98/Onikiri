@@ -381,6 +381,16 @@ namespace Onikiri.Progression
              */
             public bool StatPointsPre66;
 
+            /**
+             * @brief **측정 전용.** 골드 획득 증폭에 이만큼 공짜 포인트를 더 얹는다.
+             *
+             * 게임에는 없는 세계다. 골드 축이 Step16 체감 기준(1%/pt)의 예외라는
+             * 주장(StatPointCurve.GoldPerPoint 주석)을 끝단에서 재려면 "한 점을 더
+             * 찍은 세계"가 있어야 하는데, 배분 정책을 건드리지 않고 그 한 점만
+             * 더하는 자리가 여기다. 0이면 아무 일도 하지 않는다
+             */
+            public int ExtraGoldPoints;
+
             /** 스킬을 한 번도 올리지 않는다 (해금은 되므로 레벨 1의 기여는 남는다) */
             public bool SkipSkills;
 
@@ -968,6 +978,7 @@ namespace Onikiri.Progression
             // 가정하는 구성이자 게임 쪽 기본값이다(SkillSystem.FillEmptySlots)
             levels.GoldCapPre64 = policy.GoldAxisPre64;
             levels.StatPointsPre66 = policy.StatPointsPre66;
+            levels.ExtraGoldPoints = policy.ExtraGoldPoints;
             levels.NoExpansionSlot = policy.SkipSkillSlot;
             levels.NoExpansionSkills = policy.SkipExpansionSkills;
             levels.ForcedLoadout = policy.ForceLoadout;
@@ -2343,6 +2354,9 @@ namespace Onikiri.Progression
             /** 66단계 이전 세계(Policy.StatPointsPre66) - 축 둘, 레벨당 1점 */
             public bool StatPointsPre66;
 
+            /** 측정 전용 공짜 골드 포인트(Policy.ExtraGoldPoints) */
+            public int ExtraGoldPoints;
+
             public int L { get { return Character < 1 ? 1 : Character; } }
 
             public double AttackAmp { get { return StatPointCurve.Multiplier(AttackPoints); } }
@@ -2352,7 +2366,7 @@ namespace Onikiri.Progression
             public double ExpAmp { get { return StatPointCurve.Multiplier(CharacterLevel.ExpAmpId, ExpPoints); } }
 
             /** 골드 강화 배수(GoldGain) 위에 곱한다 - UpgradeSystem.CurrentGoldGain */
-            public double GoldAmp { get { return StatPointCurve.Multiplier(CharacterLevel.GoldAmpId, GoldPoints); } }
+            public double GoldAmp { get { return StatPointCurve.Multiplier(CharacterLevel.GoldAmpId, GoldPoints + ExtraGoldPoints); } }
 
             /**
              * @brief 골드 보상에 실제로 곱해지는 값 (66단계).
