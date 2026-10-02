@@ -92,6 +92,56 @@ namespace Onikiri.Progression
         public double ComboChance;
 
         /**
+         * @brief 명중 수치 (65단계). **0이면 강화 전 기본값(CombatBaseline.Accuracy)이다.**
+         *
+         * 0을 "명중 0"이 아니라 "기본값"으로 읽는 이유는 다른 필드와 같다 -
+         * 명중이 없던 시절에 손으로 만든 스탯(테스트·지표)이 빗나감 0%가 아니라
+         * 강화 전 플레이어와 같은 명중률을 낸다.
+         *
+         * **ExpectedDps에는 들어가지 않는다.** 명중의 값어치는 상대의 회피에
+         * 달려 있고 이 구조체는 상대를 모른다. 상대를 아는 쪽이
+         * ExpectedDpsAgainst(적 회피)를 부른다 - 기존 호출부 35곳은 그대로
+         * "빗나가지 않는 DPS"를 읽는다(65단계 보고서 §1).
+         */
+        public double Accuracy;
+
+        /** 실제로 쓰는 명중 수치. 0이면 기본값 */
+        public double EffectiveAccuracy
+        {
+            get { return Accuracy > 0d ? Accuracy : Onikiri.Battle.CombatBaseline.Accuracy; }
+        }
+
+        /** 이 적 회피를 상대로 한 명중 확률. 회피 0이면 정확히 1 */
+        public double HitChanceAgainst(double enemyEvasion)
+        {
+            return RatingContest.Chance(EffectiveAccuracy, enemyEvasion);
+        }
+
+        /**
+         * @brief 적 회피를 아는 기대 DPS. **빗나가는 것은 플레이어의 평타와 오의뿐이다.**
+         *
+         *     DPS = 한 타 x [ (공격속도 + 오의) x 명중 + 영체 + 펫 몫 x (공격속도 + 오의 + 영체) ]
+         *
+         * 영체와 동료는 명중 판정을 받지 않는다(65단계 확정 5). 동료의 몫은
+         * 플레이어의 **빗나가지 않는** 기대 DPS 기준이다 - 게임 쪽 PetCombat이
+         * PlayerCombat.ExpectedDps(명중을 모른다)를 읽으므로 같은 식이어야 한다.
+         *
+         * 적 회피가 0이면 ExpectedDps를 **그대로** 돌려준다(귀문 - 비트 동일).
+         */
+        public double ExpectedDpsAgainst(double enemyEvasion)
+        {
+            double hit = HitChanceAgainst(enemyEvasion);
+            if (hit >= 1d) return ExpectedDps;
+
+            double perHit = Damage * CritFactor * TranscendFactor * ComboFactor;
+            double rolled = AttacksPerSecond + SkillRate;
+            double all = rolled + SpiritRate;
+            double pet = PetBonus < 0d ? 0d : PetBonus;
+
+            return perHit * (rolled * hit + SpiritRate + all * pet);
+        }
+
+        /**
          * @brief 치명타 기대값을 포함한 초당 피해.
          *
          * 한 타격씩 굴리지 않고 기대값을 쓴다. 보스전은 30초에 수십 번 때리므로
@@ -159,7 +209,8 @@ namespace Onikiri.Progression
                 CritRate = CritRateCurve.ValueAtLevel(level),
                 CritMultiplier = CritDamageCurve.ValueAtLevel(level),
                 TranscendMultiplier = TranscendCurve.MultiplierAtLevel(level),
-                ComboChance = ComboCurve.UncappedChanceAtLevel(level)
+                ComboChance = ComboCurve.UncappedChanceAtLevel(level),
+                Accuracy = AccuracyCurve.ValueAtLevel(level)
             };
         }
 
@@ -179,7 +230,8 @@ namespace Onikiri.Progression
                 CritRate = CritRateCurve.CappedValueAtLevel(level),
                 CritMultiplier = CritDamageCurve.ValueAtLevel(level),
                 TranscendMultiplier = TranscendCurve.MultiplierAtLevel(level),
-                ComboChance = ComboCurve.ChanceAtLevel(level)
+                ComboChance = ComboCurve.ChanceAtLevel(level),
+                Accuracy = AccuracyCurve.ValueAtLevel(level)
             };
         }
 
@@ -201,6 +253,7 @@ namespace Onikiri.Progression
                 case UpgradeSystem.CritDamageId: copy.CritMultiplier = value; break;
                 case UpgradeSystem.TranscendId: copy.TranscendMultiplier = value; break;
                 case UpgradeSystem.ComboId: copy.ComboChance = value; break;
+                case UpgradeSystem.AccuracyId: copy.Accuracy = value; break;
             }
             return copy;
         }
@@ -219,7 +272,11 @@ namespace Onikiri.Progression
                 || trackId == UpgradeSystem.CritRateId
                 || trackId == UpgradeSystem.CritDamageId
                 || trackId == UpgradeSystem.TranscendId
-                || trackId == UpgradeSystem.ComboId;
+                || trackId == UpgradeSystem.ComboId
+                // 65단계. 명중은 DPS를 먹인다(적 회피 문맥이 있을 때 -
+                // UpgradeEfficiency가 기준 회피를 준다). 회피는 생존 축이라
+                // 여기 없다 - SurvivalEfficiency가 잰다
+                || trackId == UpgradeSystem.AccuracyId;
         }
     }
 }

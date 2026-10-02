@@ -97,6 +97,27 @@ namespace Onikiri.UI
         {
             if (rect == null) rect = (RectTransform)transform;
             if (label == null) label = GetComponent<TMP_Text>();
+            if (label != null) defaultFont = label.font;
+        }
+
+        /** 프리팹의 글꼴(래스터 숫자). 글자 표시가 바꿨다가 다음 생애에 되돌린다 */
+        private TMP_FontAsset defaultFont;
+
+        /**
+         * @brief 이 팝업의 글꼴을 바꾼다. null이면 기본(숫자 글꼴)으로 되돌린다 (65단계).
+         *
+         * 숫자 글꼴(Thaleah)에는 한글이 없다. "회피"는 한글 글꼴로 띄워야 하고,
+         * 풀에서 돌아온 인스턴스가 그 글꼴을 들고 숫자를 그리면 안 되므로
+         * Play가 매번 기본으로 되돌린다.
+         */
+        public void UseFont(TMP_FontAsset font)
+        {
+            if (label == null) return;
+            var target = font != null ? font : defaultFont;
+            if (target == null || label.font == target) return;
+
+            label.font = target;
+            if (shadow != null) shadow.font = target;
         }
 
         /**
@@ -113,6 +134,7 @@ namespace Onikiri.UI
             Accumulated = amount;
             TargetKey = targetKey;
 
+            UseFont(null);
             SetText(text, color, fontSize);
 
             position = anchoredPosition;

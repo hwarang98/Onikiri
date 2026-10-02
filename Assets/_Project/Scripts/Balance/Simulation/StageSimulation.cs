@@ -287,6 +287,30 @@ namespace Onikiri.Progression
              * 지켰다는 증거가 되지 않는다.
              */
             public double GoldGainPaybackAtPurchase;
+
+            // ------------------------------------------------------------ 65단계
+
+            /** 명중·회피 축의 레벨 */
+            public int AccuracyLevel;
+            public int EvasionLevel;
+
+            /** 이 스테이지 보스를 상대로 한 명중률 (적 회피를 아는 값) */
+            public double BossHitChance;
+
+            /** 이 스테이지 잡몹을 상대로 한 명중률 */
+            public double MobHitChance;
+
+            /** 이 스테이지 보스의 공격을 피할 확률 */
+            public double DodgeChance;
+
+            /**
+             * @brief 보스를 상대로 한 실효 DPS. **ExpectedDps는 빗나감을 모른다.**
+             *
+             * ExpectedDps는 64단계까지의 뜻 그대로 둔다 - 귀문 계산기
+             * (PromotionTrialFixture)가 그것을 읽고, 귀문의 적은 회피가 0이라
+             * 그 값이 귀문 안의 DPS와 같다.
+             */
+            public double EffectiveBossDps;
         }
 
         /**
@@ -718,6 +742,23 @@ namespace Onikiri.Progression
              */
             public bool GemsFromQuestsOnly;
 
+            // ------------------------------------------------------------ 65단계
+
+            /** 명중을 한 번도 사지 않는다 (적 회피는 그대로 - 세계는 같다) */
+            public bool SkipAccuracy;
+
+            /** 회피를 한 번도 사지 않는다 */
+            public bool SkipEvasion;
+
+            /**
+             * @brief 명중·회피 **체계 전체가 없는** 세계 = 64단계 세계의 재현.
+             *
+             * 적 회피 0(늘 맞힌다), 회피 보정 없는 잡몹·보스 체력, 두 축 구매
+             * 없음. 49단계 규칙 ⓐ의 비교군이다 - 앞 스텝들이 64단계 세계에
+             * 굳혀 둔 앵커를 상수를 옮기지 않고 재현한다.
+             */
+            public bool NeutralizeHitRating;
+
             public static Policy Default { get { return new Policy(); } }
         }
 
@@ -747,10 +788,18 @@ namespace Onikiri.Progression
             return stats.ExpectedDps;
         }
 
-        /** 지금 스탯으로 이 체력을 깎는 데 걸리는 시간 */
+        /** 지금 스탯으로 이 체력을 깎는 데 걸리는 시간. **빗나가지 않는다** */
         public static double SecondsToKill(double health, CombatStats stats)
         {
             double dps = stats.ExpectedDps;
+            if (dps <= 0d) return double.PositiveInfinity;
+            return health / dps;
+        }
+
+        /** 이 적 회피를 상대로 빗나감까지 넣은 처치 시간 (65단계). 회피 0이면 SecondsToKill과 같다 */
+        public static double SecondsToKillAt(double health, CombatStats stats, double enemyEvasion)
+        {
+            double dps = stats.ExpectedDpsAgainst(enemyEvasion);
             if (dps <= 0d) return double.PositiveInfinity;
             return health / dps;
         }
@@ -763,8 +812,27 @@ namespace Onikiri.Progression
          */
         public static double BossKillSeconds(double averageMobHealth, int stage, CombatStats stats)
         {
+            return BossKillSeconds(averageMobHealth, stage, stats, true);
+        }
+
+        /**
+         * @brief 명중·회피 체계를 켜고 끈 보스 처치 시간 (65단계).
+         *
+         * 켜면 보스 체력에 명중 보정이 걸리고(BossHealthForStage) 플레이어는
+         * 보스 회피를 상대로 빗나간다. 끄면 64단계 그대로다 - 보정 전 체력
+         * (BossHealthBeforeHitRating)을 늘 맞히는 DPS로 깎는다.
+         */
+        public static double BossKillSeconds(double averageMobHealth, int stage, CombatStats stats,
+                                             bool hitRating)
+        {
+            if (!hitRating)
+            {
+                var plain = StageCurve.BossHealthBeforeHitRating(BigDouble.FromDouble(averageMobHealth), stage);
+                return SecondsToKill(plain.ToDouble(), stats);
+            }
+
             var health = StageCurve.BossHealthForStage(BigDouble.FromDouble(averageMobHealth), stage);
-            return SecondsToKill(health.ToDouble(), stats);
+            return SecondsToKillAt(health.ToDouble(), stats, StageCurve.BossEvasionAtStage(stage));
         }
 
         /**
@@ -909,8 +977,14 @@ namespace Onikiri.Progression
 
                 // 온보딩 완화(st1~5 잡몹 전용)를 지난 값이다. 스포너와 같은 입구
                 // (StageCurve.MobHealth)를 써야 시뮬레이션이 화면과 같은 속도를 잰다
-                double mobHealth = StageCurve.MobHealth(
-                    BigDouble.FromDouble(field.AverageMobHealth), stage).ToDouble();
+                // 65단계: 회피 보정이 걸린 체력을 빗나감까지 넣은 DPS로 깎는다.
+                // 체계가 없는 세계(NeutralizeHitRating)는 64단계 그대로다
+                bool hitRating = !policy.NeutralizeHitRating;
+                double mobHealth = (hitRating
+                    ? StageCurve.MobHealth(BigDouble.FromDouble(field.AverageMobHealth), stage)
+                    : StageCurve.MobHealthBeforeEvasion(BigDouble.FromDouble(field.AverageMobHealth), stage))
+                    .ToDouble();
+                double mobEvasion = hitRating ? StageCurve.EnemyEvasionAtStage(stage) : 0d;
                 double rawGoldPerMob = field.AverageMobGold * StageCurve.GoldMultiplier(stage).ToDouble();
                 double expPerMob = ExpCurve.MobExp(stage).ToDouble();
 
@@ -922,7 +996,7 @@ namespace Onikiri.Progression
 
                 for (int k = 0; k < StageCurve.KillsPerStage; k++)
                 {
-                    double kill = SecondsToKill(mobHealth, levels.Stats);
+                    double kill = SecondsToKillAt(mobHealth, levels.Stats, mobEvasion);
 
                     // 보충 간격은 고정이 아니라 처치 속도에 수렴한다. 그래서 처치가
                     // 빨라지면 파밍 시간도 함께 줄어든다 - 9단계에서 11.0초에
@@ -957,7 +1031,7 @@ namespace Onikiri.Progression
                 // (시간 = 체력 / DPS), 이쪽은 BossHealthForStage를 건드리지
                 // 않으므로 **전투와 시뮬레이션이 같은 함수를 지난다**는 성질이
                 // 유지된다
-                double bossKill = BossKillSeconds(field.AverageMobHealth, stage, stats);
+                double bossKill = BossKillSeconds(field.AverageMobHealth, stage, stats, hitRating);
                 if (policy.NeutralizeGoldAxis) bossKill /= StageCurve.GoldAxisCompensation(stage);
                 // 64단계 이전 세계의 재현(GoldAxisPre64 주석). 보정도 램프도 옛 값으로
                 if (policy.GoldAxisPre64) bossKill *= LegacyGoldHealthRatio(stage);
@@ -1068,8 +1142,21 @@ namespace Onikiri.Progression
                     RegenLevel = levels.G,
                     MaxHealth = levels.MaxHealth,
                     RegenPerSecond = levels.RegenPerSecond,
-                    SurvivalMargin = incoming > 0d ? levels.EffectiveHealth / incoming : double.PositiveInfinity,
-                    Survived = levels.EffectiveHealth >= incoming,
+                    // 65단계: 회피가 받는 피해를 (1 - 회피율)배로 줄인다 = 유효체력에
+                    // 1 + 회피/보스 명중을 곱한다(EvasionCurve.EffectiveHealthFactor)
+                    SurvivalMargin = incoming > 0d
+                        ? levels.EffectiveHealth * levels.DodgeFactorAt(stage) / incoming
+                        : double.PositiveInfinity,
+                    Survived = levels.EffectiveHealth * levels.DodgeFactorAt(stage) >= incoming,
+
+                    AccuracyLevel = levels.Ak,
+                    EvasionLevel = levels.Va,
+                    BossHitChance = hitRating ? stats.HitChanceAgainst(StageCurve.BossEvasionAtStage(stage)) : 1d,
+                    MobHitChance = hitRating ? stats.HitChanceAgainst(mobEvasion) : 1d,
+                    DodgeChance = 1d - 1d / levels.DodgeFactorAt(stage),
+                    EffectiveBossDps = hitRating
+                        ? stats.ExpectedDpsAgainst(StageCurve.BossEvasionAtStage(stage))
+                        : stats.ExpectedDps,
                     IsChapterBoss = BossCurve.IsChapterBoss(stage),
 
                     CharacterLevel = levels.L,
@@ -1327,6 +1414,22 @@ namespace Onikiri.Progression
 
             /** 20단계의 획득 축 */
             public int Gold;
+
+            /** 65단계의 명중·회피 축 */
+            public int AccuracyLevel;
+            public int EvasionLevel;
+
+            public int Ak { get { return AccuracyLevel < 1 ? 1 : AccuracyLevel; } }
+            public int Va { get { return EvasionLevel < 1 ? 1 : EvasionLevel; } }
+
+            /** 회피 수치 */
+            public double EvasionRating { get { return EvasionCurve.ValueAtLevel(Va); } }
+
+            /** 이 스테이지 보스를 상대로 유효체력에 곱해지는 회피 배수 */
+            public double DodgeFactorAt(int stage)
+            {
+                return EvasionCurve.EffectiveHealthFactor(EvasionRating, StageCurve.BossAccuracyAtStage(stage));
+            }
 
             // ------------------------------------------------------------ 32단계
 
@@ -2363,7 +2466,10 @@ namespace Onikiri.Progression
                         // 심화 축(43단계). UpgradeSystem.Apply와 같은 경로다 -
                         // 두 곳이 갈리면 시뮬레이션이 게임과 다른 밸런스를 잰다
                         TranscendMultiplier = TranscendCurve.MultiplierAtLevel(Tx),
-                        ComboChance = ComboCurve.ChanceAtLevel(Cx)
+                        ComboChance = ComboCurve.ChanceAtLevel(Cx),
+
+                        // 65단계. UpgradeSystem.Apply가 PlayerCombat에 넣는 값과 같다
+                        Accuracy = AccuracyCurve.ValueAtLevel(Ak)
                     };
                 }
             }
@@ -2511,7 +2617,10 @@ namespace Onikiri.Progression
 
             // 스탯 포인트가 먼저다. 골드가 들지 않으므로 미룰 이유가 없고,
             // 미루면 골드 축이 그만큼을 대신 메우게 되어 두 축의 기여가 섞인다
-            levels.SpendPoints(needed);
+            // 65단계: 포인트는 **회피가 덜어 준 뒤의** 필요량을 본다. 날것의
+            // 유효체력과 비교하면 회피를 산 만큼 체력이 모자라 보여 포인트가
+            // 전부 체력 증폭으로 새고, 화력이 그만큼 빠진다
+            levels.SpendPoints(needed / levels.DodgeFactorAt(nextStage));
 
             // 해금 전에는 목록에 없다(GoldGainCurve.UnlockStage). 게이트를 시뮬레이션
             // 쪽에도 넣지 않으면 계산만 온보딩에서 이 축을 사고, 그 차이가 그대로
@@ -2520,9 +2629,13 @@ namespace Onikiri.Progression
                 && GoldGainCurve.IsUnlockedAt(currentStage))
                 BuyGoldGain(ref levels, ref purse, goldPerSecond, ref purchasePayback);
 
+            // 65단계: 회피는 유효체력에 곱해진다. 다음 보스의 명중을 상대로 잰다
+            bool canEvade = !policy.SkipEvasion && !policy.NeutralizeHitRating
+                            && EvasionCurve.IsUnlockedAt(currentStage);
+
             for (int guard = 0; guard < 100000; guard++)
             {
-                if (levels.EffectiveHealth >= needed) break;
+                if (levels.EffectiveHealth * levels.DodgeFactorAt(nextStage) >= needed) break;
 
                 double healthCost = HealthCurve.CostAtLevel(levels.H);
                 double regenCost = HealthRegenCurve.CostAtLevel(levels.G);
@@ -2572,10 +2685,20 @@ namespace Onikiri.Progression
                 double armorCost;
                 double armorGain = ArmorGainPerGold(levels, currentStage, policy, out armorCost);
 
-                double cost;
-                int pick;   // 0 체력 / 1 회복 / 2 방어구
+                // 65단계: 회피. %EHP 자가 같다 - 유효체력이 (1 + 회피/보스 명중)배
+                double evasionCost = EvasionCurve.CostAtLevel(levels.Va);
+                double evasionGain = canEvade
+                    ? (EvasionCurve.EffectiveHealthFactor(EvasionCurve.ValueAtLevel(levels.Va + 1),
+                            StageCurve.BossAccuracyAtStage(nextStage))
+                        / levels.DodgeFactorAt(nextStage) - 1d) / evasionCost
+                    : 0d;
 
-                if (armorGain > healthGain && armorGain > regenGain) { pick = 2; cost = armorCost; }
+                double cost;
+                int pick;   // 0 체력 / 1 회복 / 2 방어구 / 3 회피
+
+                if (evasionGain > armorGain && evasionGain > healthGain && evasionGain > regenGain)
+                { pick = 3; cost = evasionCost; }
+                else if (armorGain > healthGain && armorGain > regenGain) { pick = 2; cost = armorCost; }
                 else if (healthGain >= regenGain) { pick = 0; cost = healthCost; }
                 else { pick = 1; cost = regenCost; }
 
@@ -2584,6 +2707,7 @@ namespace Onikiri.Progression
                 purse -= cost;
                 if (pick == 0) levels.Health = levels.H + 1;
                 else if (pick == 1) levels.Regen = levels.G + 1;
+                else if (pick == 3) levels.EvasionLevel = levels.Va + 1;
                 else AdvanceArmor(ref levels);
             }
 
@@ -2618,7 +2742,7 @@ namespace Onikiri.Progression
                     // 스킬을 안 사는 비교군. 해금과 레벨 1의 기여는 남긴다 -
                     // 재려는 것이 "스킬 시스템이 있는가"가 아니라 **"스킬에
                     // 골드를 쓰는 것이 이득인가"**이기 때문이다
-                    if (policy.SkipSkills && axis >= 4) continue;
+                    if (policy.SkipSkills && axis >= 4 && axis != AccuracyAxis) continue;
 
                     double cost;
                     if (!TryCost(levels, axis, currentStage, policy, out cost) || cost > purse) continue;
@@ -2669,7 +2793,7 @@ namespace Onikiri.Progression
          * 해금(치명타 100%)은 TryCost의 문이다 - 잠긴 문의 축은 저울에
          * 올라오지 않는다.
          */
-        private const int DamageAxisCount = 4 + SkillSlotCapacity + 1 + PetSlotCapacity + 2;
+        private const int DamageAxisCount = 4 + SkillSlotCapacity + 1 + PetSlotCapacity + 2 + 1;
 
         /** 무기 축의 번호. 스킬 뒤 한 칸 */
         private const int WeaponAxis = 4 + SkillSlotCapacity;
@@ -2680,6 +2804,12 @@ namespace Onikiri.Progression
         /** 심화 축의 번호. 동료 뒤 두 칸 */
         private const int TranscendAxis = PetAxisFirst + PetSlotCapacity;
         private const int ComboAxis = TranscendAxis + 1;
+
+        /**
+         * 65단계: 명중. 맨 끝 한 칸이다 - 골드를 %DPS로 바꾸는 축이라 같은 저울에
+         * 올라가고, 재는 자는 다음 보스의 회피를 아는 DPS다(GainPerGoldFor)
+         */
+        private const int AccuracyAxis = ComboAxis + 1;
 
         /**
          * @brief Levels가 들고 있는 동료 칸 수.
@@ -2711,6 +2841,7 @@ namespace Onikiri.Progression
                     if (axis == WeaponAxis) { AdvanceWeapon(ref levels); return; }
                     if (axis == TranscendAxis) { levels.Transcend = levels.Tx + 1; return; }
                     if (axis == ComboAxis) { levels.Combo = levels.Cx + 1; return; }
+                    if (axis == AccuracyAxis) { levels.AccuracyLevel = levels.Ak + 1; return; }
                     if (axis >= PetAxisFirst)
                     {
                         int pet = axis - PetAxisFirst;
@@ -3469,6 +3600,14 @@ namespace Onikiri.Progression
                 return TryEquipmentCost(levels, true, currentStage, policy, out cost);
 
             // 심화 축(43단계). 문이 셋이다 - 비교군, 해금(치명타 100%), 상한(연격)
+            if (axis == AccuracyAxis)
+            {
+                if (policy.SkipAccuracy || policy.NeutralizeHitRating) return false;
+                if (!AccuracyCurve.IsUnlockedAt(currentStage)) return false;
+                cost = AccuracyCurve.CostAtLevel(levels.Ak);
+                return true;
+            }
+
             if (axis == TranscendAxis || axis == ComboAxis)
             {
                 if (policy.SkipMastery || policy.NeutralizeMastery) return false;
@@ -3565,10 +3704,15 @@ namespace Onikiri.Progression
             var after = levels;
             Advance(ref after, axis);
 
-            double dpsBefore = before.ExpectedDps;
+            // 65단계: 보스 회피를 아는 DPS로 잰다. 명중이 같은 저울에 오르려면
+            // 모든 축이 같은 자를 써야 한다 - 영체·동료는 빗나가지 않으므로
+            // 명중률이 비율 안에서 약분되지 않고, 그 차이까지가 실제 값어치다
+            double evasion = policy.NeutralizeHitRating ? 0d : StageCurve.BossEvasionAtStage(currentStage);
+
+            double dpsBefore = before.ExpectedDpsAgainst(evasion);
             if (dpsBefore <= 0d) return 0d;
 
-            return (after.Stats.ExpectedDps / dpsBefore - 1d) / cost;
+            return (after.Stats.ExpectedDpsAgainst(evasion) / dpsBefore - 1d) / cost;
         }
     }
 }

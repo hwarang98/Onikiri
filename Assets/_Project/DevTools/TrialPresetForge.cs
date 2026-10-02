@@ -105,7 +105,10 @@ namespace Onikiri.DevTools
                 UpgradeSystem.CritRateId, UpgradeSystem.CritDamageId,
                 UpgradeSystem.HealthId, UpgradeSystem.HealthRegenId,
                 UpgradeSystem.GoldGainId,
-                UpgradeSystem.TranscendId, UpgradeSystem.ComboId
+                UpgradeSystem.TranscendId, UpgradeSystem.ComboId,
+                // 65단계. 회피를 빼면 프리셋 플레이어가 체력 대신 산 생존을 잃고
+                // 귀문에 들어간다 - 시뮬레이션의 같은 줄과 다른 사람이 된다
+                UpgradeSystem.AccuracyId, UpgradeSystem.EvasionId
             };
             data.upgradeLevels = new[]
             {
@@ -113,7 +116,8 @@ namespace Onikiri.DevTools
                 row.CritRateLevel, row.CritDamageLevel,
                 row.HealthLevel, row.RegenLevel,
                 row.GoldGainLevel,
-                row.TranscendLevel, row.ComboLevel
+                row.TranscendLevel, row.ComboLevel,
+                row.AccuracyLevel, row.EvasionLevel
             };
 
             // ---- 장비 두 슬롯
@@ -290,6 +294,8 @@ namespace Onikiri.DevTools
             Int(bad, "강화:" + UpgradeSystem.GoldGainId, row.GoldGainLevel, Track(save, UpgradeSystem.GoldGainId));
             Int(bad, "강화:" + UpgradeSystem.TranscendId, row.TranscendLevel, Track(save, UpgradeSystem.TranscendId));
             Int(bad, "강화:" + UpgradeSystem.ComboId, row.ComboLevel, Track(save, UpgradeSystem.ComboId));
+            Int(bad, "강화:" + UpgradeSystem.AccuracyId, row.AccuracyLevel, Track(save, UpgradeSystem.AccuracyId));
+            Int(bad, "강화:" + UpgradeSystem.EvasionId, row.EvasionLevel, Track(save, UpgradeSystem.EvasionId));
 
             // ---- 장비
             Int(bad, "무기 등급", row.WeaponGrade, Grade(save, EquipmentCatalog.WeaponId));

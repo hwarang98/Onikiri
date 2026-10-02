@@ -141,8 +141,29 @@ namespace Onikiri.Progression
          * 티어가 4라 보정이 정확히 1이기 때문이다 - "클리어해야 걸린다"는 경계
          * 규칙이 M 표에서 이렇게 보인다.
          */
+        /**
+         * ## 65.1단계에 여섯 문을 다시 구웠다 - 규칙 동일
+         *
+         * 규칙은 그대로다: M = 41초 / 하한 플레이어의 그 게이트 보스 처치 시간.
+         * 64단계 골드 축 무한 성장과 65단계 명중 구매로 하한 플레이어가 게이트에서
+         * 세져, 여섯 문 전부가 0.5% 허용 밖이었다(구운/규칙 0.84~0.95).
+         * `HealthMultiple_TracksTheFortyFiveSecondAnchor`가 문1에서 멈춰 문1만
+         * 보였을 뿐이다.
+         *
+         *   문   2.1단계    65.1단계
+         *   1    1.7376     1.9028
+         *   2    1.9528     2.1129
+         *   3    2.1813     2.5242
+         *   4    3.1164     3.2747
+         *   5    8.6655     10.2705
+         *   6    10.4095    12.3341
+         *
+         * 체력의 바탕(StageCurve.BossHealthBeforeHitRating)은 64단계와 비트
+         * 단위로 같다 - 움직인 것은 플레이어 쪽이다. k·폐쇄·격노·심층 지수·
+         * 무료 승급은 무수정.
+         */
         public static readonly double[] TotalHealthMultiple =
-            { 1.7376d, 1.9528d, 2.1813d, 3.1164d, 8.6655d, 10.4095d };
+            { 1.9028d, 2.1129d, 2.5242d, 3.2747d, 10.2705d, 12.3341d };
 
         // ---------------------------------------------------------------- 시간 규칙
 
@@ -509,7 +530,9 @@ namespace Onikiri.Progression
         {
             if (gateNumber < 1 || gateNumber > GateCount) return BigDouble.Zero;
 
-            var bossHealth = StageCurve.BossHealthForStage(averageMobHealth, GateStages[gateNumber - 1]);
+            // 65단계: 명중·회피 보정 **전**의 값. 귀문의 적은 회피가 0이라 플레이어가
+            // 늘 맞히고, 강화 전 명중률로 낮춘 체력을 쓰면 귀문이 그만큼 쉬워진다
+            var bossHealth = StageCurve.BossHealthBeforeHitRating(averageMobHealth, GateStages[gateNumber - 1]);
             return bossHealth * BigDouble.FromDouble(TotalHealthMultiple[gateNumber - 1]);
         }
 

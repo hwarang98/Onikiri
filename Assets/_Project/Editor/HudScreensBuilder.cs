@@ -403,10 +403,13 @@ namespace Onikiri.EditorTools
             exp.color = DimColor;
             exp.text = "경험치  0 / 30";
 
+            // 65단계: "최대 체력"과 "초당 회복"을 한 줄로 합쳐 "명중 · 회피"의
+            // 자리를 냈다. 줄을 하나 더 세우면 내역 줄이 패널 밑(672px)을 넘는다 -
+            // 위 경험치 주석과 같은 산수다
             string[] names =
             {
-                "총 공격력", "공격 속도", "치명타", "최대 체력",
-                "초당 회복", "골드 획득", "동료 지원", "추정 DPS"
+                "총 공격력", "공격 속도", "치명타", "체력 · 회복",
+                "명중 · 회피", "골드 획득", "동료 지원", "추정 DPS"
             };
 
             var values = new TMP_Text[names.Length];
@@ -449,7 +452,8 @@ namespace Onikiri.EditorTools
             so.FindProperty("attackSpeedValue").objectReferenceValue = values[1];
             so.FindProperty("critValue").objectReferenceValue = values[2];
             so.FindProperty("healthValue").objectReferenceValue = values[3];
-            so.FindProperty("regenValue").objectReferenceValue = values[4];
+            so.FindProperty("regenValue").objectReferenceValue = null;
+            so.FindProperty("hitDodgeValue").objectReferenceValue = values[4];
             so.FindProperty("goldGainValue").objectReferenceValue = values[5];
             so.FindProperty("petValue").objectReferenceValue = values[6];
             so.FindProperty("dpsValue").objectReferenceValue = values[7];

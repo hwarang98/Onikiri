@@ -1,4 +1,5 @@
 using Onikiri.Core;
+using TMPro;
 using UnityEngine;
 
 namespace Onikiri.UI
@@ -150,6 +151,81 @@ namespace Onikiri.UI
          * @param sizeMultiple 아틀라스 크기의 **정수** 배수. 래스터 폰트는 정수배가
          *                     아니면 리샘플되어 흐려진다(PixelFontSizes)
          */
+        // ---------------------------------------------------------------- 65단계: 글자
+
+        /**
+         * @brief 빗나감. **숫자 글꼴이 아니라 캡션 글꼴로 그린다.**
+         *
+         * 숫자 글꼴(ThaleahFat)의 아틀라스는 숫자와 단위 접미사 44자뿐이라 I·S가
+         * 없다 - "MISS"가 "M□□□"로 뜬다. 63단계 폰트 아틀라스 사고와 같은 종류라
+         * 65단계 작업 중 아틀라스를 직접 대조해서 잡았다(보고서 §1).
+         */
+        public const string MissText = "MISS";
+
+        /** 플레이어 회피. 한글이다 */
+        public const string DodgeText = "회피";
+
+        [Header("글자 표시 (65단계)")]
+        [Tooltip("MISS·회피를 그릴 글꼴. 숫자 글꼴(Thaleah)에는 라틴 대문자 대부분과 한글이 없다. " +
+                 "빌더가 Galmuri 캡션 글꼴을 물린다 - 비면 글자를 띄우지 않는다")]
+        [SerializeField] private TMP_FontAsset labelFont;
+
+        [SerializeField] private float labelFontSize = 33f;
+
+        [Tooltip("빗나감 색. 회색 - 숫자보다 눈에 덜 걸려야 한다(피해가 아니다)")]
+        [SerializeField] private Color missColor = new Color32(0x9A, 0x94, 0xA6, 0xFF);
+
+        [Tooltip("회피 색. 플레이어 쪽 사건이라 피해 숫자들과 다른 계열")]
+        [SerializeField] private Color dodgeColor = new Color32(0x8E, 0xD1, 0xFF, 0xFF);
+
+        /** 빗나감. 대상 피격점 위에 작게 뜬다. 합산하지 않는다 */
+        public void ShowMiss(Vector3 worldPosition)
+        {
+            ShowLabel(MissText, worldPosition, missColor);
+        }
+
+        /** 플레이어 회피. 플레이어 머리 위에 뜬다 */
+        public void ShowDodge(Vector3 worldPosition)
+        {
+            ShowLabel(DodgeText, worldPosition, dodgeColor);
+        }
+
+        /** 마지막으로 띄운 글자. PlayMode 검사가 읽는다 */
+        public string LastLabel { get; private set; }
+
+        private bool warnedNoLabelFont;
+
+        private void ShowLabel(string text, Vector3 worldPosition, Color color)
+        {
+            LastLabel = text;
+            if (pool == null || canvas == null) return;
+
+            // 글꼴이 없으면 띄우지 않는다. 숫자 글꼴로 띄우면 □가 섞인 글자가
+            // 화면에 남는데, 그것이 아무것도 안 뜨는 것보다 나쁘다
+            if (labelFont == null)
+            {
+                if (!warnedNoLabelFont)
+                    Debug.LogWarning("[Onikiri] DamageNumberSpawner.labelFont is not wired - MISS/회피 text is hidden. "
+                                     + "Run Onikiri/Scene/Build Combat Content.");
+                warnedNoLabelFont = true;
+                return;
+            }
+
+            var screenPoint = worldCamera.WorldToScreenPoint(
+                worldPosition + new Vector3(worldOffset.x, worldOffset.y, 0f));
+
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+
+            Vector2 anchored;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    container, screenPoint, uiCamera, out anchored))
+                return;
+
+            var popup = pool.Get();
+            popup.Play(text, anchored, color, labelFontSize, BigDouble.Zero, null, false, Release);
+            popup.UseFont(labelFont);
+        }
+
         public void ShowSkill(BigDouble amount, Vector3 worldPosition, Color tint, int sizeMultiple)
         {
             if (pool == null || canvas == null) return;

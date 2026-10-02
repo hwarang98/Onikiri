@@ -68,10 +68,13 @@ namespace Onikiri.Tests
                 Assert.AreEqual(1d, StageCurve.MobHealthRelief(stage), 0d,
                     "st" + stage + "에 완화가 샜다");
 
-                // 나눗셈도 반올림도 없는 원곡선 값 그대로여야 한다 - 오차 0으로 잰다
+                // 나눗셈도 반올림도 없는 원곡선 값 그대로여야 한다 - 오차 0으로 잰다.
+                // 65단계: 완화의 계약은 회피 보정 **전**의 값이 진다
+                // (StageCurve.MobHealthBeforeEvasion). 회피 보정은 그 위에 얹히는
+                // 별개의 곱이고 AccuracyEvasionTests가 따로 잰다
                 Assert.AreEqual(
                     (baseHealth * StageCurve.HealthMultiplier(stage)).ToDouble(),
-                    StageCurve.MobHealth(baseHealth, stage).ToDouble(), 0d,
+                    StageCurve.MobHealthBeforeEvasion(baseHealth, stage).ToDouble(), 0d,
                     "st" + stage + " 잡몹 체력이 원곡선과 다르다 - 코리더 비트 불변이 깨졌다");
             }
         }

@@ -574,6 +574,14 @@ namespace Onikiri.Progression
             var mobHealth = stage != null
                 ? StageCurve.MobHealth(spawner.AverageBaseHealth, stage.Stage)
                 : spawner.AverageBaseHealth;
+
+            // 65단계: 빗나감만큼 오래 걸린다. 체력을 명중률로 나눈 값이 "맞히는
+            // 타격으로 깎아야 할 양"이다 - 전투와 같은 처치 속도로 방치 보상을 잰다
+            if (stage != null)
+            {
+                double hit = RatingContest.Chance(combat.Accuracy, StageCurve.EnemyEvasionAtStage(stage.Stage));
+                if (hit > 0d && hit < 1d) mobHealth = mobHealth / BigDouble.FromDouble(hit);
+            }
             var multiplierGold = stage != null ? stage.GoldMultiplier : BigDouble.One;
 
             // 획득 축(20단계)이 방치 보상에도 들어온다. 방치는 파밍의 축소판이라

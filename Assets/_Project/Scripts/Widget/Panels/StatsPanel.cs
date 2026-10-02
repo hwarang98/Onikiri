@@ -42,6 +42,13 @@ namespace Onikiri.UI
         [SerializeField] private TMP_Text healthValue;
         [SerializeField] private TMP_Text regenValue;
         [SerializeField] private TMP_Text goldGainValue;
+
+        /**
+         * 65단계: 명중·회피 한 줄. 지금 스테이지 잡몹을 상대로 한 명중률과 보스를
+         * 상대로 한 회피율이다. 줄을 새로 세우면 패널 높이(672px)를 넘으므로
+         * 체력과 회복을 한 줄로 합쳐 자리를 냈다(HudScreensBuilder.BuildStatsPanel)
+         */
+        [SerializeField] private TMP_Text hitDodgeValue;
         [SerializeField] private TMP_Text petValue;
         [SerializeField] private TMP_Text dpsValue;
 
@@ -100,11 +107,26 @@ namespace Onikiri.UI
                 critValue.text = (combat.CritChance * 100f).ToString("F1") + "%  x"
                                  + combat.CritMultiplier.ToString("F2");
 
+            // 65단계: 회복 줄이 비면(빌더가 체력과 합쳤다) 체력 줄에 함께 쓴다 -
+            // 치명타 줄이 확률과 배수를 한 줄에 쓰는 것과 같은 짝이다
             if (health != null && healthValue != null)
-                healthValue.text = NumberFormatter.Format(health.MaxHealth);
+                healthValue.text = regenValue == null
+                    ? NumberFormatter.Format(health.MaxHealth) + "  +"
+                      + NumberFormatter.Format(health.RegenPerSecond) + "/초"
+                    : NumberFormatter.Format(health.MaxHealth);
 
             if (health != null && regenValue != null)
                 regenValue.text = NumberFormatter.Format(health.RegenPerSecond) + "/초";
+
+            if (hitDodgeValue != null)
+            {
+                int stage = UpgradeTrack.DisplayStage;
+                double hit = RatingContest.Chance(combat.Accuracy, StageCurve.EnemyEvasionAtStage(stage));
+                double dodge = health != null
+                    ? RatingContest.Chance(health.Evasion, StageCurve.BossAccuracyAtStage(stage))
+                    : 0d;
+                hitDodgeValue.text = (hit * 100d).ToString("F1") + "% · " + (dodge * 100d).ToString("F1") + "%";
+            }
 
             if (goldGainValue != null)
                 goldGainValue.text = "x" + UpgradeSystem.CurrentGoldGain.ToString("F2");

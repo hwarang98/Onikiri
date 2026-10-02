@@ -201,7 +201,18 @@ namespace Onikiri.Tests
                         + "순서가 바뀌었으면 5.0단계의 결론을 다시 읽어야 한다",
                         TrialPresetForge.NameOf(profile, gate)));
 
-                    Assert.That(power.Ratio, Is.InRange(1.60d, 2.00d), string.Format(
+                    // 65.1단계 재기준: 범위 1.60~2.00 -> 1.55~2.10. 둘 다 64단계 골드
+                    // 축 상한 해제가 뿌리다. 하드 계약은 k 판정(추종 25초 바닥)이고
+                    // 그것은 그대로 통과한다 - 이 범위는 그 프레임의 크기 기록이라
+                    // 65.1에서 재기준했다.
+                    //   - 상한 2.10: 문4 하한(floor) x2.024. 보상 쇼핑 몫이 커져
+                    //     비가 1.88 -> 2.02가 됐다.
+                    //   - 하한 1.55: 문1 추종(curve) x1.5945. 보상 골드 일부가 화력이
+                    //     아니라 골드 획득 축으로 간다(st30 쇼핑에서 Lv22 -> 23, 64단계
+                    //     전에는 Lv13에서 상한). 64 전 재현 x1.7177 -> 64단계 x1.5894
+                    //     -> 65단계 x1.5945. M표 재굽기와는 무관하다 - 이 비는 M표를
+                    //     읽지 않는다
+                    Assert.That(power.Ratio, Is.InRange(1.55d, 2.10d), string.Format(
                         "{0}: 두 시점의 화력 비가 x{1:F4}다 (5.0단계 실측 x1.70~1.88). "
                         + "밖으로 나가면 곡선이나 구매 정책이 움직인 것이고, k 판정을 다시 재야 한다",
                         TrialPresetForge.NameOf(profile, gate), power.Ratio));

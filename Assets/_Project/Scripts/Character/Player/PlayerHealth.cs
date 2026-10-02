@@ -97,6 +97,40 @@ namespace Onikiri.Battle
          */
         public double DamageTaken { get; private set; }
 
+        /**
+         * @brief 회피 수치 (65단계). UpgradeSystem이 회피 축에서 넣는다.
+         *
+         * 받는 쪽이 굴린다(TryDodge). 피하면 TakeDamage가 불리지 않으므로 피해도
+         * DamageTaken도 쌓이지 않는다 - 보스전 정산과 시뮬레이션의 생존 여유가
+         * 같은 뜻을 갖는다.
+         */
+        public double Evasion { get; set; }
+
+        /** 이번 보스전에서 피한 횟수. BeginFight가 비운다 */
+        public int DodgeCount { get; private set; }
+
+        /** 피했다. 화면이 "회피"를 띄운다(PlayerCombat) */
+        public event Action Dodged;
+
+        /**
+         * @brief 이 명중의 공격을 피했는가. 피했으면 true이고 Dodged가 난다.
+         *
+         * 회피 수치가 0이면 **난수를 굴리지 않고** false다 - 회피를 안 산 세계의
+         * 난수열이 64단계와 같아야 보스전 PlayMode 검사가 흔들리지 않는다.
+         */
+        public bool TryDodge(double attackerAccuracy)
+        {
+            if (!engaged || !IsAlive || Evasion <= 0d) return false;
+
+            double chance = Onikiri.Progression.RatingContest.Chance(Evasion, attackerAccuracy);
+            if (UnityEngine.Random.value >= chance) return false;
+
+            DodgeCount++;
+            var handler = Dodged;
+            if (handler != null) handler();
+            return true;
+        }
+
         // ---------------------------------------------------------------- 스탯
 
         /** 강화가 스탯을 밀어넣는 진입점. 전투 중이면 비율을 유지한다 */
@@ -138,6 +172,7 @@ namespace Onikiri.Battle
             engaged = true;
             current = maxHealth;
             DamageTaken = 0d;
+            DodgeCount = 0;
             flashRemaining = 0f;
             if (spriteRenderer != null) spriteRenderer.color = Color.white;
             Raise();

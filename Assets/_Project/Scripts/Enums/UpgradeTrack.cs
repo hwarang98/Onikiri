@@ -50,7 +50,24 @@ namespace Onikiri.Progression
              * 무엇이 얼마나 늘었는지 읽힌다. 값이 1 아래로 내려가는 축에는 쓰지
              * 않는다(음수 보너스는 이 게임에 없다)
              */
-            BonusPercent
+            BonusPercent,
+
+            /**
+             * 65단계: 명중. 값은 수치지만 **지금 스테이지 잡몹을 상대로 한 명중률**로
+             * 보인다 - "명중 1,234"는 무엇을 뜻하는지 읽히지 않는다. 적 회피가
+             * 스테이지마다 자라므로 같은 레벨도 스테이지가 오르면 낮게 보이고,
+             * 그것이 이 축을 사야 하는 이유를 화면이 말하는 방식이다
+             */
+            HitChance,
+
+            /** 65단계: 회피. 지금 스테이지 보스의 명중을 상대로 한 회피율로 보인다 */
+            DodgeChance
+        }
+
+        /** 명중·회피 표시가 기준으로 삼는 스테이지. 진행이 없는 씬(테스트)에서는 1 */
+        public static int DisplayStage
+        {
+            get { return StageProgress.Instance != null ? StageProgress.Instance.Stage : 1; }
         }
 
         [SerializeField] private string id;
@@ -132,6 +149,14 @@ namespace Onikiri.Progression
                     return (value.ToDouble() * 100d).ToString("F1") + "%";
                 case Display.Multiplier:
                     return "x" + NumberFormatter.FormatStat(value, 2);
+                case Display.HitChance:
+                    // 소수 둘째 자리 - 한 칸이 +0.1~0.3%p라 첫째 자리로는 후반에
+                    // "91.3% -> 91.3%"가 되어 안 오르는 버튼으로 읽힌다
+                    return (RatingContest.Chance(value.ToDouble(),
+                        StageCurve.EnemyEvasionAtStage(DisplayStage)) * 100d).ToString("F2") + "%";
+                case Display.DodgeChance:
+                    return (RatingContest.Chance(value.ToDouble(),
+                        StageCurve.BossAccuracyAtStage(DisplayStage)) * 100d).ToString("F2") + "%";
                 case Display.BonusPercent:
                     // 배수 - 1. 소수 첫째 자리까지 - 한 칸이 +2.0%라 정수로 두면
                     // 후반에 복리가 만드는 "+2.3%" 같은 칸 차이가 사라진다

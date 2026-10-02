@@ -155,7 +155,7 @@ namespace Onikiri.Tests
             for (int gate = 1; gate <= Gates; gate++)
             {
                 int stage = PromotionTrialFixture.GateStages[gate - 1];
-                double bossHealth = Onikiri.Progression.StageCurve.BossHealthForStage(
+                double bossHealth = Onikiri.Progression.StageCurve.BossHealthBeforeHitRating(
                     Onikiri.Core.BigDouble.FromDouble(field.AverageMobHealth), stage).ToDouble();
                 double totalHealth = bossHealth * PromotionTrialFixture.TotalHealthMultiple[gate - 1];
 
@@ -409,7 +409,7 @@ namespace Onikiri.Tests
                 int stage = PromotionTrialFixture.GateStages[gate - 1];
                 var row = PromotionTrialFixture.Lead()[stage - 1];
 
-                double bossHealth = Onikiri.Progression.StageCurve.BossHealthForStage(
+                double bossHealth = Onikiri.Progression.StageCurve.BossHealthBeforeHitRating(
                     Onikiri.Core.BigDouble.FromDouble(field.AverageMobHealth), stage).ToDouble();
                 double bossSeconds = bossHealth / row.ExpectedDps;
 

@@ -570,6 +570,7 @@ namespace Onikiri.EditorTools
                 }
 
                 DrawMasteryTools();
+                DrawHitRatingTools();
                 DrawResetTools();
 
                 using (new EditorGUI.DisabledScope(combat == null))
@@ -2957,6 +2958,82 @@ namespace Onikiri.EditorTools
                         for (int n = 0; n < 200 && upgrades.TryPurchase(index); n++) { }
                 }
             }
+        }
+
+        /**
+         * @brief 명중·회피 (65단계).
+         *
+         * 두 축은 수치가 아니라 **지금 스테이지 기준 확률**로 읽어야 한다 - 적
+         * 회피와 보스 명중이 스테이지마다 자라므로 같은 레벨도 깊이 갈수록 낮게
+         * 보인다. 그래서 이 절은 상대 수치와 확률, 이번 판의 빗나감·회피 횟수를
+         * 나란히 보인다. 구매는 실제 경로(UpgradeSystem.TryPurchase)이고 치트는
+         * 골드 지급뿐이다. 초기화는 두 축을 Lv.1로 되돌린다(환불 없음 -
+         * DrawResetTools와 같은 규칙).
+         */
+        private void DrawHitRatingTools()
+        {
+            if (upgrades == null) return;
+
+            var accuracy = upgrades.GetTrack(Onikiri.Progression.UpgradeSystem.AccuracyId);
+            var evasion = upgrades.GetTrack(Onikiri.Progression.UpgradeSystem.EvasionId);
+            if (accuracy == null || evasion == null)
+            {
+                EditorGUILayout.HelpBox("명중·회피 트랙이 씬에 없다 - Onikiri/Scene/Build Combat Content를 다시 돌려라",
+                    MessageType.Warning);
+                return;
+            }
+
+            int stageNumber = stage != null ? stage.Stage : 1;
+            double mobEvasion = Onikiri.Progression.StageCurve.EnemyEvasionAtStage(stageNumber);
+            double bossEvasion = Onikiri.Progression.StageCurve.BossEvasionAtStage(stageNumber);
+            double bossAccuracy = Onikiri.Progression.StageCurve.BossAccuracyAtStage(stageNumber);
+            double acc = accuracy.Value.ToDouble();
+            double eva = evasion.Value.ToDouble();
+
+            EditorGUILayout.LabelField(string.Format(
+                "명중 Lv.{0} ({1:F1})  잡몹 {2:P1} / 보스 {3:P1}   [강화 전 {4:P1} / {5:P1}]",
+                accuracy.Level, acc,
+                Onikiri.Progression.RatingContest.Chance(acc, mobEvasion),
+                Onikiri.Progression.RatingContest.Chance(acc, bossEvasion),
+                Onikiri.Progression.StageCurve.UnboughtMobHitChance(stageNumber),
+                Onikiri.Progression.StageCurve.UnboughtBossHitChance(stageNumber)));
+
+            EditorGUILayout.LabelField(string.Format(
+                "회피 Lv.{0} ({1:F1})  보스 명중 {2:F1} 상대 {3:P1}",
+                evasion.Level, eva, bossAccuracy,
+                Onikiri.Progression.RatingContest.Chance(eva, bossAccuracy)));
+
+            var player = Object.FindFirstObjectByType<PlayerCombat>(FindObjectsInactive.Include);
+            var playerHealth = Object.FindFirstObjectByType<PlayerHealth>(FindObjectsInactive.Include);
+            EditorGUILayout.LabelField(string.Format(
+                "st{0} 적 회피 {1:F1} (보스 {2:F1})   빗나감 {3}회 · 이번 보스전 회피 {4}회",
+                stageNumber, mobEvasion, bossEvasion,
+                player != null ? player.MissCount : 0,
+                playerHealth != null ? playerHealth.DodgeCount : 0));
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("명중 +10 (골드 지급)")) BuyLevels(accuracy, 10);
+                if (GUILayout.Button("회피 +10 (골드 지급)")) BuyLevels(evasion, 10);
+                if (GUILayout.Button("둘 다 Lv.1 (환불 없음)"))
+                    upgrades.RestoreLevels(
+                        new[] { Onikiri.Progression.UpgradeSystem.AccuracyId, Onikiri.Progression.UpgradeSystem.EvasionId },
+                        new[] { 1, 1 });
+            }
+        }
+
+        /** 실제 구매 경로로 n칸. 모자라는 골드는 그 칸들의 합만큼 지급한다 */
+        private void BuyLevels(Onikiri.Progression.UpgradeTrack track, int count)
+        {
+            int index = -1;
+            for (int i = 0; i < upgrades.TrackCount; i++)
+                if (upgrades.GetTrack(i) == track) { index = i; break; }
+            if (index < 0) return;
+
+            var wallet = PlayerWallet.Instance;
+            if (wallet != null) wallet.Add(track.CostOfNextLevels(count));
+
+            for (int n = 0; n < count && upgrades.TryPurchase(index); n++) { }
         }
 
         /**

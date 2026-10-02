@@ -184,8 +184,12 @@ namespace Onikiri.Tests
             // 크기도 굳힌다. 임계만 재면 "간신히"와 "여유롭게"가 구분되지 않는다
             Assert.That(shippedLeadMin, Is.InRange(27d, 30d),
                 "출시값의 쇼핑 후 추종 최속 (5.0단계 실측 28.0초)");
-            Assert.That(shippedFloorMin, Is.InRange(34d, 37d),
-                "출시값의 쇼핑 후 하한 최속 (5.0단계 실측 34.9초)");
+            // 65.1단계 재기준: 바닥 34 -> 33. 64단계 골드 축 상한 해제로 보상
+            // 쇼핑 몫이 커져 두 시점 화력 비가 1.88 -> 2.02가 됐고, 그만큼 쇼핑 후
+            // 하한이 빨라졌다(65.1 실측 33.9초). 하드 계약은 k 판정(추종 25초
+            // 바닥)이고 그대로 통과한다
+            Assert.That(shippedFloorMin, Is.InRange(33d, 37d),
+                "출시값의 쇼핑 후 하한 최속 (5.0단계 실측 34.9초, 65.1 실측 33.9초)");
 
             Assert.Less(highestLeadMin, StrongFloorSeconds, string.Format(
                 "k=0.60의 쇼핑 후 추종 최속이 {0:F1}초로 25초 위다. 5.0단계 실측은 24.1초(문5)이고 "
