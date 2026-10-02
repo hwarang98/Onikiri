@@ -1,7 +1,7 @@
 # ONIKIRI 65단계 보고서 — 명중·회피 스탯 신설 (골드 강화 축 2종 + 적 회피)
 
 - **브랜치** `feature/step65-accuracy-evasion` (develop `a3bfcc9`에서 분기)
-- **커밋** 1회(PlayMode 57/57 확인 뒤, 귀문 계약 묶음 6개 실패는 알려진 상태) · **푸시** 승인 대기
+- **커밋** 1회(PlayMode 57/57 확인 뒤, 귀문 계약 묶음 6개 실패는 알려진 상태) · **푸시** 완료(96db8d7, 65.1 커밋 d3b7e33과 함께 origin에 올림, develop 머지 전)
 - **세이브 버전** SaveData v21 유지 — 강화 레벨은 id로 저장되고(`UpgradeSystem.RestoreLevels`), 새 id가 없는 세이브는 두 축이 Lv.1로 시작한다. 마이그레이션 없음
 - **firestore.rules · Cloud/** 무수정
 - **Unity 에디터** 작업 중 MCP 도구 연결이 끊겨 있어 로컬 MCP 서버(8080)에 JSON-RPC로 직접 붙었다. 그 과정에서 **사용자가 Play 모드로 두었던 에디터를 강제 새로고침해 플레이 중 재컴파일을 일으켰다** — §7.4
@@ -350,6 +350,7 @@ MCP 도구가 끊겨 있어 로컬 서버에 직접 붙어 `refresh_unity(force,
 
 1. **실기 플레이테스트:** 명중에 자투리 골드가 몰리는지(시뮬레이션 경로 위 효율 x61).
 2. **출시 전 교체:** 명중·회피 아이콘(§1, `UiIcons` - 치명타 확률의 눈·공격속도의 회오리 차용).
-3. **65.1** - 귀문 M표 재굽기(`docs/ONIKIRI_Step65_1_Report.md`).
+3. ~~**65.1** - 귀문 M표 재굽기~~ - 완료(커밋 d3b7e33, EditMode 1026/1026 · PlayMode 57/57, `docs/ONIKIRI_Step65_1_Report.md`).
+4. **develop 머지** - 승인 뒤.
 
 검증 도구: scratchpad `sim/`의 하네스(`build.sh s65full` 전후 표, `band` 효율 전수조사, `sw65.sh` 상수 스윕)와 `mcp.py`(로컬 MCP 직접 호출).
