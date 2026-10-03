@@ -458,8 +458,8 @@ namespace Onikiri.Tests
                 new { Name = SkillCatalog.Skills[0].DisplayName, Level = final.SkillLevels[0] },
                 new { Name = SkillCatalog.Skills[1].DisplayName, Level = final.SkillLevels[1] },
 
-                // 65단계의 명중(st11 해금)·회피(st5 해금). 같은 골드 저울이라 같은
-                // 기한을 받는다 - 실측 첫 구매 명중 st11 / 회피 st8
+                // 65단계의 명중·회피. 같은 골드 저울이라 같은 기한을 받는다.
+                // 66.1단계에 둘 다 st1 해금 - 실측 첫 구매 명중 st1 / 회피 st9
                 new { Name = "명중", Level = final.AccuracyLevel },
                 new { Name = "회피", Level = final.EvasionLevel },
             };

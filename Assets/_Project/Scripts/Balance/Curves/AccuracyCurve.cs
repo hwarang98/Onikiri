@@ -51,13 +51,15 @@ namespace Onikiri.Progression
         public const double CostGrowth = 1.2d;
 
         /**
-         * @brief 이 축이 강화 목록에 나타나는 스테이지.
+         * @brief 이 축이 강화 목록에 나타나는 스테이지 = **게임 시작부터**.
          *
-         * 적 회피가 체감되기 시작하는 자리다. 지역 1(st1~10)에서는 강화 전
-         * 명중률이 90%에서 88.7%로 거의 안 움직이고, 지역 2의 첫 스테이지에서
-         * 처음으로 87%대로 내려온다 - 첫 피날레를 넘은 뒤가 그 순간이다.
+         * 65단계에는 st11이었다(적 회피가 체감되기 시작하는 자리). 66.1단계에
+         * 게이트를 걷었다 - 첫 칸이 2골드라 곡선 추종 플레이어가 st1에 바로
+         * 네 칸을 사고(Lv.5), st11에서 65단계와 같은 Lv.25에 합류한다.
+         * 다시 게이트를 넣거나 상한을 두어 밴드를 맞추지 않는다 - 밴드가
+         * 깨지면 손잡이는 초반 잡몹 체력 하나다(66.1단계 확정).
          */
-        public const int UnlockStage = 11;
+        public const int UnlockStage = 1;
 
         public static bool IsUnlockedAt(int stage)
         {
@@ -90,32 +92,40 @@ namespace Onikiri.Progression
         // ------------------------------------------------------------ 기대 곡선
 
         /**
-         * @brief 해금 스테이지에서 곡선 추종 플레이어가 그 스테이지 안에 서는 레벨 (실측).
+         * @brief 닫힌 식의 st1 절편 (실측 적합). **1 아래인 것이 맞다.**
          *
-         * 닫힌 식의 절편이다. 시뮬레이션의 결과라 상수로 두고
+         * 직선은 st11 뒤의 기울기(칸당 x1.2 비용)를 따라가야 하고, 그 직선을
+         * st1로 끌어내리면 1 아래가 된다. 실측은 st1 Lv.5다(첫 칸 2골드라 바로
+         * 산다) - 직선이 st1~3을 강화 전 값으로 읽어 그 자리 오차가 0.93%p로
+         * 가장 크다(허용 1%p). 절편을 올려 그 자리를 맞추면 st11 뒤가 위로
+         * 뜬다. 66.1단계 보고서 §2.
+         *
+         * 시뮬레이션의 결과라 상수로 두고
          * `Accuracy_ExpectedCurve_TracksTheSimulation`이 대조한다.
          */
-        public const double ExpectedLevelAtUnlock = 22.1d;
+        public const double ExpectedLevelAtUnlock = -4d;
 
         /**
-         * @brief 해금 뒤 곡선 추종 레벨이 스테이지마다 오르는 칸 수 (실측 기울기).
+         * @brief 곡선 추종 레벨이 스테이지마다 오르는 칸 수 (실측 적합 기울기).
          *
-         * st11~500 선형 적합이다(해금 스테이지 실측 Lv.25). 닫힌 식으로는
-         * ln(1.72) / ln(CostGrowth) = 2.97이고 실측과 1.5% 차이다. 이 직선으로 낸
-         * 기대 명중률과 실측의 최대 차이는 0.28%p(st11)였다.
+         * st1~500에서 기대 명중률의 최대 오차를 줄이는 쪽으로 골랐다(st1~10
+         * 0.93%p@st2 / st11~500 0.47%p@st13). 닫힌 식으로는
+         * ln(1.72) / ln(CostGrowth) = 2.97이다. 65단계 값(st11~500 적합)은
+         * 22.1 + 3.0144 x (st - 11)이었고 그 직선을 st1로 늘이면 st4 오차가
+         * 1.38%p라 허용 밖이었다.
          */
-        public const double ExpectedLevelsPerStage = 3.0144d;
+        public const double ExpectedLevelsPerStage = 2.98d;
 
         /**
          * @brief 그 스테이지에서 곡선 추종 플레이어가 갖고 있을 명중 수치. **닫힌 식이다.**
          *
          * 보스 체력 보정(StageCurve.AccuracyAxisCompensation)이 읽는다 -
          * 시뮬레이션 결과를 참조하면 보스 체력이 자기 결과를 필요로 하는 순환이
-         * 된다(GoldGainCurve.ExpectedAtStage와 같은 규칙). 해금 전에는 기본값.
+         * 된다(GoldGainCurve.ExpectedAtStage와 같은 규칙). 66.1단계부터 해금
+         * 전 분기가 없다 - 축이 st1부터 열려 있다.
          */
         public static double ExpectedValueAtStage(int stage)
         {
-            if (!IsUnlockedAt(stage)) return BaseValue;
             double level = ExpectedLevelAtUnlock + ExpectedLevelsPerStage * (stage - UnlockStage);
             return BaseValue + Step * Math.Max(0d, level - 1d);
         }

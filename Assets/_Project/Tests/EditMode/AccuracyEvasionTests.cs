@@ -347,17 +347,24 @@ namespace Onikiri.Tests
             Assert.AreEqual(b, a, b * 0.01d, string.Format("온보딩이 {0:F1}초 -> {1:F1}초", b, a));
         }
 
-        /** 해금 자리: 명중은 지역 1이 끝난 뒤(st20 전), 회피는 첫 보스가 죽일 수 있는 자리 */
+        /**
+         * @brief 해금 자리: 둘 다 **게임 시작부터** (66.1단계 확정).
+         *
+         * 65단계에는 명중 st11 · 회피 st5였다. 게이트를 다시 넣어 밴드를 맞추는
+         * 길은 닫혔다 - 밴드의 손잡이는 초반 잡몹 체력 하나다. 그래서 여기서는
+         * 해금 값과 함께 "st1에 실제로 사는가"를 본다. 열려만 있고 아무도 안
+         * 누르면 게이트가 있는 것과 같다.
+         */
         [Test]
-        public void Unlocks_SitWhereTheyMeanSomething()
+        public void Unlocks_FromTheFirstStage()
         {
-            Assert.AreEqual(StageSimulation.FirstStageThatKillsAnUnupgradedPlayer(50), EvasionCurve.UnlockStage,
-                "회피 해금이 '첫 보스가 실질 위협이 되는 스테이지'와 갈렸다");
+            Assert.AreEqual(1, AccuracyCurve.UnlockStage, "명중에 스테이지 게이트가 다시 생겼다");
+            Assert.AreEqual(1, EvasionCurve.UnlockStage, "회피에 스테이지 게이트가 다시 생겼다");
+            Assert.IsTrue(AccuracyCurve.IsUnlockedAt(1));
+            Assert.IsTrue(EvasionCurve.IsUnlockedAt(1));
 
-            Assert.Greater(AccuracyCurve.UnlockStage, BossCurve.RegionLength, "명중이 지역 1 안에서 열린다");
-            Assert.LessOrEqual(AccuracyCurve.UnlockStage, 20, "명중이 st20까지 한 번도 안 팔릴 수 있다");
-            Assert.AreEqual(1d, StageCurve.AccuracyAxisCompensation(AccuracyCurve.UnlockStage - 1), 0d,
-                "해금 전인데 보스가 명중 이득을 상쇄한다");
+            var rows = StageSimulation.Run(1, Field());
+            Assert.Greater(rows[0].AccuracyLevel, 1, "명중이 st1부터 열렸는데 st1에 한 칸도 안 팔린다");
         }
 
         /**

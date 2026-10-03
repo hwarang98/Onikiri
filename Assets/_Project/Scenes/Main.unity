@@ -22003,7 +22003,7 @@ MonoBehaviour:
   masteredRowTint: {r: 0.62, g: 0.55, b: 0.42, a: 1}
   masteredLabel: MASTER
   rowBackground: {fileID: 243855866}
-  unlockStage: 11
+  unlockStage: 1
   lockedLabel: "{0}\uC2A4\uD14C\uC774\uC9C0"
   lockedColor: {r: 0.3529412, g: 0.31764707, b: 0.41960785, a: 1}
   lockedRowTint: {r: 0.34, g: 0.36, b: 0.55, a: 1}
@@ -158810,7 +158810,7 @@ MonoBehaviour:
   masteredRowTint: {r: 0.62, g: 0.55, b: 0.42, a: 1}
   masteredLabel: MASTER
   rowBackground: {fileID: 1718740958}
-  unlockStage: 5
+  unlockStage: 1
   lockedLabel: "{0}\uC2A4\uD14C\uC774\uC9C0"
   lockedColor: {r: 0.3529412, g: 0.31764707, b: 0.41960785, a: 1}
   lockedRowTint: {r: 0.34, g: 0.36, b: 0.55, a: 1}
