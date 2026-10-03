@@ -45,19 +45,23 @@ namespace Onikiri.Progression
          * 회피 9.5%가 됐고, 그 몫의 골드가 화력으로 가며 st20 피날레 여유를
          * 챕터 관문 위로 밀어 올렸다(코리더 등급 순서가 뒤집혔다). 12면 첫 구매가
          * st8, st10 3.8%로 늦어지고 순서가 돌아온다 - 보고서 §4.
+         *
+         * 66.1단계에 해금이 st1로 내려와 다시 쟀다. 12에서는 첫 구매가 여전히
+         * st9(66단계와 같다)이고 회피 레벨 경로가 st1~500 전부 그대로다 - 해금이
+         * 앞당겨져도 앞 구간에서는 화력이 이 칸을 이긴다.
          */
         public const double BaseCost = 12d;
         public const double CostGrowth = 1.2d;
 
         /**
-         * @brief 이 축이 강화 목록에 나타나는 스테이지 - 첫 보스가 실질 위협이 되는 자리.
+         * @brief 이 축이 강화 목록에 나타나는 스테이지 = **게임 시작부터**.
          *
-         * 강화하지 않은 플레이어가 보스전에서 처음 죽는 스테이지
-         * (StageSimulation.FirstStageThatKillsAnUnupgradedPlayer)다 - 실측 st5.
-         * 그 앞의 보스는 피해를 줘도 죽이지 못하므로 회피가 할 일이 없다.
-         * `Evasion_UnlocksWhereTheFirstBossCanKill`이 대조한다.
+         * 65단계에는 st5였다 - 강화하지 않은 플레이어가 보스전에서 처음 죽는
+         * 스테이지(StageSimulation.FirstStageThatKillsAnUnupgradedPlayer). 66.1단계에
+         * 게이트를 걷었다. 버튼은 st1부터 보이고 살 수 있지만, 곡선 추종
+         * 플레이어가 처음 사는 자리는 여전히 st9다(BaseCost 주석).
          */
-        public const int UnlockStage = 5;
+        public const int UnlockStage = 1;
 
         public static bool IsUnlockedAt(int stage)
         {
