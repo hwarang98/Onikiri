@@ -198,7 +198,23 @@ namespace Onikiri.Progression
          * 것이므로 간격 손잡이로 고친다** - 이 주석이 26단계에 적어둔 규칙
          * 그대로이고, 그때와 부호만 다르다.
          */
-        public const double FinaleHealthMultiplier = 1.46d;
+        /**
+         * ## 67단계에 1.46 -> 1.52. 명중 보정 지수를 내릴 자리를 만들었다
+         *
+         * 명중 보정 지수 1.0 -> 0.75(StageCurve.AccuracyMarginExponent)가 st20
+         * 피날레를 st5 챕터 위로 올린다(1.515 대 1.502). 이번에도 간격 손잡이다 -
+         * 챕터를 1.12로 내려 벌리면 st25·st45 챕터 천장이 뚫린다(-0.04 / -0.12).
+         *
+         * 1.50~1.54를 쟀고 st45 가속 천장 여유는 그 안에서 0.0321로 같다(챕터
+         * 스테이지라 이 배수를 안 읽는다). 그래서 남은 두 얇은 자리 - 순서 간격과
+         * 골드 축 안 산 플레이어의 st20 바닥(1.0) - 중 작은 쪽이 가장 큰 값을
+         * 골랐다: 1.51 간격 0.037 / 바닥 +0.054, **1.52 0.046 / +0.048**, 1.53
+         * 0.056 / +0.041. 피날레 최악 1.456, 무과금 st20 1.212(바닥 1.15).
+         *
+         * 귀문 여섯 문(st30·40·50·70·100·150)은 전부 피날레라 체력의 바탕이
+         * x1.041 움직였다 - M표를 같은 규칙으로 다시 구웠다(PromotionTrialCatalog).
+         */
+        public const double FinaleHealthMultiplier = 1.52d;
         public const double FinaleGoldMultiplier = 2.0d;
         public const double FinaleAttackMultiplier = 1.6d;
 

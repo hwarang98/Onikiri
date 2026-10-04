@@ -310,11 +310,14 @@ namespace Onikiri.Tests
          *
          * 값은 64단계 종료 시점의 실측(하네스)이다. 이 세계가 64단계와 같아야
          * 앞 스텝들의 앵커가 이 정책 한 줄로 살아남는다.
+         *
+         * 67단계: 피날레 배수 1.46 -> 1.52가 st10·st20·st30·st50·st100(전부
+         * 피날레)을 움직였다 - 같은 규칙으로 FinalePre67 한 줄을 더한다.
          */
         [Test]
         public void HitRatingNeutralized_ReproducesTheStep64World()
         {
-            var rows = StageSimulation.Run(100, Field(), new StageSimulation.Policy { NeutralizeHitRating = true, StatPointsPre66 = true });
+            var rows = StageSimulation.Run(100, Field(), new StageSimulation.Policy { NeutralizeHitRating = true, StatPointsPre66 = true, FinalePre67 = true });
 
             Assert.AreEqual(1.527d, rows[9].BossMargin, 0.002d, "st10");
             Assert.AreEqual(1.407d, rows[19].BossMargin, 0.002d, "st20");
@@ -402,6 +405,13 @@ namespace Onikiri.Tests
          * 66단계: 성장탭 세 축이 분모를 키워 지금 세계의 무한 구간 이득이 3.86%로
          * 내려앉았다. 46·49단계 처방(ⓒ)대로 4%는 **이 축이 마지막 층이던 세계**
          * (StatPointsPre66)에서 재고, 지금 세계는 3% 하한을 못 박는다
+         *
+         * 67단계: 보정 지수 1.0 -> 0.75. **이 검사는 지수를 거의 못 느낀다** - 산
+         * 플레이어와 안 산 플레이어가 같은 보스를 상대해서 둘의 보스 여유 비가
+         * 명중률 비 그대로이기 때문이다(StageCurve.AccuracyMarginExponent 주석).
+         * 지수를 내리면 보스 몫이 줄어 오히려 조금 준다(4.06% -> 4.00%,
+         * 3.86% -> 3.73%). 하한은 3% 그대로이고, 지수가 만든 이득은 아래
+         * Accuracy_FollowerBeatsTheAxislessWorld가 잰다
          */
         [Test]
         public void Accuracy_IsNotADeadButton()
@@ -422,6 +432,32 @@ namespace Onikiri.Tests
             double tuned = StageSimulation.TotalSeconds(without.GetRange(0, 50))
                          / StageSimulation.TotalSeconds(with.GetRange(0, 50)) - 1d;
             Assert.Greater(tuned, 0.03d, string.Format("조율 구간 이득 {0:P2} - 3% 아래", tuned));
+        }
+
+        /**
+         * @brief 명중을 따라 사는 플레이어가 **명중 축이 없던 세계**보다 빠르다 (67단계).
+         *
+         * 보정 지수가 1 아래라 남는 몫이다(StageCurve.AccuracyMarginExponent 주석).
+         * 다른 축들이 "축 없는 세계 대비"로 남기는 액티브 이득과 같은 자다. 지수
+         * 1.0에서는 -0.29% / -0.03%(같은 속도)였고 0.75에서 +0.97% / +0.86%다.
+         * 하한 0.5%는 지수가 1.0 쪽으로 되돌아가면 걸리는 자리다(0.9에서
+         * +0.21% / +0.33%).
+         */
+        [Test]
+        public void Accuracy_FollowerBeatsTheAxislessWorld()
+        {
+            var follower = StageSimulation.Run(500, Field());
+            var axisless = StageSimulation.Run(500, Field(), new StageSimulation.Policy { NeutralizeHitRating = true });
+
+            double tuned = StageSimulation.TotalSeconds(axisless.GetRange(0, 50))
+                         / StageSimulation.TotalSeconds(follower.GetRange(0, 50)) - 1d;
+            Assert.Greater(tuned, 0.005d, string.Format(
+                "st1~50: 추종이 축 없는 세계보다 {0:P2} 빠르다 - 0.5% 아래", tuned));
+
+            double deep = StageSimulation.CombatSeconds(axisless, 51, 500)
+                        / StageSimulation.CombatSeconds(follower, 51, 500) - 1d;
+            Assert.Greater(deep, 0.005d, string.Format(
+                "st51~500: 추종이 축 없는 세계보다 {0:P2} 빠르다 - 0.5% 아래", deep));
         }
 
         /**

@@ -785,6 +785,19 @@ namespace Onikiri.Progression
              */
             public bool NeutralizeHitRating;
 
+            // ------------------------------------------------------------ 67단계
+
+            /**
+             * @brief **67단계 이전의 피날레 배수**(1.46) - 49단계 규칙 ⓐ의 비교군.
+             *
+             * 67단계가 명중 보정 지수를 내릴 자리를 만들려고 피날레 배수를
+             * 1.46 -> 1.52로 올렸다(BossCurve.FinaleHealthMultiplier 주석). 앞 스텝이
+             * 피날레 스테이지(st10·st20·…)에 굳힌 앵커는 그 앞의 세계 것이므로
+             * 상수를 옮기지 않고 이 한 줄로 재현한다. 명중 지수는 따로 없다 -
+             * 그 앞 세계의 앵커는 이미 NeutralizeHitRating과 함께 잰다.
+             */
+            public bool FinalePre67;
+
             public static Policy Default { get { return new Policy(); } }
         }
 
@@ -1066,6 +1079,10 @@ namespace Onikiri.Progression
                 if (policy.NeutralizeGoldAxis) bossKill /= StageCurve.GoldAxisCompensation(stage);
                 // 64단계 이전 세계의 재현(GoldAxisPre64 주석). 보정도 램프도 옛 값으로
                 if (policy.GoldAxisPre64) bossKill *= LegacyGoldHealthRatio(stage);
+                // 67단계 이전 피날레 배수의 재현(FinalePre67 주석). 등급 배수는
+                // 체력의 마지막 곱이라 처치 시간에 그대로 비례한다
+                if (policy.FinalePre67 && BossCurve.TierOf(stage) == BossCurve.Tier.Finale)
+                    bossKill *= FinaleHealthMultiplierPre67 / BossCurve.FinaleHealthMultiplier;
                 if (policy.NeutralizeEquipment) bossKill /= StageCurve.EquipmentCompensation(stage);
                 // 전역 전직 보정은 여기 없다(2단계에 지웠다). 대신 2.1단계의
                 // **심층 수렴 보정**을 걷어낸다 - 이 정책이 만드는 중립 세계가
@@ -1424,6 +1441,9 @@ namespace Onikiri.Progression
             return GoldGainCurve.IsUnlockedAt(stage)
                 ? Math.Pow(LegacyGoldCeiling, LegacyGoldExponent) : 1d;
         }
+
+        /** 67단계 이전의 피날레 체력 배수(Policy.FinalePre67) */
+        private const double FinaleHealthMultiplierPre67 = 1.46d;
 
         /**
          * @brief 옛 세계의 보스 체력 / 새 세계의 보스 체력. 처치 시간에 곱한다.
