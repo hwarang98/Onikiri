@@ -601,6 +601,36 @@ namespace Onikiri.Tests
         }
 
         /**
+         * @brief 피날레가 챕터보다 **이 간격 이상** 조인다 (67단계).
+         *
+         * 위 검사는 순서만 본다. 64·65단계는 그 순서가 0.01 안에 붙은 채로
+         * 지나갔고(st20 1.430 / st5 1.440), 그 칼날이 명중 보정 지수를 1.0에
+         * 묶었다. 67단계가 피날레 배수(1.46 -> 1.52)로 간격을 0.015에서 0.046으로
+         * 벌렸다 - 다음 스텝이 이 간격을 다시 갉아먹으면 순서가 뒤집히기 전에
+         * 여기서 걸린다. 하한은 채택값 0.046을 소수 셋째 자리에서 내린 값이다.
+         */
+        const double FinaleBelowChapterGap = 0.045d;
+
+        [Test]
+        public void FinaleBosses_StayClearOfTheChapterByTheAdoptedGap()
+        {
+            var results = StageSimulation.Run(20, FieldFromAssets());
+
+            double chapterWorst = double.MaxValue, finaleWorst = double.MaxValue;
+            foreach (var row in results)
+            {
+                var tier = BossCurve.TierOf(row.Stage);
+                if (tier == BossCurve.Tier.Chapter) chapterWorst = Math.Min(chapterWorst, row.BossMargin);
+                if (tier == BossCurve.Tier.Finale) finaleWorst = Math.Min(finaleWorst, row.BossMargin);
+            }
+
+            Assert.GreaterOrEqual(chapterWorst - finaleWorst, FinaleBelowChapterGap, string.Format(
+                "챕터 최악 {0:F4} - 피날레 최악 {1:F4} = {2:F4}. 간격이 {3}보다 좁다 - 칼날이 "
+                + "다시 생겼다. 등급 배수(BossCurve)로 간격부터 되돌려라",
+                chapterWorst, finaleWorst, chapterWorst - finaleWorst, FinaleBelowChapterGap));
+        }
+
+        /**
          * @brief 챕터 배수가 **실제로 적용되는지**.
          *
          * 상수가 1보다 큰지만 검사하던 테스트가 있었고, 그것은 통과하는데
@@ -1824,8 +1854,9 @@ namespace Onikiri.Tests
             // 64단계: 골드 획득 축이 무한 성장으로 바뀌며 코리더부터 심층까지
             // 여유가 몇 % 움직였다. 이 검사가 지키는 앵커는 "그 앞의 세계"의
             // 것이므로 상수를 옮기지 않고 49단계 규칙 ⓐ대로 정책에 한 줄을
-            // 더한다 - 옛 골드 축(x1.25 / Lv.13 / 지수 0.52)을 재현하는 플래그
-            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true };
+            // 더한다 - 옛 골드 축(x1.25 / Lv.13 / 지수 0.52)을 재현하는 플래그.
+            // 67단계 피날레 배수 1.46 -> 1.52도 같은 규칙이다(FinalePre67) - st10이 피날레
+            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true, FinalePre67 = true };
             var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
 
             // ---- 앵커 넷. **승급 재설계 2.1.1단계에 다시 구웠다**
