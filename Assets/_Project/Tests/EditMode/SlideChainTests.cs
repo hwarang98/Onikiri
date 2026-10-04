@@ -105,15 +105,15 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 천장이 위로 덮은 회차는 **미끄러짐이 아니다.**
+         * @brief 아래에서 위로는 **미끄러짐이 아니다.**
          *
-         * `Downgraded`가 `Rolled != Outcome`이던 시절에는 천장 회차가
-         * 전부 "내려갔다"로 적혔다. 화면이 올라간 것을 내려갔다고 말한다.
+         * 50단계에는 천장이 낮게 굴린 회차를 위로 덮었고, `Downgraded`가
+         * `Rolled != Outcome`이던 시절에는 그 회차가 전부 "내려갔다"로 적혔다.
+         * 68단계에 천장이 사라졌지만 판정은 사다리의 성질이라 그대로 지킨다.
          */
         [Test]
-        public void ThePityPull_IsNotADowngrade()
+        public void AnUpwardStep_IsNotADowngrade()
         {
-            // 천장이 실제로 만드는 쌍이다 - 낮게 굴렸는데 개안을 받는다
             Assert.IsFalse(SkillGachaCurve.SlidesTo(SkillGachaCurve.Outcome.XpSmall,
                                                     SkillGachaCurve.Outcome.Awakening),
                 "XP 회차에서 개안으로 '미끄러졌다'고 나온다");

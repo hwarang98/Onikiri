@@ -675,6 +675,11 @@ namespace Onikiri.EditorTools
             // "무엇이 갈렸는가"가 한눈에 읽힌다 - 갈리는 것은 결과의 이름뿐이다
             DrawSkillGachaTools();
 
+            // 소환 레벨은 두 배너 **바로 다음**이다 (68단계). 두 배너가 같은 식을
+            // 쓰고 경험치만 따로이므로, 레벨표 한 벌을 두 배너의 지금 레벨과
+            // 나란히 놓는다 - 천장 직전 버튼이 서던 자리를 이 절이 받는다
+            DrawSummonLevelTools();
+
             // 전직도 보석 소비처라 장비 바로 다음이다 (33단계)
             DrawEvolutionTools();
 
@@ -1257,14 +1262,14 @@ namespace Onikiri.EditorTools
          *
          * 45단계의 상성·영체는 요도 절 안의 소절로 넣었다 - 손잡이가 요도 티어
          * 하나뿐이라 절을 나누면 화면이 거짓말을 했다. 뽑기는 반대다. 자기
-         * 재화(보석)와 자기 상태(천장 카운터·일일 무료 쿨)를 갖고, 그 상태에
-         * 도달하는 비용이 실제로 크다 - 천장 하나를 눈으로 보려면 무료 뽑기로
-         * 서른 날이다.
+         * 재화(보석)와 자기 상태(소환 경험치·일일 무료 쿨)를 갖고, 그 상태에
+         * 도달하는 비용이 실제로 크다 - 소환 Lv.5를 눈으로 보려면 무료 뽑기로
+         * 백 날이다.
          *
          * 그래서 여기 있는 것은 셋이다:
          *
          *   실제 경로   보석을 내고 단연·10연. 잔액이 모자라면 눌리지 않는다
-         *   치트        보석 없이 돌리기 · 천장 직전으로 밀기 · 무료 쿨 리셋
+         *   치트        보석 없이 돌리기 · 레벨업 직전으로 밀기 · 무료 쿨 리셋
          *   보는 것     확률표(코드가 내는 값 그대로) · 리드 상한이 지금 몇인가
          *
          * 마지막 것이 이 절의 존재 이유에 가깝다. **리드 상한**은 이 스텝
@@ -1296,11 +1301,12 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField(string.Format(
-                        "{0}  ·  천장까지 {1}회  ·  누적 {2}회  ·  무료 {3}",
+                        "{0}  ·  {1}  ·  누적 {2}회  ·  무료 {3}",
                         gacha.IsUnlocked
                             ? "개방"
                             : "잠김 (st" + Onikiri.Progression.GachaCurve.UnlockStage + " 필요)",
-                        gacha.PullsUntilPity, gacha.TotalPulls,
+                        Onikiri.Progression.SummonLevelCurve.LevelTextFor(gacha.SummonXp),
+                        gacha.TotalPulls,
                         gacha.HasFreePull ? "가능" : "오늘 씀"), GUILayout.Width(330f));
 
                     // 실제 구매 경로. 보석이 모자라면 눌리지 않는다
@@ -1328,8 +1334,8 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("공짜 10회", GUILayout.Width(80f)))
                         gacha.DebugPull(Onikiri.Progression.GachaCurve.TenPullCount);
 
-                    if (GUILayout.Button("천장 직전", GUILayout.Width(80f)))
-                        gacha.DebugPushToPity();
+                    if (GUILayout.Button("레벨업 직전", GUILayout.Width(88f)))
+                        gacha.DebugPushToLevelUp();
 
                     if (GUILayout.Button("무료 쿨 리셋", GUILayout.Width(96f)))
                         gacha.DebugResetFreePull();
@@ -1337,7 +1343,7 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("뽑기 초기화", GUILayout.Width(96f)))
                     {
                         gacha.DebugReset();
-                        Debug.Log("[Onikiri] 뽑기를 천장 0 · 누적 0 · 무료 미사용으로 되돌렸다. "
+                        Debug.Log("[Onikiri] 뽑기를 소환 경험치 0 · 누적 0 · 무료 미사용으로 되돌렸다. "
                                   + "보석과 이미 들어간 파편·혼은 돌려주지 않는다 - 환불은 "
                                   + "초기화가 아니라 별개의 치트다.");
                     }
@@ -1345,7 +1351,7 @@ namespace Onikiri.EditorTools
 
                 // 확률표. 손으로 적지 않고 코드가 내는 값을 그대로 그린다 -
                 // 화면(상점 배너)과 여기가 갈리면 어느 쪽이 진짜인지 알 수 없다
-                foreach (string line in GachaTableLines()) EditorGUILayout.LabelField(line);
+                foreach (string line in GachaTableLines(gacha.SummonLevel)) EditorGUILayout.LabelField(line);
 
                 DrawEssenceCapTools(gacha);
                 DrawLadderTools();
@@ -1353,18 +1359,17 @@ namespace Onikiri.EditorTools
         }
 
         /**
-         * @brief 확률표. **표의 값과 실효 값을 나란히 적는다.**
+         * @brief 확률표. **Lv.1 표와 지금 소환 레벨의 값을 나란히 적는다.**
          *
-         * 47단계에 두 값이 갈렸다 - 천장이 ★4를 보장하므로 아래 등급은
-         * 눌리고 ★4는 밀려 올라간다(GachaCurve.PityShare). 화면(상점 배너)은
-         * **표의 값**만 공개하는데, 실제로 몇 번에 하나가 나오는지는 실효
-         * 값이라, 뽑았는데 안 나오는 것이 확률 때문인지 천장 때문인지를
-         * 가를 수 있는 곳이 여기뿐이다.
+         * 47단계에는 표와 "천장에 눌린 실효"가 갈렸다. 68단계에 천장이 사라져
+         * 실효가 곧 지금 레벨의 표다(SummonLevelCurve.ChancesAt) - 화면(상점
+         * 배너)은 Lv.1 표를 공개하고, 지금 몇 번에 하나가 나오는지는 레벨이
+         * 정한다. 그 둘을 가를 수 있는 곳이 여기뿐이다.
          *
          * 등급별로 줄을 나눈 이유는 여섯이 한 줄에 들어가면 46단계가 화면에서
          * 겪은 것("파편 674%")이 패널에서 재현되기 때문이다.
          */
-        private static string[] GachaTableLines()
+        private static string[] GachaTableLines(int summonLevel)
         {
             var lines = new System.Collections.Generic.List<string>();
 
@@ -1386,24 +1391,19 @@ namespace Onikiri.EditorTools
                         reward = "파편 " + Onikiri.Progression.GachaCurve.ShardsOf[i]; break;
                 }
 
-                lines.Add(string.Format("    {0} {1,-10}  표 {2,5:0.0}%",
+                lines.Add(string.Format("    {0} {1,-10}  표 {2,5:0.0}%  ·  Lv.{3} {4,6:0.00}%",
                     Onikiri.Progression.GachaCurve.StarsFor(grade), reward,
-                    Onikiri.Progression.GachaCurve.Chances[i] * 100d));
+                    Onikiri.Progression.GachaCurve.Chances[i] * 100d, summonLevel,
+                    Onikiri.Progression.SummonLevelCurve.ChanceAt(summonLevel, i) * 100d));
             }
 
             lines.Add(string.Format(
-                "    실효(천장 접힘)  파편 {0:F2}  ·  ★3 {1:F2}%  ·  ★4 {2:F2}%  ·  ★5 {3:F2}%",
-                Onikiri.Progression.GachaCurve.ExpectedShardsPerPull,
-                Onikiri.Progression.GachaCurve.EffectiveEssenceChance * 100d,
-                Onikiri.Progression.GachaCurve.EffectiveRarityChance * 100d,
-                Onikiri.Progression.GachaCurve.EffectiveLegendaryChance * 100d));
-
-            lines.Add(string.Format(
-                "    ★4+ 하나에 {0:F1}회  ·  ★5 하나에 {1:F0}회  ·  파편/보석 {2:F3}"
-                + " (촉매 {3:F3})",
-                Onikiri.Progression.GachaCurve.ExpectedPullsPerEpic,
-                Onikiri.Progression.GachaCurve.ExpectedPullsPerLegendary,
-                Onikiri.Progression.GachaCurve.ExpectedShardsPerPull
+                "    Lv.{0}  ★4+ 하나에 {1:F1}회  ·  ★5 하나에 {2:F0}회  ·  파편/보석 {3:F3}"
+                + " (촉매 {4:F3})",
+                summonLevel,
+                Onikiri.Progression.GachaCurve.ExpectedPullsPerEpic(summonLevel),
+                Onikiri.Progression.GachaCurve.ExpectedPullsPerLegendary(summonLevel),
+                Onikiri.Progression.GachaCurve.ExpectedShardsPerPull(summonLevel)
                     / Onikiri.Progression.GachaCurve.PullCostGems,
                 (double)Onikiri.Progression.YodoCurve.ShardPackShards
                     / Onikiri.Progression.YodoCurve.ShardPackGems));
@@ -1452,11 +1452,12 @@ namespace Onikiri.EditorTools
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField(string.Format(
-                        "{0}  ·  천장까지 {1}회  ·  누적 {2}회  ·  무료 {3}",
+                        "{0}  ·  {1}  ·  누적 {2}회  ·  무료 {3}",
                         !gacha.IsUnlocked
                             ? "잠김 (st" + Onikiri.Progression.SkillGachaCurve.UnlockStage + " 필요)"
                             : gacha.HasStock ? "개방" : "재고 소진",
-                        gacha.PullsUntilPity, gacha.TotalPulls,
+                        Onikiri.Progression.SummonLevelCurve.LevelTextFor(gacha.SummonXp),
+                        gacha.TotalPulls,
                         gacha.HasFreePull ? "가능" : "오늘 씀"), GUILayout.Width(330f));
 
                     using (new EditorGUI.DisabledScope(!gacha.CanPull(1)))
@@ -1486,8 +1487,8 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("공짜 10회", GUILayout.Width(80f)))
                         gacha.DebugPull(Onikiri.Progression.SkillGachaCurve.TenPullCount);
 
-                    if (GUILayout.Button("천장 직전", GUILayout.Width(80f)))
-                        gacha.DebugPushToPity();
+                    if (GUILayout.Button("레벨업 직전", GUILayout.Width(88f)))
+                        gacha.DebugPushToLevelUp();
 
                     if (GUILayout.Button("무료 쿨 리셋", GUILayout.Width(96f)))
                         gacha.DebugResetFreePull();
@@ -1495,27 +1496,26 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("뽑기 초기화", GUILayout.Width(96f)))
                     {
                         gacha.DebugReset();
-                        Debug.Log("[Onikiri] 오의 뽑기를 천장 0 · 누적 0 · 무료 미사용으로 "
+                        Debug.Log("[Onikiri] 오의 뽑기를 소환 경험치 0 · 누적 0 · 무료 미사용으로 "
                                   + "되돌렸다. 이미 열린 오의와 들어간 XP는 그대로다 - "
                                   + "그쪽은 '발도 오의' 절의 초기화가 되돌린다.");
                     }
                 }
 
-                foreach (string line in SkillGachaTableLines()) EditorGUILayout.LabelField(line);
+                foreach (string line in SkillGachaTableLines(gacha.SummonLevel)) EditorGUILayout.LabelField(line);
 
                 DrawSkillXpTools();
             }
         }
 
         /**
-         * @brief 오의 뽑기 확률표. **표의 값과 실효 값을 두 줄로 적는다.**
+         * @brief 오의 뽑기 확률표. **Lv.1 표와 지금 소환 레벨의 값을 함께 적는다.**
          *
-         * 47단계가 요도 표에서 한 것과 같은 처리다 - 화면(상점 배너)은 표만
-         * 공개하고 여기서는 천장에 눌린 실효 값도 함께 본다. 두 값이 갈리는
-         * 이유는 천장이 "★4+가 아닌 굴림"을 덮어쓰기 때문이고, 그 사실을
-         * 모르면 "표에 3%인데 왜 이만큼 나오나"를 답할 수 없다.
+         * 요도 표(GachaTableLines)와 같은 처리다 - 화면은 Lv.1 표를 공개하고,
+         * 여기서는 이 배너의 지금 레벨 값도 본다. 그것을 모르면 "표에 2.1%인데
+         * 왜 이만큼 나오나"를 답할 수 없다.
          */
-        private static string[] SkillGachaTableLines()
+        private static string[] SkillGachaTableLines(int summonLevel)
         {
             var lines = new System.Collections.Generic.List<string>();
 
@@ -1524,28 +1524,101 @@ namespace Onikiri.EditorTools
                 var grade = Onikiri.Progression.GachaCurve.GradeOf[i];
                 var outcome = (Onikiri.Progression.SkillGachaCurve.Outcome)i;
 
-                lines.Add(string.Format("  {0}  {1,-14} {2,5:F1}%",
+                lines.Add(string.Format("  {0}  {1,-14} {2,5:F1}%  ·  Lv.{3} {4,6:0.00}%",
                     Onikiri.Progression.GachaCurve.StarsFor(grade),
                     Onikiri.UI.GachaResultPopup.NameOfOutcome(outcome),
-                    Onikiri.Progression.SkillGachaCurve.Chances[i] * 100d));
+                    Onikiri.Progression.SkillGachaCurve.Chances[i] * 100d, summonLevel,
+                    Onikiri.Progression.SummonLevelCurve.ChanceAt(summonLevel, i) * 100d));
             }
 
             lines.Add(string.Format(
-                "  실효(천장 눌림)  XP {0:F2}/회  ·  해금 {1:F3}%  ·  개안 {2:F3}%",
-                Onikiri.Progression.SkillGachaCurve.ExpectedXpPerPull,
-                Onikiri.Progression.SkillGachaCurve.EffectiveUnlockChance * 100d,
-                Onikiri.Progression.SkillGachaCurve.EffectiveAwakenChance * 100d));
+                "  Lv.{0}  스킬 XP {1:F2}/회  ·  해금 하나에 {2:F1}회  ·  개안 하나에 {3:F1}회",
+                summonLevel,
+                Onikiri.Progression.SkillGachaCurve.ExpectedXpPerPull(summonLevel),
+                Onikiri.Progression.SkillGachaCurve.ExpectedPullsPerUnlock(summonLevel),
+                Onikiri.Progression.SkillGachaCurve.ExpectedPullsPerAwaken(summonLevel)));
 
             lines.Add(string.Format(
-                "  ★4+ 하나에 {0:F1}회  ·  오의 하나 상한까지 {1} XP = {2:F1}회 "
-                + "(천장 {3}회)",
-                Onikiri.Progression.SkillGachaCurve.ExpectedPullsPerUnlock,
+                "  오의 하나 상한까지 {0} XP = {1:F1}회 (Lv.{2} 기준)",
                 Onikiri.Progression.SkillGachaCurve.TotalXpToCap,
                 Onikiri.Progression.SkillGachaCurve.TotalXpToCap
-                    / Onikiri.Progression.SkillGachaCurve.ExpectedXpPerPull,
-                Onikiri.Progression.SkillGachaCurve.PityPulls));
+                    / Onikiri.Progression.SkillGachaCurve.ExpectedXpPerPull(summonLevel),
+                summonLevel));
 
             return lines.ToArray();
+        }
+
+        /**
+         * @brief 소환 레벨 (68단계). **천장 직전 버튼이 서던 자리를 받는다.**
+         *
+         * 이 축의 값은 화면에 줄 하나("소환 Lv.n · xp / next")로만 뜨고, 그
+         * 레벨이 확률을 얼마나 바꿨는지는 어디에도 안 뜬다. 그래서 여기 둔다:
+         *
+         *   두 배너의 지금   레벨 · 경험치 · ★4+ / ★5 하나에 몇 회
+         *   레벨표           Lv.1/5/10/20/50의 ★3·★4·★5 - 보고서 §3과 같은 표
+         *   요구 XP          Lv.1~10의 다음 레벨 비용 (초반 간격, 밴드 c)
+         *   치트             레벨업 직전으로 밀기 (두 배너 각각) - 레벨업 이벤트와
+         *                    결과 팝업의 "소환 Lv.n 달성"을 열 번 안 뽑고 본다
+         *
+         * 레벨은 저장하지 않고 경험치에서 유도한다 - 이 절의 숫자도 같은 함수
+         * (SummonLevelCurve.LevelFor)를 지난다.
+         */
+        private void DrawSummonLevelTools()
+        {
+            EditorGUILayout.LabelField("소환 레벨", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                var yodoGacha = Onikiri.Progression.GachaSystem.Instance;
+                var skillGacha = Onikiri.Progression.SkillGachaSystem.Instance;
+
+                if (yodoGacha != null)
+                    DrawSummonLevelRow("요도", yodoGacha.SummonXp, yodoGacha.DebugPushToLevelUp);
+                if (skillGacha != null)
+                    DrawSummonLevelRow("오의", skillGacha.SummonXp, skillGacha.DebugPushToLevelUp);
+                if (yodoGacha == null && skillGacha == null)
+                    EditorGUILayout.HelpBox("뽑기 시스템이 씬에 없습니다 (플레이 중에 보세요).",
+                                            MessageType.Info);
+
+                EditorGUILayout.LabelField(string.Format(
+                    "  식  XpToNext(L) = ceil({0} x {1}^(L-1))  ·  g = ★3 {2} / ★4 {3} / ★5 {4} (★1·★2 = 1)",
+                    Onikiri.Progression.SummonLevelCurve.XpBase,
+                    Onikiri.Progression.SummonLevelCurve.XpGrowth,
+                    Onikiri.Progression.SummonLevelCurve.GradeGrowth[2],
+                    Onikiri.Progression.SummonLevelCurve.GradeGrowth[3],
+                    Onikiri.Progression.SummonLevelCurve.GradeGrowth[4]));
+
+                var costs = new System.Text.StringBuilder("  요구 XP  ");
+                for (int level = 1; level <= 10; level++)
+                    costs.Append("Lv.").Append(level).Append(' ')
+                         .Append(Onikiri.Progression.SummonLevelCurve.XpToNext(level)).Append("  ");
+                EditorGUILayout.LabelField(costs.ToString());
+
+                foreach (int level in new[] { 1, 5, 10, 20, 50 })
+                {
+                    var c = Onikiri.Progression.SummonLevelCurve.ChancesAt(level);
+                    EditorGUILayout.LabelField(string.Format(
+                        "  Lv.{0,-3} ★1 {1,5:0.0}%  ★2 {2,5:0.0}%  ★3 {3,5:0.00}%  ★4 {4,5:0.00}%  ★5 {5,5:0.00}%",
+                        level, c[0] * 100d, (c[1] + c[2]) * 100d, c[3] * 100d, c[4] * 100d, c[5] * 100d));
+                }
+            }
+        }
+
+        private static void DrawSummonLevelRow(string banner, long summonXp, System.Action pushToLevelUp)
+        {
+            int level = Onikiri.Progression.SummonLevelCurve.LevelFor(summonXp);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(string.Format(
+                    "{0}  {1}  ·  ★4+ 하나에 {2:F1}회  ·  ★5 하나에 {3:F0}회",
+                    banner, Onikiri.Progression.SummonLevelCurve.LevelTextFor(summonXp),
+                    Onikiri.Progression.GachaCurve.ExpectedPullsPerEpic(level),
+                    Onikiri.Progression.GachaCurve.ExpectedPullsPerLegendary(level)),
+                    GUILayout.Width(420f));
+
+                if (GUILayout.Button("레벨업 직전", GUILayout.Width(88f))) pushToLevelUp();
+            }
         }
 
         /**

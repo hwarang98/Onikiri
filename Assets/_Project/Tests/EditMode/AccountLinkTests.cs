@@ -472,7 +472,7 @@ namespace Onikiri.Tests
         [Test]
         public void LinkingAddsNoSaveField()
         {
-            Assert.AreEqual(22, SaveData.CurrentVersion,
+            Assert.AreEqual(23, SaveData.CurrentVersion,
                 "세이브 버전이 올랐다 - 계정 연동은 새 필드를 만들지 않기로 했다. "
                 + "다른 이유로 올랐다면 이 검사를 함께 고칠 것");
             // v20은 15종 재설계가 올렸다(★5 하드 천장 · 온보딩 10연 · 첫 장착).

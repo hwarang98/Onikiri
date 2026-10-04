@@ -53,7 +53,7 @@ namespace Onikiri.EditorTools
         private const float LineHeight = 52f;
 
         /**
-         * @brief 배너 본문 줄 수. 이름 / 설명 / 확률표 / 천장.
+         * @brief 배너 본문 줄 수. 이름 / 설명 / 확률표 / 소환 레벨.
          *
          * **확률표를 접지 않기 때문에** 줄 수가 결과 수에서 나온다 - 숨기면
          * 공개한 것이 아니고, 그 원칙이 46단계부터 이 배너의 크기를 정해
@@ -155,7 +155,7 @@ namespace Onikiri.EditorTools
          *
          * 값을 지금 적는 이유는 화면이 비어 보이지 않게 하려는 것이 아니라,
          * **가격이 밸런스의 일부**이기 때문이다 - 보석 300이 뽑기 12회이고
-         * 그것이 천장의 절반이라는 사실은 이 스텝에서 이미 정해져 있어야
+         * 그것이 (47단계) 천장의 절반이라는 사실은 이 스텝에서 이미 정해져 있어야
          * 다음 스텝이 그 위에 결제만 얹을 수 있다.
          *
          * 원화 표기에 ₩를 쓰지 않는다. 폰트 아틀라스에 그 글리프가 없고
@@ -284,12 +284,12 @@ namespace Onikiri.EditorTools
 
             Debug.Log(string.Format(
                 "[Onikiri] Shop panel built: 배너 2 + 무료 2 + 광고 + 보석 팩 {0} = {1:F0}px "
-                + "(뷰포트 {2:F0}px). 단연 {3} · 10연 {4} · 천장 {5}회 · "
-                + "오의 상한까지 XP {6} (기대 {7:F1}회)",
+                + "(뷰포트 {2:F0}px). 단연 {3} · 10연 {4} · 소환 Lv.1->2 {5}회 · "
+                + "오의 상한까지 XP {6} (Lv.1 기대 {7:F1}회)",
                 Packs.Length, ContentHeight, ViewportHeight,
-                GachaCurve.PullCostGems, GachaCurve.TenPullCostGems, GachaCurve.PityPulls,
+                GachaCurve.PullCostGems, GachaCurve.TenPullCostGems, SummonLevelCurve.XpToNext(1),
                 SkillGachaCurve.TotalXpToCap,
-                SkillGachaCurve.TotalXpToCap / SkillGachaCurve.ExpectedXpPerPull));
+                SkillGachaCurve.TotalXpToCap / SkillGachaCurve.ExpectedXpPerPull(1)));
 
             BattleContentBuilder.RelinkScreenTabs();
             return system;
@@ -307,8 +307,8 @@ namespace Onikiri.EditorTools
             so.FindProperty("yodo").objectReferenceValue = battle.GetComponent<YodoSystem>();
             so.FindProperty("stage").objectReferenceValue = battle.GetComponent<StageProgress>();
 
-            // 진행(천장·누적·무료 쿨)은 덮어쓰지 않는다. 빌더를 한 번 돌릴
-            // 때마다 천장 카운터가 0으로 돌아가면 플레이어가 지불한 29회가
+            // 진행(소환 경험치·누적·무료 쿨)은 덮어쓰지 않는다. 빌더를 한 번
+            // 돌릴 때마다 경험치가 0으로 돌아가면 플레이어가 지불한 뽑기가
             // 사라진다 - YodoPanelBuilder.EnsureSystem과 같은 규칙이다
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -326,8 +326,8 @@ namespace Onikiri.EditorTools
         /**
          * @brief 오의 뽑기 시스템 (50단계). **진행은 덮어쓰지 않는다.**
          *
-         * EnsureSystem과 같은 규칙이다 - 빌더를 한 번 돌릴 때마다 천장
-         * 카운터가 0으로 돌아가면 플레이어가 지불한 스물아홉 회가 사라진다.
+         * EnsureSystem과 같은 규칙이다 - 빌더를 한 번 돌릴 때마다 소환
+         * 경험치가 0으로 돌아가면 플레이어가 지불한 뽑기가 사라진다.
          *
          * `skills`를 배선하는 것이 이 함수가 하는 일의 전부에 가깝다. 결과를
          * 적용하는 곳이 그쪽이고(SkillGachaSystem 머리 주석), 참조가 비면
@@ -519,12 +519,12 @@ namespace Onikiri.EditorTools
             for (int i = 0; i < GachaCurve.OutcomeCount; i++)
                 BuildRateCell(go.transform, font, i, i % 2, i / 2, RewardName(i));
 
-            var pity = CreateLabel(go.transform, font, "Pity", TextAlignmentOptions.Left);
-            UiFonts.Demote(pity);
-            Place((RectTransform)pity.transform, TextLeft, 24f,
+            var summon = CreateLabel(go.transform, font, SummonLevelName, TextAlignmentOptions.Left);
+            UiFonts.Demote(summon);
+            Place((RectTransform)summon.transform, TextLeft, 24f,
                   16f + LineHeight * (2f + rows), LineHeight);
-            pity.color = DimColor;
-            pity.text = PityText(GachaCurve.PityPulls, 0);
+            summon.color = DimColor;
+            summon.text = SummonLevelCurve.LevelTextFor(0L);
 
             TMP_Text singleCost, tenCost;
             Image singleImage, tenImage;
@@ -542,7 +542,7 @@ namespace Onikiri.EditorTools
             shop.FindProperty("tenButton").objectReferenceValue = ten;
             shop.FindProperty("tenCost").objectReferenceValue = tenCost;
             shop.FindProperty("tenBackground").objectReferenceValue = tenImage;
-            shop.FindProperty("pityLabel").objectReferenceValue = pity;
+            shop.FindProperty("summonLevelLabel").objectReferenceValue = summon;
         }
 
         /**
@@ -627,11 +627,13 @@ namespace Onikiri.EditorTools
             return (GachaCurve.Chances[outcome] * 100d).ToString("0.0") + "%";
         }
 
-        /** 배너 아래 진행 줄. 문구의 출처는 런타임이다 - GachaCurve.PityText 주석 */
-        private static string PityText(int left, int total)
-        {
-            return GachaCurve.PityText(left, total);
-        }
+        /**
+         * @brief 배너 아래 진행 줄의 오브젝트 이름 (68단계).
+         *
+         * 47단계의 천장 줄이 서던 자리다. 문구의 출처는 런타임이다
+         * (SummonLevelCurve.LevelText 주석) - 여기서는 이름만 정한다.
+         */
+        public const string SummonLevelName = "SummonLevel";
 
         /**
          * @brief 배너 아래쪽 버튼 둘. 좌우로 반씩 나눈다.
@@ -719,12 +721,12 @@ namespace Onikiri.EditorTools
             for (int i = 0; i < SkillGachaCurve.OutcomeCount; i++)
                 BuildRateCell(go.transform, font, i, i % 2, i / 2, SkillRewardName(i));
 
-            var pity = CreateLabel(go.transform, font, "Pity", TextAlignmentOptions.Left);
-            UiFonts.Demote(pity);
-            Place((RectTransform)pity.transform, TextLeft, 24f,
+            var summon = CreateLabel(go.transform, font, SummonLevelName, TextAlignmentOptions.Left);
+            UiFonts.Demote(summon);
+            Place((RectTransform)summon.transform, TextLeft, 24f,
                   16f + LineHeight * (2f + rows), LineHeight);
-            pity.color = DimColor;
-            pity.text = PityText(SkillGachaCurve.PityPulls, 0);
+            summon.color = DimColor;
+            summon.text = SummonLevelCurve.LevelTextFor(0L);
 
             TMP_Text singleCost, tenCost;
             Image singleImage, tenImage;
@@ -742,7 +744,7 @@ namespace Onikiri.EditorTools
             shop.FindProperty("skillTenButton").objectReferenceValue = ten;
             shop.FindProperty("skillTenCost").objectReferenceValue = tenCost;
             shop.FindProperty("skillTenBackground").objectReferenceValue = tenImage;
-            shop.FindProperty("skillPityLabel").objectReferenceValue = pity;
+            shop.FindProperty("skillSummonLevelLabel").objectReferenceValue = summon;
         }
 
         private static void BuildSkillFreeRow(RectTransform content, TMP_FontAsset font,
@@ -1158,7 +1160,9 @@ namespace Onikiri.EditorTools
                     CheckLine(text, PercentText(i), RateNumberWidth, "rate percent");
                 }
 
-                CheckLine(text, PityText(GachaCurve.PityPulls, 8888), bannerWidth, "pity line");
+                // 68단계: 천장 줄 자리에 소환 레벨 줄. 레벨 세 자리 · 경험치 여섯 자리까지
+                CheckLine(text, SummonLevelCurve.LevelText(888, 888888L, 888888L), bannerWidth,
+                          "summon level line");
 
                 // 50단계 - 오의 배너. 확률표는 같은 상자를 쓰므로 이름만 다시 잰다
                 CheckLine(text, SkillBannerDesc, bannerWidth, "skill banner desc");
@@ -1203,12 +1207,12 @@ namespace Onikiri.EditorTools
                           halfLine, "result line");
 
                 // ★4 이상 = 전 폭 줄. 미끄러짐 사슬이 가장 길다
-                CheckLine(text, "천장! 상위 혼 → 혼 정수 → 처형인의 혼", wideLine, "wide line");
-                CheckLine(text, "천장! 상위 혼 → 파편 " + GachaCurve.ShardsPerOverflowRarity,
+                CheckLine(text, "상위 혼 → 혼 정수 → 처형인의 혼", wideLine, "wide line");
+                CheckLine(text, "상위 혼 → 파편 " + GachaCurve.ShardsPerOverflowRarity,
                           wideLine, "wide line");
                 string fullStars = YodoRarityCurve.Stars(YodoRarityCurve.MaxRarity);
                 foreach (var blade in YodoCatalog.Blades)
-                    CheckLine(text, "천장! " + blade.BladeName + " " + fullStars,
+                    CheckLine(text, blade.BladeName + " " + fullStars,
                               wideLine, "wide line");
 
                 foreach (var blade in LegendaryYodoCatalog.Blades)
@@ -1228,20 +1232,20 @@ namespace Onikiri.EditorTools
                           halfLine, "skill narrow line");
 
                 float fullLine = wideLine;
-                // 두 풀을 다 훑는다. 천장 줄에 뜰 수 있는 이름이 아홉으로
+                // 두 풀을 다 훑는다. 해금 줄에 뜰 수 있는 이름이 아홉으로
                 // 늘었으므로 그 아홉이 전부 칸에 드는지 재야 한다
                 foreach (var id in AllGachaSkillIds())
                 {
                     int index = SkillCatalog.IndexOf(id);
                     if (index < 0) continue;
-                    CheckLine(text, "천장! 오의 해금 · " + SkillCatalog.Skills[index].DisplayName,
+                    CheckLine(text, "오의 해금 · " + SkillCatalog.Skills[index].DisplayName,
                               fullLine, "skill wide line");
                 }
                 foreach (var skill in SkillCatalog.Skills)
                     CheckLine(text, "오의 개안 · " + skill.DisplayName + " Lv." + SkillCurve.MaxLevel,
                               fullLine, "skill wide line");
 
-                CheckLine(text, "천장! 오의 개안 → 오의 해금 → XP +"
+                CheckLine(text, "오의 개안 → 오의 해금 → XP +"
                               + SkillGachaCurve.XpFor(SkillGachaCurve.Outcome.XpSurge)
                               + " · Lv +" + (SkillCurve.MaxLevel - 1),
                           fullLine, "skill wide line");
@@ -1251,6 +1255,15 @@ namespace Onikiri.EditorTools
                           RowWidth - 48f, "result title");
                 CheckLine(text, "스킬 XP 8888 · 희귀 8 · 영웅 8 · 전설 8",
                           RowWidth - 48f, "result title");
+
+                // 68단계: 레벨업이 난 묶음은 제목 줄 끝에 "소환 Lv.n 달성"이 붙는다.
+                // 10연의 최악(★3 이상이 넷 다 서는 줄)에 두 자리 레벨을 붙여 잰다
+                CheckLine(text, Onikiri.UI.GachaResultPopup.WithLevelUp(
+                              "파편 8888 · 희귀 8 · 영웅 8 · 전설 8", 88),
+                          RowWidth - 48f, "result title + level up");
+                CheckLine(text, Onikiri.UI.GachaResultPopup.WithLevelUp(
+                              "스킬 XP 8888 · 희귀 8 · 영웅 8 · 전설 8", 88),
+                          RowWidth - 48f, "result title + level up");
             }
             finally
             {

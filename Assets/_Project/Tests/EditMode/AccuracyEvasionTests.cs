@@ -313,11 +313,14 @@ namespace Onikiri.Tests
          *
          * 67단계: 피날레 배수 1.46 -> 1.52가 st10·st20·st30·st50·st100(전부
          * 피날레)을 움직였다 - 같은 규칙으로 FinalePre67 한 줄을 더한다.
+         *
+         * 68단계: 천장 제거가 심층 전설 사본을 늘려 st100이 움직였다(14.37 -> 16.55) -
+         * GachaPre68 한 줄을 더한다.
          */
         [Test]
         public void HitRatingNeutralized_ReproducesTheStep64World()
         {
-            var rows = StageSimulation.Run(100, Field(), new StageSimulation.Policy { NeutralizeHitRating = true, StatPointsPre66 = true, FinalePre67 = true });
+            var rows = StageSimulation.Run(100, Field(), new StageSimulation.Policy { NeutralizeHitRating = true, StatPointsPre66 = true, FinalePre67 = true, GachaPre68 = true });
 
             Assert.AreEqual(1.527d, rows[9].BossMargin, 0.002d, "st10");
             Assert.AreEqual(1.407d, rows[19].BossMargin, 0.002d, "st20");
@@ -419,9 +422,12 @@ namespace Onikiri.Tests
             var with = StageSimulation.Run(500, Field());
             var without = StageSimulation.Run(500, Field(), new StageSimulation.Policy { SkipAccuracy = true });
 
-            var with65 = StageSimulation.Run(500, Field(), new StageSimulation.Policy { StatPointsPre66 = true });
+            // 68단계: "66 전 세계"는 천장도 있던 세계다(GachaPre68) - 천장 제거가 심층
+            // 화력을 올려 이 자의 분모가 커졌다(3.72%)
+            var with65 = StageSimulation.Run(500, Field(),
+                new StageSimulation.Policy { StatPointsPre66 = true, GachaPre68 = true });
             var without65 = StageSimulation.Run(500, Field(),
-                new StageSimulation.Policy { SkipAccuracy = true, StatPointsPre66 = true });
+                new StageSimulation.Policy { SkipAccuracy = true, StatPointsPre66 = true, GachaPre68 = true });
             double deep65 = StageSimulation.CombatSeconds(without65, 51, 500)
                           / StageSimulation.CombatSeconds(with65, 51, 500) - 1d;
             Assert.Greater(deep65, 0.04d, string.Format("무한 구간 이득(66 전 세계) {0:P2} - 4% 아래", deep65));

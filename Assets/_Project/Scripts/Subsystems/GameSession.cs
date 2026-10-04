@@ -333,15 +333,14 @@ namespace Onikiri.Progression
             // 판정하므로(YodoSystem.TryTakeEssence), 요도가 아직 0인
             // 프레임에 뽑기가 도는 경로를 만들지 않는다
             if (gacha != null)
-                gacha.Restore(data.gachaPity, data.gachaTotalPulls, data.gachaFreePullDayTicks);
+                gacha.Restore(data.yodoSummonXp, data.gachaTotalPulls, data.gachaFreePullDayTicks);
 
             // 오의 뽑기는 오의 **다음**이다(50단계). 같은 계약이고 같은 이유다 -
             // 이쪽은 오의의 상태를 읽어 재고를 판정하므로(SkillSystem.HasStock),
             // 오의가 아직 비어 있는 프레임에 배너가 "재고 없음"으로 서지 않게 한다
             if (skillGacha != null)
-                skillGacha.Restore(data.skillGachaPity, data.skillGachaTotalPulls,
+                skillGacha.Restore(data.skillSummonXp, data.skillGachaTotalPulls,
                                    data.skillGachaFreePullDayTicks,
-                                   data.skillGachaAwakenPity,
                                    data.skillGachaIntroClaimed,
                                    data.skillGachaIntroEquipDone);
 
@@ -510,17 +509,16 @@ namespace Onikiri.Progression
 
             if (gacha != null)
             {
-                data.gachaPity = gacha.CollectPity();
+                data.yodoSummonXp = gacha.CollectSummonXp();
                 data.gachaTotalPulls = gacha.CollectTotalPulls();
                 data.gachaFreePullDayTicks = gacha.CollectFreePullDay();
             }
 
             if (skillGacha != null)
             {
-                data.skillGachaPity = skillGacha.CollectPity();
+                data.skillSummonXp = skillGacha.CollectSummonXp();
                 data.skillGachaTotalPulls = skillGacha.CollectTotalPulls();
                 data.skillGachaFreePullDayTicks = skillGacha.CollectFreePullDay();
-                data.skillGachaAwakenPity = skillGacha.CollectAwakenPity();
                 data.skillGachaIntroClaimed = skillGacha.CollectIntroClaimed();
                 data.skillGachaIntroEquipDone = skillGacha.CollectIntroEquipDone();
             }

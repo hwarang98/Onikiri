@@ -798,6 +798,21 @@ namespace Onikiri.Progression
              */
             public bool FinalePre67;
 
+            // ------------------------------------------------------------ 68단계
+
+            /**
+             * @brief **68단계 이전의 요도 뽑기**(30회 ★4+ 천장) - 49단계 규칙 ⓐ의 비교군.
+             *
+             * 68단계가 천장을 걷어내고 소환 레벨을 넣었다. 추종 플레이어의 뽑기는
+             * 혼격 재고가 멈추는데, 천장은 ★4를 4.145%로 부풀려 혼격 하나당 전설이
+             * 0.19였고 표 그대로면 0.38이다 - 그래서 심층의 전설 사본이 늘었다.
+             * 앞 스텝이 심층에 굳힌 앵커는 그 앞의 세계 것이므로 상수를 옮기지 않고
+             * 이 한 줄로 재현한다. 옛 실효 확률은 47단계의 닫힌 식 그대로다
+             * (Pre68GachaChances). 오의 뽑기(Policy.SkillGacha)는 재현하지 않는다 -
+             * 기본 정책 밖이고 밴드가 가정하지 않는다.
+             */
+            public bool GachaPre68;
+
             public static Policy Default { get { return new Policy(); } }
         }
 
@@ -973,11 +988,8 @@ namespace Onikiri.Progression
 
             var levels = new Levels();
 
-            // 뽑기 천장 분포를 **새 세이브 상태로** 되돌린다. 정적 스크래치라
-            // 안 되돌리면 앞선 Run이 남긴 분포에서 이어 돌고, 그러면 같은
-            // 정책을 두 번 돌린 결과가 달라진다 - 비교군을 쓰는 검사(f2p 바닥·
-            // 죽은 버튼)가 통째로 무의미해지는 자리다
-            PityState.ResetToNewSave();
+            // (68단계) 50단계의 정적 천장 분포는 사라졌다. 소환 레벨은 Levels가
+            // 들고 가는 뽑기 수에서 유도되므로 되돌릴 정적 상태가 없다
 
             // 45단계의 두 축은 정책이 곧 세계의 규칙이라 Levels가 들고 간다
             // (Levels.NoAffinity 주석). 요도 자체가 없는 세계에서는 티어가
@@ -3125,8 +3137,11 @@ namespace Onikiri.Progression
          * 한 번씩 굴려서 세면 시뮬레이션에 난수가 들어오고, 그러면 밴드가
          * 실행마다 흔들려 재현이 불가능해진다. 그래서 굴리는 대신 기댓값을
          * 쓰되, **소비의 단위는 뽑기 한 번**으로 둔다: 매번 정가를 내고 기대
-         * 파편을 받고, 천장이 접힌 평균(GachaCurve.ExpectedPullsPerEssence)에
-         * 닿을 때마다 정수 하나가 나온다.
+         * 파편을 받고, **그 회차의 소환 레벨 표**(SummonLevelCurve.ChancesAt)의
+         * 몫을 쌓다가 1에 닿을 때마다 정수 하나가 나온다. 68단계에 천장이
+         * 사라져 회차의 확률이 레벨 하나로 정해진다 - 소환 경험치 = 뽑기 수이므로
+         * 레벨은 GachaPulls에서 바로 나온다(게임 쪽 GachaSystem.RunPulls와 같은 순서:
+         * 지금 레벨로 굴리고 그다음 1 XP).
          *
          * 처음에 "정수 하나"를 단위로 뒀다가 물렸다. 정수 한 덩어리가 보석
          * 500이라 **무과금은 한 번도 못 사고**(그의 잔액 상한이 198이다),
@@ -3173,19 +3188,60 @@ namespace Onikiri.Progression
                 if (policy.GemsFromQuestsOnly
                     && levels.GemsAvailable < GachaCurve.PullCostGems) return;
 
+                // 이 회차의 표. 굴리기 **전** 경험치의 레벨이다. 비교군(GachaPre68)은
+                // 47단계 천장이 누른 실효 표 하나를 끝까지 쓴다
+                var chances = policy.GachaPre68
+                    ? Pre68GachaChances
+                    : SummonLevelCurve.ChancesAt(SummonLevelCurve.LevelFor((long)levels.GachaPulls));
+
                 levels.GemsSpent += GachaCurve.PullCostGems;
                 levels.GachaPulls += 1d;
 
                 // 파편. 소수 자리를 들고 있다가 1이 차면 넘긴다
-                levels.GachaShardCarry += GachaCurve.ExpectedShardsPerPull;
+                double shards = 0d;
+                for (int i = 0; i < chances.Length; i++) shards += chances[i] * GachaCurve.ShardsOf[i];
+                levels.GachaShardCarry += shards;
                 int whole = (int)levels.GachaShardCarry;
                 levels.Shards += whole;
                 levels.GachaShardCarry -= whole;
 
-                GrantSimEssence(ref levels, stage);
-                if (!policy.SkipRarity) GrantSimRarity(ref levels, stage);
-                if (!policy.SkipLegendary) GrantSimLegendary(ref levels);
+                GrantSimEssence(ref levels, stage, chances[(int)GachaCurve.Outcome.SoulEssence]);
+                if (!policy.SkipRarity)
+                    GrantSimRarity(ref levels, stage, chances[(int)GachaCurve.Outcome.SoulRarity]);
+                if (!policy.SkipLegendary)
+                    GrantSimLegendary(ref levels, chances[(int)GachaCurve.Outcome.LegendaryBlade]);
             }
+        }
+
+        /**
+         * @brief 47단계 천장(30회 ★4+) 세계의 회당 실효 확률. **Policy.GachaPre68 전용.**
+         *
+         * 그때의 닫힌 식 그대로다. ★4+ 하나당 대기 E = (1 - q^30) / p (p = 2.9%)이고
+         * 천장이 터지는 몫 1/E가 아래 등급을 같은 비율로 누른다:
+         *
+         *   ★1~★3   (1 - 1/E) x c_i / q
+         *   ★4      1/E - c5           (천장이 밀어 올린다)
+         *   ★5      c5                 (천장은 전설을 훔치지 않는다)
+         *
+         * 값: ★3 2.937% · ★4 4.145% · ★5 0.800%. 천장 코드는 런타임에서 지웠으므로
+         * 이 표는 비교군으로만 산다.
+         */
+        private static readonly double[] Pre68GachaChances = BuildPre68GachaChances();
+
+        private static double[] BuildPre68GachaChances()
+        {
+            var table = GachaCurve.Chances;
+            double p = GachaCurve.EpicOrBetterChance;
+            double q = 1d - p;
+            double share = p / (1d - Math.Pow(q, 30));
+            double legendary = table[(int)GachaCurve.Outcome.LegendaryBlade];
+
+            var chances = new double[table.Length];
+            for (int i = 0; i < table.Length; i++)
+                chances[i] = GachaCurve.GradeOf[i] >= GachaCurve.Grade.Epic ? 0d : (1d - share) * table[i] / q;
+            chances[(int)GachaCurve.Outcome.SoulRarity] = share - legendary;
+            chances[(int)GachaCurve.Outcome.LegendaryBlade] = legendary;
+            return chances;
         }
 
         /**
@@ -3195,9 +3251,9 @@ namespace Onikiri.Progression
          * 자리와 같은 처리이고, 버리면 뽑기가 잦은 후반일수록 조금씩 새서
          * 그 누적이 티어 하나가 된다.
          */
-        private static void GrantSimEssence(ref Levels levels, int stage)
+        private static void GrantSimEssence(ref Levels levels, int stage, double chance)
         {
-            levels.GachaEssenceProgress += GachaCurve.EffectiveEssenceChance;
+            levels.GachaEssenceProgress += chance;
             if (levels.GachaEssenceProgress + 1e-12d < 1d) return;
 
             levels.GachaEssenceProgress -= 1d;
@@ -3215,9 +3271,9 @@ namespace Onikiri.Progression
          * 특히 초반에는 혼격이 티어에 막혀 대부분 두 번째 칸으로 내려가므로,
          * 그 미끄러짐이 없으면 시뮬레이션의 티어가 실제보다 느려진다.
          */
-        private static void GrantSimRarity(ref Levels levels, int stage)
+        private static void GrantSimRarity(ref Levels levels, int stage, double chance)
         {
-            levels.GachaRarityProgress += GachaCurve.EffectiveRarityChance;
+            levels.GachaRarityProgress += chance;
             if (levels.GachaRarityProgress + 1e-12d < 1d) return;
 
             levels.GachaRarityProgress -= 1d;
@@ -3235,9 +3291,9 @@ namespace Onikiri.Progression
         }
 
         /** ★5 한 번의 기대 몫. 상한 사본이면 파편 뭉치다 */
-        private static void GrantSimLegendary(ref Levels levels)
+        private static void GrantSimLegendary(ref Levels levels, double chance)
         {
-            levels.GachaLegendProgress += GachaCurve.EffectiveLegendaryChance;
+            levels.GachaLegendProgress += chance;
             if (levels.GachaLegendProgress + 1e-12d < 1d) return;
 
             levels.GachaLegendProgress -= 1d;
@@ -3274,30 +3330,6 @@ namespace Onikiri.Progression
          * 올리는 것인데 그 상한이 오의 몫 계약의 안전선이므로, 이 축은
          * 유한한 채로 닫히고 화면이 그것을 적는다(SkillSystem.HasStock).
          */
-        /**
-         * @brief 뽑기 여정의 (소프트, 하드) 상태 분포. **정상해가 아니라 과도기다.**
-         *
-         * ## 왜 평균을 못 쓰는가
-         *
-         * 정상해를 매 회차에 더하면 초반이 통째로 틀린다 - 100회차의 실제 ★5는
-         * 45.589%인데 평균은 1.449%라고 말한다(29배). 총변동거리가 1e-3 아래로
-         * 내려가는 데 859회가 걸리는데 귀오의 넷의 기대가 276회이므로,
-         * **이 축의 여정 전체가 과도기 안에 있다.**
-         *
-         * 그리고 두 개의 독립 누산기로는 ★4·★5의 상관을 못 적는다. ★5가
-         * 소프트 카운터를 초기화한다는 사실이 분포 안에만 있다.
-         *
-         * ## 왜 Levels 안이 아닌가
-         *
-         * 3,000칸 double = 24KB이고 Levels는 ref로 도는 struct다. 효율을 재려고
-         * 만드는 사본마다 24KB를 복사하면 시뮬레이션이 멈춘다. EquipScratch가
-         * 이미 세운 정적 스크래치 방식을 따르고, Run이 시작할 때 리셋한다 -
-         * 시뮬레이션은 한 스레드에서 한 번에 하나만 돈다.
-         */
-        private static readonly SkillGachaPityModel.State PityState =
-            new SkillGachaPityModel.State(SkillGachaCurve.PityPulls,
-                                          SkillGachaCurve.AwakenPityPulls);
-
         private static void TrySkillGacha(ref Levels levels, int stage, Policy policy)
         {
             if (!policy.SkillGacha) return;
@@ -3326,24 +3358,26 @@ namespace Onikiri.Progression
                 levels.GemsSpent += SkillGachaCurve.PullCostGems;
                 levels.SkillGachaPulls += 1d;
 
-                // **이 회차의 값**이다. 상수가 아니라 상태에서 나오므로
-                // 30회차에는 ★4가 43%, 100회차에는 ★5가 46%로 뛴다
-                var rates = SkillGachaPityModel.Advance(PityState);
+                // **이 회차의 값**이다. 50단계에는 이중 천장의 상태 분포가 냈고
+                // (30회차 ★4 43%, 100회차 ★5 46%), 68단계부터는 굴리기 전
+                // 경험치의 소환 레벨 하나가 정한다 - 요도 쪽 TryGacha와 같은 순서
+                int summonLevel = SummonLevelCurve.LevelFor((long)(levels.SkillGachaPulls - 1d));
 
                 // ★1~★3. 소수 자리를 들고 있다가 레벨이 되면 넘긴다
                 if (!policy.SkillGachaWithoutXp)
                 {
-                    levels.SkillXp += rates.Xp;
+                    levels.SkillXp += SkillGachaCurve.ExpectedXpPerPull(summonLevel);
                     SpendSimSkillXp(ref levels);
                 }
 
-                GrantSimSkillUnlock(ref levels, policy.SkillGachaWithoutXp, rates.UnlockChance);
+                GrantSimSkillUnlock(ref levels, policy.SkillGachaWithoutXp,
+                                    SkillGachaCurve.EffectiveUnlockChance(summonLevel));
 
                 // **XP가 없는 세계에서도 귀오의는 열린다.** 해금은 XP가 아니라
                 // 재고이고, 안 열면 그 세계의 재고가 영원히 안 비어 위 guard
                 // 루프가 10만 번을 돈다(실제로 그렇게 멈췄다). 개안(상한까지
                 // 밀기)만 XP 세계의 것이라 안쪽에서 갈린다
-                GrantSimAwakening(ref levels, rates.AwakenChance,
+                GrantSimAwakening(ref levels, SkillGachaCurve.EffectiveAwakenChance(summonLevel),
                                   policy.SkillGachaWithoutXp);
             }
         }

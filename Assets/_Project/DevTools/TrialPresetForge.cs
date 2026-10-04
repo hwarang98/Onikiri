@@ -595,7 +595,7 @@ namespace Onikiri.DevTools
                 "exp - 0. 그 레벨의 시작점",
                 "퀘스트 진행·수령(questIds/questClaims/카운터) - 빈 상태. 화력의 입력이 아니다",
                 "요도 혼 잔량 - 종류별 값이 StageResult에 없어 첫 자루에 합계를 얹었다",
-                "뽑기 천장(gachaPity/skillGachaPity/AwakenPity) - 0. 재고 상태이지 화력이 아니다",
+                "소환 경험치(yodoSummonXp/skillSummonXp) - 0. 확률의 성장이지 화력이 아니다",
                 "일일 무료 뽑기 쿨(…FreePullDayTicks) - 0 = 미사용",
                 "온보딩 10연 - 받은 것으로 뒀다. 안 그러면 앱 실행 직후 화력이 움직인다",
                 "playerName - 빈 문자열. 리더보드 이름 입력이 뜨는 상태 그대로",

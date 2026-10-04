@@ -61862,7 +61862,7 @@ GameObject:
   - component: {fileID: 669421940}
   - component: {fileID: 669421939}
   m_Layer: 0
-  m_Name: Pity
+  m_Name: SummonLevel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -61907,8 +61907,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uC601\uC6C5 \uC774\uC0C1 \uD655\uC815\uAE4C\uC9C0 30\uD68C  \xB7  \uB204\uC801
-    0\uD68C"
+  m_text: "\uC18C\uD658 Lv.1  \xB7  0 / 20"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6048afe734db76248aebb7435a6e45e9, type: 2}
   m_sharedMaterial: {fileID: 4788453229272654777, guid: 6048afe734db76248aebb7435a6e45e9, type: 2}
@@ -101854,7 +101853,7 @@ MonoBehaviour:
   gems: {fileID: 1105386474}
   yodo: {fileID: 1105386480}
   stage: {fileID: 1105386468}
-  pityCounter: 0
+  summonXp: 0
   totalPulls: 0
   lastFreePullDayTicks: 0
 --- !u!114 &1105386482
@@ -101888,8 +101887,7 @@ MonoBehaviour:
   gems: {fileID: 1105386474}
   skills: {fileID: 1702841814}
   stage: {fileID: 1105386468}
-  pityCounter: 0
-  awakenPity: 0
+  summonXp: 0
   introClaimed: 0
   introEquipDone: 0
   totalPulls: 0
@@ -113634,7 +113632,7 @@ MonoBehaviour:
   tenButton: {fileID: 696019289}
   tenCost: {fileID: 1998943428}
   tenBackground: {fileID: 696019290}
-  pityLabel: {fileID: 2127998012}
+  summonLevelLabel: {fileID: 2127998012}
   freeButton: {fileID: 1330347861}
   freeTitle: {fileID: 1184311706}
   freeCost: {fileID: 164630644}
@@ -113648,7 +113646,7 @@ MonoBehaviour:
   skillTenButton: {fileID: 158089030}
   skillTenCost: {fileID: 1453694296}
   skillTenBackground: {fileID: 158089031}
-  skillPityLabel: {fileID: 669421939}
+  skillSummonLevelLabel: {fileID: 669421939}
   skillFreeButton: {fileID: 1212552482}
   skillFreeTitle: {fileID: 580068994}
   skillFreeCost: {fileID: 332393261}
@@ -193052,7 +193050,7 @@ GameObject:
   - component: {fileID: 2127998013}
   - component: {fileID: 2127998012}
   m_Layer: 0
-  m_Name: Pity
+  m_Name: SummonLevel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -193097,8 +193095,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uC601\uC6C5 \uC774\uC0C1 \uD655\uC815\uAE4C\uC9C0 30\uD68C  \xB7  \uB204\uC801
-    0\uD68C"
+  m_text: "\uC18C\uD658 Lv.1  \xB7  0 / 20"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6048afe734db76248aebb7435a6e45e9, type: 2}
   m_sharedMaterial: {fileID: 4788453229272654777, guid: 6048afe734db76248aebb7435a6e45e9, type: 2}

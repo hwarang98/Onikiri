@@ -28,17 +28,17 @@ namespace Onikiri.Progression
      *
      * ## 왜 표를 새로 안 짓는가 - 사다리는 하나여야 한다
      *
-     * 확률·천장·비용·일일 무료가 전부 `GachaCurve`에서 온다. 값을 옮겨 적지
+     * 확률·소환 레벨·비용·일일 무료가 전부 `GachaCurve`(와 SummonLevelCurve)에서 온다. 값을 옮겨 적지
      * 않고 **가리키는** 이유는 두 가지다.
      *
      * **하나. 화면이 같은 것을 두 번 가르치지 않는다.** 상점의 두 배너가
-     * 다른 확률·다른 천장·다른 가격을 쓰면 플레이어는 사다리를 두 번 배워야
+     * 다른 확률·다른 성장·다른 가격을 쓰면 플레이어는 사다리를 두 번 배워야
      * 하고, 47단계가 등급 색과 별로 세운 눈금이 배너마다 다른 뜻이 된다.
      *
-     * **둘. 천장의 산수가 하나다.** 47단계는 "천장이 표를 누른다"는 보정을
-     * 닫힌 식으로 유도했고(GachaCurve.PityShare), 그 유도는 확률표가 같으면
-     * 그대로 성립한다. 표를 따로 두면 그 식을 두 번 유도해야 하고, 두 번
-     * 유도한 것은 언젠가 갈린다.
+     * **둘. 확률의 산수가 하나다.** 68단계의 소환 레벨은 표에 등급별
+     * 가중치를 곱하고 나눈다(SummonLevelCurve.ChancesAt). 표를 따로 두면 그
+     * 성장도 두 번 정해야 하고, 두 번 정한 것은 언젠가 갈린다. (47단계에는
+     * 같은 이유가 천장의 닫힌 식에 걸려 있었다.)
      *
      * 표가 갈리는 날은 두 뽑기가 **다른 물건**이 되는 날이다. 그날에는 이
      * 파일이 자기 배열을 갖게 되고, 그 전까지는 안 갖는 편이 정직하다 -
@@ -132,58 +132,6 @@ namespace Onikiri.Progression
         // ------------------------------------------------------- 15종 재설계: 전용 규칙
 
         /**
-         * @brief ★5 하드 천장. **이 배너만의 규칙이다.**
-         *
-         * ## 왜 필요한가
-         *
-         * 47단계의 소프트 천장(30회)은 "★4 **이상**"을 보장한다. ★5는 그 안에
-         * 얹혀 있을 뿐 따로 보장되지 않아서, 표 확률 0.8%면 기대 125회이고
-         * 상한이 없다. 400회를 돌아도 안 나올 수 있다는 뜻이다.
-         *
-         * ★5가 XP 가속(개안)이던 시절에는 그것이 견딜 만했다. 안 나와도
-         * 진행으로 도달하는 곳이 같았기 때문이다. 이제 ★5가 **귀오의 넷의
-         * 유일한 출처**가 되면서 상한이 없는 것이 곧 "영영 못 볼 수도 있다"가
-         * 된다 - 그것은 수집 목표가 아니라 도박이다.
-         *
-         * ## 왜 100인가
-         *
-         * 이 값으로 자르면 ★5 간격의 기대가 69.01회가 되고(SkillGachaPityModel),
-         * 귀오의 넷이 기대 276회 · **최악 400회**로 닫힌다. 일일 무료만 도는
-         * 무과금에게 기대 266일 · 최악 390일이다 - 장기 목표로는 길지만
-         * **끝이 있는** 수다.
-         *
-         * 소프트 천장(30)의 세 배가 조금 넘는 것도 값이다. 두 게이지가 화면에
-         * 나란히 서는데 배수가 정수에 가까우면 "★4 세 번쯤에 ★5 한 번"이라는
-         * 감각이 생긴다.
-         */
-        public const int AwakenPityPulls = 100;
-
-        public static int PullsUntilAwakenPity(int counter)
-        {
-            int left = AwakenPityPulls - counter;
-            return left < 0 ? 0 : left;
-        }
-
-        /**
-         * @brief 배너의 천장 줄. **두 약속을 한 줄에 나란히 적는다.**
-         *
-         * 요도 배너는 천장이 하나라 `GachaCurve.PityText` 하나면 됐다. 이쪽은
-         * 둘이고, **하나만 적으면 안 적은 쪽이 없는 규칙이 된다** - ★5 게이지를
-         * 감추면 "100회 안에 반드시"라는 이 재설계의 가장 큰 약속이 화면 어디에도
-         * 없다.
-         *
-         * 누적 횟수를 뺀 자리에 ★5를 넣었다. 셋을 다 적으면 칸을 넘치는데
-         * (빌드의 CheckLine이 잡는다), 셋 중 버릴 것을 고르면 누적이다 -
-         * 그것은 지나온 기록이고 나머지 둘은 **앞으로의 약속**이다.
-         */
-        public static string PityText(int softLeft, int hardLeft)
-        {
-            return GachaCurve.GradeNames[(int)GachaCurve.Grade.Epic] + " 확정 " + softLeft
-                 + "회  ·  " + GachaCurve.GradeNames[(int)GachaCurve.Grade.Legendary]
-                 + " 확정 " + hardLeft + "회";
-        }
-
-        /**
          * @brief 온보딩 무료 뽑기 수. st14에 한 번만 열린다.
          *
          * 10연인 것은 `GachaCurve.TenPullCount`와 같은 수이지만 **빌려 쓰지
@@ -200,11 +148,6 @@ namespace Onikiri.Progression
         public static int TenPullCount { get { return GachaCurve.TenPullCount; } }
         public static int TenPullCostGems { get { return GachaCurve.TenPullCostGems; } }
 
-        /** 소프트 천장. 이 횟수 안에 ★4 이상이 반드시 나온다 */
-        public static int PityPulls { get { return GachaCurve.PityPulls; } }
-
-        public static int PullsUntilPity(int counter) { return GachaCurve.PullsUntilPity(counter); }
-
         /**
          * @brief 하루에 주어지는 무료 뽑기 수. **f2p가 이 축에 닿는 경로다.**
          *
@@ -214,10 +157,10 @@ namespace Onikiri.Progression
          * 무과금 보석이 한 번 더 쪼개지고, 그것은 44단계가 지킨 코어 진행을
          * 두 배로 흔든다.
          *
-         * 그래서 이 배너의 f2p 경로는 보석이 아니라 **일일 무료**다. 하루
-         * 한 번이면 한 달에 천장 하나이고, 천장이 ★4(해금)를 보장하므로
-         * **무과금은 한 달에 오의 하나씩 두 달이면 둘 다 연다.** 보석은
-         * 그 위에 얹는 가속이지 경로가 아니다.
+         * 그래서 이 배너의 f2p 경로는 보석이 아니라 **일일 무료**다. 68단계에
+         * 천장이 사라진 뒤로 그 하루 한 번은 소환 경험치로도 남아, 무과금의
+         * ★4(해금) 확률을 달마다 끌어올린다(SummonLevelCurve). 보석은 그 위에
+         * 얹는 가속이지 경로가 아니다.
          *
          * 별도의 "스킬 토큰"을 두지 않은 것도 같은 판단이다. 재화를 하나 더
          * 만들면 그 재화의 faucet·화면·세이브 칸·밴드 모델이 함께 생기는데,
@@ -282,18 +225,18 @@ namespace Onikiri.Progression
             return XpOf[index];
         }
 
-        /** 0~1 난수를 결과로 옮긴다. **천장은 여기 없다** - GachaCurve.Roll과 같은 규칙 */
-        public static Outcome Roll(double value)
+        /** 0~1 난수를 결과로 옮긴다. 소환 레벨의 표를 지난다 - GachaCurve.Roll과 같은 규칙 */
+        public static Outcome Roll(double value, int summonLevel)
         {
-            return (Outcome)(int)GachaCurve.Roll(value);
+            return (Outcome)(int)GachaCurve.Roll(value, summonLevel);
         }
 
         /**
          * @brief 이 결과가 막혔을 때 **한 칸 아래**의 결과.
          *
          * 47단계의 ★4가 "혼격 -> 혼 정수 -> 파편"으로 미끄러진 것과 같은
-         * 규칙이고 같은 이유다 - 천장이 준 결과가 아무것도 아니면 30회를
-         * 채운 대가가 사라지고, 그것은 보장이 아니다.
+         * 규칙이고 같은 이유다 - 뽑은 결과가 아무것도 아니면 그 뽑기의
+         * 값이 사라지고, 그것은 확률이 아니라 사고로 읽힌다.
          *
          * 다른 점은 ★5도 미끄러진다는 것이다. 저쪽의 전설은 별개 풀이라
          * 사다리에서 내려올 자리가 없었지만(GachaSystem.GrantLegendary),
@@ -319,12 +262,13 @@ namespace Onikiri.Progression
          *
          * 결과 팝업이 미끄러진 경로를 적으려고 `Rolled`에서 `Outcome`까지
          * `SlideFor`로 걸었다. 사다리는 **아래로만** 가는데(개안 -> 해금 ->
-         * XP, 그 아래는 자기 자신), **천장은 결과를 위로 덮는다** -
-         * `SkillGachaSystem.RollOnce`가 낮게 굴린 회차를 개안으로 바꾼다.
+         * XP, 그 아래는 자기 자신), 50단계의 천장은 결과를 **위로** 덮었다 -
+         * 낮게 굴린 회차를 개안으로 바꿨다.
          *
          * 그러면 `Rolled`(낮음)에서 `Outcome`(높음)에 영영 못 닿고, 바닥
-         * 칸이 자기 자신을 돌려주므로 루프가 안 끝난다. 소프트 천장이
-         * 서른 회마다 서니 십연을 몇 번만 돌려도 걸린다.
+         * 칸이 자기 자신을 돌려주므로 루프가 안 끝났다. 68단계에 천장이
+         * 사라져 위로 덮는 경로는 없지만, 이 판정은 사다리 자신의 성질이라
+         * 그대로 둔다 - 위로 덮는 규칙이 다시 생기는 날 여기가 먼저 지킨다.
          *
          * 걷기 전에 물어봐야 하는 것은 "미끄러졌는가"이고, 그 답을 아는
          * 것은 **사다리 자신**이다. 화면이 걸음 수를 세는 방식으로 다시
@@ -352,79 +296,53 @@ namespace Onikiri.Progression
             return false;
         }
 
-        // ---------------------------------------------------------------- 실효 확률
+        // ---------------------------------------------------------------- 소환 레벨의 확률 (68단계)
 
         /**
-         * @brief 천장이 아래 등급을 누른 뒤의 회당 확률. **47단계의 닫힌 식 그대로.**
+         * @brief 레벨 L에서 한 번의 뽑기가 내는 기대 XP. **수집기 기준이라 ★4·★5는 0이다.**
          *
-         * 유도는 `GachaCurve.PityShare` 주석에 있고, 확률표가 같으므로 여기서
-         * 다시 유도할 것이 없다. 이 함수가 있는 이유는 그 유도의 **private
-         * 한 줄**(SuppressedChance)을 밖에서 다시 적지 않기 위해서다.
+         * 50단계에는 이중 천장의 정상해(옛 정상상태 솔버)가 이 값을 냈고,
+         * 상태를 세야 해서 정적 생성자에서 풀었다. 천장이 사라져 회차마다
+         * 확률이 레벨 하나로 정해지므로 닫힌 식이다 - 솔버가 필요 없다.
          */
-        public static double Suppressed(double raw)
+        public static double ExpectedXpPerPull(int level)
         {
-            double q = 1d - GachaCurve.EpicOrBetterChance;
-            if (q <= 0d) return 0d;
-            return (1d - GachaCurve.PityShare) * raw / q;
+            var chances = SummonLevelCurve.ChancesAt(level);
+            double total = 0d;
+            for (int i = 0; i < chances.Length && i < XpOf.Length; i++) total += chances[i] * XpOf[i];
+            return total;
         }
 
-        /** 표에 적힌 그대로의 기대 XP. 천장 보정 전이다 */
+        /** 표(Lv.1)에 적힌 그대로의 기대 XP */
         public static double TableXpPerPull
         {
-            get
-            {
-                double total = 0d;
-                for (int i = 0; i < Chances.Length && i < XpOf.Length; i++)
-                    total += Chances[i] * XpOf[i];
-                return total;
-            }
+            get { return ExpectedXpPerPull(1); }
         }
 
-        /**
-         * @brief 이중 천장의 **장기 평균**. 정적 생성자에서 한 번만 푼다.
-         *
-         * ## 왜 닫힌 식을 못 쓰게 됐는가
-         *
-         * 47단계의 식은 천장이 하나일 때 유도됐다. ★5 하드 천장이 붙으면
-         * 그 전제가 깨진다 - 하드가 만든 ★5가 **소프트 카운터도 함께** 0으로
-         * 되돌리므로(★5는 ★4 이상이다) 30회 천장이 발동할 기회를 ★5가
-         * 가로챈다. 두 과정이 얽히면 곱셈으로 못 풀고 상태를 세어야 한다.
-         *
-         * 그 결과 ★4가 4.145% -> 3.899%로 내려가고 ★5가 0.800% -> 1.449%로
-         * 오른다. 합계는 4.945% -> 5.348%로 늘어난다.
-         *
-         * ## ⚠ 이 값은 **장기 보고 전용**이다
-         *
-         * 실제 여정의 초반은 이 평균과 전혀 다르다 - 100회차의 ★5는 45.589%다
-         * (하드 천장이 그 회차에 몰려 있다). 총변동거리가 1e-3 아래로 내려가는
-         * 데 859회가 걸리는데 귀오의 넷의 기대가 276회이므로, **여정 전체가
-         * 과도기 안에 있다.**
-         *
-         * 여정을 재는 쪽(StageSimulation)은 이 값이 아니라
-         * `SkillGachaPityModel.Advance`로 상태를 전진시켜야 한다.
-         */
-        private static readonly SkillGachaPityModel.Rates SteadyRates =
-            SkillGachaPityModel.SolveSteady(PityPulls, AwakenPityPulls);
-
-        /** 한 번의 뽑기가 내는 기대 XP (장기 평균). 수집기 기준이라 ★4·★5는 0이다 */
-        public static double ExpectedXpPerPull { get { return SteadyRates.Xp; } }
-
-        /** 회당 ★4(표준 해금) 확률. 소프트 천장이 밀어 올리고 하드 천장이 조금 깎았다 */
-        public static double EffectiveUnlockChance { get { return SteadyRates.UnlockChance; } }
-
-        /** 회당 ★5(귀오의) 확률. **표(0.8%)의 두 배 가까이다** - 하드 천장의 몫 */
-        public static double EffectiveAwakenChance { get { return SteadyRates.AwakenChance; } }
-
-        /** ★4 하나당 실제 뽑기 수 (장기 평균) */
-        public static double ExpectedPullsPerUnlock
+        /** 레벨 L의 회당 ★4(표준 해금) 확률 */
+        public static double EffectiveUnlockChance(int level)
         {
-            get { return SkillGachaPityModel.PullsPerUnlock(SteadyRates); }
+            return SummonLevelCurve.ChanceAt(level, (int)Outcome.SkillUnlock);
         }
 
-        /** ★5 하나당 실제 뽑기 수 (장기 평균). 귀오의 넷이면 이 값의 네 배다 */
-        public static double ExpectedPullsPerAwaken
+        /** 레벨 L의 회당 ★5(귀오의) 확률 */
+        public static double EffectiveAwakenChance(int level)
         {
-            get { return SkillGachaPityModel.PullsPerAwaken(SteadyRates); }
+            return SummonLevelCurve.ChanceAt(level, (int)Outcome.Awakening);
+        }
+
+        /** 레벨 L에서 ★4 하나당 기대 뽑기 수 */
+        public static double ExpectedPullsPerUnlock(int level)
+        {
+            double p = EffectiveUnlockChance(level);
+            return p > 0d ? 1d / p : double.PositiveInfinity;
+        }
+
+        /** 레벨 L에서 ★5 하나당 기대 뽑기 수. 귀오의 넷이면 이 값을 레벨을 따라 네 번 더한다 */
+        public static double ExpectedPullsPerAwaken(int level)
+        {
+            double p = EffectiveAwakenChance(level);
+            return p > 0d ? 1d / p : double.PositiveInfinity;
         }
 
         // ---------------------------------------------------------------- 스킬 XP
@@ -438,9 +356,9 @@ namespace Onikiri.Progression
          * **몇 번 뽑아야 한 오의가 상한에 닿는가.**
          *
          * 한 오의를 상한까지 미는 데 682 XP이고(TotalXpToCap) 한 번의 뽑기가
-         * 기대 18.1 XP를 내므로(ExpectedXpPerPull) **약 38회**다. 천장이
-         * 30회이므로 "천장 한 바퀴에 오의 하나가 거의 상한"이 되고, 그 리듬이
-         * 47단계가 10연 셋으로 잡아 둔 리듬 위에 그대로 선다.
+         * 기대 18.1 XP를 내므로(50단계 천장 세계의 값) **약 38회**였다. 68단계의
+         * Lv.1 표로는 18.5 XP라 약 37회이고(ExpectedXpPerPull(1)), 10연 넷이면
+         * 오의 하나가 거의 상한이라는 리듬은 그대로다.
          *
          * 더 싸게 두면 첫 10연에 오의 하나가 상한에 닿아 남은 구간이 전부
          * 잉여가 된다 - 21단계 골드 축이 "해금 즉시 상한"으로 겪은 자리이고,

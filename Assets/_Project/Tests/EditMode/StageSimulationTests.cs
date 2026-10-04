@@ -1544,7 +1544,20 @@ namespace Onikiri.Tests
          * 은퇴한 값 기록: 26.8 / 19.2 / 15.3 (49단계 재기준, st51~200에서
          * 실측 24.56 / 17.64 / 14.00 + 9% 헤드룸).
          */
-        const double MarginSanityCap = 150d;
+        /**
+         * ## 68단계 - 150 -> 180. 천장 제거가 전설 사본을 두 배로 만들었다
+         *
+         * 실측 피크 93(52) -> 139(67) -> 166(68, 천장 제거로 전설 사본 두 배).
+         * 다음에 180을 넘으면 재기준이 아니라 전설 정지 규칙(사본 상한·넘침)을 본다.
+         *
+         * 추종의 요도 뽑기는 혼격(★4) 재고가 닫힐 때 멈춘다. 47단계 천장은 ★4 실효를
+         * 4.145%로 부풀려 혼격 하나를 채우는 동안 전설 기대가 0.19였고, 표 그대로
+         * (2.1%)면 0.38이다 - st500까지 전설 사본이 1·1 -> 2·2, 요도 배수 x1.145.
+         * 소환 레벨 상수가 얹는 몫은 0이다(g 전부 1인 세계도 165.7, 68 보고서 §5.1).
+         * 곱연산 버그를 잡는 새니티라는 뜻은 그대로다 - 이번 이동은 버그가 아니라
+         * 확률의 구조가 바뀐 것이고, 그 근거가 위 한 줄이다.
+         */
+        const double MarginSanityCap = 180d;
 
         /**
          * ## 52단계 - 검사 구간이 st200에서 **st500**으로 늘었다.
@@ -1609,8 +1622,8 @@ namespace Onikiri.Tests
 
                 Assert.LessOrEqual(row.BossMargin, MarginSanityCap, string.Format(
                     "stage {0}: 여유 {1:F2} - 이것은 과금이 앞선 것이 아니라 곱연산 "
-                    + "버그다 (52단계 실측 피크 93.3). 새 축이 두 번 곱해지는 자리를 "
-                    + "찾아라", row.Stage, row.BossMargin));
+                    + "버그다 (실측 피크 52단계 93.3 · 68단계 165.7). 새 축이 두 번 곱해지는 "
+                    + "자리를, 아니면 전설 정지 규칙(사본 상한·넘침)을 찾아라", row.Stage, row.BossMargin));
             }
         }
 
@@ -1855,8 +1868,9 @@ namespace Onikiri.Tests
             // 여유가 몇 % 움직였다. 이 검사가 지키는 앵커는 "그 앞의 세계"의
             // 것이므로 상수를 옮기지 않고 49단계 규칙 ⓐ대로 정책에 한 줄을
             // 더한다 - 옛 골드 축(x1.25 / Lv.13 / 지수 0.52)을 재현하는 플래그.
-            // 67단계 피날레 배수 1.46 -> 1.52도 같은 규칙이다(FinalePre67) - st10이 피날레
-            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true, FinalePre67 = true };
+            // 67단계 피날레 배수 1.46 -> 1.52도 같은 규칙이다(FinalePre67) - st10이 피날레.
+            // 68단계 천장 제거도 같다(GachaPre68) - 심층 전설 사본이 st151을 밀었다
+            var policy = new StageSimulation.Policy { NeutralizeMastery = true, GoldAxisPre64 = true, NeutralizeHitRating = true, StatPointsPre66 = true, FinalePre67 = true, GachaPre68 = true };
             var results = StageSimulation.Run(DeepZoneTo, FieldFromAssets(), policy);
 
             // ---- 앵커 넷. **승급 재설계 2.1.1단계에 다시 구웠다**

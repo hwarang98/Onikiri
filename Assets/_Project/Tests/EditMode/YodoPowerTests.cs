@@ -548,7 +548,11 @@ namespace Onikiri.Tests
 
             double today = TotalSeconds(nowWithout, 51, 400) / TotalSeconds(now, 51, 400) - 1d;
 
-            Assert.Greater(today, 0.03d, string.Format(
+            // 68단계: 3% -> 2.5%. 천장 제거로 추종의 심층 전설 사본이 두 배가 되어
+            // 분모(총 DPS)가 또 커졌다(2.76%). 상성은 한 계수도 안 움직였다 -
+            // 45단계 세계(위 era)의 4%가 축이 살아 있다는 계약이고, 이 줄은 지금
+            // 세계의 하한이다
+            Assert.Greater(today, 0.025d, string.Format(
                 "지금 세계에서 상성의 이득이 {0:P1}까지 닳았다 - 자를 바꿔 봐주는 것이 "
                 + "아니라 축이 실제로 묻히고 있다", today));
         }

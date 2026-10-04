@@ -116,80 +116,21 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 천장이 **★4 이상**을 지키는가. 46단계에서 한 칸 올라간 자리다.
+         * @brief Lv.1의 ★4 이상 대기가 **표 그대로**인가 (68단계).
+         *
+         * 47단계에는 이 자리가 "천장이 ★4+를 지키는가"였다(실효 20.2회).
+         * 68단계에 천장이 사라져 Lv.1은 표의 2.9% = 34.5회이고, 그 간격을
+         * 메우는 것이 소환 레벨이다 - 옛 천장의 리듬(20.2회)에 닿는 레벨은
+         * SummonLevelTests가 잰다.
          */
         [Test]
-        public void Pity_GuardsEpicOrBetter()
+        public void EpicOrBetter_AtLevelOneIsTheTable()
         {
             Assert.AreEqual(GachaCurve.RarityChance + GachaCurve.LegendaryChance,
                             GachaCurve.EpicOrBetterChance, 1e-12d);
-
-            Assert.Less(GachaCurve.ExpectedPullsPerEpic, (double)GachaCurve.PityPulls,
-                "★4+ 기대 대기가 천장보다 길다 - 산수가 뒤집혔다");
-            Assert.Less(GachaCurve.ExpectedPullsPerEpic, 1d / GachaCurve.EpicOrBetterChance,
-                "천장이 기대 대기를 줄이지 않는다 - 있으나 마나다");
-
-            // 46단계의 ★3 대기(20.0회)와 **같은 리듬**이어야 한다. 천장이
-            // 지키는 대상만 올라가고 손에 잡히는 감각은 그대로라는 것이
-            // 표를 그렇게 잡은 이유다(GachaCurve.PityPulls 주석)
-            Assert.AreEqual(20d, GachaCurve.ExpectedPullsPerEpic, 1.5d, string.Format(
-                "★4+ 실제 대기가 {0:F2}회다 - 46단계의 20.0회에서 멀어지면 "
-                + "10연 셋의 리듬이 화면에서 사라진다", GachaCurve.ExpectedPullsPerEpic));
-        }
-
-        /**
-         * @brief **천장은 전설을 훔치지 않는다.** 실효 확률 닫힌 식의 근거다.
-         *
-         * 천장이 덮어쓰는 것은 "★4+가 아닌 굴림"뿐이므로 ★5는 한 번도
-         * 잡아먹히지 않는다. 그 사실이 (1-q^(N-1))/p + q^(N-1) = (1-q^N)/p
-         * 라는 항등식으로 떨어지고, 그래서 실효 ★5 확률이 **표와 정확히
-         * 같다**(GachaCurve.PityShare 주석).
-         *
-         * 이 등식이 깨지면 시뮬레이션의 전설 수와 실제가 갈린다.
-         */
-        [Test]
-        public void Pity_NeverStealsALegendary()
-        {
-            Assert.AreEqual(GachaCurve.LegendaryChance,
-                            GachaCurve.EffectiveLegendaryChance, 1e-12d,
-                "천장이 전설을 잡아먹고 있다 - 실효 확률의 닫힌 식이 무효다");
-
-            // 반대로 ★4는 천장이 밀어 올린다 - 그것이 천장의 일이다
-            Assert.Greater(GachaCurve.EffectiveRarityChance, GachaCurve.RarityChance,
-                "천장이 ★4를 안 밀어 올린다 - 보장이 아무 일도 안 하고 있다");
-        }
-
-        /**
-         * @brief 아래 등급이 천장에 **눌리는가**, 그리고 합이 여전히 1인가.
-         *
-         * 46단계에는 이 보정이 없었다 - 천장이 표의 마지막 줄(★3)을 줬으므로
-         * 덮어쓰이는 것이 파편뿐이었고 그 차이가 밸런스에 안 닿았다. 지금은
-         * ★3이 사다리 한가운데라 덮어쓰이는 쪽이고, 보정 없이 표의 3%를 쓰면
-         * 시뮬레이션이 요도 티어를 실제보다 빨리 올린다.
-         */
-        [Test]
-        public void Pity_SuppressesTheLowerGrades()
-        {
-            Assert.Less(GachaCurve.EffectiveEssenceChance, GachaCurve.EssenceChance,
-                "천장이 아래 등급을 안 누른다 - 덮어쓴 굴림이 어디서도 안 빠졌다");
-
-            Assert.Less(GachaCurve.ExpectedShardsPerPull, GachaCurve.TableShardsPerPull,
-                "천장이 파편을 안 누른다");
-
-            // 실효 확률의 합도 1이어야 한다. ★1~★3은 눌리고 ★4는 밀려
-            // 올라가는데, 그 둘이 정확히 상쇄되지 않으면 표가 새고 있다
-            double q = 1d - GachaCurve.EpicOrBetterChance;
-            double lower = 0d;
-            for (int i = 0; i < GachaCurve.OutcomeCount; i++)
-            {
-                if (GachaCurve.GradeOf[i] >= GachaCurve.Grade.Epic) continue;
-                lower += (1d - GachaCurve.PityShare) * GachaCurve.Chances[i] / q;
-            }
-            double total = lower + GachaCurve.EffectiveRarityChance
-                                 + GachaCurve.EffectiveLegendaryChance;
-
-            Assert.AreEqual(1d, total, 1e-12d,
-                "실효 확률의 합이 1이 아니다 - 천장 보정이 확률을 만들거나 없애고 있다");
+            Assert.AreEqual(GachaCurve.EpicOrBetterChance, GachaCurve.EpicOrBetterChanceAt(1), 1e-12d,
+                "Lv.1이 표와 다르다 - 공개 확률표가 신규 계정에게 거짓말을 한다");
+            Assert.AreEqual(1d / GachaCurve.EpicOrBetterChance, GachaCurve.ExpectedPullsPerEpic(1), 1e-9d);
         }
 
         /**
@@ -376,14 +317,14 @@ namespace Onikiri.Tests
         {
             // 표의 경계를 정확히 짚는다. 누적 확률의 끝에서 한 칸 밀리면
             // 마지막 결과(전설)가 영영 안 나온다
-            Assert.AreEqual(GachaCurve.Outcome.ShardSmall, GachaCurve.Roll(0d));
-            Assert.AreEqual(GachaCurve.Outcome.LegendaryBlade, GachaCurve.Roll(0.99999d));
+            Assert.AreEqual(GachaCurve.Outcome.ShardSmall, GachaCurve.Roll(0d, 1));
+            Assert.AreEqual(GachaCurve.Outcome.LegendaryBlade, GachaCurve.Roll(0.99999d, 1));
 
             double cumulative = 0d;
             for (int i = 0; i < GachaCurve.OutcomeCount; i++)
             {
                 double middle = cumulative + GachaCurve.Chances[i] * 0.5d;
-                Assert.AreEqual((GachaCurve.Outcome)i, GachaCurve.Roll(middle),
+                Assert.AreEqual((GachaCurve.Outcome)i, GachaCurve.Roll(middle, 1),
                     "확률 구간 " + i + "의 한가운데가 다른 결과를 낸다");
                 cumulative += GachaCurve.Chances[i];
             }
@@ -402,7 +343,10 @@ namespace Onikiri.Tests
         public void Catalyst_BeatsGachaPerGemOnShards()
         {
             double catalyst = (double)YodoCurve.ShardPackShards / YodoCurve.ShardPackGems;
-            double gacha = GachaCurve.ExpectedShardsPerPull / GachaCurve.PullCostGems;
+            // Lv.1이 뽑기의 파편이 가장 많은 자리다 - 레벨이 오르면 파편 몫이
+            // 위쪽 등급으로 옮겨 간다(GachaCurve.ExpectedShardsPerPull). 여기서
+            // 이기면 모든 레벨에서 이긴다
+            double gacha = GachaCurve.ExpectedShardsPerPull(1) / GachaCurve.PullCostGems;
 
             Assert.Greater(catalyst, gacha, string.Format(
                 "뽑기가 보석당 파편을 촉매보다 많이 준다 ({0:F3} vs {1:F3}) - "
@@ -414,63 +358,44 @@ namespace Onikiri.Tests
         {
             Assert.Less(GachaCurve.TenPullCostGems,
                         GachaCurve.PullCostGems * GachaCurve.TenPullCount,
-                "10연에 할인이 없다 - 천장(10연 셋)의 리듬이 화면에서 사라진다");
+                "10연에 할인이 없다 - 소환 레벨을 미는 단위(10연)가 화면에서 사라진다");
         }
 
         /**
-         * @brief ★3의 기대 대기가 여전히 **확률의 일**인가.
+         * @brief ★3의 기대 대기가 여전히 **확률의 일**인가 - 모든 레벨에서.
          *
-         * 46단계에는 이 자리가 "천장이 기대 대기를 줄이는가"였다. 47단계에
-         * 천장이 ★4로 승격했으므로 ★3에는 더 이상 보장이 없고, 대신 눌림만
-         * 남는다(Pity_SuppressesTheLowerGrades) - 그래서 이 검사가 묻는 것도
-         * 바뀌었다: **여전히 확률로 나오는가**, 그리고 그 대기가 사람이 셀 수
-         * 있는 크기인가.
-         *
-         * 천장이 지키는 대상의 대기는 Pity_GuardsEpicOrBetter가 잰다.
+         * 47단계에는 천장이 ★3을 눌렀다. 68단계에는 레벨이 ★4·★5를 키우며
+         * ★3을 상대적으로 누른다 - 그래서 Lv.1뿐 아니라 st500 추종 레벨 근처
+         * (Lv.7~10)에서도 사람이 셀 수 있는 대기인지 본다.
          */
         [Test]
         public void Essence_StaysAReachableRoll()
         {
-            Assert.Greater(GachaCurve.ExpectedPullsPerEssence, 1d,
-                "혼 정수가 사실상 매번 나온다 - 확률이 아니다");
-            Assert.Less(GachaCurve.ExpectedPullsPerEssence, GachaCurve.PityPulls * 2d,
-                string.Format("혼 정수 대기가 {0:F1}회다 - 천장 두 바퀴보다 길면 "
-                + "★3이 사다리에서 사실상 사라진다", GachaCurve.ExpectedPullsPerEssence));
-
+            foreach (int level in new[] { 1, 5, 10 })
+            {
+                double wait = GachaCurve.ExpectedPullsPerEssence(level);
+                Assert.Greater(wait, 1d, "Lv." + level + " 혼 정수가 사실상 매번 나온다 - 확률이 아니다");
+                Assert.Less(wait, 60d, string.Format(
+                    "Lv.{0} 혼 정수 대기가 {1:F1}회다 - 10연 여섯보다 길면 ★3이 사다리에서 "
+                    + "사실상 사라진다", level, wait));
+            }
         }
 
         /**
-         * @brief 천장이 실효 확률에서 ★4를 ★3 위로 올린다. **그리고 그것이 괜찮다.**
+         * @brief ★4는 언제나 ★3 이상의 값이다 - **막히면 내려간다** (47단계 계약 유지).
          *
-         * ## 표는 단조인데 실제는 뒤집힌다
-         *
-         * 표는 ★3 3.0% > ★4 2.1%다. 그런데 천장이 30회마다 ★4를 보장하므로
-         * 실효 ★4는 최소 1/30 = 3.33%이고, ★3은 눌려서 2.94%가 된다.
-         * **백 번 뽑으면 영웅이 희귀보다 많이 나온다.**
-         *
-         * ## 그런데 사다리는 안 뒤집힌다 - ★4가 ★3을 포함하기 때문이다
-         *
-         * 혼격이 막힌 ★4는 **★3으로 내려간다**(GachaSystem.GrantRarity).
-         * 즉 ★4 한 번의 가치는 언제나 ★3 한 번 이상이고, 넘치는 ★4는
-         * 정확히 ★3이 된다. 빈도가 뒤집혀도 **값의 순서는 성립한다**.
-         *
-         * 이 검사가 그 두 사실을 함께 못 박는 이유는, 둘 중 하나만 보면
-         * 반대 방향의 "버그"로 읽히기 때문이다 - 빈도만 보면 표가 거짓말
-         * 같고, 미끄러짐만 보면 ★4가 ★3의 다른 이름 같다.
+         * 47단계 이름은 "천장이 ★4를 ★3보다 흔하게 만든다"였다. 68단계에 천장이
+         * 사라져 Lv.1에서는 표대로 ★3(3.0%) > ★4(2.1%)이고, 소환 레벨이 오르면
+         * 둘이 같은 비율로 자란다(SummonLevelCurve.GradeGrowth). 남는 계약은
+         * 값의 순서다: 혼격이 막힌 ★4는 ★3으로 내려가므로 넘치는 ★4는 정확히
+         * ★3이 된다 - 막힘 캐스케이드는 천장이 아니라 보유 상태의 문제라 그대로다.
          */
         [Test]
-        public void Pity_MakesEpicMoreCommonThanRare_AndThatIsFine()
+        public void Epic_IsAlwaysWorthAtLeastARare()
         {
-            Assert.Greater(GachaCurve.EffectiveRarityChance, GachaCurve.EffectiveEssenceChance,
-                "천장이 있는데도 실효 ★4가 ★3보다 드물다 - 천장이 안 도는 것이다");
-
-            // 표는 여전히 단조다. 공개하는 것은 굴림의 확률이고, 그것이
-            // 뒤집히면 화면이 거짓말을 한다
             Assert.Greater(GachaCurve.EssenceChance, GachaCurve.RarityChance,
-                "표에서도 ★4가 ★3보다 흔하다 - 공개 확률표가 사다리를 부정한다");
+                "표에서 ★4가 ★3보다 흔하다 - 공개 확률표가 사다리를 부정한다");
 
-            // 그리고 ★4는 언제나 ★3 이상이다 - 막히면 내려간다.
-            // 상한을 다 채운 세계에서 ★4를 하나 더 주면 혼 정수가 하나 는다
             var system = BuildLadderSystem();
             try
             {
@@ -488,15 +413,6 @@ namespace Onikiri.Tests
                     "미끄러진 ★4가 혼을 안 남겼다");
             }
             finally { Object.DestroyImmediate(system.Item1); }
-        }
-
-        [Test]
-        public void Pity_CountsDown()
-        {
-            Assert.AreEqual(GachaCurve.PityPulls, GachaCurve.PullsUntilPity(0));
-            Assert.AreEqual(1, GachaCurve.PullsUntilPity(GachaCurve.PityPulls - 1));
-            Assert.AreEqual(0, GachaCurve.PullsUntilPity(GachaCurve.PityPulls + 5),
-                "천장을 넘긴 카운터가 음수를 낸다");
         }
 
         /**
@@ -890,37 +806,48 @@ namespace Onikiri.Tests
             return system;
         }
 
+        /** 뽑은 횟수만큼 소환 경험치가 쌓인다 (68단계 확정 3: 1회 = 1 XP) */
         [Test]
-        public void Runtime_PityAlwaysFiresWithinTheWindow()
+        public void Runtime_PullsEarnSummonXp()
         {
             var system = BuildSystem();
             try
             {
-                // 천장 카운터가 상한을 넘는 순간이 있으면 안 된다. 표가
-                // 정수를 안 줘도 천장이 대신 준다
-                for (int i = 0; i < GachaCurve.PityPulls * 6; i++)
-                {
-                    system.DebugPull(1);
-                    Assert.Less(system.PityCounter, GachaCurve.PityPulls, string.Format(
-                        "{0}회째에 천장 카운터가 {1}이 됐다 - 천장이 안 터졌다",
-                        i + 1, system.PityCounter));
-                }
+                system.DebugPull(GachaCurve.TenPullCount);
+                Assert.AreEqual((long)GachaCurve.TenPullCount, system.SummonXp,
+                    "10연이 소환 경험치 10을 안 줬다");
+                Assert.AreEqual(GachaCurve.TenPullCount, system.TotalPulls);
+
+                var noon = new System.DateTime(2026, 8, 11, 3, 0, 0, System.DateTimeKind.Utc);
+                Assert.IsTrue(system.TryFreePullAt(noon));
+                Assert.AreEqual(GachaCurve.TenPullCount + 1L, system.SummonXp,
+                    "무료 뽑기가 소환 경험치를 안 줬다 - 무과금이 이 축에 닿는 길이 그것이다");
             }
             finally { Object.DestroyImmediate(system.gameObject); }
         }
 
+        /** 레벨 하나가 오르면 이벤트가 **정확히 한 번**, 새 레벨로 온다 */
         [Test]
-        public void Runtime_PityIsForcedAtTheEdge()
+        public void Runtime_LevelUpRaisesOneEvent()
         {
             var system = BuildSystem();
             try
             {
-                system.DebugPushToPity();
-                Assert.AreEqual(1, system.PullsUntilPity);
+                var heard = new List<int>();
+                system.SummonLevelUp += heard.Add;
+
+                system.DebugPushToLevelUp();
+                Assert.AreEqual(1, system.SummonLevel, "레벨업 직전인데 이미 올랐다");
+                Assert.AreEqual(0, heard.Count);
 
                 system.DebugPull(1);
-                Assert.AreEqual(GachaCurve.PityPulls, system.PullsUntilPity,
-                    "천장 직전에서 한 번 뽑았는데 카운터가 안 돌아갔다");
+                Assert.AreEqual(2, system.SummonLevel);
+                CollectionAssert.AreEqual(new[] { 2 }, heard, "레벨업 이벤트가 한 번이 아니다");
+                Assert.AreEqual(2, system.LastBatchLevelUp, "결과 팝업이 읽을 값이 안 섰다");
+
+                system.DebugPull(1);
+                Assert.AreEqual(1, heard.Count, "레벨이 안 올랐는데 이벤트가 또 왔다");
+                Assert.AreEqual(0, system.LastBatchLevelUp, "다음 묶음에 지난 레벨업이 남았다");
             }
             finally { Object.DestroyImmediate(system.gameObject); }
         }
@@ -949,28 +876,29 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief 세이브 왕복. **천장 카운터가 살아 돌아오는가.**
+         * @brief 세이브 왕복. **소환 경험치가 살아 돌아오는가.**
          *
-         * 저장하지 않으면 29회에서 껐다 켠 플레이어의 지불이 몰수된다 -
-         * 오의 쿨다운·영체 순번을 저장하지 않는 것과 기준이 다른 자리다
-         * (SaveData.gachaPity 주석).
+         * 저장하지 않으면 껐다 켠 플레이어의 레벨이 0으로 돌아가고, 그것은
+         * 성장 축이 아니라 몰수다(SaveData.yodoSummonXp 주석).
          */
         [Test]
-        public void Runtime_SaveRoundTripKeepsThePity()
+        public void Runtime_SaveRoundTripKeepsTheSummonXp()
         {
             var system = BuildSystem();
             try
             {
-                system.DebugPushToPity();
-                int pity = system.CollectPity();
+                system.DebugPull(GachaCurve.TenPullCount);
+                system.DebugPushToLevelUp();
+                long xp = system.CollectSummonXp();
                 int total = system.CollectTotalPulls();
                 long day = system.CollectFreePullDay();
 
                 system.DebugReset();
-                Assert.AreEqual(0, system.PityCounter);
+                Assert.AreEqual(0L, system.SummonXp);
 
-                system.Restore(pity, total, day);
-                Assert.AreEqual(pity, system.CollectPity(), "천장 카운터가 복원되지 않았다");
+                system.Restore(xp, total, day);
+                Assert.AreEqual(xp, system.CollectSummonXp(), "소환 경험치가 복원되지 않았다");
+                Assert.AreEqual(SummonLevelCurve.LevelFor(xp), system.SummonLevel);
                 Assert.AreEqual(total, system.CollectTotalPulls());
                 Assert.AreEqual(day, system.CollectFreePullDay());
             }
@@ -980,8 +908,8 @@ namespace Onikiri.Tests
         /**
          * @brief 사다리가 세이브를 왕복하는가 (47단계 - 세이브 v16).
          *
-         * 혼격과 전설 사본은 **플레이어가 지불한 것**이다. 천장 카운터를
-         * 저장하기로 한 것과 같은 기준이고(SaveData.gachaPity 주석) 여기는
+         * 혼격과 전설 사본은 **플레이어가 지불한 것**이다. 소환 경험치를
+         * 저장하는 것과 같은 기준이고(SaveData.yodoSummonXp 주석) 여기는
          * 그보다 세다 - 전설은 200회에 한 번이라 몰수의 크기가 다르다.
          */
         [Test]
@@ -1204,18 +1132,26 @@ namespace Onikiri.Tests
                 "전설 카탈로그와 시뮬레이션 칸 수가 갈렸다");
         }
 
+        /**
+         * @brief 손상된 세이브의 음수는 0이 되고, **큰 값은 그대로 들어온다.**
+         *
+         * 47단계에는 천장 카운터를 [0, 29]로 잘랐다 - 넘치면 다음 한 번이 무조건
+         * 보장이 됐기 때문이다. 소환 경험치에는 위쪽 상한이 없다(SummonLevelCurve
+         * 머리 주석) - 아무리 커도 레벨이 높을 뿐이고, 자르면 그것이 하드캡이다.
+         */
         [Test]
-        public void Runtime_RestoreClampsACorruptedPity()
+        public void Runtime_RestoreRejectsOnlyNegatives()
         {
             var system = BuildSystem();
             try
             {
-                system.Restore(GachaCurve.PityPulls * 10, -5, -1L);
-
-                Assert.Less(system.PityCounter, GachaCurve.PityPulls,
-                    "손상된 천장 카운터가 그대로 들어왔다 - 다음 한 번이 무조건 정수가 된다");
+                system.Restore(-5L, -5, -1L);
+                Assert.AreEqual(0L, system.SummonXp);
                 Assert.AreEqual(0, system.CollectTotalPulls());
                 Assert.AreEqual(0L, system.CollectFreePullDay());
+
+                system.Restore(1000000L, 0, 0L);
+                Assert.AreEqual(1000000L, system.SummonXp, "큰 소환 경험치가 잘렸다 - 그것이 상한이다");
             }
             finally { Object.DestroyImmediate(system.gameObject); }
         }

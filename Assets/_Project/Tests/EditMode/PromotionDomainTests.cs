@@ -743,7 +743,8 @@ namespace Onikiri.Tests
             Assert.IsTrue(bossSource.Contains("TrialDamageScale.Exit"),
                 "귀문 종료가 소프트캡을 끄지 않는다");
 
-            Assert.AreEqual(22, SaveData.CurrentVersion, "세이브 버전이 22가 아니다");
+            // 68단계가 v23(소환 경험치)으로 올렸다 - 귀문과 무관한 칸이다
+            Assert.AreEqual(23, SaveData.CurrentVersion, "세이브 버전이 23이 아니다");
         }
 
         /**

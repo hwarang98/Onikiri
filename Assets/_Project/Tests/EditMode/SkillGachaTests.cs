@@ -105,7 +105,10 @@ namespace Onikiri.Tests
 
             Assert.AreEqual(GachaCurve.OutcomeCount, SkillGachaCurve.OutcomeCount,
                 "결과 수가 갈렸다 - 확률표 UI가 같은 상자를 못 쓴다");
-            Assert.AreEqual(GachaCurve.PityPulls, SkillGachaCurve.PityPulls);
+            // 68단계: 소환 레벨의 식도 하나다 - 두 배너가 같은 표·같은 g를 지난다
+            Assert.AreEqual(GachaCurve.EpicOrBetterChanceAt(7),
+                            SkillGachaCurve.EffectiveUnlockChance(7) + SkillGachaCurve.EffectiveAwakenChance(7),
+                            1e-12d, "두 배너의 소환 레벨 표가 갈렸다");
             Assert.AreEqual(GachaCurve.PullCostGems, SkillGachaCurve.PullCostGems);
             Assert.AreEqual(GachaCurve.TenPullCostGems, SkillGachaCurve.TenPullCostGems);
             Assert.AreEqual(GachaCurve.FreePullsPerDay, SkillGachaCurve.FreePullsPerDay);
@@ -302,17 +305,17 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief XP 곡선이 단조롭고, 한 오의의 상한이 **천장 한 바퀴** 언저리다.
+         * @brief XP 곡선이 단조롭고, 한 오의의 상한이 **10연 넷** 언저리다.
          *
-         * 크기의 근거가 여기 있다(SkillGachaCurve.XpBase 주석). 682 XP는 기대
-         * 37.7회이고 천장이 30회이므로, "10연 셋이면 오의 하나가 거의 상한"이
-         * 47단계가 잡아 둔 리듬 위에 그대로 선다.
+         * 크기의 근거가 여기 있다(SkillGachaCurve.XpBase 주석). 50단계에는 "천장
+         * 한 바퀴(30회) 언저리"였고, 68단계에 천장이 사라져 Lv.1 표의 기대
+         * 18.5 XP로 약 37회다 - 범위(24~60회)는 그때와 같은 숫자를 쓴다.
          *
          * 더 싸면 첫 10연에 상한이 닿아 남은 구간이 잉여가 되고(21단계 골드
          * 축), 더 비싸면 무과금의 일일 무료가 한 오의에 두 달을 쓴다.
          */
         [Test]
-        public void TheXpCurve_PutsOneSkillAtAboutOnePityCycle()
+        public void TheXpCurve_PutsOneSkillAtAboutFourTenPulls()
         {
             long previous = 0L;
             for (int level = 1; level < SkillCurve.MaxLevel; level++)
@@ -323,12 +326,12 @@ namespace Onikiri.Tests
                 previous = cost;
             }
 
-            double pulls = SkillGachaCurve.TotalXpToCap / SkillGachaCurve.ExpectedXpPerPull;
+            double pulls = SkillGachaCurve.TotalXpToCap / SkillGachaCurve.ExpectedXpPerPull(1);
 
-            Assert.Greater(pulls, SkillGachaCurve.PityPulls * 0.8d, string.Format(
+            Assert.Greater(pulls, 24d, string.Format(
                 "오의 하나를 상한까지 미는 데 {0:F1}회밖에 안 든다 - 첫 10연에 닿으면 "
                 + "남은 구간이 전부 잉여가 된다", pulls));
-            Assert.Less(pulls, SkillGachaCurve.PityPulls * 2d, string.Format(
+            Assert.Less(pulls, 60d, string.Format(
                 "오의 하나에 {0:F1}회가 든다 - 일일 무료만 도는 무과금에게 두 달이다", pulls));
         }
 
@@ -587,12 +590,21 @@ namespace Onikiri.Tests
             Assert.AreNotEqual(-1, settledAt);
             Assert.Greater(settled, 0d, "보석 무제한인데 한 번도 안 뽑았다");
 
-            // **아홉을 여는 산수가 실제로 돌았는가.** 귀오의 넷의 결정론적
-            // 하한이 4 x 69.01 = 276회다. 그보다 적게 돌고 다 열렸다면 두 풀이
-            // 갈리지 않았거나 하드 천장이 확률을 두 번 세고 있다는 뜻이다
-            Assert.GreaterOrEqual(settled, 276d, string.Format(
-                "아홉을 {0:F0}회에 다 열었다 - 귀오의 넷의 하한(276회)보다 적다",
-                settled));
+            // **아홉을 여는 산수가 실제로 돌았는가.** 귀오의 넷의 결정론적 하한은
+            // ★5 기대를 소환 레벨을 따라 넷이 찰 때까지 쌓은 회수다(68단계 - 50단계에는
+            // 하드 천장의 4 x 69.01 = 276회였다). 그보다 적게 돌고 다 열렸다면 두 풀이
+            // 갈리지 않았거나 ★5 확률을 두 번 세고 있다는 뜻이다
+            double progress = 0d;
+            int found = 0, floorPulls = 0;
+            while (found < SkillGachaCurve.OniSecretUnlockOrder.Length && floorPulls < 5000)
+            {
+                progress += SkillGachaCurve.EffectiveAwakenChance(SummonLevelCurve.LevelFor(floorPulls));
+                floorPulls++;
+                if (progress + 1e-12d >= 1d) { progress -= 1d; found++; }
+            }
+            Assert.GreaterOrEqual(settled, (double)floorPulls, string.Format(
+                "아홉을 {0:F0}회에 다 열었다 - 귀오의 넷의 하한({1}회)보다 적다",
+                settled, floorPulls));
 
             // 다 열린 뒤로는 평평하다
             foreach (var row in rows)
@@ -688,19 +700,16 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief **일일 무료만으로 두 오의를 연다.** 두 달이 그 값이다.
+         * @brief **일일 무료만으로 표준 다섯을 연다.** 한 철이 그 값이다.
          *
-         * 천장이 ★4(해금)를 보장하므로 30회 안에 반드시 하나가 열리고
-         * (SkillGachaCurve.PityPulls), 하루 한 번이면 그것이 한 달이다.
-         * 둘이면 두 달 - 무과금에게 이 축은 **필수가 아니라 시간**이라는
-         * 것이 이 산수다.
+         * 첫 하나는 온보딩이 0일차에 준다(무료 10연). 일일 무료가 맡는 것은
+         * 나머지 넷이고, 68단계부터는 그 하루 한 번이 소환 경험치로 쌓여 해금
+         * 확률이 날마다 조금씩 오른다 - 그래서 대기를 상수 하나로 못 곱하고
+         * **레벨을 따라 걷는다.** 걸음은 시뮬레이션과 같은 기대 누적이다
+         * (StageSimulation.TrySkillGacha).
          *
          * 시뮬레이션에는 달력이 없으므로 이 트리클은 표 밖에 있다(47단계의
          * 일일 무료와 같은 자리). 그래서 여기서 재는 것은 곡선의 산수뿐이다.
-         *
-         * 15종 재설계에 산수가 바뀌었다 - 재고가 둘에서 다섯이 되고 대기가
-         * 20.22회에서 25.65회로 늘었지만, **첫 하나를 온보딩이 0일차에 준다.**
-         * 그래서 이 검사가 재는 것은 "나머지 넷"이다.
          */
         [Test]
         public void TheDailyFree_OpensTheStandardPoolInAboutOneSeason()
@@ -708,43 +717,54 @@ namespace Onikiri.Tests
             Assert.AreEqual(1, SkillGachaCurve.FreePullsPerDay,
                 "일일 무료가 하루 한 번이 아니다 - 아래 산수가 통째로 바뀐다");
 
-            // 첫 하나는 **온보딩이 0일차에 준다**(무료 10연). 일일 무료가
-            // 맡는 것은 나머지 넷이다
-            double days = SkillGachaCurve.ExpectedPullsPerUnlock * 4d;
+            // 온보딩 10연이 경험치 10을 이미 줬다
+            long xp = SkillGachaCurve.IntroPullCount;
+            double progress = 0d;
+            int opened = 0, days = 0;
+            while (opened < 4 && days < 1000)
+            {
+                progress += SkillGachaCurve.EffectiveUnlockChance(SummonLevelCurve.LevelFor(xp));
+                xp++;
+                days++;
+                if (progress + 1e-12d >= 1d) { progress -= 1d; opened++; }
+            }
 
-            Assert.Less(days, 130d, string.Format(
-                "표준 다섯을 여는 데 기대 {0:F0}일이 걸린다 - 무과금에게 이 축이 "
+            Assert.Less(days, 130, string.Format(
+                "표준 넷을 일일 무료로 여는 데 기대 {0}일이 걸린다 - 무과금에게 이 축이 "
                 + "언젠가가 되면 폭을 판다는 말이 거짓이 된다", days));
         }
 
         /**
-         * @brief ★5에 **상한이 생겼다.** 그 사실이 이 재설계의 약속이다.
+         * @brief ★5가 **소환 레벨과 함께 가까워진다.** 하드 천장이 지던 약속의 자리다.
          *
-         * v19까지 ★5는 표 확률 0.8%에 상한이 없었다 - 400회를 돌아도 안 나올
-         * 수 있었고, 그때는 ★5가 XP 가속이라 견딜 만했다. 이제 귀오의 넷의
-         * 유일한 출처가 되면서 상한 없음이 곧 "영영 못 볼 수도 있다"가 된다.
+         * 50단계의 하드 천장(100회)은 "귀오의 넷이 최악 400회 · 기대 276회로
+         * 닫힌다"를 약속했다. 68단계에 천장이 사라졌고, 그 자리를 성장이 받는다 -
+         * ★5 대기가 레벨마다 줄어 귀오의 넷의 기대가 옛 기대(276회)보다 짧아야
+         * 이 교체가 손해가 아니다. 걸음은 시뮬레이션과 같은 기대 누적이다.
          */
         [Test]
-        public void TheHardPity_BoundsTheFifthStarAtOneHundred()
+        public void TheFifthStar_ComesCloserWithSummonLevel()
         {
-            Assert.AreEqual(100, SkillGachaCurve.AwakenPityPulls,
-                "하드 천장이 100회가 아니다 - 문서의 획득 기간표가 통째로 바뀐다");
+            double previous = double.PositiveInfinity;
+            foreach (int level in new[] { 1, 3, 5, 7, 10 })
+            {
+                double wait = SkillGachaCurve.ExpectedPullsPerAwaken(level);
+                Assert.Less(wait, previous, "Lv." + level + "에서 ★5가 멀어졌다 - 성장이 아니다");
+                previous = wait;
+            }
 
-            Assert.AreEqual(0, SkillGachaCurve.PullsUntilAwakenPity(100),
-                "천장을 넘겨도 남은 회수가 음수로 안 접힌다");
-            Assert.AreEqual(100, SkillGachaCurve.PullsUntilAwakenPity(0));
+            double progress = 0d;
+            int found = 0, pulls = 0;
+            while (found < SkillGachaCurve.OniSecretUnlockOrder.Length && pulls < 5000)
+            {
+                progress += SkillGachaCurve.EffectiveAwakenChance(SummonLevelCurve.LevelFor(pulls));
+                pulls++;
+                if (progress + 1e-12d >= 1d) { progress -= 1d; found++; }
+            }
 
-            // 귀오의 넷의 **최악**이 닫힌다. 기대는 그 7할이다 (69.01 x 4)
-            int worst = SkillGachaCurve.AwakenPityPulls
-                      * SkillGachaCurve.OniSecretUnlockOrder.Length;
-            Assert.AreEqual(400, worst, "귀오의 넷의 최악이 400회가 아니다");
-
-            double expected = SkillGachaCurve.ExpectedPullsPerAwaken
-                            * SkillGachaCurve.OniSecretUnlockOrder.Length;
-            Assert.Less(expected, worst,
-                "기대가 최악과 같다 - 천장이 확률을 안 접고 있다");
-            Assert.AreEqual(276d, expected, 1d,
-                "귀오의 넷의 기대가 276회가 아니다 - 문서의 경제표와 갈렸다");
+            Assert.Less(pulls, 276, string.Format(
+                "귀오의 넷의 기대가 {0}회다 - 50단계 천장 세계의 기대(276회)보다 길면 "
+                + "천장을 걷어낸 것이 손해다", pulls));
         }
 
         /**
