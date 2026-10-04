@@ -49,7 +49,7 @@ namespace Onikiri.Tests
             Assert.IsTrue(SaveData.Migrate(data));
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            Assert.AreEqual(22, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
+            Assert.AreEqual(23, SaveData.CurrentVersion, "버전이 또 올랐으면 이 테스트도 함께 봐야 한다");
 
             Assert.AreEqual(SkillCatalog.Count, data.skillIds.Length,
                 "v6 -> v7이 오의 칸을 다 만들지 않았다");
@@ -577,8 +577,10 @@ namespace Onikiri.Tests
                 "사슬이 v10 -> v11에서 끊겼다 - v1 플레이어만 펫 없이 남는다");
             Assert.AreEqual(YodoCatalog.Count, data.yodoIds.Length,
                 "사슬이 v13 -> v14에서 끊겼다 - v1 플레이어만 요도 없이 남는다");
-            Assert.AreEqual(0, data.gachaPity,
+            Assert.AreEqual(0, data.gachaTotalPulls,
                 "사슬이 v14 -> v15에서 끊겼다 - v1 플레이어만 뽑기 없이 남는다");
+            Assert.AreEqual(0L, data.yodoSummonXp,
+                "사슬이 v22 -> v23에서 뽑지도 않은 소환 경험치를 지어냈다");
             Assert.AreEqual(LegendaryYodoCatalog.Count, data.legendaryYodoIds.Length,
                 "사슬이 v15 -> v16에서 끊겼다 - v1 플레이어만 전설 칸 없이 남는다");
 
@@ -674,12 +676,12 @@ namespace Onikiri.Tests
 
             Assert.IsTrue(SaveData.Migrate(data));
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            // v21(승급 재설계)로 올랐다. 이 검사가 재는 것은 v14 -> v15의 뽑기
+            // v23(68단계 소환 레벨)으로 올랐다. 이 검사가 재는 것은 v14 -> v15의 뽑기
             // 칸이지 최신 버전 자체가 아니므로, 숫자만 따라 올린다
-            Assert.AreEqual(22, SaveData.CurrentVersion, "세이브 버전이 최신이 아니다");
+            Assert.AreEqual(23, SaveData.CurrentVersion, "세이브 버전이 최신이 아니다");
 
-            Assert.AreEqual(0, data.gachaPity, "천장 카운터를 소급해 줬다");
             Assert.AreEqual(0, data.gachaTotalPulls);
+            Assert.AreEqual(0L, data.yodoSummonXp, "소환 경험치를 소급해 줬다");
             Assert.AreEqual(0L, data.gachaFreePullDayTicks,
                 "무료 뽑기 날짜가 채워졌다 - 승격 직후 무료 뽑기를 못 쓴다");
         }
@@ -690,16 +692,15 @@ namespace Onikiri.Tests
             var data = V11Save();
             SaveData.Migrate(data);
 
-            // 천장 직전까지 돌린 v15 상태를 흉내낸다
-            data.gachaPity = GachaCurve.PityPulls - 1;
+            // 137회를 돌린 최신 상태를 흉내낸다
+            data.yodoSummonXp = 137L;
             data.gachaTotalPulls = 137;
             data.gachaFreePullDayTicks = 638000000000000000L;
 
             Assert.IsTrue(SaveData.Migrate(data));
 
-            Assert.AreEqual(GachaCurve.PityPulls - 1, data.gachaPity,
-                "두 번째 마이그레이션이 천장 카운터를 되돌렸다 - 플레이어가 지불한 "
-                + (GachaCurve.PityPulls - 1) + "회가 몰수된다");
+            Assert.AreEqual(137L, data.yodoSummonXp,
+                "두 번째 마이그레이션이 소환 경험치를 되돌렸다 - 플레이어가 뽑은 137회가 몰수된다");
             Assert.AreEqual(137, data.gachaTotalPulls);
             Assert.AreEqual(638000000000000000L, data.gachaFreePullDayTicks,
                 "무료 뽑기 쿨이 초기화됐다 - 같은 날 두 번 뽑힌다");
@@ -715,9 +716,8 @@ namespace Onikiri.Tests
          * 상한까지 차오르고, 그것은 이 스텝이 판 재고를 통째로 지우는
          * 일이다 - 지나온 뽑기는 그때의 표로 이미 값을 받았다.
          *
-         * **천장 카운터는 그대로 둔다.** 지키는 대상이 ★3에서 ★4+로
-         * 승격했지만 카운터의 뜻("마지막 보장 뒤로 몇 번 돌렸는가")은 같고,
-         * 0으로 되돌리면 29회에서 승격을 맞은 플레이어의 지불이 몰수된다.
+         * 그때 그대로 둔 천장 카운터는 v23에 사라졌고, 그 자리를 누적 뽑기
+         * 수에서 오는 소환 경험치가 받는다 - 사슬 끝에서 240회가 240 XP로 선다.
          */
         [Test]
         public void V15_MigratesToV16WithAnEmptyLadder()
@@ -729,7 +729,6 @@ namespace Onikiri.Tests
             // 뽑기를 한참 돌린 v15 상태를 흉내낸다
             SaveData.Migrate(data);
             data.version = 15;
-            data.gachaPity = 17;
             data.gachaTotalPulls = 240;
             data.yodoRarities = new int[0];
             data.legendaryYodoIds = new string[0];
@@ -748,9 +747,9 @@ namespace Onikiri.Tests
             foreach (int copies in data.legendaryYodoCopies)
                 Assert.AreEqual(0, copies, "240회를 돌렸다고 전설을 나눠 줬다");
 
-            Assert.AreEqual(17, data.gachaPity,
-                "천장 카운터가 0으로 돌아갔다 - 승격이 몰수가 됐다");
             Assert.AreEqual(240, data.gachaTotalPulls);
+            Assert.AreEqual(240L, data.yodoSummonXp,
+                "사슬 끝(v22 -> v23)이 누적 240회를 소환 경험치로 안 옮겼다");
         }
 
         /**
@@ -841,8 +840,8 @@ namespace Onikiri.Tests
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
 
             Assert.AreEqual(0L, data.skillXp, "마이그레이션이 스킬 XP를 지어냈다");
-            Assert.AreEqual(0, data.skillGachaPity, "천장 카운터가 소급됐다");
             Assert.AreEqual(0, data.skillGachaTotalPulls, "누적 횟수가 소급됐다");
+            Assert.AreEqual(0L, data.skillSummonXp, "소환 경험치가 소급됐다");
             Assert.AreEqual(0L, data.skillGachaFreePullDayTicks,
                 "무료 뽑기가 쓰인 것으로 들어왔다 - 오늘치 하나는 곧바로 쓸 수 있어야 한다");
 
@@ -900,14 +899,14 @@ namespace Onikiri.Tests
 
             // 실제로 뽑고 모은 v18 상태를 흉내낸다
             data.skillXp = 244L;
-            data.skillGachaPity = 19;
+            data.skillSummonXp = 71L;
             data.skillGachaTotalPulls = 71;
 
             Assert.IsTrue(SaveData.Migrate(data));
 
             Assert.AreEqual(244L, data.skillXp, "두 번째 마이그레이션이 XP를 지웠다");
-            Assert.AreEqual(19, data.skillGachaPity,
-                "두 번째 마이그레이션이 천장을 되돌렸다 - 지불한 열아홉 회가 몰수된다");
+            Assert.AreEqual(71L, data.skillSummonXp,
+                "두 번째 마이그레이션이 소환 경험치를 되돌렸다 - 뽑은 일흔한 회가 몰수된다");
             Assert.AreEqual(71, data.skillGachaTotalPulls, "누적 횟수가 지워졌다");
         }
 

@@ -5,7 +5,11 @@ using Onikiri.Progression;
 namespace Onikiri.Tests
 {
     /**
-     * @brief 세이브 v20과 이중 천장의 **상태 계약**. 5단계가 지는 빚이다.
+     * @brief 세이브 v20의 **상태 계약**. 5단계가 지는 빚이다.
+     *
+     * (68단계) 이 파일의 절반이던 이중 천장(★4 소프트 30 · ★5 하드 100)은
+     * 사라졌다. 그 두 카운터의 검사는 지우고, 그 자리에 "v19에서 온 누적 뽑기가
+     * 사슬 끝(v22 -> v23)에서 소환 경험치가 되는가"를 둔다.
      *
      * 여기 있는 검사는 전부 "값이 맞는가"가 아니라 **"상태가 안 새는가"**를
      * 묻는다. 뽑기는 이 게임에서 유일하게 되돌릴 수 없는 축이라(재고가 유한하고
@@ -23,42 +27,33 @@ namespace Onikiri.Tests
         {
             var data = SaveData.NewGame();
 
-            // v19 세계를 흉내낸다. 소프트 천장은 이미 쌓여 있고, 하드 천장과
-            // 온보딩 칸은 그 세계에 없던 값이라 무엇이 들어 있든 상관없다 -
-            // 마이그레이션이 덮어써야 한다
+            // v19 세계를 흉내낸다. 누적 뽑기는 이미 쌓여 있고, 온보딩 칸은 그
+            // 세계에 없던 값이라 무엇이 들어 있든 상관없다 - 마이그레이션이 덮어써야 한다
             data.version = 19;
-            data.skillGachaPity = 17;
             data.skillGachaTotalPulls = 213;
-            data.skillGachaAwakenPity = 99;
+            data.skillSummonXp = 999L;      // 그 세계에 없던 칸 - 사슬이 덮어써야 한다
             data.skillGachaIntroClaimed = true;
             data.skillGachaIntroEquipDone = true;
             return data;
         }
 
         /**
-         * @brief v19 -> v20이 **세 칸을 전부 기본값으로 덮는가.**
+         * @brief v19 -> v20이 **온보딩 두 칸을 기본값으로 덮는가.**
          *
-         * `skillGachaAwakenPity`를 누적 뽑기 수로 소급하고 싶어지는데, 그
-         * 방식은 아무것도 인정하지 못한다 - 하드 천장이 재는 것은 **마지막 ★5
-         * 이후**의 횟수이고 누적은 그 값과 함수 관계가 없다. 213회를 돌며
-         * ★5를 세 번 받은 사람과 한 번도 못 받은 사람이 같은 213을 갖는다.
-         *
-         * 게다가 v19의 ★5는 개안이라 **해금 이력이 저장되지 않았다.** 복원할
-         * 원본이 세이브 안에 없다.
+         * 50단계에는 세 칸이었다(★5 하드 천장 포함). 하드 천장 칸은 68단계에
+         * 사라졌고, 남은 두 칸의 규칙은 그대로다 - 기존 플레이어 전원이
+         * 업데이트 후 무료 10연을 한 번 받는다.
          */
         [Test]
-        public void TheSaveV20_FillsAllThreeNewFieldsWithDefaults()
+        public void TheSaveV20_FillsTheIntroFieldsWithDefaults()
         {
             var data = FreshV19();
             Assert.IsTrue(SaveData.Migrate(data), "v19 세이브를 못 읽는다");
 
             Assert.AreEqual(SaveData.CurrentVersion, data.version);
-            // v21로 올랐다(승급 재설계). 이 검사는 v19 -> v20의 세 칸을 재므로
+            // v23으로 올랐다(68단계). 이 검사는 v19 -> v20의 칸을 재므로
             // 최신 버전 숫자만 따라 올린다
-            Assert.AreEqual(22, SaveData.CurrentVersion, "세이브 버전이 최신이 아니다");
-
-            Assert.AreEqual(0, data.skillGachaAwakenPity,
-                "하드 천장이 소급됐다 - 누적 횟수로는 마지막 ★5 이후를 복원할 수 없다");
+            Assert.AreEqual(23, SaveData.CurrentVersion, "세이브 버전이 최신이 아니다");
 
             Assert.IsFalse(data.skillGachaIntroClaimed,
                 "온보딩 10연이 이미 받은 것으로 온다 - 기존 플레이어가 업데이트 보상을 잃는다");
@@ -66,23 +61,22 @@ namespace Onikiri.Tests
         }
 
         /**
-         * @brief **소프트 천장은 지킨다.** 하드와 규칙이 정반대인 자리다.
+         * @brief v19의 누적 뽑기가 **사슬 끝에서 소환 경험치가 된다** (v22 -> v23).
          *
-         * 하드는 v20부터 시작하는 새 약속이라 0에서 출발하는 것이 맞지만,
-         * 소프트는 v18부터 있던 값이고 플레이어가 지불한 기록이다. 그것을
-         * 함께 0으로 밀면 29회를 채운 사람이 처음부터 다시 도는 셈이 된다 -
-         * 47단계가 "지불한 것을 몰수하지 않는다"로 못 박은 자리다.
+         * 50단계에는 이 자리가 "소프트 천장은 지킨다"였다 - 지불한 기록을 몰수하지
+         * 않는다는 47단계 규칙. 68단계에 천장이 사라졌고, 같은 규칙이 이번에는
+         * 누적 뽑기 수를 경험치로 읽는 것으로 지켜진다. 그 세계에 없던 칸에
+         * 들어 있던 값(999)은 덮어써진다.
          */
         [Test]
-        public void TheSaveV20_KeepsTheSoftPityItInherited()
+        public void TheSaveV19_CarriesItsPullsIntoSummonXp()
         {
             var data = FreshV19();
             SaveData.Migrate(data);
 
-            Assert.AreEqual(17, data.skillGachaPity,
-                "소프트 천장이 마이그레이션에서 리셋됐다 - 지불한 것을 몰수한다");
-            Assert.AreEqual(213, data.skillGachaTotalPulls,
-                "누적 뽑기 수가 사라졌다");
+            Assert.AreEqual(213, data.skillGachaTotalPulls, "누적 뽑기 수가 사라졌다");
+            Assert.AreEqual(213L, data.skillSummonXp,
+                "누적 213회가 소환 경험치로 안 옮겨졌다 - 이미 뽑은 사람이 Lv.1에서 다시 시작한다");
         }
 
         /**
@@ -117,75 +111,6 @@ namespace Onikiri.Tests
 
             Assert.AreEqual(data.skillIds.Length, data.skillLevels.Length,
                 "id 배열과 레벨 배열의 길이가 다르다 - 병렬 배열이 어긋났다");
-        }
-
-        #endregion
-
-        #region 이중 천장 - 두 카운터가 서로를 안 건드린다
-
-        /**
-         * @brief ★4는 **하드 카운터를 안 되돌린다.**
-         *
-         * 이것이 두 천장을 나눈 이유 전부다. 영웅이 전설까지의 거리를 줄이면
-         * 두 게이지가 같은 속도로 차고, 그러면 게이지를 둘 그릴 이유가 없다.
-         *
-         * 곡선 쪽 값으로 재는 이유는 시스템이 MonoBehaviour라 EditMode에서
-         * 씬 없이 못 돌리기 때문이다. 대신 `SkillGachaPityModel`이 같은 전이를
-         * 들고 있으므로 그쪽으로 잰다 - 두 곳이 갈리면 그 모델의 검사가 잡는다.
-         */
-        [Test]
-        public void TheEpicResult_DoesNotResetTheHardPity()
-        {
-            var state = new SkillGachaPityModel.State(SkillGachaCurve.PityPulls,
-                                                      SkillGachaCurve.AwakenPityPulls);
-
-            // **두 천장이 동시에 코앞인 자리에서 잰다.** 소프트는 다음 한 번에
-            // 터지고, 하드는 그 다음 한 번에 터진다. 긴 전파로 재지 않는 이유는
-            // 이것이 분포이기 때문이다 - 중간에 자연 ★5가 섞이면 질량이 흩어져
-            // "몇 회 뒤에 하드가 온다"를 한 숫자로 말할 수 없다
-            state.ResetToSavedCounters(SkillGachaCurve.PityPulls - 1,
-                                       SkillGachaCurve.AwakenPityPulls - 2);
-
-            var forced = SkillGachaPityModel.Advance(state);
-            Assert.AreEqual(1d - GachaCurve.EffectiveLegendaryChance, forced.UnlockChance, 1e-12d,
-                "소프트 천장 회차인데 ★5가 아닌 나머지가 전부 ★4가 아니다");
-
-            // 그 ★4가 하드를 **안 되돌렸다면** 하드는 한 칸 더 차서 다음
-            // 회차가 곧 천장이다. 되돌렸다면 다음 회차의 ★5는 표 확률(0.8%)이다
-            var next = SkillGachaPityModel.Advance(state);
-
-            Assert.Greater(next.AwakenChance, 0.99d, string.Format(
-                "다음 회차의 ★5가 {0:P2}다 - ★4가 하드 카운터를 되돌렸다는 뜻이고, "
-                + "그러면 두 천장이 한 카운터를 나눠 쓰는 것이다", next.AwakenChance));
-        }
-
-        /**
-         * @brief ★5는 **소프트도 함께 되돌린다.** 위와 반대 방향이다.
-         *
-         * 전설은 영웅 이상이므로 소프트 천장이 재는 "★4 이상"을 충족한다.
-         * 이 비대칭이 곧 소프트 천장의 정의이고, 그래서 표준 해금이 30회를
-         * 넘길 수 있다 - ★5가 카운터를 가로채기 때문이다.
-         */
-        [Test]
-        public void TheLegendaryResult_ResetsTheSoftPityToo()
-        {
-            var state = new SkillGachaPityModel.State(SkillGachaCurve.PityPulls,
-                                                      SkillGachaCurve.AwakenPityPulls);
-
-            // 하드 천장 직전 + 소프트도 거의 찼다. 다음 한 번은 ★5 확정이다
-            state.ResetToSavedCounters(SkillGachaCurve.PityPulls - 2,
-                                       SkillGachaCurve.AwakenPityPulls - 1);
-
-            var forced = SkillGachaPityModel.Advance(state);
-            Assert.AreEqual(1d, forced.AwakenChance, 1e-12d, "하드 천장 회차가 ★5가 아니다");
-            Assert.AreEqual(0d, forced.UnlockChance, 1e-12d,
-                "한 회차에 ★4와 ★5가 같이 나왔다");
-
-            // 소프트가 0으로 돌아갔다면 다음 회차는 천장이 아니라 표 확률이다.
-            // 안 돌아갔다면 남은 한 칸이 차서 곧바로 ★4 확정이 된다
-            var next = SkillGachaPityModel.Advance(state);
-            Assert.Less(next.UnlockChance, 0.5d,
-                "★5가 소프트 카운터를 안 되돌렸다 - 전설이 영웅 이상이라는 규칙이 깨졌다");
         }
 
         #endregion

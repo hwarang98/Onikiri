@@ -465,6 +465,16 @@ namespace Onikiri.UI
          */
         public void Show(List<GachaSystem.PullResult> results, YodoSystem yodo)
         {
+            Show(results, yodo, 0);
+        }
+
+        /**
+         * @param summonLevelUp 이 뽑기 묶음이 닿은 소환 레벨. 0이면 안 올랐다
+         *                      (GachaSystem.LastBatchLevelUp). 오르면 제목 줄
+         *                      끝에 "소환 Lv.n 달성"이 붙는다 - 연출은 69단계 몫이다
+         */
+        public void Show(List<GachaSystem.PullResult> results, YodoSystem yodo, int summonLevelUp)
+        {
             if (visual == null || lines == null || results == null) return;
             EnsureRowScratch();
 
@@ -490,17 +500,16 @@ namespace Onikiri.UI
 
                 // ★4 이상이 전 폭 줄이다 - 오의 배너와 **같은 자**다 (50b).
                 // 처음에 전설만 넓혔다가 실기에서 물렸다: ★4의 미끄러짐 줄
-                // ("천장! 상위 혼 → 혼 정수 → 파편 80")이 들여쓰기로 좁아진
-                // 칸을 넘어 오른쪽 칸을 덮었다. 실효 ★4가 4.1%라 10연에
-                // 반 줄꼴 - 천장이 지키는 것이 ★4+인 것과 같은 경계이고,
-                // 넓은 줄 = "천장이 보장하는 것"으로 두 배너가 같은 말을 한다
+                // ("상위 혼 → 혼 정수 → 파편 80")이 들여쓰기로 좁아진 칸을
+                // 넘어 오른쪽 칸을 덮었다. 넓은 줄 = "이 뽑기의 진짜 상품"으로
+                // 두 배너가 같은 말을 한다
                 rowWide[i] = grade >= GachaCurve.Grade.Epic;
             }
 
             // 판이 물드는 것은 전설에서만이다. ★4까지는 줄 하나의 색으로
             // 충분하고, 판까지 바뀌면 200회에 한 번의 사건이 20회에 한 번이
             // 된다 - 사건은 드물어야 사건이다
-            Render(count, Headline(shards, counts), ColorOf(best),
+            Render(count, WithLevelUp(Headline(shards, counts), summonLevelUp), ColorOf(best),
                    best == GachaCurve.Grade.Legendary);
         }
 
@@ -514,6 +523,19 @@ namespace Onikiri.UI
          * 그래서 **파편 합계 + ★3 이상만** 적는다. ★1·★2는 전부 파편이라
          * 이미 합계에 들어 있고, 위쪽 셋은 개수가 곧 사건이다.
          */
+        /**
+         * @brief 제목 줄 끝에 레벨업 한 줄을 붙인다. 안 올랐으면 그대로다.
+         *
+         * 문구의 출처는 곡선이다(SummonLevelCurve.LevelUpText). 47단계의
+         * "천장!" 꼬리표가 서던 자리를 레벨업이 대신한다 - 보장이 아니라
+         * 성장이 이 뽑기의 사건이다.
+         */
+        public static string WithLevelUp(string headline, int summonLevelUp)
+        {
+            if (summonLevelUp <= 0) return headline;
+            return headline + "  ·  " + SummonLevelCurve.LevelUpText(summonLevelUp);
+        }
+
         private static string Headline(int shards, int[] counts)
         {
             string text = "파편 " + shards;
@@ -574,7 +596,7 @@ namespace Onikiri.UI
          */
         private static string RarityText(GachaSystem.PullResult result, YodoSystem yodo)
         {
-            string prefix = result.FromPity ? "천장! " : string.Empty;
+            string prefix = string.Empty;
 
             if (result.Downgraded)
                 return EssenceText(result, yodo, prefix + "상위 혼 → ");
@@ -622,6 +644,13 @@ namespace Onikiri.UI
          */
         public void Show(List<SkillGachaSystem.PullResult> results, SkillSystem skills)
         {
+            Show(results, skills, 0);
+        }
+
+        /** @param summonLevelUp 요도 쪽 Show와 같다 (SkillGachaSystem.LastBatchLevelUp) */
+        public void Show(List<SkillGachaSystem.PullResult> results, SkillSystem skills,
+                         int summonLevelUp)
+        {
             if (visual == null || lines == null || results == null) return;
             EnsureRowScratch();
 
@@ -660,7 +689,7 @@ namespace Onikiri.UI
                 rowGrades[i] = (int)GachaCurve.GradeOf[(int)result.Rolled];
             }
 
-            Render(count, SkillHeadline(xp, counts), ColorOf(best),
+            Render(count, WithLevelUp(SkillHeadline(xp, counts), summonLevelUp), ColorOf(best),
                    best == GachaCurve.Grade.Legendary);
         }
 
@@ -684,7 +713,7 @@ namespace Onikiri.UI
          * 으로 겹쳐 있기도 했다. 갈랐다:
          *
          *   좁은 줄   "XP +6" · "XP +70 · Lv +5"    반 폭에 반드시 든다
-         *   넓은 줄   "천장! 오의 해금 · 혈폭"        화살표는 미끄러짐 전용
+         *   넓은 줄   "오의 해금 · 혈폭"              화살표는 미끄러짐 전용
          *
          * 좁은 줄에서 "스킬"을 뗀 것은 상자 때문이 아니라(그래도 들어간다)
          * 열 줄이 다 같은 말로 시작하면 눈이 훑을 것이 없어지기 때문이다 -
@@ -703,17 +732,16 @@ namespace Onikiri.UI
         private static string SkillTextFor(SkillGachaSystem.PullResult result, SkillSystem skills,
                                            bool wide)
         {
-            string prefix = result.FromPity ? "천장! " : string.Empty;
+            string prefix = string.Empty;
 
             // 미끄러진 칸을 **출발점부터 하나씩** 적는다. ★5가 두 칸 내려간
             // 줄은 "오의 개안 → 오의 해금 → XP +240"이 되고, 그 줄 하나로
             // 200회에 한 번의 결과가 무엇이었고 왜 그것이 안 됐는지가 읽힌다
             //
-            // **먼저 미끄러졌는지 묻는다.** 굴린 칸과 받은 칸이 다른 이유가
-            // 둘이기 때문이다 - 미끄러짐(위 -> 아래)과 **천장**(아래 -> 위)이다.
-            // 천장이 덮은 회차에서 아래로 걸으면 도착점에 영영 못 닿는다.
-            // 그 경우 적을 경로가 없다 - 사다리를 안 탔기 때문이고, 그 회차가
-            // 무엇이었는지는 "천장!" 표시가 이미 말한다
+            // **먼저 미끄러졌는지 묻는다.** 50단계에는 굴린 칸과 받은 칸이
+            // 다른 이유가 둘이었다 - 미끄러짐(위 -> 아래)과 천장(아래 -> 위).
+            // 68단계에 천장이 사라졌지만, 아래로 걸어 닿는지는 사다리가
+            // 판정한다는 규칙(SlidesTo)은 그대로 둔다
             if (SkillGachaCurve.SlidesTo(result.Rolled, result.Outcome))
                 for (var at = result.Rolled; at != result.Outcome;
                      at = SkillGachaCurve.SlideFor(at))

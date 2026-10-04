@@ -162,7 +162,7 @@ service cloud.firestore {
              // 미래 버전은 서버에 놓일 수 없다. 21 이하(옛 빌드)는 그대로 통과한다
              && request.resource.data.saveVersion is int
              && request.resource.data.saveVersion >= 1
-             && request.resource.data.saveVersion <= 22
+             && request.resource.data.saveVersion <= 23   // 68단계: 상한 22 -> 23 (SaveData v23 소환 경험치)
              && request.resource.data.revision is int
              && request.resource.data.baseRevision is int
              && request.resource.data.payload is string

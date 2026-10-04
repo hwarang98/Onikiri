@@ -442,7 +442,8 @@ namespace Onikiri.Tests.EditMode
         [Test]
         public void SaveV22_RoundTripsTheNewFields()
         {
-            Assert.AreEqual(22, SaveData.CurrentVersion);
+            // 68단계(v23 소환 경험치)가 한 칸 더 올렸다 - 이 검사가 재는 것은 v22의 새 칸이다
+            Assert.AreEqual(23, SaveData.CurrentVersion);
 
             var data = SaveData.NewGame();
             data.characterLevel = 40;
@@ -486,7 +487,7 @@ namespace Onikiri.Tests.EditMode
             var old = JsonUtility.FromJson<SaveData>(json);
 
             Assert.IsTrue(SaveData.Migrate(old));
-            Assert.AreEqual(22, old.version);
+            Assert.AreEqual(23, old.version);
             Assert.AreEqual(0, old.expPoints);
             Assert.AreEqual(0, old.goldPoints);
             Assert.AreEqual(0, old.idlePoints);

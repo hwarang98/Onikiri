@@ -142,8 +142,8 @@ namespace Onikiri.Tests
             AssertStateChanges(save => save.gems -= 225L, "보석");
             AssertStateChanges(save => save.killsThisStage += 1, "이번 스테이지 처치");
             AssertStateChanges(save => save.evolutionTier += 1, "승급 티어");
-            AssertStateChanges(save => save.gachaPity += 1, "요도 천장");
-            AssertStateChanges(save => save.skillGachaAwakenPity += 1, "하드 천장");
+            AssertStateChanges(save => save.yodoSummonXp += 1, "요도 소환 경험치");
+            AssertStateChanges(save => save.skillSummonXp += 1, "오의 소환 경험치");
             AssertStateChanges(save => save.playerName = "다른이름", "이름");
         }
 
@@ -1154,7 +1154,7 @@ namespace Onikiri.Tests
         [Test]
         public void CrossSaveDoesNotTouchTheSaveFormat()
         {
-            Assert.AreEqual(22, SaveData.CurrentVersion,
+            Assert.AreEqual(23, SaveData.CurrentVersion,
                 "동기화 메타는 sidecar에 산다 - 세이브 버전을 올릴 이유가 없다");
         }
 
@@ -1328,7 +1328,7 @@ namespace Onikiri.Tests
             data.yodoRarities = new[] { 4, 3 };
             data.yodoShards = 77L;
 
-            data.gachaPity = 17;
+            data.yodoSummonXp = 213L;
             data.gachaTotalPulls = 213;
             data.gachaFreePullDayTicks = 638_090_000_000_000_000L;
 
@@ -1337,11 +1337,10 @@ namespace Onikiri.Tests
 
             data.gachaSkillIds = new[] { "skill_c" };
             data.skillXp = 4_200L;
-            data.skillGachaPity = 9;
+            data.skillSummonXp = 88L;
             data.skillGachaTotalPulls = 88;
             data.skillGachaFreePullDayTicks = 638_095_000_000_000_000L;
 
-            data.skillGachaAwakenPity = 41;
             data.skillGachaIntroClaimed = true;
             data.skillGachaIntroEquipDone = true;
 

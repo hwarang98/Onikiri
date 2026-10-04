@@ -45,9 +45,6 @@ namespace Onikiri.Progression
             /** 전설이 들어간 자루. -1이면 미해당이거나 상한이라 파편이 됐다 */
             public int LegendaryIndex;
 
-            /** 천장이 준 결과인가. 화면이 "천장!"을 따로 적는다 */
-            public bool FromPity;
-
             /**
              * @brief 상위 혼(★4)이 혼 정수(★3)로 미끄러졌는가.
              *
@@ -66,13 +63,14 @@ namespace Onikiri.Progression
         [SerializeField] private StageProgress stage;
 
         /**
-         * @brief 마지막 혼 정수 뒤로 돌린 뽑기 수. **천장의 카운터다.**
+         * @brief 이 배너의 소환 경험치 = 지금까지 돌린 횟수 (68단계).
          *
-         * 저장한다(세이브 v15). 오의 쿨다운·영체 순번을 저장하지 않는 것과
-         * 반대인 이유는 이것이 **플레이어가 지불한 것**이기 때문이다 -
-         * 29회에서 껐다 켰더니 0으로 돌아가면 그것은 리셋이 아니라 몰수다.
+         * 저장한다(세이브 v23). 47단계 천장 카운터가 서던 자리이고 저장하는
+         * 이유도 같다 - **플레이어가 지불한 것**이다. 다른 점은 이 값이 0으로
+         * 돌아가지 않는다는 것이다. 천장은 터질 때마다 비워졌지만 경험치는
+         * 쌓이기만 하고, 레벨(SummonLevel)은 이 값에서 유도된다.
          */
-        [SerializeField] private int pityCounter;
+        [SerializeField] private long summonXp;
 
         /** 지금까지 돌린 총 횟수. 상점이 "지금까지 N회"로 적는다 */
         [SerializeField] private int totalPulls;
@@ -87,17 +85,32 @@ namespace Onikiri.Progression
          */
         [SerializeField] private long lastFreePullDayTicks;
 
-        /** 잔액·천장·무료 상태 중 무엇이든 바뀌면 발생. 상점이 듣는다 */
+        /** 잔액·소환 레벨·무료 상태 중 무엇이든 바뀌면 발생. 상점이 듣는다 */
         public event Action Changed;
 
         /** 방금 뽑았다. 연출이 듣는다 - 결과 목록이 함께 온다 */
         public event Action<List<PullResult>> Pulled;
 
+        /**
+         * @brief 소환 레벨이 올랐다. 새 레벨이 온다 - **오른 레벨마다 한 번.**
+         *
+         * Pulled보다 먼저 온다. 결과 팝업은 같은 묶음의 LastBatchLevelUp을
+         * 읽어 제목 줄에 한 줄을 붙인다. 연출은 69단계(UI 개편) 몫이다.
+         */
+        public event Action<int> SummonLevelUp;
+
         public static GachaSystem Instance { get; private set; }
 
-        public int PityCounter { get { return pityCounter; } }
         public int TotalPulls { get { return totalPulls; } }
-        public int PullsUntilPity { get { return GachaCurve.PullsUntilPity(pityCounter); } }
+
+        /** 소환 경험치 (누적 뽑기 수) */
+        public long SummonXp { get { return summonXp; } }
+
+        /** 소환 레벨. 경험치에서 유도된다 - 저장하지 않는다 */
+        public int SummonLevel { get { return SummonLevelCurve.LevelFor(summonXp); } }
+
+        /** 마지막 뽑기 묶음에서 닿은 레벨. 0이면 안 올랐다 - 결과 팝업이 읽는다 */
+        public int LastBatchLevelUp { get; private set; }
 
         /**
          * @brief 결과를 담아 넘기는 목록. **매 뽑기마다 새로 만들지 않는다.**
@@ -227,13 +240,36 @@ namespace Onikiri.Progression
             return true;
         }
 
+        /**
+         * @brief count번 굴린다. **회차마다 그 순간의 레벨로 굴리고 1 XP를 쌓는다.**
+         *
+         * 10연 도중에 레벨이 오르면 남은 회차는 오른 레벨로 굴린다 - 시뮬레이션이
+         * 뽑기 한 번을 단위로 세는 것과 같은 규칙이다(StageSimulation.TryGacha).
+         */
         private void RunPulls(int count)
         {
             results.Clear();
+            LastBatchLevelUp = 0;
 
-            for (int i = 0; i < count; i++) results.Add(RollOnce());
+            int before = SummonLevel;
+
+            for (int i = 0; i < count; i++)
+            {
+                results.Add(RollOnce());
+                summonXp++;
+            }
 
             totalPulls += count;
+
+            int after = SummonLevel;
+            if (after > before)
+            {
+                LastBatchLevelUp = after;
+
+                var levelUp = SummonLevelUp;
+                if (levelUp != null)
+                    for (int level = before + 1; level <= after; level++) levelUp(level);
+            }
 
             Raise();
 
@@ -242,51 +278,31 @@ namespace Onikiri.Progression
         }
 
         /**
-         * @brief 한 번 굴린다. **천장은 표 위에 얹힌다.**
+         * @brief 한 번 굴린다. **지금의 소환 레벨로 표를 굴리고, 그 값이 결과다.**
          *
-         * 표(GachaCurve.Roll)는 순수하게 확률만 보고, 천장은 카운터를 아는
-         * 여기서 결과를 덮어쓴다. 나누는 이유는 시뮬레이션 때문이다 -
-         * 시뮬레이션은 기댓값(GachaCurve.ExpectedPullsPerEssence)으로 세고
-         * 실제는 굴리는데, 둘이 **같은 표**를 지나야 두 값이 같은 것을 뜻한다.
+         * 68단계에 천장이 사라져 덮어쓰는 단계가 없다. 시뮬레이션은 같은
+         * 표(SummonLevelCurve.ChancesAt)의 기댓값으로 센다.
          */
         private PullResult RollOnce()
         {
-            var outcome = GachaCurve.Roll(UnityEngine.Random.value);
-
-            // **천장은 ★4 이상을 보장한다** (46단계는 ★3이었다 -
-            // GachaCurve.PityPulls 주석). 이미 ★4+를 굴렸으면 천장은
-            // 아무것도 안 한다. 그 한 줄이 "천장은 전설을 훔치지 않는다"를
-            // 만들고, 그 사실이 실효 확률의 닫힌 식을 성립시킨다
-            bool pity = false;
-            if (GachaCurve.GradeFor(outcome) < GachaCurve.Grade.Epic
-                && pityCounter + 1 >= GachaCurve.PityPulls)
-            {
-                outcome = GachaCurve.Outcome.SoulRarity;
-                pity = true;
-            }
-
-            // 카운터는 ★4+에서만 돌아간다. ★3은 이제 사다리의 한가운데라
-            // 천장을 리셋하지 않는다 - 리셋하면 "★3이 자주 나올수록 ★4가
-            // 멀어진다"가 되어 사다리가 스스로를 막는다
-            if (GachaCurve.GradeFor(outcome) >= GachaCurve.Grade.Epic) pityCounter = 0;
-            else pityCounter++;
+            var outcome = GachaCurve.Roll(UnityEngine.Random.value, SummonLevel);
 
             switch (outcome)
             {
                 case GachaCurve.Outcome.SoulEssence:  return GrantEssence();
-                case GachaCurve.Outcome.SoulRarity:   return GrantRarity(pity);
+                case GachaCurve.Outcome.SoulRarity:   return GrantRarity();
                 case GachaCurve.Outcome.LegendaryBlade: return GrantLegendary();
             }
 
             int shards = GachaCurve.ShardsFor(outcome);
             if (yodo != null) yodo.GrantShards(shards);
 
-            return Result(outcome, shards, -1, -1, false, false);
+            return Result(outcome, shards, -1, -1, false);
         }
 
         /** 결과 한 줄. 등급은 언제나 표에서 나온다 - 화면이 따로 판정하지 않게 */
         private static PullResult Result(GachaCurve.Outcome outcome, int shards, int blade,
-                                         int legendary, bool pity, bool downgraded)
+                                         int legendary, bool downgraded)
         {
             return new PullResult
             {
@@ -295,7 +311,6 @@ namespace Onikiri.Progression
                 Shards = shards,
                 BladeIndex = blade,
                 LegendaryIndex = legendary,
-                FromPity = pity,
                 Downgraded = downgraded
             };
         }
@@ -312,12 +327,12 @@ namespace Onikiri.Progression
         {
             int blade = yodo != null ? yodo.TryTakeEssence(StageNow) : -1;
             if (blade >= 0)
-                return Result(GachaCurve.Outcome.SoulEssence, 0, blade, -1, false, false);
+                return Result(GachaCurve.Outcome.SoulEssence, 0, blade, -1, false);
 
             int shards = YodoCurve.ShardsPerOverflowSoul;
             if (yodo != null) yodo.GrantShards(shards);
 
-            return Result(GachaCurve.Outcome.SoulEssence, shards, -1, -1, false, false);
+            return Result(GachaCurve.Outcome.SoulEssence, shards, -1, -1, false);
         }
 
         /**
@@ -329,27 +344,27 @@ namespace Onikiri.Progression
          *
          * 사다리의 역순으로 미끄러지는 것이 요점이다. 혼격은 티어를 앞설 수
          * 없으므로(YodoRarityCurve.CapAt) 바퀴가 얕은 초반에는 ★4가
-         * 자주 막히는데, 그때 곧바로 파편이 되면 **천장이 준 결과가 파편**인
-         * 순간이 생긴다 - 30회를 채운 대가가 파편 80이면 그것은 보장이 아니다.
+         * 자주 막히는데, 그때 곧바로 파편이 되면 **★4를 뽑고 받은 것이 파편**인
+         * 순간이 생긴다 - 사다리 위쪽을 굴린 대가가 파편 80이면 그것은 상품이 아니다.
          *
          * 한 칸 내려가면 그 상황이 없어진다. ★4가 막히는 이유가 "티어가
          * 얕아서"이므로 내려간 자리가 정확히 **그 티어를 미는 물건**이고,
          * 다음 ★4는 받을 수 있게 된다. 막힘이 스스로를 푸는 구조다.
          */
-        private PullResult GrantRarity(bool pity)
+        private PullResult GrantRarity()
         {
             int blade = yodo != null ? yodo.TryTakeRarity() : -1;
             if (blade >= 0)
-                return Result(GachaCurve.Outcome.SoulRarity, 0, blade, -1, pity, false);
+                return Result(GachaCurve.Outcome.SoulRarity, 0, blade, -1, false);
 
             int fallback = yodo != null ? yodo.TryTakeEssence(StageNow) : -1;
             if (fallback >= 0)
-                return Result(GachaCurve.Outcome.SoulRarity, 0, fallback, -1, pity, true);
+                return Result(GachaCurve.Outcome.SoulRarity, 0, fallback, -1, true);
 
             int shards = GachaCurve.ShardsPerOverflowRarity;
             if (yodo != null) yodo.GrantShards(shards);
 
-            return Result(GachaCurve.Outcome.SoulRarity, shards, -1, -1, pity, true);
+            return Result(GachaCurve.Outcome.SoulRarity, shards, -1, -1, true);
         }
 
         /**
@@ -364,17 +379,17 @@ namespace Onikiri.Progression
         {
             int blade = yodo != null ? yodo.TryTakeLegendary() : -1;
             if (blade >= 0)
-                return Result(GachaCurve.Outcome.LegendaryBlade, 0, -1, blade, false, false);
+                return Result(GachaCurve.Outcome.LegendaryBlade, 0, -1, blade, false);
 
             int shards = LegendaryYodoCurve.ShardsPerOverflow;
             if (yodo != null) yodo.GrantShards(shards);
 
-            return Result(GachaCurve.Outcome.LegendaryBlade, shards, -1, -1, false, true);
+            return Result(GachaCurve.Outcome.LegendaryBlade, shards, -1, -1, true);
         }
 
         // ---------------------------------------------------------------- 세이브
 
-        public int CollectPity() { return pityCounter; }
+        public long CollectSummonXp() { return summonXp; }
         public int CollectTotalPulls() { return totalPulls; }
         public long CollectFreePullDay() { return lastFreePullDayTicks; }
 
@@ -386,11 +401,10 @@ namespace Onikiri.Progression
          * 순간 무료 뽑기 하나를 들고 있다 - "새 시스템이 열리는 것"이고
          * 소급이 아니다(v7 -> v8 업적과 같은 결).
          */
-        public void Restore(int savedPity, int savedTotal, long savedFreeDay)
+        public void Restore(long savedSummonXp, int savedTotal, long savedFreeDay)
         {
-            // 손상된 세이브가 천장을 넘겨 오면 다음 한 번이 무조건 정수가
-            // 된다. 잘라 두는 것은 GemWallet.SetBalance와 같은 규칙이다
-            pityCounter = Mathf.Clamp(savedPity, 0, GachaCurve.PityPulls - 1);
+            // 음수만 막는다 - 위쪽은 상한이 없다(SummonLevelCurve 머리 주석)
+            summonXp = savedSummonXp < 0L ? 0L : savedSummonXp;
             totalPulls = Mathf.Max(0, savedTotal);
             lastFreePullDayTicks = savedFreeDay < 0L ? 0L : savedFreeDay;
 
@@ -412,16 +426,17 @@ namespace Onikiri.Progression
             Raise();
         }
 
-        /** 천장 직전까지 카운터를 민다. 천장 연출을 30번 안 돌리고 보는 경로 */
-        public void DebugPushToPity()
+        /** 다음 레벨 직전까지 경험치를 민다. 레벨업을 수십 번 안 돌리고 보는 경로 */
+        public void DebugPushToLevelUp()
         {
-            pityCounter = GachaCurve.PityPulls - 1;
+            summonXp += SummonLevelCurve.XpToNext(SummonLevel)
+                      - SummonLevelCurve.XpIntoLevel(summonXp) - 1L;
             Raise();
         }
 
         public void DebugReset()
         {
-            pityCounter = 0;
+            summonXp = 0L;
             totalPulls = 0;
             lastFreePullDayTicks = 0L;
             Raise();

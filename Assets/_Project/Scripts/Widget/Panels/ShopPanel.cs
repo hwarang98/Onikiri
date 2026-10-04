@@ -25,7 +25,7 @@ namespace Onikiri.UI
      *
      * ## 화면이 말하는 것
      *
-     *   뽑기 배너   확률표(공개) · 천장까지 남은 횟수 · 단연/10연
+     *   뽑기 배너   확률표(공개) · 소환 레벨과 다음 레벨까지 · 단연/10연
      *   일일 무료   오늘 남았는가 · 아니면 다음 04:00까지
      *   준비 중     광고 · 보석 팩. **가격은 적고 버튼은 죽인다**
      *
@@ -48,8 +48,8 @@ namespace Onikiri.UI
         [SerializeField] private TMP_Text tenCost;
         [SerializeField] private Image tenBackground;
 
-        [Tooltip("천장까지 남은 횟수 + 누적")]
-        [SerializeField] private TMP_Text pityLabel;
+        [Tooltip("소환 레벨 · 이번 레벨의 경험치 / 다음 레벨 (68단계)")]
+        [SerializeField] private TMP_Text summonLevelLabel;
 
         [Header("일일 무료")]
         [SerializeField] private Button freeButton;
@@ -64,7 +64,7 @@ namespace Onikiri.UI
          * 필드를 따로 두고 그리는 함수를 공유하지 않은 이유는 두 시스템이
          * 다른 타입이기 때문이다(GachaSystem / SkillGachaSystem). 인터페이스를
          * 하나 세워 묶을 수도 있지만, 그러면 "두 배너가 같은 물건"이라는
-         * 말을 코드가 하게 된다 - 천장도 무료 쿨도 재고도 갈려 있는 것이
+         * 말을 코드가 하게 된다 - 소환 레벨도 무료 쿨도 재고도 갈려 있는 것이
          * 이 스텝의 설계이므로(SkillGachaSystem 머리 주석) 화면도 그것을
          * 두 벌로 적는 편이 정직하다.
          */
@@ -78,8 +78,8 @@ namespace Onikiri.UI
         [SerializeField] private TMP_Text skillTenCost;
         [SerializeField] private Image skillTenBackground;
 
-        [Tooltip("천장까지 남은 횟수 + 누적. 재고가 없으면 그 사실을 적는다")]
-        [SerializeField] private TMP_Text skillPityLabel;
+        [Tooltip("소환 레벨 · 경험치 / 다음 레벨. 재고가 없으면 그 사실을 적는다")]
+        [SerializeField] private TMP_Text skillSummonLevelLabel;
 
         [Header("오의 일일 무료")]
         [SerializeField] private Button skillFreeButton;
@@ -232,14 +232,17 @@ namespace Onikiri.UI
          */
         private void ShowSkillResults(System.Collections.Generic.List<SkillGachaSystem.PullResult> list)
         {
-            if (popup != null) popup.Show(list, skills);
+            // 같은 묶음에서 오른 레벨을 제목 줄에 붙인다(68단계) - 이벤트 순서상
+            // SummonLevelUp이 Pulled보다 먼저 와서 이 값이 이미 서 있다
+            if (popup != null)
+                popup.Show(list, skills, skillSystem != null ? skillSystem.LastBatchLevelUp : 0);
         }
 
         private void ShowResults(System.Collections.Generic.List<GachaSystem.PullResult> list)
         {
             // 목록은 GachaSystem이 돌려 쓰는 것이다 - 여기서 보관하지 않고
             // 그 자리에서 그린다(GachaSystem.results 주석)
-            if (popup != null) popup.Show(list, yodo);
+            if (popup != null) popup.Show(list, yodo, system != null ? system.LastBatchLevelUp : 0);
         }
 
         // ---------------------------------------------------------------- 표시
@@ -251,25 +254,21 @@ namespace Onikiri.UI
             DrawPullButton(singleButton, singleBackground, singleCost, 1, unlocked);
             DrawPullButton(tenButton, tenBackground, tenCost, GachaCurve.TenPullCount, unlocked);
 
-            if (pityLabel != null)
+            if (summonLevelLabel != null)
             {
                 if (!unlocked)
                 {
-                    pityLabel.text = GachaCurve.UnlockStage + "스테이지부터";
-                    pityLabel.color = unaffordableColor;
+                    summonLevelLabel.text = GachaCurve.UnlockStage + "스테이지부터";
+                    summonLevelLabel.color = unaffordableColor;
                 }
                 else
                 {
                     // 문구의 출처는 곡선이다 - 빌더가 초기값을 적고 여기가
                     // 매번 다시 적는데, 두 곳에 따로 쓰면 씬을 연 순간과 첫
-                    // 갱신 사이에 문장이 바뀐다(GachaCurve.PityText 주석)
-                    int left = system.PullsUntilPity;
-                    pityLabel.text = GachaCurve.PityText(left, system.TotalPulls);
-
-                    // 천장이 코앞이면 금색이다. 다른 줄이 전부 "지금 얼마인가"인데
-                    // 이 줄만 **다음에 무엇이 오는가**이고, 마지막 몇 회에서
-                    // 그것이 지금의 사실이 된다
-                    pityLabel.color = left <= GachaCurve.TenPullCount ? goldColor : unaffordableColor;
+                    // 갱신 사이에 문장이 바뀐다(SummonLevelCurve.LevelText 주석).
+                    // 게이지 바·레벨업 연출은 69단계 몫이다
+                    summonLevelLabel.text = SummonLevelCurve.LevelTextFor(system.SummonXp);
+                    summonLevelLabel.color = NearLevelUp(system.SummonXp) ? goldColor : unaffordableColor;
                 }
             }
 
@@ -295,44 +294,50 @@ namespace Onikiri.UI
             DrawSkillButton(skillTenButton, skillTenBackground, skillTenCost,
                             SkillGachaCurve.TenPullCount);
 
-            if (skillPityLabel != null)
+            if (skillSummonLevelLabel != null)
             {
                 if (!unlocked)
                 {
-                    skillPityLabel.text = SkillGachaCurve.UnlockStage + "스테이지부터";
-                    skillPityLabel.color = unaffordableColor;
+                    skillSummonLevelLabel.text = SkillGachaCurve.UnlockStage + "스테이지부터";
+                    skillSummonLevelLabel.color = unaffordableColor;
                 }
                 else if (!skillSystem.CanBuy)
                 {
                     // 배너는 섰는데 지갑이 아직이다. **무료로는 돌아간다** -
                     // 그 사실을 안 적으면 플레이어가 배너를 잠긴 것으로 읽는다
-                    skillPityLabel.text = "보석 구매는 " + SkillGachaCurve.PullUnlockStage
+                    skillSummonLevelLabel.text = "보석 구매는 " + SkillGachaCurve.PullUnlockStage
                                         + "스테이지부터  ·  무료는 지금부터";
-                    skillPityLabel.color = unaffordableColor;
+                    skillSummonLevelLabel.color = unaffordableColor;
                 }
                 else if (!stock)
                 {
-                    skillPityLabel.text = SoldOutText;
-                    skillPityLabel.color = unaffordableColor;
+                    skillSummonLevelLabel.text = SoldOutText;
+                    skillSummonLevelLabel.color = unaffordableColor;
                 }
                 else
                 {
-                    // **두 게이지를 함께 적는다.** 하나만 적으면 안 적은 쪽이
-                    // 없는 규칙이 된다(SkillGachaCurve.PityText 주석)
-                    int left = skillSystem.PullsUntilPity;
-                    int awakenLeft = skillSystem.PullsUntilAwakenPity;
-
-                    skillPityLabel.text = SkillGachaCurve.PityText(left, awakenLeft);
-
-                    // 둘 중 **더 가까운 쪽**이 색을 정한다. ★5가 코앞이면
-                    // ★4가 아직 멀어도 그 줄은 금빛이어야 한다
-                    int nearest = left < awakenLeft ? left : awakenLeft;
-                    skillPityLabel.color = nearest <= SkillGachaCurve.TenPullCount
+                    // 요도 배너와 같은 줄이다 - 경험치만 이 배너의 것이다
+                    skillSummonLevelLabel.text = SummonLevelCurve.LevelTextFor(skillSystem.SummonXp);
+                    skillSummonLevelLabel.color = NearLevelUp(skillSystem.SummonXp)
                         ? goldColor : unaffordableColor;
                 }
             }
 
             RefreshSkillFree();
+        }
+
+        /**
+         * @brief 다음 레벨이 10연 하나 안에 있는가. 그러면 줄이 금빛이다.
+         *
+         * 47단계에는 "천장이 코앞이면 금색"이었다. 다른 줄이 전부 "지금
+         * 얼마인가"인데 이 줄만 **다음에 무엇이 오는가**이고, 그 규칙을 레벨업에
+         * 그대로 옮겼다.
+         */
+        private static bool NearLevelUp(long summonXp)
+        {
+            int level = SummonLevelCurve.LevelFor(summonXp);
+            long left = SummonLevelCurve.XpToNext(level) - SummonLevelCurve.XpIntoLevel(summonXp);
+            return left <= GachaCurve.TenPullCount;
         }
 
         /**

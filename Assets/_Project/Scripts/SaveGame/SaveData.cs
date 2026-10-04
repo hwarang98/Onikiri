@@ -45,10 +45,13 @@ namespace Onikiri.Progression
          *      "재화로 산 티어"에서 "귀문을 돌파해 보유한 티어"로 바뀌고,
          *      그 변환이 마이그레이션을 필요로 한다
          *   22 66단계. 성장탭 세 축(경험치·골드·방치) 포인트 · 보석 초기화 횟수
+         *   23 68단계. 천장 제거 · 배너별 소환 경험치(요도 / 오의). 천장 카운터
+         *      셋(gachaPity · skillGachaPity · skillGachaAwakenPity)이 사라지고
+         *      두 경험치가 누적 뽑기 수로 채워진다
          *
          * 모르는(더 높은) 버전이면 새 게임으로 시작한다. 낮은 버전은 Migrate가 올린다.
          */
-        public const int CurrentVersion = 22;
+        public const int CurrentVersion = 23;
 
         public int version = CurrentVersion;
 
@@ -322,17 +325,12 @@ namespace Onikiri.Progression
         // ---------------------------------------------------------------- 46단계
 
         /**
-         * @brief 마지막 혼 정수 뒤로 돌린 뽑기 수. **천장의 카운터다.**
+         * @brief 지금까지 돌린 총 횟수. 상점 표시용.
          *
-         * 오의 쿨다운·영체 순번은 저장하지 않는데 이것은 저장한다. 기준이
-         * 다르기 때문이다 - 저쪽은 **런타임이 다시 만들 수 있는 값**이고
-         * 이쪽은 **플레이어가 지불한 것**이다. 29회에서 껐다 켰더니 0으로
-         * 돌아가면 그것은 리셋이 아니라 몰수이고, 세이브가 지켜야 할 것의
-         * 정의에 정확히 들어맞는다.
+         * 68단계(v22 -> v23)에 한 번 밸런스에 쓰였다 - 소환 경험치(yodoSummonXp)의
+         * 출발값이 이 값이다. 그 뒤로 둘은 같이 자라지만 뜻이 다르다: 이쪽은
+         * 기록이고 저쪽은 성장 축이다.
          */
-        public int gachaPity;
-
-        /** 지금까지 돌린 총 횟수. 상점 표시용 - 밸런스에는 쓰이지 않는다 */
         public int gachaTotalPulls;
 
         /**
@@ -403,15 +401,6 @@ namespace Onikiri.Progression
          */
         public long skillXp;
 
-        /**
-         * @brief 오의 뽑기의 천장 카운터. **요도 뽑기(gachaPity)와 다른 값이다.**
-         *
-         * 한 칸에 접지 않는 이유는 두 배너가 다른 상품이기 때문이다
-         * (SkillGachaSystem 머리 주석) - 합치면 요도를 스물아홉 번 돌린
-         * 사람이 오의 해금을 한 번에 받는다.
-         */
-        public int skillGachaPity;
-
         public int skillGachaTotalPulls;
 
         /** 마지막으로 오의 무료 뽑기를 쓴 퀘스트일. 요도 쪽과 같은 형식·같은 경계 */
@@ -420,22 +409,27 @@ namespace Onikiri.Progression
         // ---------------------------------------------------------------- v20
 
         /**
-         * @brief 마지막 ★5 뒤로 돌린 뽑기 수 (15종 재설계).
-         *
-         * `skillGachaPity`와 한 칸에 접지 않는 이유가 두 배너를 안 접은 이유와
-         * 같다 - **서로 다른 것을 센다.** 소프트는 "★4 이상"을 재고 이쪽은
-         * "★5만"을 재므로, 영웅을 아무리 받아도 이 값은 안 줄어든다.
-         */
-        public int skillGachaAwakenPity;
-
-        /**
          * @brief st14 온보딩 무료 10연을 받았는가.
          *
          * v19에서 오면 **false**다. 그래서 기존 플레이어 전원이 업데이트 후
-         * 한 번 받는다 - 하드 천장을 0에서 시작시키는 것에 대한 보상이고,
+         * 한 번 받는다 - v20의 하드 천장을 0에서 시작시키는 것에 대한 보상이었고,
          * 버그가 아니라 의도한 선물이다(Migrate 주석).
          */
         public bool skillGachaIntroClaimed;
+
+        // ---------------------------------------------------------------- v23 (68단계)
+
+        /**
+         * @brief 요도 배너의 소환 경험치 = 그 배너의 누적 뽑기 수.
+         *
+         * 천장 카운터(옛 gachaPity)가 서던 자리다. 레벨은 저장하지 않는다 -
+         * 이 값에서 유도되고(SummonLevelCurve.LevelFor), 둘을 다 적으면 언젠가
+         * 갈린다. long인 것은 상한이 없기 때문이다.
+         */
+        public long yodoSummonXp;
+
+        /** 오의 배너의 소환 경험치. 요도 쪽과 **다른 값이다** - 두 배너는 다른 상품이다 */
+        public long skillSummonXp;
 
         /**
          * @brief 온보딩으로 받은 오의를 **처음 장착했는가.**
@@ -768,8 +762,8 @@ namespace Onikiri.Progression
 
             if (data.version == 14)
             {
-                // v14에는 뽑기가 없었다. 천장 카운터 0 · 누적 0 · 무료 뽑기
-                // **미사용**으로 명시적으로 적어 넣는다.
+                // v14에는 뽑기가 없었다. 누적 0 · 무료 뽑기 **미사용**으로
+                // 명시적으로 적어 넣는다(그때의 천장 카운터 칸은 v23에 사라졌다).
                 //
                 // **이 마이그레이션은 밸런스를 바꾸지 않는다.** 뽑기는
                 // 요도의 재료만 주고, 한 번도 안 돌린 상태의 기여가 정확히
@@ -778,12 +772,11 @@ namespace Onikiri.Progression
                 //
                 // **소급하지 않는 것도 같다.** 이미 st200인 플레이어에게
                 // 지나온 날수만큼 무료 뽑기를 쌓아주면 접속하자마자 200회가
-                // 돌아가고, 그것은 천장(GachaCurve.PityPulls)을 여섯 번
-                // 지나는 양이라 요도가 통째로 리드 상한까지 올라간다.
+                // 돌아가고, 그것은 그때의 천장(30회)을 여섯 번 지나는 양이라
+                // 요도가 통째로 리드 상한까지 올라간다.
                 // 조건(st41)은 이미 넘겼으므로 상점은 열린 채로 시작하고
                 // **오늘치 무료 뽑기 하나**를 곧바로 쓸 수 있다 - v7 -> v8
                 // 업적이 "곧바로 받을 수 있는 상태로 열린다"였던 것과 같은 결이다.
-                data.gachaPity = 0;
                 data.gachaTotalPulls = 0;
                 data.gachaFreePullDayTicks = 0L;
 
@@ -806,7 +799,7 @@ namespace Onikiri.Progression
                 // 차오르고, 그것은 이 스텝이 판 재고를 통째로 지우는 일이다.
                 // 지나온 뽑기는 그때의 표로 이미 값을 받았다.
                 //
-                // 천장 카운터(gachaPity)는 **그대로 둔다.** 지키는 대상이
+                // 그때의 천장 카운터는 **그대로 뒀다**(v23에 사라졌다). 지키는 대상이
                 // ★3에서 ★4+로 승격했지만 카운터의 뜻("마지막 보장 뒤로
                 // 몇 번 돌렸는가")은 같고, 0으로 되돌리면 29회에서 승격을
                 // 맞은 플레이어의 지불이 몰수된다 - v14 -> v15가 그 값을
@@ -854,7 +847,7 @@ namespace Onikiri.Progression
 
             if (data.version == 17)
             {
-                // v17에는 오의 뽑기가 없었다. 천장 0 · 누적 0 · 무료 뽑기
+                // v17에는 오의 뽑기가 없었다. 누적 0 · 무료 뽑기
                 // **미사용** · XP 0으로 명시적으로 적어 넣는다.
                 //
                 // **이 마이그레이션은 밸런스를 바꾸지 않는다.** XP 0의 기여가
@@ -866,7 +859,6 @@ namespace Onikiri.Progression
                 // 접속하자마자 천장을 여러 번 지나 오의 둘이 통째로 열리고,
                 // 그것은 이 스텝이 판 재고를 지우는 일이다.
                 data.skillXp = 0L;
-                data.skillGachaPity = 0;
                 data.skillGachaTotalPulls = 0;
                 data.skillGachaFreePullDayTicks = 0L;
 
@@ -927,7 +919,7 @@ namespace Onikiri.Progression
             {
                 // ---- 세 칸 다 기본값이다. **소급하지 않는다.**
                 //
-                // `skillGachaAwakenPity`를 누적 뽑기 수(min(total, 99))로
+                // (v20의 ★5 하드 천장 칸은 v23에 사라졌다.) 그 칸을 누적 뽑기 수(min(total, 99))로
                 // 소급하고 싶어지는데, 그 방식은 아무것도 인정하지 못한다.
                 // 하드 천장이 재는 것은 **마지막 ★5 이후**의 횟수인데
                 // `skillGachaTotalPulls`는 누적일 뿐이다 - 200회를 돌며 ★5를
@@ -937,7 +929,6 @@ namespace Onikiri.Progression
                 //
                 // 게다가 v19의 ★5는 개안이라 **해금 이력이 저장되지 않았다.**
                 // 복원할 원본이 세이브 안에 없다.
-                data.skillGachaAwakenPity = 0;
 
                 // ---- 그 대신 **전원에게 무료 10연을 준다.**
                 //
@@ -1017,6 +1008,25 @@ namespace Onikiri.Progression
                 data.idlePoints = 0;
                 data.statResetCount = 0;
                 data.version = 22;
+            }
+
+            if (data.version == 22)
+            {
+                /**
+                 * v22 -> v23 (68단계). **천장을 버리고, 뽑은 만큼 레벨을 준다.**
+                 *
+                 * 소환 경험치 = 그 배너의 누적 뽑기 수. 경험치의 정의가 "1회 = 1"
+                 * 이므로(SummonLevelCurve) 이것은 소급 보상이 아니라 **같은 값을
+                 * 새 이름으로 읽는 것**이다 - 이미 뽑은 사람이 0에서 다시 시작하면
+                 * 그것은 성장 축이 아니라 몰수다.
+                 *
+                 * 천장 카운터 셋은 버린다. JSON의 옛 칸은 필드가 없어져 읽히지
+                 * 않을 뿐이라 따로 지울 것이 없다. 멱등이다 - 두 번 돌려도 같은
+                 * 누적값에서 같은 경험치가 나온다.
+                 */
+                data.yodoSummonXp = data.gachaTotalPulls > 0 ? data.gachaTotalPulls : 0L;
+                data.skillSummonXp = data.skillGachaTotalPulls > 0 ? data.skillGachaTotalPulls : 0L;
+                data.version = 23;
             }
 
             data.version = CurrentVersion;

@@ -587,3 +587,8 @@ X
 체력 · 회복
 명중 · 회피
 MISS
+
+# 68단계 소환 레벨. 출처는 SummonLevelCurve.LevelText / LevelUpText - 런타임이 조립하는
+# 문구라 씬에는 Lv.1 줄 하나만 선다. "환"이 아틀라스에 없었다.
+소환 Lv.1  ·  0 / 20
+소환 Lv.2 달성

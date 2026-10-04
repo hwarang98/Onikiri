@@ -3,7 +3,7 @@ using System;
 namespace Onikiri.Progression
 {
     /**
-     * @brief 요괴 봉인 뽑기(가챠)의 확률표·비용·천장, 그리고 **가속 상한**.
+     * @brief 요괴 봉인 뽑기(가챠)의 확률표·비용·소환 레벨, 그리고 **가속 상한**.
      *
      * ## 이 뽑기는 혼을 팔지 않는다 - 파편을 판다
      *
@@ -63,9 +63,8 @@ namespace Onikiri.Progression
      * 않는다 - 등급은 **드라마의 층**이고 결과는 **보상의 층**이라 일대일일
      * 필요가 없다.
      *
-     * 그리고 천장이 승격했다. "혼 정수 확정"이 아니라 **"★4 이상 확정"**이다
-     * (PityPulls 주석) - 사다리가 생겼으므로 천장이 지키는 것도 사다리의
-     * 위쪽이어야 한다.
+     * 47단계에 "★4 이상 확정" 천장이 붙었고, **68단계에 그 천장을 통째로
+     * 걷어내고 소환 레벨로 바꿨다**(SummonLevelCurve) - 보장 대신 성장이다.
      */
     public static class GachaCurve
     {
@@ -114,9 +113,10 @@ namespace Onikiri.Progression
         /**
          * @brief 10연의 보석 값. 단연 열 번의 90%.
          *
-         * 할인이 있는 이유는 10연이 **천장을 향해 가는 단위**이기 때문이다
-         * (PityPulls = 30 = 10연 셋). 할인이 없으면 10연은 손가락을 아끼는
-         * 버튼일 뿐이고, 그러면 "세 번이면 확정"이라는 리듬이 화면에서 사라진다.
+         * 할인이 있는 이유는 10연이 **소환 레벨을 미는 단위**이기 때문이다 -
+         * 47단계에는 천장(10연 셋)을 향한 단위였고, 68단계부터는 레벨 하나가
+         * 초반 10연 두세 번이다(SummonLevelCurve.XpBase). 할인이 없으면 10연은
+         * 손가락을 아끼는 버튼일 뿐이다.
          */
         public const int TenPullCostGems = PullCostGems * TenPullCount * 9 / 10;
 
@@ -151,24 +151,6 @@ namespace Onikiri.Progression
          * 하나로만 말하면 색약에게 사다리가 통째로 사라지고, 그 판단은
          * 이 프로젝트가 게이지에서 이미 한 번 했다(38b - 그라데이션 금지).
          */
-        /**
-         * @brief 배너 아래 진행 줄. **빌더와 런타임이 같은 함수를 지난다.**
-         *
-         * 46단계에는 두 곳에 따로 적혀 있었고 우연히 같은 말이었다(둘 다
-         * "혼 정수 확정까지"). 47단계에 천장이 지키는 것이 ★4로 승격하면서
-         * 그 우연이 끝났다 - 한쪽만 고치면 씬을 연 순간과 첫 갱신 사이에
-         * 문장이 바뀌고, 그 증상은 "확률표가 잠깐 다른 말을 한다"다.
-         *
-         * 런타임에 두는 이유는 빌더가 런타임을 참조할 수 있고 그 반대는
-         * 아니기 때문이다(YodoSprites가 런타임 어셈블리에 사는 것과 같은
-         * 규칙).
-         */
-        public static string PityText(int left, int total)
-        {
-            return GradeNames[(int)Grade.Epic] + " 이상 확정까지 " + left
-                 + "회  ·  누적 " + total + "회";
-        }
-
         public static string StarsFor(Grade grade)
         {
             int filled = (int)grade + 1;
@@ -280,19 +262,20 @@ namespace Onikiri.Progression
         }
 
         /**
-         * @brief 0~1 난수를 결과로 옮긴다. **천장은 여기 없다.**
+         * @brief 0~1 난수를 결과로 옮긴다. **소환 레벨의 표를 지난다.**
          *
-         * 천장(PityPulls)은 카운터가 필요하므로 뽑는 쪽(GachaSystem)이
-         * 들고 있고, 이 함수는 순수한 표다 - 시뮬레이션이 기댓값을 쓰고
-         * 실제가 굴리는 두 경로가 **같은 표**를 지나야 한다는 44단계 규칙
-         * (YodoSpec.DropChance)의 연장이다.
+         * 68단계에 천장이 사라져 덮어쓰는 단계가 없다 - 굴린 값이 곧 결과다.
+         * 시뮬레이션이 기댓값으로 세는 것과 실제가 굴리는 것이 **같은 표**
+         * (SummonLevelCurve.ChancesAt)를 지나야 한다는 44단계 규칙
+         * (YodoSpec.DropChance)의 연장이다. Lv.1이면 Chances 그대로다.
          */
-        public static Outcome Roll(double value)
+        public static Outcome Roll(double value, int summonLevel)
         {
+            var chances = SummonLevelCurve.ChancesAt(summonLevel);
             double cumulative = 0d;
-            for (int i = 0; i < Chances.Length; i++)
+            for (int i = 0; i < chances.Length; i++)
             {
-                cumulative += Chances[i];
+                cumulative += chances[i];
                 if (value < cumulative) return (Outcome)i;
             }
             return Outcome.ShardSmall;
@@ -315,196 +298,94 @@ namespace Onikiri.Progression
         public static double LegendaryChance { get { return Chances[(int)Outcome.LegendaryBlade]; } }
 
         /**
-         * @brief ★4 이상이 나올 확률. **천장이 지키는 것이 이 값이다.**
+         * @brief 표(Lv.1)의 ★4 이상 확률. 47단계 천장이 지키던 값이다.
          *
-         * 46단계의 천장은 ★3(혼 정수)을 지켰다. 사다리가 생겼으므로 천장도
-         * 승격했다 - 아래 PityPulls 주석.
+         * 68단계에 천장이 사라졌고, 레벨 L의 값은 EpicOrBetterChanceAt이 준다.
          */
         public static double EpicOrBetterChance { get { return RarityChance + LegendaryChance; } }
 
-        // ---------------------------------------------------------------- 천장
+        // ---------------------------------------------------------------- 소환 레벨 (68단계)
 
         /**
-         * @brief 소프트 천장. 이 횟수 안에 **★4 이상**이 반드시 나온다.
+         * @brief 레벨 L의 회당 확률들. **천장이 없으므로 표 = 실효다.**
          *
-         * ## 무엇을 막는가 - 46단계에서 한 칸 올라갔다
-         *
-         * 파편은 매번 나오므로 이 게임의 뽑기에 꽝은 없다. 46단계에서 천장이
-         * 막은 것은 "혼 정수(★3)를 한 번도 못 보는 것"이었다. 사다리가
-         * 생긴 지금 그 자리는 **★4 이상**이다 - 천장이 지키는 것은 언제나
-         * "이 뽑기의 진짜 상품"이어야 하고, ★3은 이제 사다리의 한가운데이지
-         * 꼭대기가 아니다.
-         *
-         * 승격에는 대가가 없다. 30회 안에 ★4+를 보장하면 ★3도 자연 확률로
-         * 계속 나오므로(3.0%, 34회에 하나) 46단계의 플레이어가 잃는 것이
-         * 없다 - 오히려 같은 30회에 위쪽이 하나 더 붙는다.
-         *
-         * ## 30을 안 옮긴 이유, 그리고 기대 대기가 그대로인 이유
-         *
-         * 30은 10연 셋이다. 화면의 진행 표시가 "10연 세 번이면 확정"으로
-         * 읽히는 것이 요점이고, 그 리듬이 10연 할인(TenPullCostGems)과 같은
-         * 단위 위에 선다 - 사다리가 생겼다고 그 리듬을 옮길 이유는 없다.
-         *
-         * 그리고 표를 그렇게 잡았다. ★4+ 합이 2.9%라 천장을 접은 실제 대기가
-         * **20.2회**이고, 46단계의 ★3 대기(20.0회)와 사실상 같다. 천장이
-         * 지키는 대상만 한 칸 올라가고 **손에 잡히는 리듬은 그대로**인 것이
-         * 이 표의 설계다.
-         *
-         * ## f2p 바닥이 신성해서 두는 장치이기도 하다
-         *
-         * 일일 무료 뽑기는 하루 한 번이므로(FreePullsPerDay) 무과금에게 30회는
-         * 한 달이다. 천장이 없으면 그 한 달이 확률에 따라 두 달도 되고, 그
-         * 편차는 무과금에게 "이 시스템은 나를 위한 것이 아니다"로 읽힌다.
-         * 극단적 streak를 자르는 것이 곧 바닥을 지키는 일이다.
+         * 47단계에는 천장이 아래 등급을 눌러(SuppressedChance) 실효 확률이
+         * 표와 달랐고, 시뮬레이션과 화면이 그 눌린 값을 썼다. 68단계에
+         * 천장을 걷어내면서 그 차이가 사라졌다 - 실효가 곧 레벨 L의 표다
+         * (SummonLevelCurve.ChancesAt). 옛 천장 세계의 값(★4+ 1/20.22회,
+         * ★4 4.145%, ★3 2.937%)은 68단계 보고서 §4의 비교군으로만 남는다.
          */
-        public const int PityPulls = 30;
-
-        /**
-         * @brief 천장까지 몇 번 남았는가. counter는 마지막 ★4+ 뒤의 뽑기 수.
-         */
-        public static int PullsUntilPity(int counter)
+        public static double EssenceChanceAt(int level)
         {
-            int left = PityPulls - counter;
-            return left < 0 ? 0 : left;
+            return SummonLevelCurve.ChanceAt(level, (int)Outcome.SoulEssence);
         }
 
-        /**
-         * @brief 천장을 포함한 **★4 이상 하나당 실제 뽑기 수**.
-         *
-         * 표의 확률(2.9%)만 보면 34.5회지만 30회에서 잘리므로 실제는 그보다
-         * 짧다.
-         *
-         *   E[뽑기] = Σ(k=1..N-1) k·p·q^(k-1) + N·q^(N-1)
-         *
-         * 닫힌 식으로 접으면 (1 - q^N) / p 이다(기하분포의 절단 기댓값).
-         */
-        public static double ExpectedPullsPerEpic
+        /** 레벨 L의 회당 ★4(상위 혼) 확률 */
+        public static double RarityChanceAt(int level)
         {
-            get
-            {
-                double p = EpicOrBetterChance;
-                if (p <= 0d) return PityPulls;
-                double q = 1d - p;
-                return (1d - Math.Pow(q, PityPulls)) / p;
-            }
+            return SummonLevelCurve.ChanceAt(level, (int)Outcome.SoulRarity);
         }
 
-        /**
-         * @brief 천장이 표를 눌러 만드는 **실효 확률**들.
-         *
-         * ## 왜 표의 값을 그대로 못 쓰는가
-         *
-         * 천장이 터지는 뽑기는 그 회차의 굴림을 **덮어쓴다**. 30회째에
-         * 파편 소가 나왔어도 결과는 ★4이므로, 아래 등급들은 천장이 터지는
-         * 만큼(1/E) 실제로는 덜 나온다. 46단계에는 이 보정이 없었다 -
-         * 천장이 ★3을 줬고 ★3이 표의 마지막 줄이라, 덮어쓰이는 것이
-         * 파편뿐이고 그 차이가 밸런스에 안 닿았다.
-         *
-         * 지금은 ★3이 사다리 한가운데라 **덮어쓰이는 쪽**이다. 보정 없이
-         * 표의 3%를 쓰면 시뮬레이션이 요도 티어를 실제보다 2% 빨리 올리고,
-         * 그 2%가 심층 밴드에서 보정과 실제의 차로 남는다.
-         *
-         * ## 닫힌 식
-         *
-         * 갱신 주기(cycle)를 "★4+가 나올 때까지"로 잡으면 주기의 길이가
-         * E = ExpectedPullsPerEpic이고, 주기마다:
-         *
-         *   ★4+          정확히 1회      -> 회당 1/E
-         *   ★5 전설      c5·E 회         -> 회당 **정확히 c5** (아래 항등식)
-         *   ★4 영웅      나머지          -> 회당 1/E - c5
-         *   ★3 이하 i    (E-1)·c_i/q 회  -> 회당 (1 - 1/E)·c_i/q
-         *
-         * 전설 몫이 표의 값과 정확히 같은 것은 우연이 아니다. 천장이
-         * 덮어쓰는 것은 "★4+가 아닌 굴림"뿐이라 전설은 한 번도 안 잡아먹히고,
-         * 그 사실이 (1-q^(N-1))/p + q^(N-1) = (1-q^N)/p 라는 항등식으로
-         * 떨어진다. **천장은 전설을 훔치지 않는다** - 검사가 그것을 못 박는다
-         * (GachaTests.Pity_NeverStealsALegendary).
-         */
-        public static double PityShare { get { return 1d / ExpectedPullsPerEpic; } }
-
-        /** 천장에 눌린 뒤의 회당 ★3 확률. 시뮬레이션과 화면이 이것을 쓴다 */
-        public static double EffectiveEssenceChance
+        /** 레벨 L의 회당 ★5(전설) 확률 */
+        public static double LegendaryChanceAt(int level)
         {
-            get { return SuppressedChance(EssenceChance); }
+            return SummonLevelCurve.ChanceAt(level, (int)Outcome.LegendaryBlade);
         }
 
-        /** 회당 ★4(영웅) 확률. 천장이 밀어 올린 값이라 표보다 크다 */
-        public static double EffectiveRarityChance
+        /** 레벨 L의 회당 ★4 이상 확률 */
+        public static double EpicOrBetterChanceAt(int level)
         {
-            get
-            {
-                double value = PityShare - LegendaryChance;
-                return value < 0d ? 0d : value;
-            }
+            return RarityChanceAt(level) + LegendaryChanceAt(level);
         }
 
-        /** 회당 ★5 확률. **표와 정확히 같다** - 위 주석의 항등식 */
-        public static double EffectiveLegendaryChance { get { return LegendaryChance; } }
-
-        /** ★3 이하 한 줄이 천장에 눌린 뒤의 회당 확률 */
-        private static double SuppressedChance(double raw)
+        /** 레벨 L에서 ★4 이상 하나당 기대 뽑기 수 (기하분포 1/p) */
+        public static double ExpectedPullsPerEpic(int level)
         {
-            double q = 1d - EpicOrBetterChance;
-            if (q <= 0d) return 0d;
-            return (1d - PityShare) * raw / q;
+            return PullsPer(EpicOrBetterChanceAt(level));
         }
 
-        /**
-         * @brief 실효 ★3 하나당 뽑기 수. 시뮬레이션의 정수 주기다.
-         *
-         * 46단계에는 이 이름이 "천장이 접힌 ★3 대기"였고 지금은 "천장이
-         * **누른** ★3 대기"다 - 천장이 ★4로 옮겨 갔으므로 ★3에는 더 이상
-         * 보장이 없고, 대신 눌림만 남는다.
-         */
-        public static double ExpectedPullsPerEssence
+        /** 레벨 L에서 ★3 하나당 기대 뽑기 수 */
+        public static double ExpectedPullsPerEssence(int level)
         {
-            get
-            {
-                double p = EffectiveEssenceChance;
-                return p > 0d ? 1d / p : double.PositiveInfinity;
-            }
+            return PullsPer(EssenceChanceAt(level));
         }
 
-        /** 실효 ★4 하나당 뽑기 수 */
-        public static double ExpectedPullsPerRarity
+        /** 레벨 L에서 ★4 하나당 기대 뽑기 수 */
+        public static double ExpectedPullsPerRarity(int level)
         {
-            get
-            {
-                double p = EffectiveRarityChance;
-                return p > 0d ? 1d / p : double.PositiveInfinity;
-            }
+            return PullsPer(RarityChanceAt(level));
         }
 
-        /** 실효 ★5 하나당 뽑기 수 */
-        public static double ExpectedPullsPerLegendary
+        /** 레벨 L에서 ★5 하나당 기대 뽑기 수 */
+        public static double ExpectedPullsPerLegendary(int level)
         {
-            get
-            {
-                double p = EffectiveLegendaryChance;
-                return p > 0d ? 1d / p : double.PositiveInfinity;
-            }
+            return PullsPer(LegendaryChanceAt(level));
         }
 
-        /** 표에 적힌 그대로의 기대 파편. 천장 보정 전이다 - 보고와 검사가 쓴다 */
+        private static double PullsPer(double chance)
+        {
+            return chance > 0d ? 1d / chance : double.PositiveInfinity;
+        }
+
+        /** 표(Lv.1)에 적힌 그대로의 기대 파편. 보고와 검사가 쓴다 */
         public static double TableShardsPerPull
         {
-            get
-            {
-                double total = 0d;
-                for (int i = 0; i < Chances.Length; i++) total += Chances[i] * ShardsOf[i];
-                return total;
-            }
+            get { return ExpectedShardsPerPull(1); }
         }
 
         /**
-         * @brief 한 번의 뽑기가 내는 기대 파편. **천장에 눌린 값이다.**
+         * @brief 레벨 L에서 한 번의 뽑기가 내는 기대 파편.
          *
          * 위쪽 세 등급이 넘쳐 파편이 되는 몫은 여기 없다 - 그것은 요도의
-         * 상태에 달린 값이라 표가 알 수 없다.
+         * 상태에 달린 값이라 표가 알 수 없다. 레벨이 오르면 파편 등급의
+         * 몫이 줄어 이 값도 준다 - 위쪽 등급으로 옮겨 간 만큼이다.
          */
-        public static double ExpectedShardsPerPull
+        public static double ExpectedShardsPerPull(int level)
         {
-            get { return SuppressedChance(TableShardsPerPull); }
+            var chances = SummonLevelCurve.ChancesAt(level);
+            double total = 0d;
+            for (int i = 0; i < chances.Length; i++) total += chances[i] * ShardsOf[i];
+            return total;
         }
 
         // ---------------------------------------------------------------- 가속 상한
@@ -725,8 +606,8 @@ namespace Onikiri.Progression
          *
          * 그래서 이 게임의 무과금은 **뽑기에 보석을 쓰지 않는 것이 정답**이고
          * (화면이 그것을 말리지는 않는다 - 선택은 플레이어의 것이다), 대신
-         * 무료 뽑기로 트리클을 받는다. 하루 한 번은 한 달에 30회, 곧 천장
-         * (PityPulls) 하나다.
+         * 무료 뽑기로 트리클을 받는다. 하루 한 번은 한 달에 30회이고, 68단계
+         * 부터는 그 30회가 소환 경험치로도 남는다(SummonLevelCurve).
          *
          * 시뮬레이션에는 이 트리클이 들어가지 않는다 - 거기에는 달력이 없다
          * (44단계가 일일 퀘스트 보석을 뺀 것과 같은 이유). 그래서 보고되는
