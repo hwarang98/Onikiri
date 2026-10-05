@@ -66,6 +66,16 @@ namespace Onikiri.UI
         /** 그리드 위 한 줄. 합계 + ★3 이상 개수, 공개가 끝나면 레벨업 꼬리가 붙는다 */
         [SerializeField] private TMP_Text titleLabel;
 
+        /**
+         * 제목이 한 줄 폭을 넘을 때 내려 쓰는 캡션 글꼴(33) - 70단계. 최장형
+         * "파편 278 · 희귀 1 · 영웅 2 · 전설 1 · 소환 Lv.8 달성"이 44pt로 1037px라
+         * 레벨 · 개수가 두 자리가 되면 넘친다(실기). 비면 내리지 않는다
+         */
+        [SerializeField] private TMP_FontAsset titleCaptionFont;
+
+        /** 판 자체(딤)의 버튼. 열리는 중에 누르면 남은 타일을 전부 연다 - 70단계 */
+        [SerializeField] private Button overlayButton;
+
         [SerializeField] private RectTransform grid;
         [SerializeField] private Tile[] tiles = new Tile[0];
 
@@ -135,6 +145,13 @@ namespace Onikiri.UI
 
         private int count;
         private string headline = string.Empty;
+
+        /** 열리는 동안의 제목. 합계를 먼저 쓰면 타일이 열리기 전에 결과를 말해 버린다(70단계 실기) */
+        public const string RevealingText = "소환 중...";
+
+        private List<string> pendingNotes;
+        private TMP_FontAsset titleFont;
+        private float titleFontSize;
         private int summonLevelUp;
         private int[] tileGrades;
         private Color[] tileColors;
@@ -320,17 +337,15 @@ namespace Onikiri.UI
                 tile.root.sizeDelta = new Vector2(tileSize, tileSize);
             }
 
-            for (int i = 0; i < notes.Length; i++)
-            {
-                if (notes[i] == null) continue;
-                notes[i].text = noteLines != null && i < noteLines.Count ? noteLines[i] : string.Empty;
-                notes[i].color = dimColor;
-            }
+            // 등급 하락 줄도 결과다 - 마지막 타일이 열린 뒤에 쓴다(70단계)
+            pendingNotes = noteLines;
+            WriteNotes(null);
 
-            // 꼬리(소환 Lv.n 달성)는 **마지막 타일이 열린 뒤에** 붙는다 (69단계 결정 4)
+            // 합계와 꼬리(소환 Lv.n 달성)는 **마지막 타일이 열린 뒤에** 쓴다
+            // (69단계 결정 4 + 70단계 - 그 전에 쓰면 타일이 열리기 전에 결과가 보인다)
             if (titleLabel != null)
             {
-                titleLabel.text = headline;
+                SetTitle(RevealingText);
                 titleLabel.color = textColor;
             }
 
@@ -371,7 +386,51 @@ namespace Onikiri.UI
         private void FinishReveal()
         {
             nextRevealAt = 0f;
-            if (titleLabel != null) titleLabel.text = WithLevelUp(headline, summonLevelUp);
+            if (titleLabel != null) SetTitle(WithLevelUp(headline, summonLevelUp));
+            WriteNotes(pendingNotes);
+        }
+
+        private void WriteNotes(List<string> lines)
+        {
+            for (int i = 0; i < notes.Length; i++)
+            {
+                if (notes[i] == null) continue;
+                notes[i].text = lines != null && i < lines.Count ? lines[i] : string.Empty;
+                notes[i].color = dimColor;
+            }
+        }
+
+        /**
+         * 제목 한 줄. 44pt로 폭을 넘으면 캡션(33)으로 내린다 - 래스터 글꼴이라
+         * 크기를 줄이지 않고 **구운 다른 배수의 아틀라스로 갈아 끼운다**(PixelFontSizes)
+         */
+        private void SetTitle(string text)
+        {
+            if (titleFont == null) { titleFont = titleLabel.font; titleFontSize = titleLabel.fontSize; }
+
+            titleLabel.font = titleFont;
+            titleLabel.fontSize = titleFontSize;
+            titleLabel.text = text;
+
+            if (titleCaptionFont == null) return;
+            float room = titleLabel.rectTransform.rect.width;
+            if (room > 0f && titleLabel.GetPreferredValues(text).x > room)
+            {
+                titleLabel.font = titleCaptionFont;
+                titleLabel.fontSize = Onikiri.UI.PixelFontSizes.GalmuriCaption;
+            }
+        }
+
+        /** 제목이 지금 캡션으로 내려가 있는가 (검사용) */
+        public bool TitleDemoted { get { return titleLabel != null && titleCaptionFont != null && titleLabel.font == titleCaptionFont; } }
+
+        /** 지금 제목 글자 (검사용) */
+        public string TitleText { get { return titleLabel != null ? titleLabel.text : null; } }
+
+        /** 딤 탭. 열리는 중이면 전부 연다 - 다 열린 뒤에는 아무 일도 안 한다(닫기는 확인 버튼) */
+        private void OnOverlay()
+        {
+            if (Revealing) RevealAll();
         }
 
         /**
@@ -463,6 +522,7 @@ namespace Onikiri.UI
         {
             if (confirmButton != null) confirmButton.onClick.AddListener(OnConfirm);
             if (repullButton != null) repullButton.onClick.AddListener(OnRepull);
+            if (overlayButton != null) overlayButton.onClick.AddListener(OnOverlay);
             if (visual != null && visual.activeSelf) Close();
         }
 
@@ -470,6 +530,7 @@ namespace Onikiri.UI
         {
             if (confirmButton != null) confirmButton.onClick.RemoveListener(OnConfirm);
             if (repullButton != null) repullButton.onClick.RemoveListener(OnRepull);
+            if (overlayButton != null) overlayButton.onClick.RemoveListener(OnOverlay);
         }
 
         /**

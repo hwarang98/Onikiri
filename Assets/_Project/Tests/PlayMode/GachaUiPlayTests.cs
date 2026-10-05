@@ -261,6 +261,69 @@ namespace Onikiri.Tests.PlayMode
                             view.barText.text, "연출 뒤 바 숫자가 곡선 값이 아니다");
         }
 
+        Button OverlayButton()
+        {
+            var button = typeof(GachaResultPopup).GetField("overlayButton", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(popup) as Button;
+            Assert.IsNotNull(button, "판 딤의 버튼 배선이 비었다 - Onikiri/Build Shop Panel");
+            return button;
+        }
+
+        /** 70단계: 판(딤)을 누르면 남은 타일이 전부 열린다 - 69단계 지시서의 "탭하면 전부 열림" */
+        [UnityTest]
+        public IEnumerator OverlayTap_RevealsEveryTile()
+        {
+            var view = Banner(false);
+            view.tenButton.onClick.Invoke();
+            yield return null;
+            Assert.IsTrue(popup.IsRevealing, "10연 직후인데 이미 다 열렸다 - 검사의 전제가 깨졌다");
+
+            OverlayButton().onClick.Invoke();
+
+            Assert.IsFalse(popup.IsRevealing, "딤을 눌렀는데 아직 열리는 중이다");
+            Assert.IsTrue(popup.IsOpen, "딤 탭이 판을 닫았다 - 닫기는 확인 버튼이다");
+
+            // 다 열린 뒤의 딤 탭은 아무 일도 안 한다
+            OverlayButton().onClick.Invoke();
+            Assert.IsTrue(popup.IsOpen);
+        }
+
+        /** 70단계: 열리는 동안 제목은 결과를 말하지 않는다 - 합계 · 등급 하락 줄은 다 열린 뒤에 */
+        [UnityTest]
+        public IEnumerator Title_StaysQuietUntilTheLastTile()
+        {
+            var view = Banner(false);
+            view.tenButton.onClick.Invoke();
+            yield return null;
+            Assert.IsTrue(popup.IsRevealing);
+
+            Assert.AreEqual(GachaResultPopup.RevealingText, popup.TitleText, "열리는 중인데 제목이 결과를 말한다");
+            var notes = (TMPro.TMP_Text[])typeof(GachaResultPopup)
+                .GetField("notes", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(popup);
+            foreach (var note in notes) Assert.IsEmpty(note.text, "열리는 중인데 등급 하락 줄이 먼저 떴다");
+
+            popup.RevealAll();
+            StringAssert.StartsWith("파편 ", popup.TitleText, "다 열렸는데 제목이 합계가 아니다");
+        }
+
+        /** 70단계: 최장형 제목(44pt로 1037px > 칸 936px, 실기)은 캡션으로 내려간다. 짧으면 44 그대로 */
+        [UnityTest]
+        public IEnumerator LongTitle_FallsBackToTheCaptionFont()
+        {
+            var view = Banner(false);
+            view.tenButton.onClick.Invoke();
+            yield return null;
+            popup.RevealAll();
+
+            var setTitle = typeof(GachaResultPopup).GetMethod("SetTitle", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            setTitle.Invoke(popup, new object[] { GachaResultPopup.WithLevelUp("파편 2400 · 희귀 10 · 영웅 10 · 전설 10", 88) });
+            Assert.IsTrue(popup.TitleDemoted, "최장형 제목이 44pt 그대로다 - 칸을 넘친다");
+
+            setTitle.Invoke(popup, new object[] { "파편 60" });
+            Assert.IsFalse(popup.TitleDemoted, "짧은 제목까지 캡션으로 내려갔다");
+        }
+
         /** 확률 팝업의 표 = 그 배너의 지금 레벨 곡선 - Lv.1 표가 아니다 */
         [UnityTest]
         public IEnumerator RatePopup_ShowsTheCurrentLevelTable()

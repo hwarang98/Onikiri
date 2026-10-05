@@ -172,6 +172,19 @@ namespace Onikiri.UI
 
         [SerializeField] private float labelFontSize = 33f;
 
+        /**
+         * 글자(MISS · 회피)를 숫자 기준점에서 띄우는 거리(캔버스 단위, 위쪽) - 70단계.
+         * 같은 피격점에서 타격 숫자와 빗나감이 같이 뜨면 "367,8MISS,736"처럼 겹쳤다(실기).
+         * 숫자와 글자는 같은 속도로 떠오르므로 출발점만 벌려 두면 끝까지 떨어져 있다
+         */
+        [SerializeField] private Vector2 labelOffset = new Vector2(0f, LabelRise);
+
+        /** 데미지 숫자(Thaleah 32)의 두 줄 높이 - 치명타 숫자(x2)의 윗선까지 비켜 선다 */
+        public const float LabelRise = 64f;
+
+        /** 글자의 기준점 = 숫자의 기준점 + 이 값 (PlayMode 검사가 읽는다) */
+        public Vector2 LabelOffset { get { return labelOffset; } }
+
         [Tooltip("빗나감 색. 회색 - 숫자보다 눈에 덜 걸려야 한다(피해가 아니다)")]
         [SerializeField] private Color missColor = new Color32(0x9A, 0x94, 0xA6, 0xFF);
 
@@ -222,7 +235,7 @@ namespace Onikiri.UI
                 return;
 
             var popup = pool.Get();
-            popup.Play(text, anchored, color, labelFontSize, BigDouble.Zero, null, false, Release);
+            popup.Play(text, anchored + labelOffset, color, labelFontSize, BigDouble.Zero, null, false, Release);
             popup.UseFont(labelFont);
         }
 

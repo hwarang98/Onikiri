@@ -2096,6 +2096,10 @@ namespace Onikiri.EditorTools
             StretchFull((RectTransform)root.transform);
             parts.Root = root;
 
+            // 팝업 층위(20). 66단계에는 이 줄이 없어 바탕(0)에 그려졌고, 층위 10인
+            // 가이드 카드 · EXP 띠가 본문 위에 올라왔다(70단계 실기, PopupLayerAudit)
+            BattleContentBuilder.RaiseToLayer(root.transform, Onikiri.Core.DisplayConfig.SortingPopup, true);
+
             // 딤은 누르면 닫힌다(PopupPanel과 같은 규칙) - 바깥을 누르는 것이
             // 손가락 화면의 취소다
             var dim = new GameObject("Dim", typeof(RectTransform));

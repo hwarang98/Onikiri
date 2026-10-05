@@ -113,6 +113,39 @@ namespace Onikiri.Tests.PlayMode
             Assert.AreEqual(Onikiri.UI.DamageNumberSpawner.MissText, numbers.LastLabel, "MISS가 뜨지 않았다");
         }
 
+        /**
+         * 70단계 실기: MISS가 같은 피격점의 데미지 숫자 위에 겹쳤다("367,8MISS,736").
+         * 글자(MISS · 회피)는 숫자보다 LabelRise 위에서 출발한다 - 둘은 같은 속도로 떠오른다
+         */
+        [UnityTest]
+        public IEnumerator MissLabel_StartsAboveTheDamageNumber()
+        {
+            Assert.GreaterOrEqual(numbers.LabelOffset.y, Onikiri.UI.DamageNumberSpawner.LabelRise - 0.5f,
+                                  "글자 오프셋이 씬에서 줄어 있다");
+
+            var at = dummy.transform.position;
+            numbers.ShowSkill(BigDouble.FromDouble(367836736d), at, Color.white, 1);
+            numbers.ShowMiss(at);
+
+            RectTransform miss = null, number = null;
+            foreach (var popup in Object.FindObjectsByType<Onikiri.UI.DamageNumber>(FindObjectsSortMode.None))
+            {
+                var text = popup.GetComponent<TMPro.TMP_Text>();
+                if (text == null) text = popup.GetComponentInChildren<TMPro.TMP_Text>();
+                if (text == null) continue;
+                if (text.text == Onikiri.UI.DamageNumberSpawner.MissText) miss = (RectTransform)popup.transform;
+                else if (text.text == NumberFormatter.FormatFull(BigDouble.FromDouble(367836736d)))
+                    number = (RectTransform)popup.transform;
+            }
+            Assert.IsNotNull(miss, "MISS가 뜨지 않았다");
+            Assert.IsNotNull(number, "데미지 숫자가 뜨지 않았다");
+
+            // 같은 프레임 - 아직 떠오르지 않았다
+            Assert.AreEqual(numbers.LabelOffset.y, miss.anchoredPosition.y - number.anchoredPosition.y, 0.5f,
+                            "MISS가 숫자와 같은 자리에서 출발했다");
+            yield return null;
+        }
+
         /** 확정 5: 영체(출처 Special)는 빗나가지 않는다 */
         [UnityTest]
         public IEnumerator Spirit_NeverMisses()
