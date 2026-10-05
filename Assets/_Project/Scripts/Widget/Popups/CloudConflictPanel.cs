@@ -173,7 +173,7 @@ namespace Onikiri.UI
             var sidecar = CloudSaveSidecar.Load();
 
             if (!CloudSavePolicy.SidecarAppliesTo(sidecar, uid))
-                sidecar = CloudSaveLocalState.NewFor(uid, CloudSaveSidecar.NewDeviceId());
+                sidecar = CloudSaveSidecar.NewOwnedBy(uid);   // 71: 이 실행의 기기 id
 
             if (sidecar == null) return;
 

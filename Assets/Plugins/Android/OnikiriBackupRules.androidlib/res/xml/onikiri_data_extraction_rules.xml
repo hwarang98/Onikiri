@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  71단계: 이 앱의 데이터는 Android 백업으로 옮겨지지 않는다. 복원 경로는 클라우드 세이브 하나다.
+
+  왜 allowBackup="false"만으로 모자라는가: targetSdk 31 이상에서 allowBackup="false"는
+  클라우드 백업만 끄고 **기기 간 직접 전송(device-transfer)은 끄지 못한다.** 70단계 실기에서
+  자동 백업이 옛 uid의 클라우드 사이드카(onikiri_cloud_state.json)를 되살려 새 uid로 뜬 앱의
+  업로드를 막았다 - 새 폰으로 직접 옮겨도 같은 파일이 같은 모양으로 넘어온다.
+
+  include가 없으면 "전부 포함 - exclude 제외"이므로, 모든 도메인을 exclude해 아무것도 넘기지 않는다.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

@@ -242,7 +242,7 @@ namespace Onikiri.Cloud
 
             if (AwaitedIdentity && sidecar == null && DiskSidecar() != null)
                 Debug.LogWarning(Tag + " 기다린 사이드카가 지금 uid("
-                                 + Mask(uid) + ")의 것이 아닙니다. 자동 적용하지 않습니다.");
+                                 + Mask(uid) + ")의 것이 아닙니다. 자동 적용하지 않고 복구 입구로 갑니다.");
 
             CloudSaveFetchResult fetch = default(CloudSaveFetchResult);
             bool serverChecked = false;
@@ -272,7 +272,29 @@ namespace Onikiri.Cloud
                 }
             }
 
+            // ★ 71단계: 디스크의 사이드카가 **다른 uid의 것**이다 -> Recover의 부팅 입구.
+            //
+            // 자동 백업 복원(재설치)·복구 중단이 이 모양을 만든다. 판정은 위의
+            // `sidecar == null`로 이미 "모르는 기기"로 내려지고(아래 ChooseFrom),
+            // 입구는 그 판정을 바꾸지 않는다 - 이 uid의 사이드카를 디스크에 남기고
+            // 옛 것을 옆에 보존할 뿐이다. 안 남기면 이 실행의 기기 id가 어디에도
+            // 없어, 커밋은 거부되고 다음 부팅은 자기 자신에게 인수를 묻는다(70단계)
+            if (sidecar == null && !string.IsNullOrEmpty(uid) && ForeignSidecarOnDisk(uid))
+                CloudSaveRecovery.EnterAtBoot(uid, local, fetch, serverChecked);
+
             Finish(ChooseFrom(local, sidecar, fetch, serverChecked), sidecar, fetch, onDone);
+        }
+
+        /**
+         * @brief 디스크에 **다른 uid의** 온전한 사이드카가 있는가 (71단계).
+         *
+         * `DiskSidecar`와 달리 존재 seam을 보지 않는다 - 여기서 일어나는 일은
+         * 실제 파일을 옮기고 쓰는 것이라, 실제 파일이 있을 때만 의미가 있다.
+         */
+        private static bool ForeignSidecarOnDisk(string uid)
+        {
+            CloudSaveLocalState disk = CloudSaveSidecar.Load();
+            return disk != null && disk.ownerUid != uid;
         }
 
         /**
@@ -439,7 +461,7 @@ namespace Onikiri.Cloud
             // **저장이 성공한 지금** 세운다 - 여기서 안 만들면 첫 커밋이 base 0으로
             // 나가 방금 채택한 기록을 두고 충돌이 난다
             if (!CloudSavePolicy.SidecarAppliesTo(chain, chainUid))
-                chain = CloudSaveLocalState.NewFor(chainUid, CloudSaveSidecar.NewDeviceId());
+                chain = CloudSaveSidecar.NewOwnedBy(chainUid);   // 71: 이 실행의 기기 id
 
             // ★★ 62.1.2: **sidecar 파일이 디스크에 남은 뒤에만 예약을 푼다.**
             //

@@ -393,13 +393,8 @@ namespace Onikiri.Cloud
                 string uid = CloudScores.Uid;
                 if (string.IsNullOrEmpty(uid)) { MarkFailure(); return; }
 
-                CloudSaveLocalState sidecar = CloudSaveSidecar.Load();
-                if (!CloudSavePolicy.SidecarAppliesTo(sidecar, uid))
-                {
-                    // 첫 커밋. 이 uid의 sidecar를 여기서 만든다 (revision 0 = 신규)
-                    sidecar = CloudSaveLocalState.NewFor(uid, CloudSaveSidecar.NewDeviceId());
-                    if (sidecar == null) { MarkFailure(); return; }
-                }
+                CloudSaveLocalState sidecar = PrepareSidecar(uid);
+                if (sidecar == null) { MarkFailure(); return; }
 
                 // 세션 없이는 규칙이 어차피 거부한다. 먼저 잡는다
                 CloudSaveSessionStatus session =
@@ -487,6 +482,36 @@ namespace Onikiri.Cloud
             {
                 committing = false;
             }
+        }
+
+        /**
+         * @brief 커밋이 들고 갈 이 uid의 사이드카. **디스크에 있는 것만 돌려준다.**
+         *
+         * ## 70단계 실기가 연 결함 (71단계)
+         *
+         * 예전에는 이 uid의 사이드카가 없으면 여기서 `NewFor(uid, NewDeviceId())`로
+         * **메모리에서만** 만들었다. 기기 id가 시도마다 새로 나왔고, 같은 실행의
+         * 세션 게이트가 이미 다른 기기 id로 자리를 잡아 둔 뒤였다. 같은 세션 id에
+         * 다른 기기 id를 적는 쓰기는 규칙(`ownerRenew`)이 거부한다 - 재설치 후
+         * 30초마다 `세션 Acquire 실패: PERMISSION_DENIED`, 업로드 0회. 사이드카도
+         * 끝내 안 남아 다음 부팅도 기기 id를 모르고 자기 자신에게 인수를 물었다.
+         *
+         * 이제 새 사이드카는 이 실행의 기기 id로 만들고 **세션을 잡기 전에**
+         * 디스크에 쓴다. 쓰지 못하면 null - 서버로 아무것도 보내지 않는다.
+         */
+        public static CloudSaveLocalState PrepareSidecar(string uid)
+        {
+            CloudSaveLocalState sidecar = CloudSaveSidecar.Load();
+            if (CloudSavePolicy.SidecarAppliesTo(sidecar, uid)) return sidecar;
+
+            // 첫 커밋 (revision 0 = 신규). 다른 uid의 사이드카는 옆에 옮겨 둔다
+            sidecar = CloudSaveSidecar.CreateOwnedBy(uid);
+
+            if (sidecar == null)
+                Debug.LogWarning(Tag + " 이 uid의 사이드카를 디스크에 남기지 못해 커밋하지 않습니다 "
+                                 + "(다음 재시도에서 다시 만든다).");
+
+            return sidecar;
         }
 
         /**
