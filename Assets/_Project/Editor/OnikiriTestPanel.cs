@@ -1580,6 +1580,20 @@ namespace Onikiri.EditorTools
                     EditorGUILayout.HelpBox("뽑기 시스템이 씬에 없습니다 (플레이 중에 보세요).",
                                             MessageType.Info);
 
+                // 69단계 - 배너 바의 레벨업 연출. 경험치를 안 바꾸고 한 번 재생한다
+                // (결과 판이 떠 있으면 닫힐 때까지 기다린다 - 실제와 같은 큐)
+                var shop = Object.FindFirstObjectByType<Onikiri.UI.ShopPanel>(FindObjectsInactive.Include);
+                if (shop != null)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField(string.Format("바 연출 재생 (요도 {0}회 · 오의 {1}회 끝까지 재생함)",
+                            shop.YodoLevelUpsPlayed, shop.SkillLevelUpsPlayed), GUILayout.Width(330f));
+                        if (GUILayout.Button("요도 바", GUILayout.Width(72f))) shop.DebugPlayLevelUp(false);
+                        if (GUILayout.Button("오의 바", GUILayout.Width(72f))) shop.DebugPlayLevelUp(true);
+                    }
+                }
+
                 EditorGUILayout.LabelField(string.Format(
                     "  식  XpToNext(L) = ceil({0} x {1}^(L-1))  ·  g = ★3 {2} / ★4 {3} / ★5 {4} (★1·★2 = 1)",
                     Onikiri.Progression.SummonLevelCurve.XpBase,

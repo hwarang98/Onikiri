@@ -132,6 +132,9 @@ namespace Onikiri.Tests.PlayMode
                 popup.Show(last, Object.FindFirstObjectByType<YodoSystem>(FindObjectsInactive.Include),
                            gacha.LastBatchLevelUp);
                 yield return null;
+
+                // 69단계: 꼬리는 마지막 타일이 열린 뒤에 붙는다(결정 4)
+                popup.RevealAll();
                 StringAssert.EndsWith(SummonLevelCurve.LevelUpText(2), title.text,
                     "레벨업이 난 뽑기의 제목 줄에 \"소환 Lv.2 달성\"이 없다");
                 StringAssert.DoesNotContain("천장", title.text, "결과 팝업에 천장 꼬리표가 남았다");
@@ -141,6 +144,7 @@ namespace Onikiri.Tests.PlayMode
                 popup.Show(last, Object.FindFirstObjectByType<YodoSystem>(FindObjectsInactive.Include),
                            gacha.LastBatchLevelUp);
                 yield return null;
+                popup.RevealAll();
                 StringAssert.DoesNotContain("달성", title.text, "레벨이 안 올랐는데 제목 줄에 레벨업이 붙었다");
             }
             finally { gacha.Pulled -= grab; }
