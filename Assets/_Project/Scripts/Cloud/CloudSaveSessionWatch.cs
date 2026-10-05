@@ -65,6 +65,11 @@ namespace Onikiri.Cloud
             string uid = CloudScores.Uid;
             if (string.IsNullOrEmpty(uid)) return;
 
+            // ★ 71.1: 쥔 자리가 **이 uid의 것**일 때만 본다. 계정 복구로 uid가 바뀐 뒤
+            // 옛 uid의 세대로 새 uid의 문서를 판정하면, 아무도 인수하지 않았는데
+            // 스스로를 회수한다(실기: "세대 1 -> 20"). 새 uid의 자리는 첫 커밋이 잡는다
+            if (!CloudSaveSession.HoldsSeatFor(uid)) return;
+
             float now = Now;
             if (now - lastPollAt < CloudSaveTakeoverPolicy.SessionPollSeconds) return;
 

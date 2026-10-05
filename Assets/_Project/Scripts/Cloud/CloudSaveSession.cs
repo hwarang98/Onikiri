@@ -138,6 +138,25 @@ namespace Onikiri.Cloud
             get { return MyGeneration >= CloudSaveTakeoverPolicy.FirstGeneration; }
         }
 
+        /** 지금 쥔 자리가 어느 uid의 세션 문서인가 (71.1단계) */
+        private static string seatUid;
+
+        /**
+         * @brief **이 uid의** 자리를 가진 적이 있는가 (71.1단계).
+         *
+         * 세대는 uid마다 따로 센다(세션 문서가 uid마다 하나다). 계정 복구로 uid가
+         * 바뀌면 `MyGeneration`은 **옛 uid의 세대**인데, 감시는 새 uid의 문서를 읽는다.
+         * 실기에서 그대로 났다: 복구 2초 뒤 "다른 기기가 세션을 인수했습니다 (세대 1 -> 20)"
+         * - 1은 버린 익명 uid의 세대, 20은 복구한 계정의 세대다. 아무도 인수하지
+         * 않았는데 이 기기가 스스로를 회수해 타이틀로 나갔다.
+         *
+         * 감시는 이것을 본다. 새 uid의 자리는 그 uid로 처음 세션을 잡을 때(첫 커밋) 생긴다.
+         */
+        public static bool HoldsSeatFor(string uid)
+        {
+            return HasHeldSeat && !string.IsNullOrEmpty(uid) && seatUid == uid;
+        }
+
         /**
          * @brief 지금 이 실행이 작성권을 들고 있는가.
          *
@@ -202,6 +221,7 @@ namespace Onikiri.Cloud
         {
             currentId = null;                                   // 다음 사용에서 새로 만든다
             MyGeneration = 0L;
+            seatUid = null;
             LastStatus = CloudSaveSessionStatus.Offline;
         }
 
@@ -285,7 +305,7 @@ namespace Onikiri.Cloud
                 return Finish(CloudSaveSessionStatus.Invalid);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (writeOverride != null) return FinishWrite(writeOverride(mode.ToString()));
+            if (writeOverride != null) return FinishWrite(writeOverride(mode.ToString()), uid);
 #endif
 
             if (!await FirebaseRuntime.EnsureReadyAsync())
@@ -340,7 +360,10 @@ namespace Onikiri.Cloud
             if (result == CloudSaveSessionStatus.Acquired
                 || result == CloudSaveSessionStatus.Renewed
                 || result == CloudSaveSessionStatus.TookOver)
+            {
                 MyGeneration = wonGeneration;
+                seatUid = uid;
+            }
 
             if (result == CloudSaveSessionStatus.TookOver)
                 Debug.Log(Tag + " 세션을 인수했습니다 (세대 " + wonGeneration + ").");
@@ -532,14 +555,17 @@ namespace Onikiri.Cloud
         }
 
         /** 시늉한 결과도 실제와 같은 자리에서 세대를 기억한다 */
-        private static CloudSaveSessionStatus FinishWrite(CloudSaveSessionStatus status)
+        private static CloudSaveSessionStatus FinishWrite(CloudSaveSessionStatus status, string uid)
         {
             if (status == CloudSaveSessionStatus.Acquired
                 || status == CloudSaveSessionStatus.Renewed
                 || status == CloudSaveSessionStatus.TookOver)
+            {
                 MyGeneration = MyGeneration < CloudSaveTakeoverPolicy.FirstGeneration
                     ? CloudSaveTakeoverPolicy.FirstGeneration
                     : MyGeneration;
+                seatUid = uid;
+            }
 
             return Finish(status);
         }
@@ -560,6 +586,12 @@ namespace Onikiri.Cloud
             MyGeneration = generation;
         }
 
+        /** 자리를 쥔 uid를 손에 쥔다. 71.1 이전 검사들은 uid 없이 세대만 세웠다 */
+        public static void UseSeatUidForTests(string uid)
+        {
+            seatUid = uid;
+        }
+
         public static void ResetForTests()
         {
             peekOverride = null;
@@ -567,6 +599,7 @@ namespace Onikiri.Cloud
             currentId = null;
             pendingDeviceId = null;
             MyGeneration = 0L;
+            seatUid = null;
             LastStatus = CloudSaveSessionStatus.Offline;
         }
 #endif

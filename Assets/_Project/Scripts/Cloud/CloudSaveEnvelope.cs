@@ -339,7 +339,9 @@ namespace Onikiri.Cloud
             // 어느 쪽이 거짓인지 알 방법이 없으므로 적용하지 않는다
             if (parsed.version != saveVersion) return CloudSaveEnvelopeFault.SaveVersionMismatch;
 
-            if (!CloudSavePolicy.SameState(CloudSaveFingerprint.StateHashOf(parsed), stateSha256))
+            // 71.1: **원문**에서 계산한다. 지금 클래스로 다시 직렬화하면 옛 버전 payload에
+            // 새 필드가 붙어 지문이 달라지고, 정상 세이브가 손상으로 막힌다(운영 v21 실측)
+            if (!CloudSavePolicy.SameState(CloudSaveFingerprint.StateHashOfPayload(payload), stateSha256))
                 return CloudSaveEnvelopeFault.StateHashMismatch;
 
             if (summary == null || !summary.Matches(parsed)) return CloudSaveEnvelopeFault.SummaryMismatch;
