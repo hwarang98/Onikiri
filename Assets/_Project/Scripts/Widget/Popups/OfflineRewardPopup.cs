@@ -84,8 +84,9 @@ namespace Onikiri.UI
             if (claimButton != null) claimButton.onClick.RemoveListener(Hide);
 
             // static 이벤트라 구독을 남기면 씬을 다시 열어도 죽은 객체가 붙어
-            // 있는다
-            if (waiting) IntroFlow.Entered -= OnIntroEntered;
+            // 있는다. 조건 없이 푼다 - 안 단 구독을 푸는 것은 아무 일도 안 한다
+            IntroFlow.Entered -= OnIntroEntered;
+            waiting = false;
         }
 
         /**
@@ -141,6 +142,19 @@ namespace Onikiri.UI
         {
             IntroFlow.Entered -= OnIntroEntered;
             waiting = false;
+
+            /*
+             * 이미 파괴된 팝업이면 여기서 끝낸다 (69단계).
+             *
+             * OnDestroy의 해제만으로는 모자란다 - **한 번도 Awake되지 않은
+             * 컴포넌트는 파괴돼도 OnDestroy가 불리지 않는다.** 꺼진 계층에서
+             * Show가 구독만 하고 씬이 내려가면(도메인 리로드를 끈 에디터의
+             * PlayMode 테스트 뒤가 그렇다) 죽은 객체의 구독이 정적 이벤트에 남고,
+             * 다음 인트로 진입에서 ShowNow가 gameObject를 만져
+             * MissingReferenceException을 낸다. 그 예외는 같은 이벤트의 뒤
+             * 구독자까지 막는다.
+             */
+            if (this == null) return;
 
             if (!pending) return;
             pending = false;

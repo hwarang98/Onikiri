@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Onikiri.Progression;
 using TMPro;
@@ -7,34 +8,81 @@ using UnityEngine.UI;
 namespace Onikiri.UI
 {
     /**
-     * @brief 뽑기 결과를 한 판에 펼친다.
+     * @brief 뽑기 결과를 **타일 그리드**로 펼친다 (69단계).
      *
-     * ## 왜 한 판에 다 보여주는가 - 연출을 한 줄씩 넘기지 않는다
+     * ## 46~68단계의 줄 목록에서 무엇이 바뀌었나
      *
-     * 뽑기 연출의 표준은 하나씩 열어 보이는 것인데, 이 게임에서는 그것이
-     * 맞지 않는다. 방치형이고 10연이 30초짜리 사건이 되면 **다음에 또 하고
-     * 싶지 않아진다** - 26단계가 오의 쿨다운을 20초 안팎에 묶은 것과 같은
-     * 기준(흘깃 볼 때 보여야 한다)이 여기에도 있다.
+     * 결과가 글자 줄이었다 - "파편 6", "혼 정수 → 처형인의 혼". 열 줄이 같은
+     * 모양이라 흘깃 볼 때 **어느 칸이 좋은 결과인가**를 글자를 읽어야 알았다.
+     * 타일은 그것을 모양으로 말한다: 테두리 색이 등급이고, ★4·★5는 타일 뒤에
+     * 빛이 돈다. 글자는 모서리 두 칸(등급명 · 보조값)으로 줄었다.
      *
-     * 대신 크기로 말한다. 파편 등급 셋과 혼 정수가 색과 글자로 갈리고,
-     * 잭팟과 정수만 금색이다 - 열 줄 중 금색이 몇 개인가가 이 판이 전하는
-     * 유일한 정보이고, 그것은 한눈에 읽힌다.
+     * 한 판에 다 보여준다는 46단계 규칙과 0.7초 열림 연출(#12)은 그대로다 -
+     * 열리는 것이 줄에서 타일로 바뀌었을 뿐이다.
+     *
+     * ## 화면 전체를 덮는다 - 상단 바만 남긴다
+     *
+     * 결과 판이 상점 띠 안의 카드였을 때는 그 아래 전투 화면이 보였다. 이제
+     * 판은 SafeArea의 0 ~ BattleAreaTop을 덮고 상단 바(보석 잔액)만 남긴다 -
+     * 재뽑기 버튼이 판 위에 있으므로 "한 번 더 돌릴 수 있는가"의 답(잔액)이
+     * 같은 화면에 보여야 한다.
      *
      * ## 판이 스스로 닫히지 않는다
      *
      * 자동으로 사라지면 10연의 결과가 **뭐였는지 모르는 채로** 지나간다.
      * 확인 버튼 하나를 두는 이유이고, 오프라인 보상 팝업(OfflineRewardPopup)이
-     * 같은 규칙을 쓴다.
+     * 같은 규칙을 쓴다. 닫히는 순간 상점 배너의 레벨업 연출이 이어진다
+     * (Closed - ShopPanel이 듣는다).
      */
     public sealed class GachaResultPopup : MonoBehaviour
     {
+        /** 타일 하나의 조각들. 빌더가 짓고 배선한다 */
+        [Serializable]
+        public sealed class Tile
+        {
+            public RectTransform root;
+
+            /** 테두리. 등급 색이다 */
+            public Image frame;
+
+            /** 안쪽 판. 등급 색을 눌러 어둡게 - 아이콘이 테두리보다 앞에 읽힌다 */
+            public Image inner;
+
+            public Image icon;
+
+            /** 좌상단 등급명 */
+            public TMP_Text grade;
+
+            /** 우하단 보조값 (파편 수 · 혼격 ★ · 오의 이름 · +XP) */
+            public TMP_Text value;
+
+            /** 타일 뒤의 빛. ★4 보라 · ★5 금. 그 아래 등급은 꺼진다 */
+            public Image glow;
+        }
+
         [Tooltip("켜고 끄는 판. 이 컴포넌트는 항상 켜진 뿌리에 산다")]
         [SerializeField] private GameObject visual;
 
+        /** 그리드 위 한 줄. 합계 + ★3 이상 개수, 공개가 끝나면 레벨업 꼬리가 붙는다 */
         [SerializeField] private TMP_Text titleLabel;
-        [SerializeField] private TMP_Text[] lines;
+
+        [SerializeField] private RectTransform grid;
+        [SerializeField] private Tile[] tiles = new Tile[0];
+
+        /** 그리드 아래 줄. 미끄러진 결과의 경로("등급 하락 · …")를 적는다 */
+        [SerializeField] private TMP_Text[] notes = new TMP_Text[0];
+
         [SerializeField] private Button confirmButton;
 
+        [Header("재뽑기 (10회)")]
+        [SerializeField] private Button repullButton;
+        [SerializeField] private Image repullBackground;
+        [SerializeField] private TMP_Text repullTitle;
+        [SerializeField] private TMP_Text repullCost;
+        [SerializeField] private Image repullGem;
+        [SerializeField] private Color repullTint = new Color(0.42f, 0.56f, 1.00f, 1f);
+
+        [Header("색")]
         [SerializeField] private Color textColor = new Color32(0xF6, 0xE5, 0xBF, 0xFF);
         [SerializeField] private Color dimColor = new Color32(0x8A, 0x7F, 0x9B, 0xFF);
         [SerializeField] private Color goldColor = new Color32(0xFF, 0xD3, 0x4D, 0xFF);
@@ -44,265 +92,266 @@ namespace Onikiri.UI
          *
          * 스크립트 기본값이 아니라 빌더가 쓰는 이유는 이 프로젝트의 규칙이다 -
          * 컴포넌트가 이미 씬에 있으면 스크립트 기본값을 고쳐도 반영되지 않는다.
-         * 배열이 비어 있으면 46단계의 색으로 떨어진다(ColorFor).
+         * 배열이 비어 있으면 46단계의 색으로 떨어진다(ColorOf).
          */
         [SerializeField] private Color[] gradeColors = new Color[0];
 
-        /**
-         * @brief 전설이 나왔을 때 판 전체가 물드는 색.
-         *
-         * ## 왜 연출이 이것 하나뿐인가
-         *
-         * 46단계가 정한 규칙("한 판에 다 보여준다 - 10연이 30초짜리 사건이
-         * 되면 다음에 또 하고 싶지 않아진다")이 여기서도 그대로다. 전설
-         * 하나 때문에 판을 한 줄씩 여는 연출로 바꾸면, 200회 중 199회는
-         * 그 연출을 **전설 없이** 지나야 한다.
-         *
-         * 그래서 사건성은 **판의 색**에 싣는다. 여섯 줄 중 하나가 금색인
-         * 것과 판 전체가 금테를 두른 것은 흘깃 볼 때 다른 화면이고, 그
-         * 차이가 200회에 한 번만 나타난다.
-         */
-        [SerializeField] private Image cardBackground;
-        [SerializeField] private Color cardNormalTint = new Color(0.34f, 0.36f, 0.68f, 1f);
-        [SerializeField] private Color cardLegendaryTint = new Color(0.62f, 0.50f, 0.22f, 1f);
+        /** 안쪽 판 = 등급 색 x 이 값 (RGB만). 테두리와 같은 계열로 어둡게 */
+        [SerializeField] private float innerShade = 0.22f;
 
-        /**
-         * @brief 판의 치수. **빌더가 옮겨 적는다** - 스크립트 기본값이 아니라.
-         *
-         * 50b에 판이 자리를 스스로 놓게 되면서(Render) 빌더의 상수 여섯이
-         * 여기로 들어왔다. 빌더가 초기 배치에 쓰는 값과 판이 다시 놓는 값이
-         * 두 곳에 살면 반드시 갈리고, 그 증상은 "첫 프레임과 갱신 후의 판이
-         * 다르다"다.
-         */
-        [SerializeField] private float lineHeight = 52f;
-        [SerializeField] private float topPad = 16f;
-        [SerializeField] private float buttonGap = 28f;
-        [SerializeField] private float confirmHeight = 84f;
-        [SerializeField] private float cardSidePad = 24f;
-        [SerializeField] private float outerSidePad = 48f;
+        [SerializeField] private Color glowEpic = new Color(0.78f, 0.30f, 1.00f, 0.85f);
+        [SerializeField] private Color glowLegendary = new Color(1.00f, 0.80f, 0.25f, 0.95f);
 
-        /**
-         * @brief 좁은 칸의 들여쓰기. 왼쪽 정렬이 판 가장자리에 붙지 않게.
-         *
-         * public인 이유는 빌더의 검산 때문이다 - 좁은 칸의 실사용 폭이
-         * 이만큼 줄었으므로 VerifyTextFits가 같은 값을 빼고 재야 한다.
-         * 두 곳에 적으면 이 값이 움직이는 날 검산이 옛 폭을 잰다.
-         */
-        public const float NarrowInset = 60f;
+        [Tooltip("빛이 도는 속도(도/초). 실시간이다")]
+        [SerializeField] private float glowSpinDegreesPerSecond = 24f;
 
-        /** 줄 하나의 재료. Show가 채우고 Render가 놓는다 */
-        private string[] rowTexts;
-        private Color[] rowColors;
-        private bool[] rowWide;
+        [Header("그리드 치수 - 빌더가 옮겨 적는다")]
+        [SerializeField] private float tileSize = 160f;
+        [SerializeField] private float tileGap = 32f;
+        [SerializeField] private int columns = 5;
 
-        /** 줄의 등급. 열리는 연출의 세기가 여기서 나온다 (#12) */
-        private int[] rowGrades;
+        [Header("아이콘 - 빌더가 옮겨 적는다")]
+        [SerializeField] private Sprite shardSprite;
+        [SerializeField] private Sprite soulSprite;
+
+        /** YodoCatalog 순서. GachaSystem.PullResult.BladeIndex가 이 인덱스다 */
+        [SerializeField] private Sprite[] bladeSprites = new Sprite[0];
+
+        /** LegendaryYodoCatalog 순서 */
+        [SerializeField] private Sprite[] legendarySprites = new Sprite[0];
+
+        /** SkillCatalog 순서. 해금·개안 결과의 인덱스가 이것이다 */
+        [SerializeField] private Sprite[] skillSprites = new Sprite[0];
+
+        [SerializeField] private Sprite skillXpSprite;
+
+        /** 이 판이 닫혔다. 상점이 레벨업 연출을 이어서 재생한다 */
+        public event Action Closed;
+
+        /** 재뽑기 버튼(10회)을 눌렀다. 어느 배너인지는 판을 연 상점이 안다 */
+        public event Action RepullRequested;
+
+        // ---------------------------------------------------------------- 판의 상태
+
+        private int count;
+        private string headline = string.Empty;
+        private int summonLevelUp;
+        private int[] tileGrades;
+        private Color[] tileColors;
+        private string[] tileValues;
+
+        public bool IsOpen { get { return visual != null && visual.activeSelf; } }
+
+        /** 이번 판에 실제로 선 타일 수 */
+        public int VisibleTileCount { get { return count; } }
+
+        /** 열림 연출 중인가 */
+        public bool IsRevealing { get { return Revealing; } }
+
+        /** 타일 i의 등급 (GachaCurve.Grade). 검사가 읽는다 */
+        public int TileGrade(int index)
+        {
+            return tileGrades != null && index >= 0 && index < count ? tileGrades[index] : -1;
+        }
+
+        /** 타일 i의 테두리 색 */
+        public Color TileFrameColor(int index)
+        {
+            return tileColors != null && index >= 0 && index < count ? tileColors[index] : Color.clear;
+        }
+
+        /** 타일 i의 우하단 보조값 */
+        public string TileValue(int index)
+        {
+            return tileValues != null && index >= 0 && index < count ? tileValues[index] : string.Empty;
+        }
 
         // ---------------------------------------------------------------- 열림 연출 (#12)
 
         /**
-         * @brief 줄이 **하나씩 열린다.** 대신 아주 빠르게.
+         * @brief 타일이 **하나씩 열린다.** 대신 아주 빠르게.
          *
-         * ## 46단계의 규칙을 어기지 않는다
+         * 46단계 머리 주석의 "하나씩 여는 연출은 이 게임에 맞지 않는다 - 10연이
+         * 30초짜리 사건이 되면 다음에 또 하고 싶지 않아진다"는 판단은 지금도
+         * 옳다. 여기서 하는 것은 **0.7초짜리**다 - 열 타일이 70ms 간격으로 켜지고
+         * 끝난다. 흘깃 보는 시간 안에 끝나면서, 눈이 타일을 따라가고 빛나는
+         * 타일이 **언제** 나오는지가 사건이 된다.
          *
-         * 이 판의 머리 주석은 "하나씩 열어 보이는 연출은 이 게임에 맞지
-         * 않는다 - 10연이 30초짜리 사건이 되면 다음에 또 하고 싶지 않아진다"
-         * 고 적어뒀고, 그 판단은 지금도 옳다. 어긴 적이 없다.
-         *
-         * 여기서 하는 것은 **0.7초짜리**다. 열 줄이 70ms 간격으로 켜지고
-         * 끝난다 - 흘깃 보는 시간 안에 끝나므로 "기다림"이 되지 않으면서,
-         * 열 줄이 한 프레임에 통째로 나타날 때는 없던 것이 생긴다: 눈이
-         * 줄을 따라 내려가고, 금색 줄이 **언제** 나오는지가 사건이 된다.
-         *
-         * 30초 연출과 이것을 가르는 것은 방향이 아니라 시간이다.
-         *
-         * ## 기다릴 수 없으면 건너뛴다
-         *
-         * 연출 중에 확인 버튼을 누르면 닫히는 대신 **전부 열린다.** 0.7초도
-         * 참지 못하는 순간이 있고(백 번째 10연), 그때 연출이 손을 막으면
-         * 그것이 정확히 46단계가 피하려던 상태다.
+         * 연출 중에 확인을 누르면 닫히는 대신 **전부 열린다**(RevealAll).
          */
         [Header("열림 연출 (#12)")]
-        [Tooltip("줄과 줄 사이(초). 실시간이다 - 히트스톱이 걸려도 같은 속도로 열린다")]
+        [Tooltip("타일과 타일 사이(초). 실시간이다 - 히트스톱이 걸려도 같은 속도로 열린다")]
         [SerializeField] private float revealInterval = 0.07f;
 
-        [Tooltip("한 줄이 제 크기로 내려앉는 시간(초)")]
+        [Tooltip("한 타일이 제 크기로 내려앉는 시간(초)")]
         [SerializeField] private float revealPunchSeconds = 0.16f;
 
         /**
          * @brief 등급별 튀어나오는 배율. 높을수록 크게 튄다 (#12).
          *
-         * 인덱스가 곧 등급이다(GachaCurve.Grade). 배열이 비어 있거나 짧으면
-         * 1.15배로 떨어진다 - 배선이 빠져도 연출이 아예 없어지지는 않는다.
-         *
-         * ★1~★2는 거의 안 튄다(1.10). 열 줄 중 여덟이 그것이라 크게 튀면
-         * 판 전체가 덜컹거리고, 그러면 정작 금색 줄이 튀는 것이 안 보인다 -
+         * ★1~★2는 거의 안 튄다(1.10). 열 타일 중 여덟이 그것이라 크게 튀면
+         * 판 전체가 덜컹거리고, 그러면 정작 빛나는 타일이 튀는 것이 안 보인다 -
          * 화려함은 **대비**이지 총량이 아니다.
          */
         [SerializeField] private float[] revealPunchByGrade = { 1.10f, 1.12f, 1.22f, 1.45f, 1.75f };
 
-        [Tooltip("★3 이상이 열릴 때 흰색에서 제 색으로 물든다. 0이면 안 쓴다")]
+        [Tooltip("★3 이상이 열릴 때 안쪽 판이 흰색에서 제 색으로 물든다. 0이면 안 쓴다")]
         [SerializeField] private float revealFlashSeconds = 0.12f;
 
-        /** 지금 열고 있는 줄. count 이상이면 연출이 끝났다 */
         private int revealed;
-
-        /** 다음 줄이 열리는 시각(unscaled). 0이면 연출 중이 아니다 */
         private float nextRevealAt;
-
-        /** 이번 판에 실제로 그려진 줄 수 */
-        private int revealCount;
+        private List<int> shrinking;
+        private float[] shrinkStart;
 
         private bool Revealing { get { return nextRevealAt > 0f; } }
 
-        private void EnsureRowScratch()
-        {
-            if (lines == null) return;
-            if (rowTexts != null && rowTexts.Length == lines.Length) return;
-
-            rowTexts = new string[lines.Length];
-            rowColors = new Color[lines.Length];
-            rowWide = new bool[lines.Length];
-            rowGrades = new int[lines.Length];
-        }
+        // ---------------------------------------------------------------- 배치
 
         /**
-         * @brief 줄들을 실제로 놓는다. **자리가 상수가 아니라 결과에서 나온다.**
+         * @brief count개 타일의 중심 좌표(그리드 중심 기준). **줄마다 가운데 정렬.**
          *
-         * ## 50b - 두 열 격자가 문자열에 밀렸다
-         *
-         * 처음에는 열 줄이 두 칸 x 다섯 줄 고정이었고, 그 격자에 "오의 해금 →
-         * 스킬 XP 240 → Lv +9" 같은 긴 줄이 들어오자 열 경계를 넘어 판 밖으로
-         * 삐져나왔다(실기 캡처). 44단계의 규칙 그대로다 - **상자를 글자에
-         * 맞추지 그 반대가 아니다**(VerifyRowsFit).
-         *
-         * 그래서 줄이 두 종류가 됐다:
-         *
-         *   좁은 줄   반 폭, 두 칸씩.  짧은 고정 포맷("XP +6")만 들어온다
-         *   넓은 줄   전 폭, 한 줄 통째.  **드문 사건**(해금·개안·전설)이 들어온다
-         *
-         * 넓은 줄은 오버플로 수리이면서 동시에 연출이다 - 200회에 한 번의
-         * 결과가 열 줄 사이에 끼어 있으면 흘깃 볼 때 안 읽히는데, 혼자 한
-         * 줄을 다 쓰면 판의 리듬이 거기서 끊긴다. 47단계가 전설에서만 판을
-         * 금테로 물들인 것과 같은 층의 신호이고, 같은 이유로 드물어야 한다.
-         *
-         * 판의 높이도 여기서 나온다 - 줄 수가 결과마다 다르므로(넓은 줄 하나가
-         * 좁은 칸 둘 몫을 쓴다) 상수로 두면 넓은 줄이 많은 판에서 반드시
-         * 넘친다. 상점 배너 높이를 상수에서 식으로 바꾼 47단계 규칙의 연장이다.
+         * 1회면 한 타일이 한가운데, 10회면 다섯씩 두 줄. 줄 수가 결과 수에서
+         * 나오므로 상수가 아니다 - 47단계가 배너 높이를 식으로 바꾼 규칙과 같다.
+         * 검사(GachaUiLayoutTests)가 같은 함수를 부른다.
          */
-        private void Render(int count, string headline, Color headColor, bool legendaryCard)
+        public static Vector2[] TileLayout(int count, int columns, float tile, float gap)
         {
-            // 줄 수 먼저. 좁은 칸은 둘씩 접히고 넓은 줄은 혼자 한 줄이다.
-            // 넓은 줄이 중간에 오면 차 있던 왼쪽 칸은 그대로 두고 다음 줄로
-            // 내려간다 - 순서를 지키는 것이 정렬보다 먼저다(뽑기 순서가 곧
-            // 사건의 순서다)
-            int rows = 0, column = 0;
+            if (count <= 0 || columns <= 0) return new Vector2[0];
+
+            var centers = new Vector2[count];
+            int rows = (count + columns - 1) / columns;
+            float step = tile + gap;
+            float top = (rows - 1) * step * 0.5f;
+
             for (int i = 0; i < count; i++)
             {
-                if (rowWide[i]) { if (column > 0) { rows++; column = 0; } rows++; }
-                else { column++; if (column == 2) { rows++; column = 0; } }
+                int row = i / columns;
+                int inRow = Mathf.Min(columns, count - row * columns);
+                int column = i % columns;
+                float left = -(inRow - 1) * step * 0.5f;
+                centers[i] = new Vector2(left + column * step, top - row * step);
             }
-            if (column > 0) rows++;
+            return centers;
+        }
 
-            // 판의 폭은 뿌리(패널 전체)에서 유도한다. visual은 이 순간 아직
-            // 꺼져 있을 수 있어 자기 rect가 낡았을 수 있다
-            float cardWidth = ((RectTransform)transform).rect.width - outerSidePad * 2f;
-            float innerWidth = cardWidth - cardSidePad * 2f;
+        /** 그리드 전체의 높이 */
+        public static float GridHeight(int count, int columns, float tile, float gap)
+        {
+            if (count <= 0 || columns <= 0) return 0f;
+            int rows = (count + columns - 1) / columns;
+            return rows * tile + (rows - 1) * gap;
+        }
 
-            float cardHeight = topPad + lineHeight * 1.4f + rows * lineHeight
-                             + buttonGap + confirmHeight + topPad;
+        public int Columns { get { return columns; } }
 
-            var visualRect = (RectTransform)visual.transform;
-            visualRect.offsetMin = new Vector2(outerSidePad, -cardHeight * 0.5f);
-            visualRect.offsetMax = new Vector2(-outerSidePad, cardHeight * 0.5f);
+        // ---------------------------------------------------------------- 그리기
 
-            float half = innerWidth * 0.5f;
-            int row = 0;
-            column = 0;
+        private void EnsureScratch()
+        {
+            int n = tiles != null ? tiles.Length : 0;
+            if (tileGrades != null && tileGrades.Length == n) return;
 
-            for (int i = 0; i < lines.Length; i++)
+            tileGrades = new int[n];
+            tileColors = new Color[n];
+            tileValues = new string[n];
+            shrinkStart = new float[n];
+        }
+
+        private void SetTile(int index, int grade, Sprite icon, string value)
+        {
+            var tile = tiles[index];
+            var color = ColorOf((GachaCurve.Grade)grade);
+
+            tileGrades[index] = grade;
+            tileColors[index] = color;
+            tileValues[index] = value;
+
+            if (tile.frame != null) tile.frame.color = color;
+            if (tile.inner != null) tile.inner.color = Shade(color);
+
+            if (tile.icon != null)
             {
-                if (lines[i] == null) continue;
-
-                if (i >= count)
-                {
-                    lines[i].text = string.Empty;
-                    continue;
-                }
-
-                var rect = (RectTransform)lines[i].transform;
-                rect.anchorMin = new Vector2(0f, 1f);
-                rect.anchorMax = new Vector2(0f, 1f);
-                rect.pivot = new Vector2(0f, 1f);
-
-                if (rowWide[i])
-                {
-                    if (column > 0) { row++; column = 0; }
-                    rect.sizeDelta = new Vector2(innerWidth, lineHeight);
-                    rect.anchoredPosition = new Vector2(cardSidePad,
-                        -(topPad + lineHeight * (1.4f + row)));
-
-                    // 넓은 줄은 가운데다 - 혼자 한 줄을 쓰는 사건이라 제목과
-                    // 같은 축에 선다
-                    lines[i].alignment = TMPro.TextAlignmentOptions.Center;
-                    row++;
-                }
-                else
-                {
-                    // 좁은 칸은 **왼쪽 정렬**이다 (50b). 가운데로 두면 길이가
-                    // 다른 줄들("XP +6" / "XP +20 · Lv +1")의 시작점이 칸마다
-                    // 흔들려 열이 열로 안 읽힌다 - 확률표가 열을 세운 것과
-                    // 같은 이유이고, 들여쓰기 한 칸이 두 열의 경계를 만든다
-                    rect.sizeDelta = new Vector2(half - NarrowInset, lineHeight);
-                    rect.anchoredPosition = new Vector2(
-                        cardSidePad + column * half + NarrowInset,
-                        -(topPad + lineHeight * (1.4f + row)));
-
-                    lines[i].alignment = TMPro.TextAlignmentOptions.Left;
-                    column++;
-                    if (column == 2) { row++; column = 0; }
-                }
-
-                lines[i].text = rowTexts[i];
-                lines[i].color = rowColors[i];
+                tile.icon.sprite = icon;
+                tile.icon.enabled = icon != null;
+                tile.icon.preserveAspect = true;
             }
 
+            if (tile.grade != null)
+            {
+                tile.grade.text = GachaCurve.GradeNames[Mathf.Clamp(grade, 0, GachaCurve.GradeCount - 1)];
+                tile.grade.color = color;
+            }
+
+            if (tile.value != null)
+            {
+                tile.value.text = value;
+                tile.value.color = grade >= (int)GachaCurve.Grade.Epic ? goldColor : textColor;
+            }
+
+            // 빛은 열릴 때 켠다(RevealNext). 지금은 꺼 둔다
+            if (tile.glow != null) tile.glow.enabled = false;
+        }
+
+        private Color Shade(Color color)
+        {
+            var shaded = color;
+            shaded.r *= innerShade; shaded.g *= innerShade; shaded.b *= innerShade;
+            shaded.a = 1f;
+            return shaded;
+        }
+
+        private void Render(int shown, string head, List<string> noteLines, int levelUp)
+        {
+            count = shown;
+            headline = head;
+            summonLevelUp = levelUp;
+
+            var centers = TileLayout(count, columns, tileSize, tileGap);
+            for (int i = 0; i < tiles.Length; i++)
+            {
+                var tile = tiles[i];
+                if (tile == null || tile.root == null) continue;
+
+                bool on = i < count;
+                tile.root.gameObject.SetActive(on);
+                if (!on) continue;
+
+                tile.root.anchoredPosition = centers[i];
+                tile.root.sizeDelta = new Vector2(tileSize, tileSize);
+            }
+
+            for (int i = 0; i < notes.Length; i++)
+            {
+                if (notes[i] == null) continue;
+                notes[i].text = noteLines != null && i < noteLines.Count ? noteLines[i] : string.Empty;
+                notes[i].color = dimColor;
+            }
+
+            // 꼬리(소환 Lv.n 달성)는 **마지막 타일이 열린 뒤에** 붙는다 (69단계 결정 4)
             if (titleLabel != null)
             {
                 titleLabel.text = headline;
-                titleLabel.color = headColor;
+                titleLabel.color = textColor;
             }
-
-            if (cardBackground != null)
-                cardBackground.color = legendaryCard ? cardLegendaryTint : cardNormalTint;
 
             visual.SetActive(true);
             visual.transform.SetAsLastSibling();
 
-            BeginReveal(count);
+            BeginReveal();
         }
 
-        /**
-         * @brief 줄을 전부 숨기고 하나씩 여는 연출을 시작한다 (#12).
-         *
-         * 숨기는 방법은 **크기 0**이다. 알파를 쓰지 않는 이유는 TMP의 색을
-         * 건드리면 등급 색을 다시 계산해야 하고(줄마다 다르다), 열릴 때
-         * 튀어나오는 연출도 어차피 크기로 하기 때문이다 - 한 가지 값으로
-         * 숨김과 등장을 다 처리하면 중간에 끊겨도 어긋나지 않는다.
-         */
-        private void BeginReveal(int count)
+        private void BeginReveal()
         {
-            revealCount = count;
             revealed = 0;
+            if (shrinking != null) shrinking.Clear();
 
-            if (lines == null) return;
+            for (int i = 0; i < tiles.Length; i++)
+                if (tiles[i] != null && tiles[i].root != null) tiles[i].root.localScale = Vector3.zero;
 
-            for (int i = 0; i < lines.Length; i++)
-                if (lines[i] != null) lines[i].transform.localScale = Vector3.zero;
-
-            // 첫 줄은 다음 프레임에 바로 연다. 첫 줄까지 기다리게 하면
+            // 첫 타일은 다음 프레임에 바로 연다. 첫 타일까지 기다리게 하면
             // 판이 빈 채로 떠 있는 순간이 생기고, 그것은 고장으로 읽힌다
-            nextRevealAt = Time.unscaledTime;
+            nextRevealAt = count > 0 ? Time.unscaledTime : 0f;
+            if (count == 0) FinishReveal();
         }
 
         private void Update()
@@ -314,128 +363,120 @@ namespace Onikiri.UI
             while (Revealing && Time.unscaledTime >= nextRevealAt)
             {
                 RevealNext();
-                if (revealed >= revealCount) { nextRevealAt = 0f; break; }
+                if (revealed >= count) { FinishReveal(); break; }
                 nextRevealAt += revealInterval;
             }
         }
 
+        private void FinishReveal()
+        {
+            nextRevealAt = 0f;
+            if (titleLabel != null) titleLabel.text = WithLevelUp(headline, summonLevelUp);
+        }
+
         /**
-         * @brief 다음 줄 하나를 연다. 등급이 셀수록 크게 튄다.
+         * @brief 다음 타일 하나를 연다. 등급이 셀수록 크게 튄다.
          *
          * 코루틴을 쓰지 않는다 - 판이 꺼졌다 켜지는 사이에 코루틴이 살아
-         * 있으면 다음 판의 줄을 지난 판의 연출이 건드린다. 상태를 필드에
-         * 두면 판이 꺼질 때(Close) 그냥 멈춘다.
+         * 있으면 다음 판의 타일을 지난 판의 연출이 건드린다.
          */
         private void RevealNext()
         {
             int index = revealed++;
-            if (lines == null || index < 0 || index >= lines.Length) return;
+            if (index < 0 || index >= tiles.Length || tiles[index] == null) return;
 
-            var line = lines[index];
-            if (line == null) return;
+            var tile = tiles[index];
+            if (tile.root != null) tile.root.localScale = Vector3.one * PunchOf(index);
 
-            line.transform.localScale = Vector3.one * PunchOf(index);
-            StartShrink(index);
+            if (tile.glow != null)
+            {
+                int grade = tileGrades[index];
+                tile.glow.enabled = grade >= (int)GachaCurve.Grade.Epic;
+                tile.glow.color = grade >= (int)GachaCurve.Grade.Legendary ? glowLegendary : glowEpic;
+            }
 
-            // ★3 이상은 흰빛에서 제 색으로 물든다. 아래 등급까지 물들이면
-            // 열 줄이 다 반짝여서 무엇이 좋은 결과인지가 안 보인다
-            if (revealFlashSeconds > 0f && rowGrades != null && index < rowGrades.Length
-                && rowGrades[index] >= (int)GachaCurve.Grade.Rare)
-                line.color = Color.white;
-        }
+            // ★3 이상은 안쪽 판이 흰빛에서 제 색으로 물든다. 아래 등급까지 물들이면
+            // 열 타일이 다 반짝여서 무엇이 좋은 결과인지가 안 보인다
+            if (revealFlashSeconds > 0f && tile.inner != null && tileGrades[index] >= (int)GachaCurve.Grade.Rare)
+                tile.inner.color = Color.white;
 
-        private float PunchOf(int index)
-        {
-            if (rowGrades == null || index >= rowGrades.Length) return 1.15f;
-
-            int grade = rowGrades[index];
-            if (revealPunchByGrade == null || grade < 0 || grade >= revealPunchByGrade.Length)
-                return 1.15f;
-
-            return revealPunchByGrade[grade];
-        }
-
-        /**
-         * @brief 튀어나온 줄을 제 크기로 되돌린다.
-         *
-         * 줄마다 시작 시각이 다르므로 리스트로 들고 매 프레임 민다. 코루틴을
-         * 안 쓰는 이유는 RevealNext와 같다.
-         */
-        private void StartShrink(int index)
-        {
             if (shrinking == null) shrinking = new List<int>();
-            if (shrinkStart == null) shrinkStart = new float[lines.Length];
-
             shrinkStart[index] = Time.unscaledTime;
             if (!shrinking.Contains(index)) shrinking.Add(index);
         }
 
-        private List<int> shrinking;
-        private float[] shrinkStart;
+        private float PunchOf(int index)
+        {
+            int grade = tileGrades != null && index < tileGrades.Length ? tileGrades[index] : 0;
+            if (revealPunchByGrade == null || grade < 0 || grade >= revealPunchByGrade.Length) return 1.15f;
+            return revealPunchByGrade[grade];
+        }
 
         private void LateUpdate()
         {
+            if (!IsOpen) return;
+
+            // 빛은 천천히 돈다 - 켜진 것만
+            float spin = glowSpinDegreesPerSecond * Time.unscaledDeltaTime;
+            for (int i = 0; i < count && i < tiles.Length; i++)
+                if (tiles[i] != null && tiles[i].glow != null && tiles[i].glow.enabled)
+                    tiles[i].glow.rectTransform.Rotate(0f, 0f, -spin);
+
             if (shrinking == null || shrinking.Count == 0) return;
 
             for (int n = shrinking.Count - 1; n >= 0; n--)
             {
                 int index = shrinking[n];
-                if (lines == null || index >= lines.Length || lines[index] == null)
-                {
-                    shrinking.RemoveAt(n);
-                    continue;
-                }
+                var tile = index < tiles.Length ? tiles[index] : null;
+                if (tile == null || tile.root == null) { shrinking.RemoveAt(n); continue; }
 
-                float t = revealPunchSeconds <= 0f
-                    ? 1f
-                    : (Time.unscaledTime - shrinkStart[index]) / revealPunchSeconds;
-
+                float t = revealPunchSeconds <= 0f ? 1f : (Time.unscaledTime - shrinkStart[index]) / revealPunchSeconds;
                 if (t >= 1f)
                 {
-                    lines[index].transform.localScale = Vector3.one;
-                    if (rowColors != null && index < rowColors.Length)
-                        lines[index].color = rowColors[index];
+                    tile.root.localScale = Vector3.one;
+                    if (tile.inner != null) tile.inner.color = Shade(tileColors[index]);
                     shrinking.RemoveAt(n);
                     continue;
                 }
 
-                float punch = PunchOf(index);
-                lines[index].transform.localScale = Vector3.one * Mathf.Lerp(punch, 1f, t);
+                tile.root.localScale = Vector3.one * Mathf.Lerp(PunchOf(index), 1f, t);
 
                 // 흰빛에서 제 색으로. 크기보다 빨리 끝난다 - 색이 오래
                 // 남아 있으면 등급 색이 헷갈린다
-                if (revealFlashSeconds > 0f && rowColors != null && index < rowColors.Length)
+                if (revealFlashSeconds > 0f && tile.inner != null)
                 {
                     float ct = (Time.unscaledTime - shrinkStart[index]) / revealFlashSeconds;
-                    if (ct < 1f) lines[index].color = Color.Lerp(Color.white, rowColors[index], ct);
+                    if (ct < 1f && tileGrades[index] >= (int)GachaCurve.Grade.Rare)
+                        tile.inner.color = Color.Lerp(Color.white, Shade(tileColors[index]), ct);
                 }
             }
         }
 
-        /** 남은 줄을 그 자리에서 전부 연다. 연출을 못 기다리는 순간을 위한 문 */
-        private void RevealAll()
+        /** 남은 타일을 그 자리에서 전부 연다. 연출을 못 기다리는 순간을 위한 문 */
+        public void RevealAll()
         {
-            while (revealed < revealCount) RevealNext();
-            nextRevealAt = 0f;
+            while (revealed < count) RevealNext();
+            FinishReveal();
         }
 
         private void Start()
         {
             if (confirmButton != null) confirmButton.onClick.AddListener(OnConfirm);
-            Close();
+            if (repullButton != null) repullButton.onClick.AddListener(OnRepull);
+            if (visual != null && visual.activeSelf) Close();
         }
 
         private void OnDestroy()
         {
             if (confirmButton != null) confirmButton.onClick.RemoveListener(OnConfirm);
+            if (repullButton != null) repullButton.onClick.RemoveListener(OnRepull);
         }
 
         /**
          * @brief 확인 버튼. **연출 중이면 닫지 않고 전부 연다** (#12).
          *
-         * 연출이 도는 동안 이 버튼이 판을 닫으면, 급해서 누른 사람은 자기가
-         * 무엇을 뽑았는지 못 본 채로 판을 잃는다. 첫 탭은 건너뛰기, 두 번째
-         * 탭이 닫기다 - 뽑기 화면의 표준이고, 0.7초라 두 번 누를 일도 드물다.
+         * 첫 탭은 건너뛰기, 두 번째 탭이 닫기다 - 뽑기 화면의 표준이고,
+         * 0.7초라 두 번 누를 일도 드물다.
          */
         private void OnConfirm()
         {
@@ -443,26 +484,58 @@ namespace Onikiri.UI
             Close();
         }
 
+        /** 재뽑기. 연출 중이면 먼저 다 연다 - 확인과 같은 규칙 */
+        private void OnRepull()
+        {
+            if (Revealing) { RevealAll(); return; }
+            var handler = RepullRequested;
+            if (handler != null) handler();
+        }
+
         public void Close()
         {
-            // 열리다 만 상태로 꺼지면 다음 판이 그 상태를 이어받는다.
-            // 크기 0인 줄이 남아 있는 판이 바로 그것이다
             nextRevealAt = 0f;
             if (shrinking != null) shrinking.Clear();
 
-            if (lines != null)
-                foreach (var line in lines)
-                    if (line != null) line.transform.localScale = Vector3.one;
+            if (tiles != null)
+                foreach (var tile in tiles)
+                    if (tile != null && tile.root != null) tile.root.localScale = Vector3.one;
 
+            bool wasOpen = IsOpen;
             if (visual != null) visual.SetActive(false);
+
+            if (wasOpen)
+            {
+                var handler = Closed;
+                if (handler != null) handler();
+            }
         }
 
         /**
-         * @brief 결과 목록을 그린다. 목록은 **보관하지 않는다.**
+         * @brief 재뽑기 버튼의 상태. 상점이 Refresh마다 부른다 - 같은 지갑 규칙(CanPull).
          *
-         * GachaSystem이 돌려 쓰는 목록이라 다음 뽑기가 덮어쓴다. 그 자리에서
-         * 문자열로 옮기고 끝낸다.
+         * 못 사면 판을 죽인다. RGB만 곱한다 - 스칼라 곱은 알파까지 눌러 판을
+         * 반투명으로 만든다(41단계에서 물린 자리).
          */
+        public void SetRepull(bool affordable, int cost)
+        {
+            if (repullButton != null) repullButton.interactable = affordable;
+            if (repullCost != null)
+            {
+                repullCost.text = cost.ToString();
+                repullCost.color = affordable ? textColor : dimColor;
+            }
+            if (repullTitle != null) repullTitle.color = affordable ? textColor : dimColor;
+            if (repullBackground != null)
+            {
+                var tint = repullTint;
+                if (!affordable) { tint.r *= 0.55f; tint.g *= 0.55f; tint.b *= 0.55f; tint.a = 1f; }
+                repullBackground.color = tint;
+            }
+        }
+
+        // ---------------------------------------------------------------- 요도 뽑기
+
         public void Show(List<GachaSystem.PullResult> results, YodoSystem yodo)
         {
             Show(results, yodo, 0);
@@ -470,65 +543,112 @@ namespace Onikiri.UI
 
         /**
          * @param summonLevelUp 이 뽑기 묶음이 닿은 소환 레벨. 0이면 안 올랐다
-         *                      (GachaSystem.LastBatchLevelUp). 오르면 제목 줄
-         *                      끝에 "소환 Lv.n 달성"이 붙는다 - 연출은 69단계 몫이다
+         *                      (GachaSystem.LastBatchLevelUp). 오르면 마지막 타일이
+         *                      열린 뒤 제목 줄 끝에 "소환 Lv.n 달성"이 붙는다
          */
         public void Show(List<GachaSystem.PullResult> results, YodoSystem yodo, int summonLevelUp)
         {
-            if (visual == null || lines == null || results == null) return;
-            EnsureRowScratch();
+            if (visual == null || tiles == null || results == null) return;
+            EnsureScratch();
 
             int shards = 0;
-            var best = GachaCurve.Grade.Common;
             var counts = new int[GachaCurve.GradeCount];
-            int count = System.Math.Min(results.Count, lines.Length);
+            var noteLines = new List<string>();
+            int shown = Mathf.Min(results.Count, tiles.Length);
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < shown; i++)
             {
                 var result = results[i];
                 shards += result.Shards;
 
-                var grade = GachaCurve.GradeFor(result.Outcome);
-                counts[(int)grade]++;
-                if (grade > best) best = grade;
+                int grade = (int)GachaCurve.GradeFor(result.Outcome);
+                counts[grade]++;
 
-                rowTexts[i] = TextFor(result, yodo);
-                rowColors[i] = ColorOf(grade);
+                SetTile(i, grade, YodoIcon(result), YodoValue(result, yodo));
 
-                // 열리는 세기가 등급에서 나온다 (#12)
-                rowGrades[i] = (int)grade;
-
-                // ★4 이상이 전 폭 줄이다 - 오의 배너와 **같은 자**다 (50b).
-                // 처음에 전설만 넓혔다가 실기에서 물렸다: ★4의 미끄러짐 줄
-                // ("상위 혼 → 혼 정수 → 파편 80")이 들여쓰기로 좁아진 칸을
-                // 넘어 오른쪽 칸을 덮었다. 넓은 줄 = "이 뽑기의 진짜 상품"으로
-                // 두 배너가 같은 말을 한다
-                rowWide[i] = grade >= GachaCurve.Grade.Epic;
+                // 미끄러진 결과는 그리드 아래에 경로를 적는다 - 타일은 도착한
+                // 것을 보여주고, 무엇이 무엇이 됐는지는 이 줄이 말한다
+                // (44단계의 "버려지는 드랍 0"을 문구로 지키는 자리)
+                if (result.Downgraded) noteLines.Add(DowngradePrefix + TextFor(result, yodo));
             }
 
-            // 판이 물드는 것은 전설에서만이다. ★4까지는 줄 하나의 색으로
-            // 충분하고, 판까지 바뀌면 200회에 한 번의 사건이 20회에 한 번이
-            // 된다 - 사건은 드물어야 사건이다
-            Render(count, WithLevelUp(Headline(shards, counts), summonLevelUp), ColorOf(best),
-                   best == GachaCurve.Grade.Legendary);
+            Render(shown, Headline(shards, counts), TrimNotes(noteLines), summonLevelUp);
+        }
+
+        /** 미끄러짐 줄의 머리. 47단계의 "천장!" 자리 - 68단계에 천장이 사라졌다 */
+        public const string DowngradePrefix = "등급 하락 · ";
+
+        private Sprite YodoIcon(GachaSystem.PullResult result)
+        {
+            switch (result.Outcome)
+            {
+                case GachaCurve.Outcome.SoulEssence:
+                    return result.BladeIndex >= 0 ? soulSprite : shardSprite;
+
+                case GachaCurve.Outcome.SoulRarity:
+                    if (result.BladeIndex >= 0 && result.BladeIndex < bladeSprites.Length)
+                        return result.Downgraded ? soulSprite : bladeSprites[result.BladeIndex];
+                    return shardSprite;
+
+                case GachaCurve.Outcome.LegendaryBlade:
+                    return result.LegendaryIndex >= 0 && result.LegendaryIndex < legendarySprites.Length
+                        ? legendarySprites[result.LegendaryIndex] : shardSprite;
+
+                default:
+                    return shardSprite;
+            }
         }
 
         /**
-         * @brief 머리글. **합계이고, 위쪽 등급만 센다.**
+         * @brief 우하단 보조값. **짧다** - 타일 160px의 모서리 한 칸이다.
          *
-         * 46단계는 "파편 54 · 혼 정수 1"이었다. 사다리가 다섯이 되면서
-         * 등급을 다 세면 머리글이 다섯 조각이 되는데, 그러면 열 줄을 안
-         * 세게 하려고 만든 줄이 그 자체로 세야 하는 줄이 된다.
-         *
-         * 그래서 **파편 합계 + ★3 이상만** 적는다. ★1·★2는 전부 파편이라
-         * 이미 합계에 들어 있고, 위쪽 셋은 개수가 곧 사건이다.
+         * 파편이면 "+수", 혼 정수면 "혼 +1", 혼격이면 올라간 뒤의 "★n", 전설이면
+         * "획득" / "돌파 n". 긴 문장은 그리드 아래 노트 줄이 맡는다.
          */
+        private static string YodoValue(GachaSystem.PullResult result, YodoSystem yodo)
+        {
+            switch (result.Outcome)
+            {
+                case GachaCurve.Outcome.SoulEssence:
+                    return result.BladeIndex >= 0 ? "혼 +1" : "+" + result.Shards;
+
+                case GachaCurve.Outcome.SoulRarity:
+                {
+                    if (result.Downgraded)
+                        return result.BladeIndex >= 0 ? "혼 +1" : "+" + result.Shards;
+                    var blade = yodo != null ? yodo.GetBlade(result.BladeIndex) : null;
+                    return blade != null ? "★" + blade.rarity : "★";
+                }
+
+                case GachaCurve.Outcome.LegendaryBlade:
+                {
+                    if (result.LegendaryIndex < 0) return "+" + result.Shards;
+                    var blade = yodo != null ? yodo.GetLegendary(result.LegendaryIndex) : null;
+                    if (blade == null) return "획득";
+                    return blade.copies <= 1 ? "획득" : "돌파 " + blade.Breakthrough;
+                }
+
+                default:
+                    return "+" + result.Shards;
+            }
+        }
+
+        /** 노트 줄은 판에 있는 칸만큼. 넘치면 마지막 칸이 "외 n"이 된다 */
+        private List<string> TrimNotes(List<string> lines)
+        {
+            int capacity = notes != null ? notes.Length : 0;
+            if (lines.Count <= capacity || capacity == 0) return lines;
+
+            var trimmed = lines.GetRange(0, capacity - 1);
+            trimmed.Add("외 " + (lines.Count - capacity + 1));
+            return trimmed;
+        }
+
         /**
          * @brief 제목 줄 끝에 레벨업 한 줄을 붙인다. 안 올랐으면 그대로다.
          *
-         * 문구의 출처는 곡선이다(SummonLevelCurve.LevelUpText). 47단계의
-         * "천장!" 꼬리표가 서던 자리를 레벨업이 대신한다 - 보장이 아니라
-         * 성장이 이 뽑기의 사건이다.
+         * 문구의 출처는 곡선이다(SummonLevelCurve.LevelUpText). 69단계부터는
+         * **마지막 타일이 열린 뒤에** 붙는다(FinishReveal).
          */
         public static string WithLevelUp(string headline, int summonLevelUp)
         {
@@ -536,6 +656,12 @@ namespace Onikiri.UI
             return headline + "  ·  " + SummonLevelCurve.LevelUpText(summonLevelUp);
         }
 
+        /**
+         * @brief 머리글. **합계이고, 위쪽 등급만 센다.**
+         *
+         * 파편 합계 + ★3 이상의 개수. ★1·★2는 전부 파편이라 이미 합계에
+         * 들어 있고, 위쪽 셋은 개수가 곧 사건이다.
+         */
         private static string Headline(int shards, int[] counts)
         {
             string text = "파편 " + shards;
@@ -549,148 +675,105 @@ namespace Onikiri.UI
         }
 
         /**
-         * @brief 한 줄의 문구.
-         *
-         * 혼 정수가 갈 곳이 있었는지를 반드시 적는다. 상한(리드)에 닿아
-         * 파편이 된 경우에 "혼 정수"라고만 적으면 플레이어는 티어가 오를
-         * 것을 기대하고 대장간에 갔다가 아무것도 못 찾는다 - 44단계가
-         * "버려지는 드랍 0"을 값으로 지켰다면 여기서는 **문구로** 지킨다.
+         * @brief 미끄러짐 노트의 본문. 46~68단계 결과 줄의 문장 그대로다.
          */
         private static string TextFor(GachaSystem.PullResult result, YodoSystem yodo)
         {
             switch (result.Outcome)
             {
-                case GachaCurve.Outcome.SoulEssence:
-                    return EssenceText(result, yodo, string.Empty);
-
-                case GachaCurve.Outcome.SoulRarity:
-                    return RarityText(result, yodo);
-
-                case GachaCurve.Outcome.LegendaryBlade:
-                    return LegendaryText(result, yodo);
-
-                default:
-                    return "파편 " + result.Shards;
+                case GachaCurve.Outcome.SoulEssence:    return EssenceText(result, yodo, string.Empty);
+                case GachaCurve.Outcome.SoulRarity:     return RarityText(result, yodo);
+                case GachaCurve.Outcome.LegendaryBlade: return LegendaryText(result, yodo);
+                default:                                return "파편 " + result.Shards;
             }
         }
 
-        private static string EssenceText(GachaSystem.PullResult result, YodoSystem yodo,
-                                          string prefix)
+        private static string EssenceText(GachaSystem.PullResult result, YodoSystem yodo, string prefix)
         {
-            if (result.BladeIndex < 0)
-                return prefix + "혼 정수 → 파편 " + result.Shards;
+            if (result.BladeIndex < 0) return prefix + "혼 정수 → 파편 " + result.Shards;
 
             var blade = yodo != null ? yodo.GetBlade(result.BladeIndex) : null;
             string name = blade != null ? blade.soulName : "혼";
             return prefix + "혼 정수 → " + name;
         }
 
-        /**
-         * @brief ★4 한 줄. **미끄러진 것을 반드시 적는다.**
-         *
-         * 혼격이 꽉 차면 ★4는 ★3으로 내려간다(GachaSystem.GrantRarity).
-         * 그때 "상위 혼"이라고만 적으면 플레이어는 대장간에 가서 혼격이 안
-         * 오른 것을 보고, "혼 정수"라고만 적으면 등급이 내려간 것을 모른다.
-         * 두 단어를 다 적어 **무엇이 무엇이 됐는지**를 그 자리에서 말한다 -
-         * 46단계의 "혼 정수 → 파편 40"과 같은 문법이다.
-         */
         private static string RarityText(GachaSystem.PullResult result, YodoSystem yodo)
         {
-            string prefix = string.Empty;
-
-            if (result.Downgraded)
-                return EssenceText(result, yodo, prefix + "상위 혼 → ");
+            if (result.Downgraded) return EssenceText(result, yodo, "상위 혼 → ");
 
             var blade = yodo != null ? yodo.GetBlade(result.BladeIndex) : null;
-            if (blade == null) return prefix + "상위 혼";
-
-            // 혼격은 올라간 **뒤**의 값이다. 화면이 도감과 같은 숫자를 적어야
-            // "뽑았는데 안 올랐다"가 안 나온다
-            return prefix + blade.bladeName + " " + YodoRarityCurve.Stars(blade.rarity);
+            if (blade == null) return "상위 혼";
+            return blade.bladeName + " " + YodoRarityCurve.Stars(blade.rarity);
         }
 
-        /**
-         * @brief ★5 한 줄. 새 칼인가 돌파인가를 가른다.
-         *
-         * 두 사건의 크기가 다르다 - 새 칼은 도감에 줄이 하나 켜지는 일이고
-         * 돌파는 있던 줄이 깊어지는 일이다. 같은 문구로 적으면 200회에 한
-         * 번의 결과가 어느 쪽이었는지 판에서 읽히지 않는다.
-         */
         private static string LegendaryText(GachaSystem.PullResult result, YodoSystem yodo)
         {
-            if (result.LegendaryIndex < 0)
-                return "전설 → 파편 " + result.Shards;
+            if (result.LegendaryIndex < 0) return "전설 → 파편 " + result.Shards;
 
             var blade = yodo != null ? yodo.GetLegendary(result.LegendaryIndex) : null;
             if (blade == null) return "전설 요도";
-
-            return blade.copies <= 1
-                ? blade.bladeName + " 획득!"
-                : blade.bladeName + " 돌파 " + blade.Breakthrough;
+            return blade.copies <= 1 ? blade.bladeName + " 획득!" : blade.bladeName + " 돌파 " + blade.Breakthrough;
         }
 
         // ---------------------------------------------------------------- 오의 뽑기 (50단계)
 
-        /**
-         * @brief 오의 뽑기 결과를 **같은 판에** 그린다.
-         *
-         * 판을 따로 만들지 않은 이유는 47단계가 등급 색과 별로 세운 것이
-         * **눈금**이기 때문이다(UiSkin.Grades 주석) - 눈금은 뜻이 하나여야
-         * 하고, 같은 ★4가 두 판에서 다른 색·다른 배치로 뜨면 그 하나가 깨진다.
-         * 갈리는 것은 줄의 문구뿐이고, 그것이 두 배너의 차이 전부다.
-         *
-         * 머리글도 규칙이 같다 - 합계 하나 + ★3 이상만 센다. 저쪽의 합계가
-         * 파편이고 이쪽은 XP다.
-         */
         public void Show(List<SkillGachaSystem.PullResult> results, SkillSystem skills)
         {
             Show(results, skills, 0);
         }
 
-        /** @param summonLevelUp 요도 쪽 Show와 같다 (SkillGachaSystem.LastBatchLevelUp) */
-        public void Show(List<SkillGachaSystem.PullResult> results, SkillSystem skills,
-                         int summonLevelUp)
+        /**
+         * @brief 오의 뽑기 결과를 **같은 판에** 그린다.
+         *
+         * 판을 따로 만들지 않은 이유는 47단계가 등급 색과 별로 세운 것이
+         * **눈금**이기 때문이다(UiSkin.Grades 주석). 타일의 색·빛은 **굴린
+         * 등급**이다 - 미끄러져 XP로 떨어진 ★5도 ★5로 빛난다: 그 타일이
+         * 기록하는 사건이 도착지가 아니라 출발지이기 때문이다(50b 판단 그대로).
+         * 도착한 것은 아이콘과 보조값이, 경로는 노트 줄이 말한다.
+         */
+        public void Show(List<SkillGachaSystem.PullResult> results, SkillSystem skills, int summonLevelUp)
         {
-            if (visual == null || lines == null || results == null) return;
-            EnsureRowScratch();
+            if (visual == null || tiles == null || results == null) return;
+            EnsureScratch();
 
             int xp = 0;
-            var best = GachaCurve.Grade.Common;
             var counts = new int[GachaCurve.GradeCount];
-            int count = System.Math.Min(results.Count, lines.Length);
+            var noteLines = new List<string>();
+            int shown = Mathf.Min(results.Count, tiles.Length);
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < shown; i++)
             {
                 var result = results[i];
                 xp += result.Xp;
 
+                int rolled = (int)GachaCurve.GradeOf[(int)result.Rolled];
                 counts[(int)result.Grade]++;
-                if (result.Grade > best) best = result.Grade;
 
-                // **굴린 등급이 넓은 줄을 정한다** - 도착한 등급이 아니라.
-                // ★4·★5는 미끄러져 XP로 떨어져도 그 줄이 사건의 기록이고
-                // ("오의 해금 → XP +240"), 실기에서 삐져나온 것이 정확히
-                // 그 미끄러짐 줄이었다. 요도 쪽과 기준이 다른 이유는 재고다 -
-                // 이 배너의 ★4(해금)는 평생 두 번뿐이라 넓혀도 사건으로
-                // 남지만, 요도의 ★4는 실효 4.1%라 넓히면 판이 넓은 줄투성이가
-                // 된다
-                rowWide[i] = GachaCurve.GradeOf[(int)result.Rolled] >= GachaCurve.Grade.Epic;
+                SetTile(i, rolled, SkillIcon(result), SkillValue(result, skills));
 
-                rowTexts[i] = SkillTextFor(result, skills, rowWide[i]);
-
-                // 미끄러진 줄의 색도 굴린 등급이다. 도착한 등급(XP = ★1~★3)
-                // 으로 칠하면 전 폭 줄이 바닥 색을 입어 "넓은데 수수한" 줄이
-                // 되고, 그것은 신호 둘이 서로를 지우는 것이다
-                rowColors[i] = ColorOf(GachaCurve.GradeOf[(int)result.Rolled]);
-
-                // 색과 같은 자에서 나온다 - 굴린 등급이다 (#12). 미끄러져
-                // XP로 떨어진 ★5도 ★5만큼 크게 튄다: 그 줄이 기록하는 사건이
-                // 도착지가 아니라 출발지이기 때문이다(위 rowWide와 같은 판단)
-                rowGrades[i] = (int)GachaCurve.GradeOf[(int)result.Rolled];
+                if (result.Downgraded) noteLines.Add(DowngradePrefix + SkillTextFor(result, skills));
             }
 
-            Render(count, WithLevelUp(SkillHeadline(xp, counts), summonLevelUp), ColorOf(best),
-                   best == GachaCurve.Grade.Legendary);
+            Render(shown, SkillHeadline(xp, counts), TrimNotes(noteLines), summonLevelUp);
+        }
+
+        private Sprite SkillIcon(SkillGachaSystem.PullResult result)
+        {
+            int index = result.Outcome == SkillGachaCurve.Outcome.Awakening ? result.AwakenedIndex
+                      : result.Outcome == SkillGachaCurve.Outcome.SkillUnlock ? result.UnlockedIndex
+                      : -1;
+            if (index >= 0 && index < skillSprites.Length && skillSprites[index] != null) return skillSprites[index];
+            return skillXpSprite;
+        }
+
+        private static string SkillValue(SkillGachaSystem.PullResult result, SkillSystem skills)
+        {
+            switch (result.Outcome)
+            {
+                case SkillGachaCurve.Outcome.Awakening:   return "개안";
+                case SkillGachaCurve.Outcome.SkillUnlock: return NameOf(skills, result.UnlockedIndex);
+                default:                                  return "+" + result.Xp;
+            }
         }
 
         private static string SkillHeadline(int xp, int[] counts)
@@ -706,55 +789,24 @@ namespace Onikiri.UI
         }
 
         /**
-         * @brief 오의 뽑기 한 줄. **넓은 줄과 좁은 줄이 다른 문법을 쓴다** (50b).
+         * @brief 미끄러짐 노트의 본문. 50b 결과 줄의 문장 그대로다.
          *
-         * 처음에는 한 문법이었다("스킬 XP 240 → Lv +8"). 그 줄이 반 폭 칸을
-         * 넘어 판 밖으로 삐져나왔고, 화살표가 두 가지 뜻(미끄러짐 / 레벨업)
-         * 으로 겹쳐 있기도 했다. 갈랐다:
-         *
-         *   좁은 줄   "XP +6" · "XP +70 · Lv +5"    반 폭에 반드시 든다
-         *   넓은 줄   "오의 해금 · 혈폭"              화살표는 미끄러짐 전용
-         *
-         * 좁은 줄에서 "스킬"을 뗀 것은 상자 때문이 아니라(그래도 들어간다)
-         * 열 줄이 다 같은 말로 시작하면 눈이 훑을 것이 없어지기 때문이다 -
-         * 헤드라인이 이미 "스킬 XP 360"으로 합계를 말하고 있다.
-         *
-         * **미끄러진 것은 반드시 적는다.** 47단계가 "상위 혼 → 혼 정수"로
-         * 세운 문법 그대로다 - 도착한 곳만 적으면 등급이 내려간 것을 모르고,
-         * 출발한 곳만 적으면 화면과 실제가 갈린다. 미끄러진 줄은 굴린 등급이
-         * ★4+라 언제나 넓은 줄이고, 그래서 긴 사슬이 좁은 칸에 끼일 일이
-         * 없다.
-         *
-         * XP 줄에 **오른 레벨을 함께 적는** 규칙은 그대로다. XP는 게이지
-         * 안으로 사라지는 값이라 수량만 적으면 그 줄이 무슨 일을 했는지
-         * 화면에서 읽히지 않는다.
+         * 미끄러진 칸을 **출발점부터 하나씩** 적는다 - "오의 개안 → 오의 해금 →
+         * XP +240". 아래로 걸어 닿는지는 사다리가 판정한다(SlidesTo).
          */
-        private static string SkillTextFor(SkillGachaSystem.PullResult result, SkillSystem skills,
-                                           bool wide)
+        private static string SkillTextFor(SkillGachaSystem.PullResult result, SkillSystem skills)
         {
             string prefix = string.Empty;
 
-            // 미끄러진 칸을 **출발점부터 하나씩** 적는다. ★5가 두 칸 내려간
-            // 줄은 "오의 개안 → 오의 해금 → XP +240"이 되고, 그 줄 하나로
-            // 200회에 한 번의 결과가 무엇이었고 왜 그것이 안 됐는지가 읽힌다
-            //
-            // **먼저 미끄러졌는지 묻는다.** 50단계에는 굴린 칸과 받은 칸이
-            // 다른 이유가 둘이었다 - 미끄러짐(위 -> 아래)과 천장(아래 -> 위).
-            // 68단계에 천장이 사라졌지만, 아래로 걸어 닿는지는 사다리가
-            // 판정한다는 규칙(SlidesTo)은 그대로 둔다
             if (SkillGachaCurve.SlidesTo(result.Rolled, result.Outcome))
-                for (var at = result.Rolled; at != result.Outcome;
-                     at = SkillGachaCurve.SlideFor(at))
+                for (var at = result.Rolled; at != result.Outcome; at = SkillGachaCurve.SlideFor(at))
                     prefix += NameOfOutcome(at) + " → ";
 
             switch (result.Outcome)
             {
                 case SkillGachaCurve.Outcome.Awakening:
-                    // 도달한 레벨을 함께 적는다. 개안의 사건은 "어디까지 갔는가"
-                    // 이고, 상한이 곧 그 답이다 - 적지 않으면 해금 줄과 같은
-                    // 무게로 읽힌다
                     return prefix + "오의 개안 · " + NameOf(skills, result.AwakenedIndex)
-                         + " Lv." + Onikiri.Progression.SkillCurve.MaxLevel;
+                         + " Lv." + SkillCurve.MaxLevel;
 
                 case SkillGachaCurve.Outcome.SkillUnlock:
                     return prefix + "오의 해금 · " + NameOf(skills, result.UnlockedIndex);
@@ -772,8 +824,7 @@ namespace Onikiri.UI
          * @brief 결과의 이름. **확률표와 같은 말을 쓴다.**
          *
          * 표에서 "영웅 오의 해금"으로 읽은 것이 결과 판에서 다른 이름으로
-         * 뜨면 플레이어는 그 둘이 같은 것인지 알 수 없다 - 47단계가 확률표와
-         * 결과 판을 같은 배열에서 뽑은 것과 같은 규칙이다.
+         * 뜨면 플레이어는 그 둘이 같은 것인지 알 수 없다.
          */
         public static string NameOfOutcome(SkillGachaCurve.Outcome outcome)
         {
@@ -791,22 +842,13 @@ namespace Onikiri.UI
             return slot != null ? slot.displayName : "오의";
         }
 
-        private Color ColorFor(GachaSystem.PullResult result)
-        {
-            return ColorOf(GachaCurve.GradeFor(result.Outcome));
-        }
-
         /**
          * @brief 등급의 색. 배열이 안 배선된 씬에서는 46단계의 색으로 떨어진다.
-         *
-         * 폴백을 남기는 이유는 41단계 이후의 규칙이다 - 배선이 빠진 씬에서
-         * 화면이 아예 안 뜨는 것보다 조용히 수수한 편이 낫다.
          */
         private Color ColorOf(GachaCurve.Grade grade)
         {
             int index = (int)grade;
-            if (gradeColors != null && index >= 0 && index < gradeColors.Length)
-                return gradeColors[index];
+            if (gradeColors != null && index >= 0 && index < gradeColors.Length) return gradeColors[index];
 
             return grade >= GachaCurve.Grade.Rare ? goldColor
                  : grade == GachaCurve.Grade.Uncommon ? textColor
