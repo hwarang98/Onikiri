@@ -826,6 +826,9 @@ namespace Onikiri.EditorTools
             notice.transform.SetAsLastSibling();
             Stretch((RectTransform)notice.transform);
             notice.AddComponent<Image>().color = DimColor;
+            // 화면을 덮는 딤이라 팝업 층위다 - 층위 10인 가이드 카드 · EXP 띠가 그 위에 올라오면
+            // 안내 글자를 가린다(70단계, PopupLayerAudit). 레이캐스터는 딤이 탭을 막던 그대로 둔다
+            BattleContentBuilder.RaiseToLayer(notice.transform, Onikiri.Core.DisplayConfig.SortingPopup, true);
 
             var noticeLabel = CreateLabel(notice.transform, font, "Label",
                                           PixelFontSizesSmall, TextAlignmentOptions.Center);
@@ -840,6 +843,7 @@ namespace Onikiri.EditorTools
             result.transform.SetAsLastSibling();
             Stretch((RectTransform)result.transform);
             result.AddComponent<Image>().color = DimColor;
+            BattleContentBuilder.RaiseToLayer(result.transform, Onikiri.Core.DisplayConfig.SortingPopup, true);
 
             var resultTitle = CreateLabel(result.transform, font, "Title",
                                           PixelFontSizesLarge, TextAlignmentOptions.Center);

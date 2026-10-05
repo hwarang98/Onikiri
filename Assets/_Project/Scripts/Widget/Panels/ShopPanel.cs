@@ -158,6 +158,7 @@ namespace Onikiri.UI
                     SkillBuyLaterText, SoldOutText, LockedText(41),
                     LevelLabel(888), BarText(8888, 8888),
                     GachaRatePopup.YodoTitle, GachaRatePopup.SkillTitle, GachaRatePopup.FootnoteFor(888),
+                    GachaResultPopup.RevealingText,
                     GachaRatePopup.PercentText(0.7163),
                     GachaResultPopup.DowngradePrefix + "상위 혼 → 혼 정수 → 파편 80",
                     GachaResultPopup.DowngradePrefix + "오의 개안 → 오의 해금 → XP +240",

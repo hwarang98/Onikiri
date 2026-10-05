@@ -292,6 +292,9 @@ namespace Onikiri.EditorTools
                 SkillGachaCurve.TotalXpToCap / SkillGachaCurve.ExpectedXpPerPull(1)));
 
             BattleContentBuilder.RelinkScreenTabs();
+
+            // 팝업은 전부 층위 20 위에 (70단계) - 이 빌더가 세운 둘만이 아니라 SafeArea 전체를 잰다
+            PopupLayerAudit.LogProblems(safeArea);
             return system;
         }
 
@@ -969,6 +972,12 @@ namespace Onikiri.EditorTools
             overlay.color = ResultOverlayColor;
             overlay.raycastTarget = true;               // 판 뒤의 상점이 눌리지 않게
 
+            // 판을 누르면 남은 타일을 전부 연다(70단계 - 69단계 지시서의 "탭하면 전부 열림"이
+            // 확인 · 재뽑기 버튼에만 있었다). 색은 바꾸지 않는다 - 딤이 깜빡이면 고장으로 읽힌다
+            var overlayButton = visual.AddComponent<Button>();
+            overlayButton.transition = Selectable.Transition.None;
+            overlayButton.targetGraphic = overlay;
+
             // ---- 그리드. 가운데보다 조금 위 - 아래에 노트와 버튼이 선다
             var gridGo = new GameObject("Grid", typeof(RectTransform));
             gridGo.transform.SetParent(visual.transform, false);
@@ -986,7 +995,7 @@ namespace Onikiri.EditorTools
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = titleRect.anchorMax = new Vector2(0.5f, 0.5f);
             titleRect.pivot = new Vector2(0.5f, 0f);
-            titleRect.sizeDelta = new Vector2(DisplayConfig.DesignWidth - ResultSidePad * 2f, LineHeight);
+            titleRect.sizeDelta = new Vector2(ResultTitleWidth, LineHeight);
             titleRect.anchoredPosition = new Vector2(0f, ResultGridCenterY + gridHalf + 36f);
             title.text = "파편 0";
 
@@ -1079,6 +1088,8 @@ namespace Onikiri.EditorTools
             var so = new SerializedObject(popup);
             so.FindProperty("visual").objectReferenceValue = visual;
             so.FindProperty("titleLabel").objectReferenceValue = title;
+            so.FindProperty("titleCaptionFont").objectReferenceValue = UiFonts.Caption;
+            so.FindProperty("overlayButton").objectReferenceValue = overlayButton;
             so.FindProperty("grid").objectReferenceValue = grid;
             so.FindProperty("confirmButton").objectReferenceValue = confirm;
             so.FindProperty("repullButton").objectReferenceValue = repull;
@@ -1150,6 +1161,26 @@ namespace Onikiri.EditorTools
         }
 
         public const string ResultPopupName = "GachaResultPopup";
+
+        /** 결과 판 제목의 최장형 - 한 판 10장이라 개수는 많아야 두 자리, 레벨은 두 자리로 잡는다 */
+        public static string ResultTitleWorst
+        {
+            get { return Onikiri.UI.GachaResultPopup.WithLevelUp("파편 2400 · 희귀 10 · 영웅 10 · 전설 10", 88); }
+        }
+
+        public static string ResultTitleWorstSkill
+        {
+            get { return Onikiri.UI.GachaResultPopup.WithLevelUp("스킬 XP 2400 · 희귀 10 · 영웅 10 · 전설 10", 88); }
+        }
+
+        /**
+         * 결과 판 제목 칸의 폭. 그리드 여백(72)보다 넓다(40) - 70단계에 캡션으로 내린
+         * 오의 최장형이 942px라 936px 칸을 6px 넘었다. 제목은 그리드 위 한 줄이라
+         * 그리드보다 넓어도 어긋나 보이지 않는다
+         */
+        public static float ResultTitleWidth { get { return DisplayConfig.DesignWidth - ResultTitleSidePad * 2f; } }
+
+        private const float ResultTitleSidePad = 40f;
 
         /** 판 뒤 딤. 선형 색 공간이라 알파 0.88은 체감 38% 밝기로만 어두워진다 - 0.96(체감 약 23%)으로 결과만 보이게, 그래도 게임이 돈다는 기색은 남긴다 */
         private static readonly Color ResultOverlayColor = new Color(0f, 0f, 0f, 0.96f);
@@ -1285,6 +1316,13 @@ namespace Onikiri.EditorTools
             footnote.text = Onikiri.UI.GachaRatePopup.FootnoteFor(1);
             footnote.color = DimColor;
 
+            // 창 높이를 표에 맞춘다(70단계). PopupBuilder의 높이는 세이프 영역의 비율이라
+            // 긴 화면(22:9)일수록 창이 길어져 표 아래 절반이 비었다(실기) - 고정 px로 묶는다
+            window.anchorMin = new Vector2(window.anchorMin.x, 0.5f);
+            window.anchorMax = new Vector2(window.anchorMax.x, 0.5f);
+            window.offsetMin = new Vector2(window.offsetMin.x, -RateWindowHeight * 0.5f);
+            window.offsetMax = new Vector2(window.offsetMax.x, RateWindowHeight * 0.5f);
+
             var popup = root.gameObject.AddComponent<Onikiri.UI.GachaRatePopup>();
             var so = new SerializedObject(popup);
             so.FindProperty("yodoTable").objectReferenceValue = yodoTable;
@@ -1330,6 +1368,9 @@ namespace Onikiri.EditorTools
         private static string RateFootnote { get { return Onikiri.UI.GachaRatePopup.FootnoteFor(888); } }
 
         private const float RatePopupHeightFraction = 0.24f;
+
+        /** 확률 창 높이 = 표 위 104 + 세 줄 + 16 + 아랫줄 + 아래 여백 40 */
+        private const float RateWindowHeight = RateTableTop + LineHeight * 3f + 16f + LineHeight + 40f;
         private const float RatePad = 48f;
         private const float RateTableTop = 104f;
         private static float RateWindowWidth { get { return DisplayConfig.DesignWidth - 72f; } }
@@ -1458,10 +1499,11 @@ namespace Onikiri.EditorTools
                               + (SkillCurve.MaxLevel - 1), noteWidth, "result note");
                 CheckLine(text, "확인", ResultConfirmWidth - ButtonTextPad * 2f, "confirm");
 
-                CheckLine(text, Onikiri.UI.GachaResultPopup.WithLevelUp(
-                              "파편 8888 · 희귀 8 · 영웅 8 · 전설 8", 88), noteWidth, "result title + level up");
-                CheckLine(text, Onikiri.UI.GachaResultPopup.WithLevelUp(
-                              "스킬 XP 8888 · 희귀 8 · 영웅 8 · 전설 8", 88), noteWidth, "result title + level up");
+                // 결과 판 제목은 44pt로 그리고, 넘치면 런타임이 캡션(33)으로 내린다(70단계).
+                // 그래서 여기서는 **내린 뒤의 최장형**(두 자리 개수 · 두 자리 레벨)이 칸 안인지 잰다.
+                // 69단계는 이 줄을 캡션으로만 재서 44pt 넘침(1037px > 936px, 실기)을 놓쳤다
+                CheckLine(text, ResultTitleWorst, ResultTitleWidth, "result title (caption fallback)");
+                CheckLine(text, ResultTitleWorstSkill, ResultTitleWidth, "result title (caption fallback)");
 
                 // 44pt - 배너 제목 · 버튼 동사
                 SetFont(text, primary, Onikiri.UI.PixelFontSizes.GalmuriSmall);
