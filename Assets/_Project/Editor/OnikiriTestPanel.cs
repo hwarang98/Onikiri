@@ -3984,7 +3984,140 @@ namespace Onikiri.EditorTools
                     MessageType.Info);
             }
 
+            DrawCloudForeignSidecarTools();
             DrawCloudAppCheckTools();
+        }
+
+        private string foreignSidecarPreview = string.Empty;
+
+        /**
+         * @brief 71단계 - **다른 uid의 사이드카**를 만난 부팅 (Recover의 부팅 입구).
+         *
+         * 70단계 실기: 자동 백업이 옛 uid의 사이드카를 되살려 새 익명 uid로 뜬
+         * 앱이 30초마다 PERMISSION_DENIED를 냈다(한 실행에 기기 id가 둘).
+         * 위 줄은 지금 디스크의 실제 상태(읽기만), 아래 버튼은 SaveSandbox 안에서
+         * 부팅 코루틴을 직접 돌린다 - 실사용 세이브·사이드카 무접촉.
+         */
+        private void DrawCloudForeignSidecarTools()
+        {
+            EditorGUILayout.LabelField("크로스 저장 (71단계 - 다른 uid 사이드카)", EditorStyles.boldLabel);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                string uid = Onikiri.Cloud.CloudScores.Uid;
+                var disk = Onikiri.Cloud.CloudSaveSidecar.Load();
+
+                Row("지금 uid", string.IsNullOrEmpty(uid) ? "(없음 - 에디터는 로그인 없음)" : MaskId(uid));
+                Row("디스크 사이드카", disk == null ? "없음"
+                    : MaskId(disk.ownerUid) + " · rev " + disk.baseRevision + " · 기기 " + MaskId(disk.deviceId)
+                      + (string.IsNullOrEmpty(uid) ? "" : disk.ownerUid == uid ? "  (이 uid)" : "  ★ 다른 uid"));
+                Row("이 실행의 기기 id", string.IsNullOrEmpty(uid) ? "-"
+                    : MaskId(Onikiri.Cloud.CloudSaveSession.DeviceIdFor(uid)));
+                Row("옛 사이드카 보존", System.IO.File.Exists(Onikiri.Cloud.CloudSaveSidecar.PreRecoverPath)
+                    ? "있음" : "없음");
+                Row("부팅 입구 횟수", Onikiri.Cloud.CloudSaveRecovery.BootEntries.ToString());
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("부팅 시뮬 (샌드박스 - 실사용 파일 무접촉)",
+                                           EditorStyles.miniBoldLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("③ 새 uid 서버 없음")) SimulateForeignBoot(RecoverySim.Missing);
+                    if (GUILayout.Button("④ 같음")) SimulateForeignBoot(RecoverySim.Same);
+                    if (GUILayout.Button("⑤ 다름")) SimulateForeignBoot(RecoverySim.Diverged);
+                    if (GUILayout.Button("오프라인")) SimulateForeignBoot(RecoverySim.Offline);
+                }
+
+                if (!string.IsNullOrEmpty(foreignSidecarPreview))
+                    EditorGUILayout.HelpBox(foreignSidecarPreview, MessageType.None);
+
+                EditorGUILayout.HelpBox(
+                    "기대: 어느 갈래든 새 uid의 rev 0 사이드카가 디스크에 남고, 그 기기 id가 "
+                    + "세션 게이트의 DeviceIdFor와 같다. 옛 사이드카는 .prerecover로 남는다.\n"
+                    + "실기 검증 = logcat에서 '다른 uid의 사이드카 - 부팅 복구 판정' → '새 사이드카를 "
+                    + "남겼습니다' → '동기화 완료 (rev 1)', PERMISSION_DENIED 0건.",
+                    MessageType.Info);
+            }
+        }
+
+        private void SimulateForeignBoot(RecoverySim sim)
+        {
+            const string OldUid = "panel-old-uid-71";
+            const string NewUid = "panel-new-uid-71";
+
+            bool netAllowed = Onikiri.Cloud.CloudSaveSync.EditorNetworkAllowed;
+
+            try
+            {
+                using (new SaveSandbox())
+                {
+                    var local = SaveData.NewGame();
+                    local.stage = 12;
+                    local.maxStageReached = 12;
+                    SaveSystem.Save(local);
+
+                    var old = Onikiri.Cloud.CloudSaveLocalState.NewFor(OldUid, Onikiri.Cloud.CloudSaveIds.New());
+                    Onikiri.Cloud.CloudSaveSidecar.Save(old);
+
+                    var server = SaveData.NewGame();
+                    server.stage = sim == RecoverySim.Same ? 12 : 171;
+                    server.maxStageReached = server.stage;
+
+                    var status = sim == RecoverySim.Missing
+                        ? Onikiri.Cloud.CloudSaveStoreStatus.Missing
+                        : sim == RecoverySim.Offline
+                            ? Onikiri.Cloud.CloudSaveStoreStatus.Offline
+                            : Onikiri.Cloud.CloudSaveStoreStatus.Found;
+
+                    var envelope = Onikiri.Cloud.CloudSaveEnvelope.ForUpload(
+                        sim == RecoverySim.Same ? local : server, 4L,
+                        Onikiri.Cloud.CloudSaveIds.New(), Onikiri.Cloud.CloudSaveIds.New(),
+                        Onikiri.Cloud.CloudSaveIds.New());
+
+                    Onikiri.Cloud.CloudSaveCoordinator.UseIdentityForTests(() => NewUid);
+                    Onikiri.Cloud.CloudSaveCoordinator.UseFetchForTests(u =>
+                        System.Threading.Tasks.Task.FromResult(new Onikiri.Cloud.CloudSaveFetchResult
+                        {
+                            status = status,
+                            envelope = status == Onikiri.Cloud.CloudSaveStoreStatus.Found ? envelope : null
+                        }));
+
+                    Onikiri.Cloud.CloudSaveBootChoice choice = null;
+                    var routine = Onikiri.Cloud.CloudSaveCoordinator.ChooseBootSave(local, c => choice = c);
+                    int guard = 0;
+                    while (routine.MoveNext() && guard++ < 10000) { }
+
+                    var after = Onikiri.Cloud.CloudSaveSidecar.Load();
+                    string gateDevice = Onikiri.Cloud.CloudSaveSession.DeviceIdFor(NewUid);
+
+                    foreignSidecarPreview = "입구 " + Onikiri.Cloud.CloudSaveRecovery.BootEntries + "회 · 갈래 -> "
+                        + Onikiri.Cloud.CloudSaveRecovery.LastPlan
+                        + "\n부팅 판정 -> " + (choice != null ? choice.decision + " / " + choice.state : "(없음)")
+                        + "\n새 사이드카 -> " + (after == null ? "없음 ✗"
+                            : (after.ownerUid == NewUid ? "새 uid" : after.ownerUid) + " · rev " + after.baseRevision
+                              + " · 기기 id " + (after.deviceId == gateDevice ? "= 게이트 ✓" : "≠ 게이트 ✗"))
+                        + "\n옛 사이드카 보존 -> " + (System.IO.File.Exists(
+                            Onikiri.Cloud.CloudSaveSidecar.PreRecoverPath) ? "남음" : "없음 ✗")
+                        + " · 세이브 .prerecover -> " + (System.IO.File.Exists(
+                            Onikiri.Cloud.CloudSaveRecovery.PreRecoverBackupPath) ? "남음" : "없음 ✗")
+                        + "\nurgent -> " + (Onikiri.Cloud.CloudSaveSync.IsUrgentForTests ? "예약됨" : "없음")
+                        + " · 충돌 재료 -> " + (Onikiri.Cloud.CloudSaveSync.ConflictServerEnvelope != null ? "있음" : "없음");
+                }
+            }
+            finally
+            {
+                Onikiri.Cloud.CloudSaveRecovery.ResetForTests();
+                Onikiri.Cloud.CloudSaveCoordinator.ResetForTests();
+                Onikiri.Cloud.CloudSaveSync.ResetForTests();
+                Onikiri.Cloud.CloudSaveSync.EditorNetworkAllowed = netAllowed;
+            }
+        }
+
+        private static string MaskId(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "(없음)";
+            return id.Length <= 6 ? id : id.Substring(0, 6) + "…";
         }
 
         private string appCheckPreview = string.Empty;
@@ -4178,11 +4311,8 @@ namespace Onikiri.EditorTools
             if (sidecar != null && Onikiri.Cloud.CloudSavePolicy.SidecarAppliesTo(sidecar, uid))
                 return sidecar;
 
-            var created = Onikiri.Cloud.CloudSaveLocalState.NewFor(
-                uid, Onikiri.Cloud.CloudSaveSidecar.NewDeviceId());
-
-            Onikiri.Cloud.CloudSaveSidecar.Save(created);
-            return created;
+            // 71단계: 실기와 같은 문으로 만든다 - 이 실행의 기기 id, 디스크에 먼저
+            return Onikiri.Cloud.CloudSaveSidecar.CreateOwnedBy(uid);
         }
 
         private void RunSession(

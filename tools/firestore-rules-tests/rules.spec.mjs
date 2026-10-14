@@ -646,6 +646,95 @@ describe('단일 활성 기기 - 세대(generation)와 명시적 인수 (63단�
   });
 });
 
+// ------------------------------------- 71단계: 다른 uid의 사이드카를 만난 설치
+
+describe('다른 uid 사이드카 + 새 uid - 기기 id는 한 실행 안에서 하나다 (71단계)', () => {
+  // 70단계 실측: 자동 백업이 옛 uid의 사이드카를 되살리고, 앱은 새 익명 uid로 떴다.
+  // ME = 새 uid. 옛 uid의 문서는 OLD_UID 아래에 그대로 있어야 한다
+  const OLD_UID = 'player-old';
+  const DEVICE_OLD = '9'.repeat(32);
+  const DEVICE_STRAY = '8'.repeat(32);
+
+  async function seedOldUid() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'playerSaves', OLD_UID), envelope({
+        revision: 7, baseRevision: 6, deviceId: DEVICE_OLD, sessionId: SESSION_C,
+      }));
+      await setDoc(doc(db, 'playerSaveSessions', OLD_UID), {
+        sessionId: SESSION_C, deviceId: DEVICE_OLD, released: true, generation: 4,
+        takeoverSessionId: '', takeoverDeviceId: '',
+        heartbeatAt: Timestamp.fromMillis(Date.now() - 86_400_000),
+        takeoverAt: Timestamp.fromMillis(Date.now() - 86_400_000),
+      });
+    });
+  }
+
+  it('[70단계 재현] 같은 세션이 기기 id를 바꿔 갱신하면 거부된다', async () => {
+    // 부팅 게이트가 D1(실행마다 메모리에서 만든 값)으로 자리를 잡았다
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A })));
+
+    // 첫 커밋이 NewDeviceId()로 **다른** D2를 만들어 같은 세션을 갱신하려 했다.
+    // 클라이언트 판정은 Renew(세션 id 일치)지만 ownerRenew는 deviceId 불변을 요구한다
+    const takeoverAt = (await readRaw('playerSaveSessions')).takeoverAt;
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_STRAY, takeoverAt })));
+  });
+
+  it('첫 커밋이 게이트와 같은 기기 id로 세션을 이어 rev 1을 올린다', async () => {
+    await seedOldUid();
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A })));
+
+    const takeoverAt = (await readRaw('playerSaveSessions')).takeoverAt;
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_A, takeoverAt })));
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaves', ME),
+      envelope({ revision: 1, baseRevision: 0, sessionId: SESSION_A, deviceId: DEVICE_A })));
+
+    const saved = await readRaw('playerSaves');
+    assert.equal(saved.revision, 1);
+    assert.equal(saved.deviceId, DEVICE_A);
+  });
+
+  it('두 번째 부팅은 디스크의 같은 기기 id로 묻지 않고 이어받는다', async () => {
+    // 이전 실행이 release 없이 죽었다 (heartbeat 5초 전 - 살아 있다)
+    await seedSession({ sessionId: SESSION_A, deviceId: DEVICE_A, ageSeconds: 5, generation: 1 });
+
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_B, deviceId: DEVICE_A, generation: 2 })));
+  });
+
+  it('[70단계 재현] 기기 id가 실행마다 바뀌면 같은 폰이 자기 자리를 못 잇는다', async () => {
+    await seedSession({ sessionId: SESSION_A, deviceId: DEVICE_A, ageSeconds: 5, generation: 1 });
+
+    // 사이드카가 안 남아 새 D로 부팅 -> 클라는 AskTheHuman, 규칙도 그냥은 안 준다
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', ME),
+      sessionDoc({ sessionId: SESSION_B, deviceId: DEVICE_STRAY, generation: 2 })));
+  });
+
+  it('옛 uid의 문서는 읽지도 쓰지도 못하고, 흐름 뒤에도 그대로다', async () => {
+    await seedOldUid();
+    const before = await readRaw('playerSaves', OLD_UID);
+    const sessionBefore = await readRaw('playerSaveSessions', OLD_UID);
+
+    await assertFails(getDoc(doc(me(), 'playerSaves', OLD_UID)));
+    await assertFails(getDoc(doc(me(), 'playerSaveSessions', OLD_UID)));
+    await assertFails(setDoc(doc(me(), 'playerSaveSessions', OLD_UID),
+      sessionDoc({ sessionId: SESSION_A, deviceId: DEVICE_OLD, generation: 5 })));
+
+    // 새 uid의 정상 흐름
+    await assertSucceeds(setDoc(doc(me(), 'playerSaveSessions', ME), sessionDoc()));
+    await assertSucceeds(setDoc(doc(me(), 'playerSaves', ME), envelope()));
+
+    assert.deepEqual(await readRaw('playerSaves', OLD_UID), before);
+    assert.deepEqual(await readRaw('playerSaveSessions', OLD_UID), sessionBefore);
+  });
+});
+
 // ---------------------------------------------------------------- 랭킹 회귀
 
 describe('랭킹(scores) 회귀 - 54단계 계약은 그대로다', () => {

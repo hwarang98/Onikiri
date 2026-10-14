@@ -62,6 +62,7 @@ namespace Onikiri.Cloud
         {
             fetchOverride = null;
             LastPlan = CloudRecoveryPlan.WaitForServer;
+            BootEntries = 0;
         }
 #endif
 
@@ -82,17 +83,78 @@ namespace Onikiri.Cloud
             var session = UnityEngine.Object.FindFirstObjectByType<GameSession>();
             if (session != null && session.IsLoaded) session.Save();
 
-            try
-            {
-                if (File.Exists(SaveSystem.Path))
-                    File.Copy(SaveSystem.Path, PreRecoverBackupPath, true);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning(Tag + " 복구 전 백업 실패(계속 진행): " + exception.Message);
-            }
+            BackupLocalSave();
 
             return SaveSystem.Load();
+        }
+
+        // ---------------------------------------------------------------- 부팅 입구 (71단계)
+
+        /** 부팅 입구를 지난 횟수. 검사·진단이 "정확히 한 번"을 잰다 */
+        public static int BootEntries { get; private set; }
+
+        /**
+         * @brief **Recover의 두 번째 입구.** 부팅이 다른 uid의 사이드카를 만났다 (71단계).
+         *
+         * ## 무엇을 만났는가 - 70단계 실기
+         *
+         * 재설치하면 Android 자동 백업이 `files/`를 되살린다 - 세이브와 함께
+         * **옛 uid의 사이드카**가 돌아온다. 그런데 로그인은 돌아오지 않아 새 익명
+         * uid로 뜬다. 이것은 계정 복구(uid 교체)와 **같은 모양**이다: 이 기기의
+         * 로컬은 다른 계정의 사슬에서 왔고, 지금 계정의 서버와는 아무 관계도
+         * 증명되지 않았다. 그래서 새 판정을 만들지 않고 61단계 순서를 그대로 탄다.
+         *
+         *     ① 로컬을 `.prerecover`로, 옛 사이드카를 사이드카 `.prerecover`로 보존
+         *     ② 새 uid의 서버만 읽는다 - **부팅이 이미 읽었다.** 두 번 읽지 않는다
+         *     ③~⑤ `CloudSaveRecoveryPolicy.PlanFor`
+         *     ⑥ 옛 uid의 문서는 읽지도 쓰지도 않는다 (권한도 없다)
+         *
+         * ## 앱 안의 Recover와 다른 것 하나 - 상태는 부팅이 정한다
+         *
+         * 여기는 `ApplyBoot` **앞**이다. 상태·충돌 재료·사슬은 부팅의 `Finish`가
+         * 같은 사실로 이미 정한다 - 자기 사이드카가 없는 `Decide`와 `PlanFor`는
+         * 네 갈래 모두 같은 답을 낸다(UploadLocal↔③ · InSync↔④ · Conflict↔⑤ ·
+         * LocalOnly↔대기). 여기서 또 적으면 같은 일을 두 번 하게 된다. 특히 ④를
+         * `AdoptQuietly`로 곧바로 확정하면 62.1.1의 순서(**로컬 저장이 성공한 뒤에
+         * 사슬**)를 부팅에서 깨뜨린다 - 부팅의 `ArmChain`이 그 일을 맡는다.
+         *
+         * 여기가 하는 것은 갈래와 무관한 한 가지다: **이 uid의 사이드카를 디스크에
+         * 남긴다.** 기기 id가 거기 눌려야 다음 커밋과 다음 부팅이 같은 기기가 된다.
+         *
+         * @return 밟은 갈래. 서버를 못 봤으면 WaitForServer
+         */
+        public static CloudRecoveryPlan EnterAtBoot(string uid, SaveData local,
+                                                    CloudSaveFetchResult fetch, bool serverChecked)
+        {
+            BootEntries++;
+
+            // ① 덮이기 전의 한 벌. 이 입구는 사이드카를 바꾸므로 그 전에 남긴다
+            BackupLocalSave();
+
+            SaveData candidate = local ?? SaveData.NewGame();
+            CloudSaveStoreStatus status = serverChecked ? fetch.status : CloudSaveStoreStatus.Offline;
+
+            string localSha = CloudSaveFingerprint.StateHashOf(candidate);
+            string cloudSha = fetch.envelope != null ? fetch.envelope.stateSha256 : string.Empty;
+
+            CloudRecoveryPlan plan = CloudSaveRecoveryPolicy.PlanFor(status, localSha, cloudSha);
+            LastPlan = plan;
+
+            Debug.Log(Tag + " ★ 다른 uid의 사이드카 - 부팅 복구 판정 = " + plan + " (서버 " + status
+                      + " / 로컬 " + Short(localSha) + " / 서버지문 " + Short(cloudSha) + ")");
+
+            // 모든 갈래 공통. 옛 사이드카는 NewOwnedBy가 먼저 옆에 옮긴다
+            bool persisted = CloudSaveSidecar.CreateOwnedBy(uid) != null;
+            if (!persisted)
+                Debug.LogWarning(Tag + " 부팅 복구: 새 사이드카를 남기지 못했습니다. "
+                                 + "첫 커밋 준비가 다시 시도합니다(그 전에는 서버로 쓰지 않는다).");
+
+            // ③ 잃으면 이 계정의 첫 정본이 사라지는 순간이다. 120초를 기다리지 않는다.
+            // 올릴 스냅샷은 부팅의 첫 저장(BootWith → Save)이 세운다 - 방치 보상 뒤의 한 벌
+            if (plan == CloudRecoveryPlan.KeepLocalAsFirstRevision && persisted)
+                CloudSaveSync.RequestUrgent("다른 uid 사이드카 - 새 계정의 첫 업로드");
+
+            return plan;
         }
 
         /**
@@ -162,8 +224,8 @@ namespace Onikiri.Cloud
         /** ③ 새 계정의 첫 정본이 될 준비. 실제 revision 1은 다음 커밋이 만든다 */
         private static void KeepLocal(string uid, SaveData candidate)
         {
-            var sidecar = CloudSaveLocalState.NewFor(uid, CloudSaveSidecar.NewDeviceId());
-            if (sidecar == null || !CloudSaveSidecar.Save(sidecar))
+            // 71단계: 기기 id는 이 실행의 것 · 옛 uid의 사이드카는 옆에 남는다
+            if (CloudSaveSidecar.CreateOwnedBy(uid) == null)
             {
                 // sidecar가 디스크에 못 남으면 서버 쓰기도 없다(57단계 계약).
                 // 로컬 dirty로 남고 다음 커밋 준비에서 다시 만든다
@@ -180,7 +242,7 @@ namespace Onikiri.Cloud
         /** ④ 같은 기록. 서버 revision만 채택한다 - 쓰기도 물음도 없다 */
         private static void AdoptQuietly(string uid, CloudSaveEnvelope envelope)
         {
-            var sidecar = CloudSaveLocalState.NewFor(uid, CloudSaveSidecar.NewDeviceId());
+            var sidecar = CloudSaveSidecar.NewOwnedBy(uid);   // 71: 이 실행의 기기 id
 
             if (sidecar != null
                 && sidecar.MarkSynced(envelope.revision, envelope.payloadSha256,
@@ -202,6 +264,20 @@ namespace Onikiri.Cloud
         }
 
         // ---------------------------------------------------------------- 내부
+
+        /** ① 지금 디스크의 세이브를 `.prerecover`로. 최선의 노력이다 */
+        private static void BackupLocalSave()
+        {
+            try
+            {
+                if (File.Exists(SaveSystem.Path))
+                    File.Copy(SaveSystem.Path, PreRecoverBackupPath, true);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(Tag + " 복구 전 백업 실패(계속 진행): " + exception.Message);
+            }
+        }
 
         private static Task<CloudSaveFetchResult> Fetch(string uid)
         {
