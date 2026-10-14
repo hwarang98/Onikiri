@@ -120,15 +120,82 @@ namespace Onikiri.Cloud
 
         public static string StateHashOf(SaveData data)
         {
-            var normalized = Normalize(data);
-            if (normalized == null) return null;
-            return HashOf(Serialize(normalized));
+            return StateHashOfPayload(Serialize(data));
         }
 
-        /** 내려받은 봉투의 상태 지문을 직접 다시 계산한다 (서버 값과 대조용) */
+        /**
+         * @brief payload **원문**의 상태 지문. 시간성 세 필드만 글자 그대로 0으로 바꾼다.
+         *
+         * ## 71.1단계 - 옛 버전 세이브가 "손상"으로 막혔다
+         *
+         * 예전에는 payload를 **지금의** `SaveData`로 읽고 다시 직렬화해서 지문을 냈다.
+         * 같은 버전끼리는 문제가 없지만, v21이 올린 payload를 v23 클래스로 읽으면
+         * v22·v23에서 생긴 필드가 기본값으로 **붙어서** 문자열이 달라진다. 올린 쪽이
+         * 적은 지문과 영영 맞지 않아 `StateHashMismatch` → Blocked. 실기에서 운영
+         * 계정(v21, rev 1243)의 정상 세이브가 정확히 이렇게 막혔다(payload 해시는 일치).
+         *
+         * 원문에서 세 값만 바꾸면 **어느 버전이 만든 payload든** 그 버전이 계산한
+         * 값과 같다 - 예전 정의 `Serialize(Normalize(data))`와 결과가 같고(EditMode가
+         * 대조한다), 새 필드를 끼워 넣는 단계가 없다. 올리는 쪽도 이 함수를 지나
+         * 지문의 정의가 하나다.
+         *
+         * 세 필드 중 하나가 **두 번 이상** 나오거나 숫자가 아니면 null이다 -
+         * 모르는 모양을 "같은 상태"로 읽느니 검증 실패가 낫다(빈 지문은 SameState가
+         * 언제나 거부한다). 필드가 **없는** 것은 괜찮다 - 그 필드가 생기기 전 버전이다.
+         */
         public static string StateHashOfPayload(string payload)
         {
-            return StateHashOf(Deserialize(payload));
+            string normalized = NormalizePayloadText(payload);
+            return normalized == null ? null : HashOf(normalized);
+        }
+
+        /**
+         * 필드 -> 0의 표기. `JsonUtility`가 0을 쓰는 모양 그대로다
+         * (long은 "0", double은 "0.0") - 예전 정의가 실제로 만들던 글자와 같아야 한다.
+         */
+        private static readonly string[][] VolatileZeros =
+        {
+            new[] { "lastQuitUtcTicks", "0" },
+            new[] { "goldPerSecond", "0.0" },
+            new[] { "expPerSecond", "0.0" }
+        };
+
+        private const string JsonNumber = @"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?";
+
+        private static string NormalizePayloadText(string payload)
+        {
+            if (string.IsNullOrEmpty(payload)) return null;
+
+            string text = payload;
+            foreach (string[] field in VolatileZeros)
+            {
+                string key = "\"" + field[0] + "\":";
+
+                int keys = CountOf(text, key);
+                if (keys == 0) continue;
+                if (keys > 1) return null;
+
+                var pattern = new System.Text.RegularExpressions.Regex(
+                    System.Text.RegularExpressions.Regex.Escape(key) + JsonNumber
+                    + @"(?=[,}\]\s])");
+
+                if (pattern.Matches(text).Count != 1) return null;
+                text = pattern.Replace(text, key + field[1]);
+            }
+
+            return text;
+        }
+
+        private static int CountOf(string text, string needle)
+        {
+            int count = 0;
+            int index = text.IndexOf(needle, StringComparison.Ordinal);
+            while (index >= 0)
+            {
+                count++;
+                index = text.IndexOf(needle, index + needle.Length, StringComparison.Ordinal);
+            }
+            return count;
         }
 
         /** SHA-256 소문자 16진. 서버에도 같은 형식으로 적힌다 */
