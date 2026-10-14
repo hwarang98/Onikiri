@@ -1340,6 +1340,10 @@ namespace Onikiri.EditorTools
                     if (GUILayout.Button("무료 쿨 리셋", GUILayout.Width(96f)))
                         gacha.DebugResetFreePull();
 
+                    // 72단계 - 넘친 혼 정수 줄("혼 정수 초과 · 파편 +n"). 실제 뽑기로는 모든
+                    // 요도가 상한이어야 나와서, 결과 판에 견본 묶음만 세운다(지갑·파편 무변화)
+                    if (GUILayout.Button("넘침 견본 판", GUILayout.Width(96f))) ShowOverflowSample();
+
                     if (GUILayout.Button("뽑기 초기화", GUILayout.Width(96f)))
                     {
                         gacha.DebugReset();
@@ -1515,6 +1519,33 @@ namespace Onikiri.EditorTools
          * 여기서는 이 배너의 지금 레벨 값도 본다. 그것을 모르면 "표에 2.1%인데
          * 왜 이만큼 나오나"를 답할 수 없다.
          */
+        /** 결과 판에 넘침 2장 + 파편 8장 견본을 세운다 (72단계). 시스템 상태는 그대로다 */
+        private static void ShowOverflowSample()
+        {
+            var popup = Object.FindFirstObjectByType<Onikiri.UI.GachaResultPopup>(FindObjectsInactive.Include);
+            if (popup == null || !Application.isPlaying) { Debug.LogWarning("[Onikiri] 플레이 중에 결과 판이 있어야 한다"); return; }
+
+            var results = new System.Collections.Generic.List<Onikiri.Progression.GachaSystem.PullResult>();
+            for (int i = 0; i < Onikiri.Progression.GachaCurve.TenPullCount; i++)
+            {
+                var outcome = i % 5 == 2 ? Onikiri.Progression.GachaCurve.Outcome.SoulEssence
+                                         : Onikiri.Progression.GachaCurve.Outcome.ShardSmall;
+                results.Add(new Onikiri.Progression.GachaSystem.PullResult
+                {
+                    Outcome = outcome,
+                    Grade = Onikiri.Progression.GachaCurve.GradeFor(outcome),
+                    Shards = outcome == Onikiri.Progression.GachaCurve.Outcome.SoulEssence
+                        ? Onikiri.Progression.YodoCurve.ShardsPerOverflowSoul
+                        : Onikiri.Progression.GachaCurve.ShardsFor(outcome),
+                    BladeIndex = -1,
+                    LegendaryIndex = -1
+                });
+            }
+
+            for (var t = popup.transform; t != null; t = t.parent) t.gameObject.SetActive(true);
+            popup.Show(results, Onikiri.Progression.YodoSystem.Instance);
+        }
+
         private static string[] SkillGachaTableLines(int summonLevel)
         {
             var lines = new System.Collections.Generic.List<string>();
@@ -2382,6 +2413,15 @@ namespace Onikiri.EditorTools
                     character.AddExp(character.ExpRequired * BigDouble.FromDouble(0.5));
                 if (GUILayout.Button("+1렙 미청구 (맥동)"))
                     character.AddExp(character.ExpRequired);
+
+                // 72단계 - 세 자리 대기에서 버튼이 "레벨업 99+"로 줄어드는지(70단계 실기 272)
+                if (GUILayout.Button("+272렙 미청구 (99+)"))
+                {
+                    var total = BigDouble.Zero;
+                    for (int i = 0; i < 272; i++)
+                        total = total + Onikiri.Progression.ExpCurve.RequiredForLevel(character.Level + character.PendingLevelUps + i);
+                    character.AddExp(total);
+                }
 
                 // 알림 점의 지금 상태. 화면의 점과 이 값이 어긋나면 배지가
                 // CharacterLevel.Changed를 놓치고 있다는 뜻이다

@@ -197,6 +197,12 @@ namespace Onikiri.DevTools
             data.yodoShards = row.Shards;
             data.gachaTotalPulls = (int)row.GachaPulls;
 
+            // ---- 소환 경험치(v23, 68단계). **0으로 찍는다** - NewGame의 값에 기대지
+            // 않고 손으로 적는다. 다른 v23 필드는 전부 여기서 직접 쓰는데 이 둘만
+            // 빠져 있었다(70단계 관찰). 확률의 성장이지 화력이 아니라 0이다(NotModelled)
+            data.yodoSummonXp = 0L;
+            data.skillSummonXp = 0L;
+
             var legend = LegendaryYodoCatalog.Blades;
             data.legendaryYodoIds = new string[legend.Length];
             data.legendaryYodoCopies = new int[legend.Length];
@@ -351,6 +357,8 @@ namespace Onikiri.DevTools
                         ? save.legendaryYodoCopies[i] : 0);
 
             Int(bad, "파편", row.Shards, (int)save.yodoShards);
+            Int(bad, "요도 소환 경험치", 0, (int)save.yodoSummonXp);
+            Int(bad, "오의 소환 경험치", 0, (int)save.skillSummonXp);
             Int(bad, "보석 잔액", row.GemsEarned - row.GemsSpent, (int)save.gems);
 
             /**

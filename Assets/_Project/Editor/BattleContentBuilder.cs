@@ -1912,6 +1912,7 @@ namespace Onikiri.EditorTools
                 RequireReference(hudSo, "levelUpRoot", problems);
                 RequireReference(hudSo, "levelUpButton", problems);
                 RequireReference(hudSo, "levelUpLabel", problems);
+                RequireReference(hudSo, "levelUpCaptionFont", problems);   // 72단계 99+ 폴백
 
                 // 패널 헤더의 "Lv · EXP" 라벨(개선안 v2). 빠지면 헤더가
                 // 빌더의 자리표시 문구를 영영 보여준다
@@ -3092,6 +3093,8 @@ namespace Onikiri.EditorTools
                 levelUpRoot != null ? levelUpRoot.gameObject : null;
             so.FindProperty("levelUpButton").objectReferenceValue = button;
             so.FindProperty("levelUpLabel").objectReferenceValue = levelUpLabel;
+            // 72단계 - "레벨업 99+"가 칸(210)을 넘으면 캡션 아틀라스로 내려 쓴다
+            so.FindProperty("levelUpCaptionFont").objectReferenceValue = UiFonts.Caption;
             so.FindProperty("headerLabel").objectReferenceValue = headerLabel;
             so.FindProperty("levelPrefix").stringValue = "Lv.";
             so.ApplyModifiedPropertiesWithoutUndo();

@@ -5,7 +5,8 @@
         "Onikiri.Runtime",
         "Onikiri.DevTools",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"
