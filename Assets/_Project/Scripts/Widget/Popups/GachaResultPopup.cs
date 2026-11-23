@@ -613,6 +613,7 @@ namespace Onikiri.UI
             EnsureScratch();
 
             int shards = 0;
+            int overflowShards = 0;
             var counts = new int[GachaCurve.GradeCount];
             var noteLines = new List<string>();
             int shown = Mathf.Min(results.Count, tiles.Length);
@@ -631,13 +632,48 @@ namespace Onikiri.UI
                 // 것을 보여주고, 무엇이 무엇이 됐는지는 이 줄이 말한다
                 // (44단계의 "버려지는 드랍 0"을 문구로 지키는 자리)
                 if (result.Downgraded) noteLines.Add(DowngradePrefix + TextFor(result, yodo));
+                else if (IsEssenceOverflow(result)) overflowShards += result.Shards;
             }
+
+            // 넘침은 하락이 아니다(68단계) - 다른 문구로, 묶음당 한 줄
+            if (overflowShards > 0) noteLines.Add(OverflowNote(overflowShards));
 
             Render(shown, Headline(shards, counts), TrimNotes(noteLines), summonLevelUp);
         }
 
         /** 미끄러짐 줄의 머리. 47단계의 "천장!" 자리 - 68단계에 천장이 사라졌다 */
         public const string DowngradePrefix = "등급 하락 · ";
+
+        /**
+         * @brief 넘친 혼 정수 줄의 머리 (72단계). "등급 하락"과 **다른 말**이다.
+         *
+         * 희귀(★3) 타일에 "+40"만 서 있으면 "희귀인데 왜 파편?"으로 읽혔다(70단계
+         * 실기). 갈 곳 없는 혼 정수가 파편이 되는 것은 68단계 규칙상 하락이 아니라
+         * 넘침이다(GachaSystem.GrantEssence). "넘"이 아틀라스(472자)에 없어 "초과"로 쓴다.
+         */
+        public const string OverflowPrefix = "혼 정수 초과 · 파편 +";
+
+        /** 이 묶음에서 넘친 혼 정수가 된 파편의 합 한 줄. 여러 장이어도 한 줄이다 */
+        public static string OverflowNote(int shards)
+        {
+            return OverflowPrefix + shards;
+        }
+
+        /** 갈 곳 없는 혼 정수(★3)가 파편이 됐다. 하락이 아니다 */
+        public static bool IsEssenceOverflow(GachaSystem.PullResult result)
+        {
+            return result.Outcome == GachaCurve.Outcome.SoulEssence && result.BladeIndex < 0
+                && !result.Downgraded && result.Shards > 0;
+        }
+
+        /** 지금 판에 적힌 노트 줄들(빈 칸 제외). 검사가 읽는다 */
+        public List<string> NoteTexts()
+        {
+            var lines = new List<string>();
+            foreach (var note in notes)
+                if (note != null && !string.IsNullOrEmpty(note.text)) lines.Add(note.text);
+            return lines;
+        }
 
         private Sprite YodoIcon(GachaSystem.PullResult result)
         {

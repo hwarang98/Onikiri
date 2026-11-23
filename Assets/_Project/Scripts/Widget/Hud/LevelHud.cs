@@ -40,6 +40,16 @@ namespace Onikiri.UI
         [SerializeField] private TMP_Text levelUpLabel;
 
         /**
+         * 버튼 글자가 칸 폭을 넘을 때 내려 쓰는 캡션 글꼴(33) - 72단계. "레벨업 99+"는
+         * 44pt로 231px라 칸(210)을 넘는다("레벨업 272"와 같은 폭이다). 래스터 글꼴이라
+         * 크기를 줄이지 않고 구운 다른 배수의 아틀라스로 갈아 끼운다(GachaResultPopup 제목과
+         * 같은 처리). 비면 내리지 않는다
+         */
+        [SerializeField] private TMP_FontAsset levelUpCaptionFont;
+        private TMP_FontAsset levelUpFont;
+        private float levelUpFontSize;
+
+        /**
          * @brief 성장 패널 헤더의 "Lv.56 · EXP 72%" 라벨 (개선안 v2).
          *
          * 레벨업 버튼이 전투 화면을 떠나 패널 헤더로 들어오면서, 버튼 옆에
@@ -132,6 +142,47 @@ namespace Onikiri.UI
             return (hundredths / 100d).ToString("F2", CultureInfo.InvariantCulture) + "%";
         }
 
+        /** 개수 표시의 상한. 칸 폭이 두 자리까지다 - 넘으면 "99+" (72단계) */
+        public const int LevelUpCountCap = 99;
+
+        /**
+         * @brief 레벨업 버튼 글자. 하나면 "레벨업", 여럿이면 "레벨업 n", 100 이상이면 "레벨업 99+".
+         *
+         * 세 자리("레벨업 272")가 빨간 칸 밖으로 넘쳤다(70단계 실기). 칸을 넓히지
+         * 않고 글자를 줄인다 - 버튼이 말해야 하는 것은 "아직 많다"이지 정확한 개수가
+         * 아니다(정확한 값은 누를 때마다 줄어드는 것으로 보인다). **표시만이다** -
+         * 쌓인 개수(`PendingLevelUps`)는 그대로다.
+         */
+        public static string LevelUpText(int pending)
+        {
+            if (pending <= 1) return "레벨업";
+            return pending > LevelUpCountCap ? "레벨업 " + LevelUpCountCap + "+" : "레벨업 " + pending;
+        }
+
+        /** 칸에 들어가면 본 글꼴, 넘치면 캡션으로. 칸 폭은 그대로다 */
+        private void SetLevelUpText(string text)
+        {
+            if (levelUpFont == null) { levelUpFont = levelUpLabel.font; levelUpFontSize = levelUpLabel.fontSize; }
+
+            levelUpLabel.font = levelUpFont;
+            levelUpLabel.fontSize = levelUpFontSize;
+            levelUpLabel.text = text;
+
+            if (levelUpCaptionFont == null) return;
+            float room = levelUpLabel.rectTransform.rect.width;
+            if (room > 0f && levelUpLabel.GetPreferredValues(text).x > room)
+            {
+                levelUpLabel.font = levelUpCaptionFont;
+                levelUpLabel.fontSize = PixelFontSizes.GalmuriCaption;
+            }
+        }
+
+        /** 레벨업 글자가 지금 캡션으로 내려가 있는가 (검사용) */
+        public bool LevelUpDemoted
+        {
+            get { return levelUpLabel != null && levelUpCaptionFont != null && levelUpLabel.font == levelUpCaptionFont; }
+        }
+
         private void OnLevelUpClicked()
         {
             if (character != null) character.TryLevelUp();
@@ -162,7 +213,7 @@ namespace Onikiri.UI
                 levelUpRoot.SetActive(pending > 0);
 
             if (levelUpLabel != null && pending > 0)
-                levelUpLabel.text = pending > 1 ? "레벨업 " + pending : "레벨업";
+                SetLevelUpText(LevelUpText(pending));
 
             bool shouldPulse = pending > 0;
             if (pulsing && !shouldPulse && expFill != null) expFill.color = fillBase;

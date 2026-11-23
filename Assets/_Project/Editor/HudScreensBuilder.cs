@@ -187,6 +187,8 @@ namespace Onikiri.EditorTools
             var later = CreateRowButton(EnsureRow(panel, "Later", 5), font,
                                         "Button", "나중에 결정", 400f);
 
+            FitWindowToContent(panel, RowBottom(5));
+
             var conflict = root.gameObject.GetComponent<Onikiri.UI.CloudConflictPanel>();
             if (conflict == null) conflict = root.gameObject.AddComponent<Onikiri.UI.CloudConflictPanel>();
 
@@ -255,10 +257,15 @@ namespace Onikiri.EditorTools
             var confirm = CreateRowButton(cancelRect.parent as RectTransform, font,
                                           "Confirm", "이 기기로 이어하기", 360f);
 
-            var retryRow = EnsureRow(panel, "Retry", 4);
+            // 다시 확인은 취소·이어하기와 **같은 줄**이다(72단계). 둘은 함께 서는
+            // 일이 없어서(CloudTakeoverPanel.Draw), 한 줄 아래에 두면 평소 화면에
+            // 빈 줄 하나가 그대로 여백으로 남았다
+            var retryRow = EnsureRow(panel, "Retry", 3);
             retryRow.GetComponent<Image>().enabled = false;   // 버튼이 숨으면 띠도 숨는다
 
             var retry = CreateRowButton(retryRow, font, "Button", "다시 확인", 360f);
+
+            FitWindowToContent(panel, RowBottom(3));
 
             var takeover = root.gameObject.GetComponent<Onikiri.UI.CloudTakeoverPanel>();
             if (takeover == null)
@@ -293,6 +300,8 @@ namespace Onikiri.EditorTools
 
             var confirm = CreateRowButton(EnsureRow(panel, "Confirm", 2), font,
                                           "Button", "확인", 360f);
+
+            FitWindowToContent(panel, RowBottom(2));
 
             var evicted = root.gameObject.GetComponent<Onikiri.UI.CloudEvictedPanel>();
             if (evicted == null)
@@ -1061,6 +1070,68 @@ namespace Onikiri.EditorTools
             UiSkin.ApplyPanel(image, UiSkin.Row);
 
             return rect;
+        }
+
+        /** index번째 행의 아래 끝 = 창 위에서 px. EnsureRow와 같은 식이다 */
+        private static float RowBottom(int index)
+        {
+            return TopPadding + HeaderHeight + 8f + index * (RowHeight + RowGap) + RowHeight;
+        }
+
+        /** 마지막 행 아래 여백. 위쪽(머리글 자리 88)보다 작게 - 창 아래가 비어 보이지 않을 만큼 */
+        public const float WindowBottomPadding = 48f;
+
+        /**
+         * @brief 창 높이를 **내용에 맞춘 고정 px**로 묶는다 (72단계).
+         *
+         * PopupBuilder의 높이는 세이프 영역의 **비율**이라 긴 화면(22:9)일수록 창이
+         * 길어져 버튼 아래가 크게 비었다(70단계 실기 `a02_qa_boot`). 69단계 확률
+         * 팝업이 같은 문제를 같은 방법으로 풀었다(ShopPanelBuilder.BuildRatePopup).
+         * 폭은 그대로다 - 좌우 여백(offset x)을 건드리지 않는다.
+         */
+        private static void FitWindowToContent(RectTransform window, float contentBottom)
+        {
+            float height = contentBottom + WindowBottomPadding;
+            window.anchorMin = new Vector2(window.anchorMin.x, 0.5f);
+            window.anchorMax = new Vector2(window.anchorMax.x, 0.5f);
+            window.offsetMin = new Vector2(window.offsetMin.x, -height * 0.5f);
+            window.offsetMax = new Vector2(window.offsetMax.x, height * 0.5f);
+        }
+
+        /**
+         * @brief 열린 씬에서 클라우드 팝업 셋만 다시 짓는다 (72단계). 저장은 부르는 쪽이 한다.
+         *
+         * 충돌 화면은 설정 화면만 참조하므로 배선을 다시 건다(WireConflictIntoSettings).
+         * 나머지 씬은 건드리지 않는다 - `Build()` 전체가 참조를 끊는 이유는
+         * BuildSessionPanelsBatch 주석 그대로다.
+         */
+        public static void RebuildCloudPopups()
+        {
+            var safeArea = MainSceneBuilder.FindBand(MainSceneBuilder.SafeAreaName);
+            if (safeArea == null)
+            {
+                Debug.LogError("[Onikiri] SafeArea missing - run Build Main Scene first.");
+                return;
+            }
+
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GalmuriFontPath);
+            int index = safeArea.Find(ConflictPanelName) != null
+                ? safeArea.Find(ConflictPanelName).GetSiblingIndex() : -1;
+            int takeoverIndex = safeArea.Find(TakeoverPanelName) != null
+                ? safeArea.Find(TakeoverPanelName).GetSiblingIndex() : -1;
+            int evictedIndex = safeArea.Find(EvictedPanelName) != null
+                ? safeArea.Find(EvictedPanelName).GetSiblingIndex() : -1;
+
+            BuildCloudConflictPanel(safeArea, font);
+            WireConflictIntoSettings(safeArea);
+            BuildCloudSessionPanels(safeArea, font);
+
+            // 형제 순서를 되돌린다 - 다시 지으면 맨 끝으로 가서 다른 팝업 위로 올라간다
+            if (index >= 0) safeArea.Find(ConflictPanelName).SetSiblingIndex(index);
+            if (takeoverIndex >= 0) safeArea.Find(TakeoverPanelName).SetSiblingIndex(takeoverIndex);
+            if (evictedIndex >= 0) safeArea.Find(EvictedPanelName).SetSiblingIndex(evictedIndex);
+
+            Debug.Log("[Onikiri] Cloud popups rebuilt (conflict / takeover / evicted).");
         }
 
         private static void StretchInside(TMP_Text label, float sidePadding, float anchorMaxX)
