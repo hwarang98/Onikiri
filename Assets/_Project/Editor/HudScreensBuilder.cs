@@ -138,6 +138,11 @@ namespace Onikiri.EditorTools
          *
          * 이름·수치 줄은 정적 폰트로 충분하다 - 층수·레벨·전직명·보석은 전부
          * 우리가 짓는 글자다(남이 지은 이름이 없다).
+         *
+         * **카드는 머리 위 · 요약 아래 두 줄이다**(73단계). 한 줄에 가로로
+         * 나눠 두었더니 요약이 길어질 때 머리를 덮었다(71.1 §8.4-2, 72 §4-2).
+         * 요약은 값에서 나오고 상한이 없어서 - 전직 이름만 해도 `로닌`(66px)과
+         * `진 데몬사무라이`(240px)가 174px 차이다 - 폭 배분으로는 막을 수 없다.
          */
         private static void BuildCloudConflictPanel(Transform safeArea, TMP_FontAsset font)
         {
@@ -146,33 +151,33 @@ namespace Onikiri.EditorTools
                                             dimIsInert: true);
             BuildTitle(panel, font, "기록 선택 필요");
 
-            // -- 현재 기기 카드
-            var localRow = EnsureRow(panel, "LocalCard", 0);
+            // -- 현재 기기 카드. 머리 위 · 요약 아래로 **두 칸**을 먹는다 (73단계)
+            var localRow = EnsureRow(panel, "LocalCard", 0, 2);
             var localHead = CreateLabel(localRow, font, "Head", TextAlignmentOptions.Left);
-            StretchInside(localHead, 24f, 0.45f);
+            StackInside(localHead, 24f, 0.5f, 1f);
             localHead.text = "현재 기기 기록";
 
-            var localSummary = CreateLabel(localRow, font, "Summary", TextAlignmentOptions.Right);
-            StretchInside(localSummary, 24f, 1f);
+            var localSummary = CreateLabel(localRow, font, "Summary", TextAlignmentOptions.Left);
+            StackInside(localSummary, 24f, 0f, 0.5f);
             UiFonts.Demote(localSummary);
             localSummary.text = "최고 1층 · Lv.1 · 로닌 · 보석 0";
 
-            var useLocal = CreateRowButton(EnsureRow(panel, "LocalUse", 1), font,
+            var useLocal = CreateRowButton(EnsureRow(panel, "LocalUse", 2), font,
                                            "Button", "현재 기기 기록 사용", 560f);
 
             // -- 클라우드 카드
-            var cloudRow = EnsureRow(panel, "CloudCard", 2);
+            var cloudRow = EnsureRow(panel, "CloudCard", 3, 2);
             var cloudHead = CreateLabel(cloudRow, font, "Head", TextAlignmentOptions.Left);
-            StretchInside(cloudHead, 24f, 0.45f);
+            StackInside(cloudHead, 24f, 0.5f, 1f);
             cloudHead.text = "클라우드 기록";
 
-            var cloudSummary = CreateLabel(cloudRow, font, "Summary", TextAlignmentOptions.Right);
-            StretchInside(cloudSummary, 24f, 1f);
+            var cloudSummary = CreateLabel(cloudRow, font, "Summary", TextAlignmentOptions.Left);
+            StackInside(cloudSummary, 24f, 0f, 0.5f);
             UiFonts.Demote(cloudSummary);
             cloudSummary.text = "최고 1층 · Lv.1 · 로닌 · 보석 0";
 
             // 서버 저장 시각. 판정이 아니라 사람의 기억을 돕는 줄이다
-            var stampRow = EnsureRow(panel, "CloudStamp", 3);
+            var stampRow = EnsureRow(panel, "CloudStamp", 5);
             stampRow.GetComponent<Image>().enabled = false;
             var stamp = CreateLabel(stampRow, font, "Label", TextAlignmentOptions.Right);
             StretchInside(stamp, 24f, 1f);
@@ -180,14 +185,14 @@ namespace Onikiri.EditorTools
             stamp.color = DimColor;
             stamp.text = string.Empty;
 
-            var useCloud = CreateRowButton(EnsureRow(panel, "CloudUse", 4), font,
+            var useCloud = CreateRowButton(EnsureRow(panel, "CloudUse", 6), font,
                                            "Button", "클라우드 기록 사용", 560f);
 
             // -- 보류. 로컬 플레이는 계속, 클라우드 쓰기만 멈춘다
-            var later = CreateRowButton(EnsureRow(panel, "Later", 5), font,
+            var later = CreateRowButton(EnsureRow(panel, "Later", 7), font,
                                         "Button", "나중에 결정", 400f);
 
-            FitWindowToContent(panel, RowBottom(5));
+            FitWindowToContent(panel, RowBottom(7));
 
             var conflict = root.gameObject.GetComponent<Onikiri.UI.CloudConflictPanel>();
             if (conflict == null) conflict = root.gameObject.AddComponent<Onikiri.UI.CloudConflictPanel>();
@@ -1052,8 +1057,15 @@ namespace Onikiri.EditorTools
             label.color = DimColor;
         }
 
-        /** index번째 행. 머리글 아래에서 위에서 아래로 쌓인다 */
-        private static RectTransform EnsureRow(RectTransform panel, string name, int index)
+        /**
+         * @brief index번째 행. 머리글 아래에서 위에서 아래로 쌓인다.
+         *
+         * `span`은 **이 행이 먹는 칸 수**다(73단계). 두 칸을 먹는 행은 칸 사이
+         * 간격까지 흡수하므로, 다음 행은 `index + span`에 선다 - 그래야
+         * `RowBottom`의 식이 그대로 맞는다.
+         */
+        private static RectTransform EnsureRow(RectTransform panel, string name, int index,
+                                               int span = 1)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(panel, false);
@@ -1062,7 +1074,7 @@ namespace Onikiri.EditorTools
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(-SidePadding * 2f, RowHeight);
+            rect.sizeDelta = new Vector2(-SidePadding * 2f, RowSpanHeight(span));
             rect.anchoredPosition = new Vector2(0f,
                 -(TopPadding + HeaderHeight + 8f + index * (RowHeight + RowGap)));
 
@@ -1070,6 +1082,12 @@ namespace Onikiri.EditorTools
             UiSkin.ApplyPanel(image, UiSkin.Row);
 
             return rect;
+        }
+
+        /** span칸을 먹는 행의 높이. 칸 사이 간격도 제 몫으로 삼킨다 */
+        private static float RowSpanHeight(int span)
+        {
+            return span * RowHeight + (span - 1) * RowGap;
         }
 
         /** index번째 행의 아래 끝 = 창 위에서 px. EnsureRow와 같은 식이다 */
@@ -1132,6 +1150,26 @@ namespace Onikiri.EditorTools
             if (evictedIndex >= 0) safeArea.Find(EvictedPanelName).SetSiblingIndex(evictedIndex);
 
             Debug.Log("[Onikiri] Cloud popups rebuilt (conflict / takeover / evicted).");
+        }
+
+        /**
+         * @brief 라벨을 행의 **세로 한 칸**에 둔다 (73단계).
+         *
+         * `StretchInside`는 가로를 나눠 쓰므로 두 라벨이 같은 줄에 선다. 글자가
+         * 자라면 서로를 덮는데, **폭으로는 막을 수 없다** - 요약(층·레벨·전직
+         * 이름·보석)은 길이가 값에 따라 변하고 상한이 없다. 세로로 나누면
+         * 겹침이 **구조적으로** 불가능해지고, 넘치는 글자는 Ellipsis가 제 칸
+         * 안에서 자른다.
+         */
+        private static void StackInside(TMP_Text label, float sidePadding,
+                                        float anchorMinY, float anchorMaxY)
+        {
+            var rect = (RectTransform)label.transform;
+            rect.anchorMin = new Vector2(0f, anchorMinY);
+            rect.anchorMax = new Vector2(1f, anchorMaxY);
+            rect.offsetMin = new Vector2(sidePadding, 0f);
+            rect.offsetMax = new Vector2(-sidePadding, 0f);
+            label.overflowMode = TextOverflowModes.Ellipsis;
         }
 
         private static void StretchInside(TMP_Text label, float sidePadding, float anchorMaxX)
